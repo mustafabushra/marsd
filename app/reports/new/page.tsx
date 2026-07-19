@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
-import Textarea from '@/components/Textarea'
 import Card from '@/components/Card'
 import Alert from '@/components/Alert'
 import { ArrowRight, Star, AlertCircle, Loader } from 'lucide-react'
@@ -13,7 +12,6 @@ import { apiClient } from '@/lib/api'
 
 interface ReportFormData {
   companyId: string
-  companyName?: string
   rating: number
   title: string
   description: string
@@ -38,10 +36,8 @@ export default function AddReportPage() {
   const [selectedRating, setSelectedRating] = useState(3)
 
   const {
-    control,
     register,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<ReportFormData>({
     defaultValues: {
@@ -51,8 +47,6 @@ export default function AddReportPage() {
       description: '',
     },
   })
-
-  const companyId = watch('companyId')
 
   useEffect(() => {
     fetchCompanies()
@@ -101,7 +95,6 @@ export default function AddReportPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-7">
-      {/* Header */}
       <div className="mb-8">
         <button
           onClick={() => router.back()}
@@ -131,7 +124,6 @@ export default function AddReportPage() {
 
       <Card className="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Company Selection */}
           <div>
             <label className="block text-sm font-600 text-slate-900 mb-2">
               اختر الشركة <span className="text-red-600">*</span>
@@ -159,7 +151,6 @@ export default function AddReportPage() {
             )}
           </div>
 
-          {/* Rating */}
           <div>
             <label className="block text-sm font-600 text-slate-900 mb-2">
               التقييم <span className="text-red-600">*</span>
@@ -169,10 +160,7 @@ export default function AddReportPage() {
                 <button
                   key={star}
                   type="button"
-                  onClick={() => {
-                    setSelectedRating(star)
-                    register('rating').onChange({ target: { value: star } })
-                  }}
+                  onClick={() => setSelectedRating(star)}
                   className="transition-transform hover:scale-110"
                 >
                   <Star
@@ -185,7 +173,6 @@ export default function AddReportPage() {
             <input type="hidden" {...register('rating')} value={selectedRating} />
           </div>
 
-          {/* Title */}
           <div>
             <label className="block text-sm font-600 text-slate-900 mb-2">
               عنوان التقرير <span className="text-red-600">*</span>
@@ -197,7 +184,6 @@ export default function AddReportPage() {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-sm font-600 text-slate-900 mb-2">
               التفاصيل <span className="text-red-600">*</span>
@@ -213,46 +199,33 @@ export default function AddReportPage() {
             )}
           </div>
 
-          {/* Deal Information */}
           <div className="border-t border-slate-200 pt-6">
             <p className="text-sm font-600 text-slate-900 mb-4">معلومات العقد (اختياري)</p>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-500 text-slate-700 mb-1">
-                  قيمة الصفقة
-                </label>
+                <label className="block text-sm font-500 text-slate-700 mb-1">قيمة الصفقة</label>
                 <Input
                   type="number"
                   placeholder="أدخل المبلغ"
                   {...register('dealAmount')}
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-500 text-slate-700 mb-1">
-                  تاريخ الصفقة
-                </label>
+                <label className="block text-sm font-500 text-slate-700 mb-1">تاريخ الصفقة</label>
                 <Input
                   type="date"
                   {...register('dealDate')}
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-500 text-slate-700 mb-1">
-                  اسم جهة التواصل
-                </label>
+                <label className="block text-sm font-500 text-slate-700 mb-1">اسم جهة التواصل</label>
                 <Input
                   placeholder="اسم الشخص المسؤول"
                   {...register('contactName')}
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-500 text-slate-700 mb-1">
-                  البريد الإلكتروني
-                </label>
+                <label className="block text-sm font-500 text-slate-700 mb-1">البريد الإلكتروني</label>
                 <Input
                   type="email"
                   placeholder="البريد الإلكتروني"
@@ -262,7 +235,6 @@ export default function AddReportPage() {
             </div>
           </div>
 
-          {/* Form Actions */}
           <div className="flex gap-3 pt-6 border-t border-slate-200">
             <Button
               type="button"
