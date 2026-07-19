@@ -285,18 +285,6 @@ export default function AddReportPage() {
       </Card>
     </div>
   )
-}
-            label="نوع التقرير"
-            name="type"
-            value={formData.type}
-            onChange={handleChange}
-            options={[
-              { value: 'positive', label: '✓ إيجابي - تجربة جيدة' },
-              { value: 'negative', label: '✗ سلبي - تجربة سيئة' },
-              { value: 'neutral', label: '○ محايد - تجربة عادية' },
-            ]}
-            required
-          />
 
           {/* Rating */}
           <Select
