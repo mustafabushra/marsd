@@ -5,7 +5,7 @@ import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
 import Dashboard from '@/components/Dashboard'
 
-export default function Home() {
+export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
