@@ -56,7 +56,8 @@ export default function AddReportPage() {
     try {
       setCompaniesLoading(true)
       const response = await apiClient.getCompanies({ limit: 100 })
-      setCompanies(response?.data || [])
+      const data = (response as any)?.data || []
+      setCompanies(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to fetch companies:', err)
       setError('فشل في تحميل قائمة الشركات')

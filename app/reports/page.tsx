@@ -40,7 +40,8 @@ export default function ReportsPage() {
       setLoading(true)
       setError(null)
       const response = await apiClient.getReports({ limit: 50 })
-      setReports(response?.data || [])
+      const data = (response as any)?.data || []
+      setReports(Array.isArray(data) ? data : [])
     } catch (err) {
       setError('فشل في تحميل التقارير')
       console.error('Failed to fetch reports:', err)

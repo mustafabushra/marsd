@@ -46,7 +46,8 @@ export default function CompaniesPage() {
         page,
         limit: 20,
       })
-      setCompanies(response?.data || [])
+      const data = (response as any)?.data || []
+      setCompanies(Array.isArray(data) ? data : [])
     } catch (err) {
       setError('فشل في تحميل الشركات. يرجى المحاولة مرة أخرى.')
       console.error('Failed to fetch companies:', err)

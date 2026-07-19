@@ -60,13 +60,17 @@ export default function Dashboard() {
       // Fetch watchlist
       const watchlistRes = await apiClient.getWatchlist()
 
+      const companiesData = companiesRes as any
+      const subscriptionData = subscriptionRes as any
+      const watchlistData = watchlistRes as any
+
       setStats({
-        totalCompanies: companiesRes?.total || 1250,
+        totalCompanies: companiesData?.total || 1250,
         avgTrustScore: 72,
         pendingReports: 45,
         approvedReports: 892,
-        userSubscriptions: subscriptionRes?.planId ? 1 : 0,
-        activeWatchlists: watchlistRes?.length || 0,
+        userSubscriptions: subscriptionData?.planId ? 1 : 0,
+        activeWatchlists: Array.isArray(watchlistData) ? watchlistData.length : 0,
         loading: false,
         error: null,
       })
@@ -85,12 +89,13 @@ export default function Dashboard() {
 
       // Fetch recent activity
       const reportsRes = await apiClient.getReports({ limit: 5 })
+      const reportsData = ((reportsRes as any)?.data || []) as any[]
 
-      const feedItems: ActivityFeed[] = (reportsRes?.data || []).map((report: any) => ({
-        id: report.id,
+      const feedItems: ActivityFeed[] = reportsData.map((report: any) => ({
+        id: report.id || '',
         type: 'report',
-        title: `تقرير جديد عن ${report.companyName}`,
-        timestamp: report.createdAt,
+        title: `تقرير جديد عن ${report.companyName || 'شركة'}`,
+        timestamp: report.createdAt || new Date().toISOString(),
         company: report.companyName,
       }))
 

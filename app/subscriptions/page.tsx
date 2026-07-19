@@ -97,24 +97,26 @@ export default function SubscriptionsPage() {
 
       // Fetch current subscription
       const subscription = await apiClient.getUserSubscription()
-      if (subscription) {
+      const sub = subscription as any
+      if (sub) {
         setCurrentSubscription({
-          planId: subscription.planId,
-          planName: subscription.planName || 'مجاني',
-          startDate: subscription.startDate || new Date().toISOString(),
-          endDate: subscription.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          status: subscription.status || 'active',
-          queriesUsed: subscription.queriesUsed || 2,
-          queriesLimit: subscription.queriesLimit || 5,
+          planId: sub.planId || 'free',
+          planName: sub.planName || 'مجاني',
+          startDate: sub.startDate || new Date().toISOString(),
+          endDate: sub.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          status: sub.status || 'active',
+          queriesUsed: sub.queriesUsed || 2,
+          queriesLimit: sub.queriesLimit || 5,
         })
       }
 
       // Fetch available plans
       const plansRes = await apiClient.getSubscriptionPlans()
-      if (plansRes?.data) {
+      const plansData = (plansRes as any)?.data || []
+      if (plansData && Array.isArray(plansData) && plansData.length > 0) {
         const updatedPlans = DEFAULT_PLANS.map((plan) => ({
           ...plan,
-          isCurrent: subscription?.planId === plan.id,
+          isCurrent: (sub as any)?.planId === plan.id,
         }))
         setPlans(updatedPlans)
       }

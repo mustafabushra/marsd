@@ -61,7 +61,7 @@ export default function SearchPage() {
       }
 
       const response = await apiClient.getCompanies(params)
-      let searchResults = response?.data || []
+      let searchResults = ((response as any)?.data || []) as SearchResult[]
 
       // Apply sorting
       if (sortBy === 'score') {
