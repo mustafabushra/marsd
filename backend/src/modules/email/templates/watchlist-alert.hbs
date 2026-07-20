@@ -1,0 +1,21 @@
+<h2>تنبيه قائمة المراقبة</h2>
+<p>مرحباً {{firstName}},</p>
+<p>تم إضافة تقرير جديد عن شركة في قائمة مراقبتك.</p>
+<p><strong>تفاصيل التنبيه:</strong></p>
+<ul>
+  <li>الشركة: {{companyName}} ({{crNumber}})</li>
+  <li>حالة الدفع: {{paymentStatus}}</li>
+  <li>المبلغ: {{amount}}</li>
+  <li>التاريخ: {{reportDate}}</li>
+</ul>
+<p><strong>تأثير مؤشر الثقة:</strong></p>
+<ul>
+  <li>المؤشر السابق: {{oldScore}}</li>
+  <li>المؤشر الحالي: {{newScore}}</li>
+  <li>الفئة: {{riskBand}}</li>
+</ul>
+<p><a href="{{companyProfileUrl}}">عرض ملف الشركة</a></p>
+<hr>
+<footer style="color: #666; font-size: 12px;">
+  <p>هذا البريد الإلكتروني تم إرساله من قبل مرصد. يرجى عدم الرد على هذا البريد.</p>
+</footer>

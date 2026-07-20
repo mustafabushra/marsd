@@ -1,0 +1,53 @@
+
+> marsad-react@1.0.0 dev
+> vite
+
+Port 3000 is in use, trying another one...
+Port 3001 is in use, trying another one...
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m527[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3002[22m/[39m
+[2m12:13:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminCompanies.jsx[22m
+[2m12:13:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminCompanies.jsx[22m
+[2m12:13:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminUsers.jsx[22m
+[2m12:13:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminUsers.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminLogs.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminLogs.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminRequests.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminRequests.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminBulkImport.jsx[22m
+[2m12:13:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminBulkImport.jsx[22m
+[2m12:14:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m12:14:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ModalDemo.jsx[22m
+[2m12:14:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ModalDemo.jsx[22m
+[2m12:16:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Landing.jsx[22m
+[2m12:16:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminDashboard.jsx[22m
+[2m12:17:13[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Login.jsx[22m
+[2m12:17:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Register.jsx[22m
+[2m12:17:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CompanyDashboard.jsx[22m
+[2m12:17:31[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TrustReport.jsx[22m
+[2m15:29:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/About.jsx[22m
+[2m15:29:25[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/About.jsx[22m
+[2m15:29:37[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/About.jsx[22m
+[2m15:29:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/About.jsx[22m
+[2m15:30:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminBulkImport.jsx[22m
+[2m15:30:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminBulkImport.jsx[22m
+[2m15:30:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminBulkImport.jsx[22m
+[2m15:30:33[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminCompanies.jsx[22m
+[2m15:30:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminCompanies.jsx[22m
+[2m15:31:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminLogs.jsx[22m
+[2m15:31:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminLogs.jsx[22m
+[2m15:31:19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminUsers.jsx[22m
+[2m15:31:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminUsers.jsx[22m
+[2m15:31:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ModalDemo.jsx[22m
+[2m15:31:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ModalDemo.jsx[22m
+[2m15:32:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m15:32:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m15:49:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m15:49:19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m15:49:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m15:49:45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Partners.jsx[22m
+[2m17:58:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CompanyDashboard.jsx[22m
+[2m19:52:44[22m [36m[1m[vite][22m[39m changed tsconfig file detected: C:\Users\DTG\marsd\backend\tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.
+[2m19:52:44[22m [36m[1m[vite][22m[39m changed tsconfig file detected: C:\Users\DTG\marsd\backend\tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.

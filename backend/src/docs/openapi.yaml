@@ -1,0 +1,1500 @@
+openapi: 3.0.0
+info:
+  title: Marsad API
+  description: |
+    Complete REST API for Marsad — Saudi B2B Business Trust Platform
+
+    ## Authentication
+    All endpoints (except `/auth/register` and `/auth/login`) require JWT token in Authorization header:
+    ```
+    Authorization: Bearer <jwt_token>
+    ```
+
+    ## Error Handling
+    All error responses follow this format:
+    ```json
+    {
+      "statusCode": 400,
+      "errorCode": "ERR_4002",
+      "message": "Validation failed",
+      "timestamp": "2024-07-18T10:30:00Z",
+      "path": "/auth/login"
+    }
+    ```
+
+    ## Rate Limiting
+    - Rate limit: 1000 requests per hour
+    - Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+  version: '1.0.0'
+  contact:
+    name: Marsad Support
+    url: https://marsad.local
+    email: support@marsad.local
+  license:
+    name: Proprietary
+    url: https://marsad.local/license
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://api.marsad.local
+    description: Production
+
+paths:
+  # ============================================================================
+  # AUTHENTICATION ENDPOINTS
+  # ============================================================================
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: |
+        Create a new user account. No authentication required.
+        Company CR Number (Commercial Registration) is required for verification.
+      operationId: auth_register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              success:
+                summary: Valid registration
+                value:
+                  name: 'أحمد الشريف'
+                  email: 'ahmad@company.sa'
+                  password: 'SecurePass123'
+                  crNumber: '1010569444'
+                  phone: '+966501234567'
+                  city: 'الرياض'
+                  sector: 'تجارة إلكترونية'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate user and receive JWT token
+      operationId: auth_login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              success:
+                summary: Valid login
+                value:
+                  email: 'ahmad@company.sa'
+                  password: 'SecurePass123'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get a new access token using current JWT
+      operationId: auth_refresh
+      security:
+        - jwt: []
+      parameters:
+        - in: header
+          name: authorization
+          required: true
+          schema:
+            type: string
+          description: 'Bearer token'
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Token invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Send password reset email (implementation pending)
+      operationId: auth_forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ============================================================================
+  # COMPANIES ENDPOINTS
+  # ============================================================================
+  /companies/search:
+    get:
+      tags:
+        - Companies
+      summary: Search companies
+      description: Search for companies by name or CR number with pagination
+      operationId: companies_search
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Search query (company name or CR number)
+          example: 'سابك'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          description: Results per page
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanySearchResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /companies/{id}/report:
+    get:
+      tags:
+        - Companies
+      summary: Get company report
+      description: Retrieve detailed company report with trust score and transaction history
+      operationId: companies_getReport
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Company ID
+      responses:
+        '200':
+          description: Company report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyReport'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /companies/request-add:
+    post:
+      tags:
+        - Companies
+      summary: Request company addition
+      description: Submit request to add new company to platform
+      operationId: companies_requestAdd
+      security:
+        - jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyAddRequest'
+            examples:
+              success:
+                summary: Add new company
+                value:
+                  name: 'شركة التقنية المتقدمة'
+                  crNumber: '1234567890'
+                  sector: 'تكنولوجيا'
+                  city: 'الرياض'
+      responses:
+        '201':
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyAddResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          description: Company already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /companies/claim-profile/{companyId}:
+    post:
+      tags:
+        - Companies
+      summary: Claim company profile
+      description: Claim ownership of a company profile for management
+      operationId: companies_claimProfile
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Company ID to claim
+      responses:
+        '200':
+          description: Profile claimed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  companyId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # ============================================================================
+  # REPORTS ENDPOINTS
+  # ============================================================================
+  /reports:
+    post:
+      tags:
+        - Reports
+      summary: Create transaction report
+      description: |
+        Submit a new transaction report for another company.
+        Reports require review by platform moderators before approval.
+      operationId: reports_create
+      security:
+        - jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportCreateRequest'
+            examples:
+              success:
+                summary: Valid transaction report
+                value:
+                  targetCompanyId: 'comp_123456'
+                  dealAmountRange: '50000-100000'
+                  paymentCommitment: '30'
+                  delayDays: 15
+                  defaulted: false
+                  dealtAt: '2024-07-18T10:30:00Z'
+      responses:
+        '201':
+          description: Report submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /reports/mine:
+    get:
+      tags:
+        - Reports
+      summary: Get user's reports
+      description: Retrieve all reports submitted by current user
+      operationId: reports_getMyReports
+      security:
+        - jwt: []
+      responses:
+        '200':
+          description: User's reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /reports/review-queue:
+    get:
+      tags:
+        - Reports
+      summary: Get review queue (reviewers only)
+      description: Get pending reports for review. Requires reviewer or admin role.
+      operationId: reports_getReviewQueue
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Reports pending review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportResponse'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /reports/{id}/approve:
+    post:
+      tags:
+        - Reports
+      summary: Approve report (reviewers only)
+      description: Approve a pending report. Requires reviewer or admin role.
+      operationId: reports_approve
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Report ID
+      responses:
+        '200':
+          description: Report approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /reports/{id}/reject:
+    post:
+      tags:
+        - Reports
+      summary: Reject report (reviewers only)
+      description: Reject a pending report with reason
+      operationId: reports_reject
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for rejection
+      responses:
+        '200':
+          description: Report rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /reports/{id}/request-info:
+    post:
+      tags:
+        - Reports
+      summary: Request additional info (reviewers only)
+      description: Ask report submitter for more information
+      operationId: reports_requestInfo
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Information requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /reports/{id}/upload-document:
+    post:
+      tags:
+        - Reports
+      summary: Upload supporting document
+      description: Upload document to support report submission
+      operationId: reports_uploadDocument
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileName:
+                  type: string
+                fileSize:
+                  type: integer
+                  description: Size in bytes
+                mimeType:
+                  type: string
+      responses:
+        '200':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl:
+                    type: string
+                  documentId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ============================================================================
+  # TRUST SCORE ENDPOINTS
+  # ============================================================================
+  /trust-score/{companyId}:
+    get:
+      tags:
+        - Trust Score
+      summary: Get company trust score
+      description: |
+        Retrieve computed trust score for a company based on transaction history,
+        payment patterns, and platform reviews.
+      operationId: trustScore_get
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Company ID
+      responses:
+        '200':
+          description: Trust score information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustScoreResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # ============================================================================
+  # ADMIN ENDPOINTS
+  # ============================================================================
+  /admin/reports:
+    get:
+      tags:
+        - Admin
+      summary: Get pending reports (admin only)
+      description: Get all pending reports for admin review
+      operationId: admin_getPendingReports
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Pending reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportResponse'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/reports/all:
+    get:
+      tags:
+        - Admin
+      summary: Get all reports (admin only)
+      description: Get all reports with optional status filter
+      operationId: admin_getAllReports
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected, info_requested]
+      responses:
+        '200':
+          description: All reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportResponse'
+                  total:
+                    type: integer
+
+  /admin/reports/{id}/approve:
+    patch:
+      tags:
+        - Admin
+      summary: Approve report (admin only)
+      operationId: admin_approveReport
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /admin/reports/{id}/reject:
+    post:
+      tags:
+        - Admin
+      summary: Reject report (admin only)
+      operationId: admin_rejectReport
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Report rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /admin/reports/batch-approve:
+    post:
+      tags:
+        - Admin
+      summary: Batch approve reports (admin only)
+      operationId: admin_batchApproveReports
+      security:
+        - jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reportIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Reports approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approved:
+                    type: integer
+                  failed:
+                    type: integer
+
+  /admin/companies:
+    get:
+      tags:
+        - Admin
+      summary: Get companies list (admin only)
+      operationId: admin_getCompanies
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Companies list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CompanyReport'
+                  total:
+                    type: integer
+
+  /admin/companies/{id}/approve:
+    post:
+      tags:
+        - Admin
+      summary: Approve company (admin only)
+      operationId: admin_approveCompany
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Company approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyReport'
+
+  /admin/companies/{id}/reject:
+    post:
+      tags:
+        - Admin
+      summary: Reject company (admin only)
+      operationId: admin_rejectCompany
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Company rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /admin/users:
+    get:
+      tags:
+        - Admin
+      summary: Get users list (admin only)
+      operationId: admin_getUsers
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: role
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserResponse'
+                  total:
+                    type: integer
+
+  /admin/users/{id}/status:
+    patch:
+      tags:
+        - Admin
+      summary: Update user status (admin only)
+      operationId: admin_updateUserStatus
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, suspended, deleted]
+      responses:
+        '200':
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /admin/audit-logs:
+    get:
+      tags:
+        - Admin
+      summary: Get audit logs (admin only)
+      operationId: admin_getAuditLogs
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: entity
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogResponse'
+                  total:
+                    type: integer
+
+  /admin/requests:
+    get:
+      tags:
+        - Admin
+      summary: Get business requests (admin only)
+      operationId: admin_getBusinessRequests
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Business requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BusinessRequestResponse'
+
+  /admin/requests/{id}/approve:
+    post:
+      tags:
+        - Admin
+      summary: Approve business request (admin only)
+      operationId: admin_approveBusinessRequest
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessRequestResponse'
+
+  /admin/bulk-upload:
+    post:
+      tags:
+        - Admin
+      summary: Bulk import companies (admin only)
+      operationId: admin_bulkImportCompanies
+      security:
+        - jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companies:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      crNumber:
+                        type: string
+                      sector:
+                        type: string
+                      city:
+                        type: string
+      responses:
+        '200':
+          description: Companies imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  failed:
+                    type: integer
+
+components:
+  securitySchemes:
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from login endpoint.
+        Include in Authorization header: `Authorization: Bearer <token>`
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    BadRequestError:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ============================================================================
+    # ERROR & RESPONSE SCHEMAS
+    # ============================================================================
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - errorCode
+        - message
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        errorCode:
+          type: string
+          example: 'ERR_4002'
+          description: Structured error code for programmatic handling
+        message:
+          type: string
+          example: 'Validation failed'
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+
+    # ============================================================================
+    # AUTHENTICATION SCHEMAS
+    # ============================================================================
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+        - crNumber
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: Full name of user
+        email:
+          type: string
+          format: email
+          description: Email address
+        password:
+          type: string
+          minLength: 8
+          description: Password (min 8 chars, uppercase, lowercase, numbers)
+        crNumber:
+          type: string
+          description: Commercial Registration number (CR number)
+        phone:
+          type: string
+          description: Phone number
+        city:
+          type: string
+          description: City name
+        sector:
+          type: string
+          description: Business sector
+
+    RegisterResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, reviewer, platform_admin]
+        createdAt:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: Refresh token
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+            role:
+              type: string
+        expiresIn:
+          type: integer
+          description: Token expiry in seconds
+
+    # ============================================================================
+    # COMPANY SCHEMAS
+    # ============================================================================
+    CompanyAddRequest:
+      type: object
+      required:
+        - name
+        - crNumber
+      properties:
+        name:
+          type: string
+          description: Company name
+        crNumber:
+          type: string
+          description: Commercial Registration number
+        sector:
+          type: string
+        city:
+          type: string
+
+    CompanyAddResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved]
+
+    CompanySearchResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              crNumber:
+                type: string
+              trustScore:
+                type: number
+                format: float
+              sector:
+                type: string
+              city:
+                type: string
+              status:
+                type: string
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CompanyReport:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        crNumber:
+          type: string
+        sector:
+          type: string
+        city:
+          type: string
+        trustScore:
+          type: number
+          format: float
+        totalReports:
+          type: integer
+        approvedReports:
+          type: integer
+        averagePaymentDelay:
+          type: number
+          description: Average payment delay in days
+        status:
+          type: string
+          enum: [active, suspended, pending]
+        claimedBy:
+          type: string
+          description: User ID if profile is claimed
+        lastUpdated:
+          type: string
+          format: date-time
+        transactionHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date-time
+              amount:
+                type: string
+              paymentDelay:
+                type: integer
+              defaulted:
+                type: boolean
+
+    # ============================================================================
+    # REPORT SCHEMAS
+    # ============================================================================
+    ReportCreateRequest:
+      type: object
+      required:
+        - targetCompanyId
+        - dealAmountRange
+        - paymentCommitment
+      properties:
+        targetCompanyId:
+          type: string
+          description: ID of company being reported on
+        dealAmountRange:
+          type: string
+          description: Deal amount range (e.g., '10000-50000')
+        paymentCommitment:
+          type: string
+          description: Payment commitment period (e.g., '30')
+        delayDays:
+          type: integer
+          description: Days payment was delayed (0 if on-time)
+        defaulted:
+          type: boolean
+          description: Whether payment defaulted
+        dealtAt:
+          type: string
+          format: date-time
+          description: Date of transaction
+
+    ReportResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        reporterCompanyId:
+          type: string
+        targetCompanyId:
+          type: string
+        dealAmountRange:
+          type: string
+        paymentCommitment:
+          type: string
+        delayDays:
+          type: integer
+        defaulted:
+          type: boolean
+        status:
+          type: string
+          enum: [pending, approved, rejected, info_requested]
+        approvedBy:
+          type: string
+          description: User ID of approver
+        rejectionReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ============================================================================
+    # TRUST SCORE SCHEMAS
+    # ============================================================================
+    TrustScoreResponse:
+      type: object
+      properties:
+        companyId:
+          type: string
+        score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Trust score (0-100)
+        level:
+          type: string
+          enum: [low, medium, high, excellent]
+        based_on:
+          type: object
+          properties:
+            totalReports:
+              type: integer
+            approvedReports:
+              type: integer
+            averagePaymentDelay:
+              type: number
+            defaultRate:
+              type: number
+              format: float
+        lastCalculated:
+          type: string
+          format: date-time
+
+    # ============================================================================
+    # ADMIN SCHEMAS
+    # ============================================================================
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, reviewer, platform_admin]
+        status:
+          type: string
+          enum: [active, suspended]
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        action:
+          type: string
+        entity:
+          type: string
+        entityId:
+          type: string
+        changes:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+
+    BusinessRequestResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

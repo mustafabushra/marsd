@@ -1,0 +1,1 @@
+{"version":3,"file":"BackendEngineer.d.ts","sourceRoot":"","sources":["../../backend/BackendEngineer.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,SAAS,EAAqB,MAAM,mBAAmB,CAAA;AAG3E,qBAAa,eAAgB,SAAQ,SAAS;;cAK5B,gBAAgB,CAAC,IAAI,EAAE,SAAS,GAAG,OAAO,CAAC,IAAI,CAAC;YAkBlD,gBAAgB;YA0ChB,iBAAiB;YA4BjB,uBAAuB;YAuCvB,oBAAoB;YA2BpB,yBAAyB;YAqBzB,kBAAkB;IAKhC,OAAO,CAAC,OAAO;CAGhB"}

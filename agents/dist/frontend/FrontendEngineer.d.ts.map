@@ -1,0 +1,1 @@
+{"version":3,"file":"FrontendEngineer.d.ts","sourceRoot":"","sources":["../../frontend/FrontendEngineer.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,SAAS,EAAE,MAAM,mBAAmB,CAAA;AAExD,qBAAa,gBAAiB,SAAQ,SAAS;;cAK7B,gBAAgB,CAAC,IAAI,EAAE,SAAS,GAAG,OAAO,CAAC,IAAI,CAAC;YAgBlD,cAAc;YA2Bd,SAAS;YAqBT,oBAAoB;YAqBpB,mBAAmB;YAenB,mBAAmB;IAIjC,OAAO,CAAC,OAAO;CAGhB"}

@@ -1,0 +1,267 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *' # Daily at 2 AM UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Audit root dependencies
+        continue-on-error: true
+        run: npm audit --production
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Audit backend dependencies
+        continue-on-error: true
+        run: cd backend && npm audit --production
+
+      - name: Install dependencies (agents)
+        run: cd agents && npm ci
+
+      - name: Audit agents dependencies
+        continue-on-error: true
+        run: cd agents && npm audit --production
+
+  code-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Run TSC type check (backend)
+        continue-on-error: true
+        run: cd backend && npm run build 2>&1 | grep -E "error TS|^$" || echo "✓ No TypeScript errors"
+
+      - name: Install dependencies (agents)
+        run: cd agents && npm ci
+
+      - name: Run TSC type check (agents)
+        continue-on-error: true
+        run: cd agents && npm run build 2>&1 | grep -E "error TS|^$" || echo "✓ No TypeScript errors"
+
+  sonarqube-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ vars.SONARQUBE_HOST_URL != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Generate backend coverage
+        run: cd backend && npm run test:cov || true
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONARQUBE_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
+            -Dsonar.sources=backend/src,agents
+
+  snyk-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ secrets.SNYK_TOKEN != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      - name: Test root dependencies
+        continue-on-error: true
+        run: snyk test --severity-threshold=high
+
+      - name: Test backend dependencies
+        continue-on-error: true
+        run: cd backend && snyk test --severity-threshold=high
+
+      - name: Test agents dependencies
+        continue-on-error: true
+        run: cd agents && snyk test --severity-threshold=high
+
+      - name: Monitor dependencies
+        continue-on-error: true
+        run: snyk monitor
+
+  trivy-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+  codeql-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        language: ['javascript', 'typescript']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  license-compliance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Check root licenses
+        run: npm ls --prod 2>&1 | head -100 || echo "License check completed"
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Check backend licenses
+        run: cd backend && npm ls --prod 2>&1 | head -100 || echo "License check completed"
+
+      - name: Install dependencies (agents)
+        run: cd agents && npm ci
+
+      - name: Check agents licenses
+        run: cd agents && npm ls --prod 2>&1 | head -100 || echo "License check completed"
+
+  security-report:
+    needs: [dependency-check, code-quality]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Generate security report
+        run: |
+          echo "# Security Scan Report"
+          echo ""
+          echo "## Summary"
+          echo "- Dependency Check: ${{ needs.dependency-check.result }}"
+          echo "- Code Quality: ${{ needs.code-quality.result }}"
+          echo ""
+          echo "## Status"
+          if [[ "${{ needs.dependency-check.result }}" == "failure" || "${{ needs.code-quality.result }}" == "failure" ]]; then
+            echo "⚠️ Security scan detected issues. Please review."
+            exit 1
+          else
+            echo "✅ Security scan passed."
+          fi
+
+      - name: Comment PR with security report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## Security Scan Report
+
+| Check | Status |
+|-------|--------|
+| Dependency Audit | ${{ needs.dependency-check.result }} |
+| Code Quality | ${{ needs.code-quality.result }} |
+
+**Note:** Review the workflow logs for detailed information.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

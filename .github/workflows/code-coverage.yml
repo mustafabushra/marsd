@@ -1,0 +1,151 @@
+name: Code Coverage Reports
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  coverage-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: cd backend && npm ci
+
+      - name: Run tests with coverage
+        run: cd backend && npm run test:cov
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage/lcov.info
+          flags: backend
+          name: codecov-backend
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload coverage to Codacy
+        if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
+        uses: codacy/codacy-coverage-reporter-action@master
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: ./backend/coverage/lcov.info
+          force-coverage-parser: javascript
+
+      - name: Comment PR with coverage delta
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./backend/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Check coverage thresholds
+        if: success()
+        run: |
+          if [ -f backend/coverage/coverage-summary.json ]; then
+            node << 'EOF'
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('./backend/coverage/coverage-summary.json', 'utf8')).total;
+
+            const thresholds = {
+              lines: 70,
+              branches: 60,
+              functions: 70,
+              statements: 70
+            };
+
+            console.log('\n📊 Coverage Summary:\n');
+            console.log('┌────────────┬─────────┬───────────┐');
+            console.log('│ Metric     │ Current │ Threshold │');
+            console.log('├────────────┼─────────┼───────────┤');
+
+            let passed = true;
+            Object.keys(thresholds).forEach(metric => {
+              const current = coverage[metric].pct;
+              const threshold = thresholds[metric];
+              const status = current >= threshold ? '✅' : '❌';
+              console.log(`│ ${metric.padEnd(10)} │ ${String(current + '%').padEnd(7)} │ ${String(threshold + '%').padEnd(9)} │ ${status}`);
+              if (current < threshold) passed = false;
+            });
+
+            console.log('└────────────┴─────────┴───────────┘\n');
+
+            if (passed) {
+              console.log('✅ All thresholds met!');
+            } else {
+              console.log('⚠️ Some thresholds not met. Please improve coverage.');
+              process.exit(1);
+            }
+            EOF
+          fi
+
+  coverage-report:
+    needs: coverage-backend
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
+        continue-on-error: true
+
+      - name: Generate coverage badge
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('Coverage badge generation would go here');
+            // This could use https://github.com/Yog9/LatestActionWorkflow to generate badges
+
+      - name: Publish coverage report
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: backend/coverage/
+          retention-days: 30
+        continue-on-error: true
+
+  enforce-coverage:
+    needs: coverage-backend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Comment with coverage status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## Coverage Status
+
+Coverage analysis has been completed. Please review the coverage reports in the GitHub Actions workflow logs.
+
+**Required Actions:**
+- Ensure code coverage meets minimum thresholds (70% lines, 60% branches, 70% functions)
+- Review the detailed coverage report in Codecov or Codacy
+- Add tests for uncovered code paths if needed
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

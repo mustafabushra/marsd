@@ -1,0 +1,5 @@
+export { WebSocketGateway } from './websocket.gateway'
+export { ConnectionManager } from './connection-manager.service'
+export { RealtimeNotificationService } from './realtime-notification.service'
+export { PresenceService } from './presence.service'
+export { WebSocketModule } from './websocket.module'

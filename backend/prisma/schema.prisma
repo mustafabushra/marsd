@@ -1,0 +1,666 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// TENANT (الشركة المشترِكة / المستأجر)
+// ============================================================================
+model Tenant {
+  id                String      @id @default(uuid())
+  name              String      // اسم الشركة
+  crNumber          String      @unique // السجل التجاري
+  email             String      @unique
+  phone             String?
+  city              String?
+  sector            String?
+  status            String      @default("active") // active | suspended | inactive
+  planId            String?
+  subscription      Subscription?
+
+  // العلاقات
+  users             User[]
+  reports           Report[]    @relation("ReporterTenant")
+  watchlistItems    WatchlistItem[]
+  businessRequests  BusinessRequest[] @relation("FromTenant")
+  receivedRequests  BusinessRequest[] @relation("ToTenant")
+  notifications     Notification[]
+  viewQuotaUsage    ViewQuotaUsage[]
+  companyProfile    CompanyProfile?
+  exportJobs        ExportJob[]
+  exportTemplates   ExportTemplate[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("tenants")
+  @@index([crNumber])
+  @@index([status])
+}
+
+// ============================================================================
+// USER (مستخدم — موظف في الشركة أو إدارة المنصة)
+// ============================================================================
+model User {
+  id                String      @id @default(uuid())
+  tenantId          String?     // NULL = مستخدم إدارة المنصة
+  email             String      @unique
+  passwordHash      String
+  firstName         String?
+  lastName          String?
+  role              String      // company_member | company_admin | platform_admin | reviewer
+  status            String      @default("active") // active | inactive | pending_email_verification
+  emailVerified     Boolean     @default(false)
+  lastLoginAt       DateTime?
+
+  // العلاقات
+  tenant            Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reviewActions     ReviewAction[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  exportJobs        ExportJob[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("users")
+  @@index([tenantId])
+  @@index([email])
+  @@index([role])
+}
+
+// ============================================================================
+// COMPANY (الشركة — موضوع التقييم)
+// ============================================================================
+model Company {
+  id                String      @id @default(uuid())
+  name              String      // اسم الشركة
+  crNumber          String      @unique // السجل التجاري
+  sector            String      // مقاولات، تجارة، إلخ
+  city              String
+  foundedYear       Int?
+  crStatus          String      @default("active") // نشط، منتهٍ، معلق
+  source            String      @default("community") // official | community
+  approved          Boolean     @default(true)
+
+  // العلاقات
+  reports           Report[]    @relation("TargetCompany")
+  trustScore        TrustScore?
+  watchlistItems    WatchlistItem[]
+  companyProfile    CompanyProfile?
+  disputeTickets    DisputeTicket[]
+  fraudAlerts       FraudAlert[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("companies")
+  @@index([crNumber])
+  @@index([name])
+  @@index([approved])
+}
+
+// ============================================================================
+// COMPANY_PROFILE (Claim — ربط Tenant بملفه كشركة مُقيَّمة)
+// ============================================================================
+model CompanyProfile {
+  id                String      @id @default(uuid())
+  tenantId          String      @unique
+  companyId         String      @unique
+  claimedAt         DateTime    @default(now())
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company           Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+// ============================================================================
+// REPORT (تقرير التعامل)
+// ============================================================================
+model Report {
+  id                String      @id @default(uuid())
+  reporterTenantId  String      // من الشركة التي رفعت
+  targetCompanyId   String      // ضد أي شركة
+  status            String      @default("draft") // draft | pending_review | approved | rejected | request_info | cancelled
+
+  // البيانات
+  dealAmountRange   String?     // "0-50k" | "50k-100k" | "100k-500k" | "500k+"
+  paymentCommitment String?     // "full" | "partial" | "late" | "default"
+  delayDays         Int         @default(0)
+  defaulted         Boolean     @default(false)
+  dealtAt           DateTime    // تاريخ التعامل
+
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+
+  // العلاقات
+  reporterTenant    Tenant      @relation("ReporterTenant", fields: [reporterTenantId], references: [id], onDelete: Cascade)
+  targetCompany     Company     @relation("TargetCompany", fields: [targetCompanyId], references: [id], onDelete: Cascade)
+  documents         ReportDocument[]
+  reviewActions     ReviewAction[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("reports")
+  @@index([reporterTenantId])
+  @@index([targetCompanyId])
+  @@index([status])
+  @@index([approvedAt])
+}
+
+// ============================================================================
+// REPORT_DOCUMENT (المستندات الداعمة)
+// ============================================================================
+model ReportDocument {
+  id                String      @id @default(uuid())
+  reportId          String
+  s3Key             String      // المسار في S3
+  fileName          String
+  mimeType          String      // application/pdf, image/jpeg
+  fileSize          Int         // بالبايتات
+  uploadedBy        String?     // user ID
+
+  report            Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+
+  @@map("report_documents")
+  @@index([reportId])
+}
+
+// ============================================================================
+// REVIEW_ACTION (قرار المراجعة)
+// ============================================================================
+model ReviewAction {
+  id                String      @id @default(uuid())
+  reportId          String
+  reviewerId        String
+  action            String      // approve | reject | request_info
+  reason            String?     // سبب الرفض أو طلب المعلومات
+
+  report            Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewer          User        @relation(fields: [reviewerId], references: [id])
+
+  createdAt         DateTime    @default(now())
+
+  @@map("review_actions")
+  @@index([reportId])
+  @@index([reviewerId])
+}
+
+// ============================================================================
+// TRUST_SCORE (مؤشر الثقة — Materialized View)
+// ============================================================================
+model TrustScore {
+  id                String      @id @default(uuid())
+  companyId         String      @unique
+  score             Int         // 0-100
+  riskBand          String      // low | medium | high
+  tier              String      // full | preliminary | none
+  approvedReports   Int         @default(0)
+
+  // التفصيل — JSON
+  breakdown         Json        // { official: 100, community: 59.1, formal_data_weight: 0.3, ... }
+
+  computedAt        DateTime    @default(now())
+  company           Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("trust_scores")
+  @@index([companyId])
+  @@index([score])
+}
+
+// ============================================================================
+// PLAN (الباقات)
+// ============================================================================
+model Plan {
+  id                String      @id @default(uuid())
+  name              String      // مجاني، أساسي، احترافي، مؤسسات
+  priceMonthly      Decimal     // 0، 99، 299، ...
+  limits            Json        // { views: 200, users: 3, watchlists: 1, ... }
+  features          String[]    // ["feature1", "feature2"]
+  active            Boolean     @default(true)
+
+  subscriptions     Subscription[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("plans")
+}
+
+// ============================================================================
+// SUBSCRIPTION (الاشتراك)
+// ============================================================================
+model Subscription {
+  id                String      @id @default(uuid())
+  tenantId          String      @unique
+  planId            String
+  status            String      @default("active") // active | cancelled | expired | failed
+
+  currentPeriodStart DateTime   @default(now())
+  currentPeriodEnd  DateTime
+  gatewayRef        String?     // Stripe subscription ID
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan              Plan        @relation(fields: [planId], references: [id])
+  invoices          Invoice[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("subscriptions")
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ============================================================================
+// INVOICE (الفاتورة)
+// ============================================================================
+model Invoice {
+  id                String      @id @default(uuid())
+  subscriptionId    String
+  amount            Decimal
+  vat               Decimal     @default(0)
+  status            String      @default("pending") // pending | paid | failed
+  pdfS3Key          String?
+  issuedAt          DateTime    @default(now())
+  dueAt             DateTime
+  paidAt            DateTime?
+
+  subscription      Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("invoices")
+  @@index([subscriptionId])
+  @@index([status])
+}
+
+// ============================================================================
+// WATCHLIST_ITEM (قوائم المراقبة)
+// ============================================================================
+model WatchlistItem {
+  id                String      @id @default(uuid())
+  tenantId          String
+  companyId         String
+  listName          String      @default("قائمة المراقبة")
+  createdBy         String?     // user ID
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company           Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+
+  @@map("watchlist_items")
+  @@unique([tenantId, companyId])
+  @@index([tenantId])
+  @@index([companyId])
+}
+
+// ============================================================================
+// BUSINESS_REQUEST (طلبات الأعمال)
+// ============================================================================
+model BusinessRequest {
+  id                String      @id @default(uuid())
+  fromTenantId      String
+  toTenantId        String
+  subject           String
+  body              String
+  status            String      @default("pending") // pending | accepted | declined | expired
+  expiresAt         DateTime
+
+  fromTenant        Tenant      @relation("FromTenant", fields: [fromTenantId], references: [id], onDelete: Cascade)
+  toTenant          Tenant      @relation("ToTenant", fields: [toTenantId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("business_requests")
+  @@index([fromTenantId])
+  @@index([toTenantId])
+  @@index([status])
+}
+
+// ============================================================================
+// NOTIFICATION (الإشعارات)
+// ============================================================================
+model Notification {
+  id                String      @id @default(uuid())
+  userId            String
+  tenantId          String
+  type              String      // report_approved | score_changed | request_received | watchlist_alert
+  payload           Json        // { companyId, oldScore, newScore, ... }
+  readAt            DateTime?
+
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([tenantId])
+  @@index([readAt])
+}
+
+// ============================================================================
+// AUDIT_LOG (سجل العمليات — Append-Only)
+// ============================================================================
+model AuditLog {
+  id                String      @id @default(uuid())
+  userId            String?     // user ID أو NULL للسيستم
+  actorRole         String?     // الدور الذي نفّذ العملية
+  action            String      // report:approve, report:reject, setting:change, ...
+  entity            String      // report, company, subscription, ...
+  entityId          String      // معرّف الكيان المتأثر
+  meta              Json        // تفاصيل إضافية
+  ipAddress         String?
+  userAgent         String?
+
+  user              User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime    @default(now())
+
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// VIEW_QUOTA_USAGE (استهلاك حد الاطلاع)
+// ============================================================================
+model ViewQuotaUsage {
+  id                String      @id @default(uuid())
+  tenantId          String
+  period            String      // YYYY-MM
+  viewsCount        Int         @default(0)
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("view_quota_usage")
+  @@unique([tenantId, period])
+  @@index([tenantId])
+}
+
+// ============================================================================
+// ADMIN_USER (مسؤول النظام)
+// ============================================================================
+model AdminUser {
+  id                String      @id @default(uuid())
+  email             String      @unique
+  passwordHash      String
+  role              String      // super_admin | admin | moderator
+  permissions       String[]    // ["manage_users", "manage_settings", "view_audit_logs", ...]
+  lastLogin         DateTime?
+  status            String      @default("active") // active | inactive | suspended
+
+  auditLogsAdmin    AuditLogAdmin[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("admin_users")
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+// ============================================================================
+// AUDIT_LOG_ADMIN (سجل عمليات الإدارة — Append-Only)
+// ============================================================================
+model AuditLogAdmin {
+  id                String      @id @default(uuid())
+  adminId           String?     // admin user ID أو NULL للسيستم
+  action            String      // user:create, setting:update, company:approve, ...
+  resourceType      String      // user | setting | company | tenant | plan | ...
+  resourceId        String      // معرّف المورد المتأثر
+  changes           Json?       // { before: {...}, after: {...} }
+  ipAddress         String?
+  userAgent         String?
+  status            String      @default("success") // success | failure
+
+  admin             AdminUser?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  timestamp         DateTime    @default(now())
+
+  @@map("audit_logs_admin")
+  @@index([adminId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// SYSTEM_SETTINGS (إعدادات قابلة للضبط)
+// ============================================================================
+model SystemSetting {
+  id                String      @id @default(uuid())
+  key               String      @unique
+  value             Json
+  type              String      @default("string") // string | number | boolean | json | array
+  description       String?
+  updatedBy         String?     // admin user ID
+
+  updatedAt         DateTime    @updatedAt
+  createdAt         DateTime    @default(now())
+
+  @@map("system_settings")
+  @@index([key])
+}
+
+// ============================================================================
+// EMAIL_TEMPLATE (قوالب البريد الإلكتروني)
+// ============================================================================
+model EmailTemplate {
+  id                String      @id @default(uuid())
+  name              String      @unique // report_approved, password_reset, etc
+  subject           String
+  bodyHtml          String      // HTML content
+  variables         String[]    // ["{{companyName}}", "{{reporterName}}", ...]
+  active            Boolean     @default(true)
+  description       String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("email_templates")
+  @@index([name])
+  @@index([active])
+}
+
+// ============================================================================
+// INTEGRATION (التكاملات الخارجية)
+// ============================================================================
+model Integration {
+  id                String      @id @default(uuid())
+  name              String      // slack, webhook, payment_gateway, etc
+  type              String      // webhook | api | service
+  config            Json        // { url, headers, auth_method, ... }
+  apiKey            String?     // encrypted
+  active            Boolean     @default(true)
+  lastSync          DateTime?   // آخر مزامنة ناجحة
+  lastError         String?     // آخر خطأ
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("integrations")
+  @@index([name])
+  @@index([active])
+  @@index([lastSync])
+}
+
+// ============================================================================
+// BACKUP_JOB (وظائف النسخ الاحتياطي)
+// ============================================================================
+model BackupJob {
+  id                String      @id @default(uuid())
+  status            String      @default("pending") // pending | running | success | failed
+  fileSize          BigInt?     // بالبايتات
+  filePath          String?     // S3 path
+  errorMessage      String?
+  retryCount        Int         @default(0)
+
+  createdAt         DateTime    @default(now())
+  completedAt       DateTime?
+  nextScheduled     DateTime?
+
+  @@map("backup_jobs")
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// DISPUTE_TICKET (تذاكر النزاعات)
+// ============================================================================
+model DisputeTicket {
+  id                String      @id @default(uuid())
+  companyId         String
+  reporterId        String?     // tenant ID
+  description       String
+  status            String      @default("open") // open | in_review | resolved | closed | rejected
+  resolution        String?     // الحل/الإجراء المتخذ
+  priority          String      @default("normal") // low | normal | high | critical
+  assignedTo        String?     // admin user ID
+  attachments       Json?       // [{ name, s3Key, mimeType }]
+
+  company           Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  resolvedAt        DateTime?
+
+  @@map("dispute_tickets")
+  @@index([companyId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// FRAUD_ALERT (تنبيهات الاحتيال)
+// ============================================================================
+model FraudAlert {
+  id                String      @id @default(uuid())
+  companyId         String
+  alertType         String      // multiple_defaults | suspicious_pattern | blacklist_match | payment_fraud | etc
+  riskScore         Int         // 0-100
+  details           Json        // { reason, evidence, affected_reports, ... }
+  reviewed          Boolean     @default(false)
+  reviewedBy        String?     // admin user ID
+  reviewedAt        DateTime?
+  action            String?     // block | warning | investigate | clear
+
+  company           Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("fraud_alerts")
+  @@index([companyId])
+  @@index([alertType])
+  @@index([riskScore])
+  @@index([reviewed])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// EXPORT_JOB (مهام التصدير)
+// ============================================================================
+model ExportJob {
+  id                String      @id @default(uuid())
+  tenantId          String
+  userId            String?     // مستخدم الطلب
+  format            String      // csv | excel | pdf | json
+  entityType        String      // reports | companies | watchlist | all
+  status            String      @default("pending") // pending | processing | completed | failed | scheduled
+
+  // التصفية والاختيار
+  filters           Json?       // { dateRange: { from, to }, status, search, ... }
+  columns           String[]    // الأعمدة المختارة للتصدير
+
+  // النتائج
+  fileUrl           String?     // رابط التحميل
+  fileSize          BigInt?     // حجم الملف بالبايتات
+  rowsCount         Int         @default(0) // عدد الصفوف المصدرة
+
+  // الجدولة
+  isScheduled       Boolean     @default(false)
+  scheduleFrequency String?     // daily | weekly | monthly (إذا كانت مجدولة)
+  nextScheduledRun  DateTime?
+
+  // البريد الإلكتروني
+  sendToEmail       String?     // بريد إرسال الملف إليه
+  emailSent         Boolean     @default(false)
+  emailSentAt       DateTime?
+
+  // الأخطاء
+  errorMessage      String?
+  errorDetails      Json?
+
+  // التوقيت
+  startedAt         DateTime?
+  completedAt       DateTime?
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("export_jobs")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([format])
+  @@index([entityType])
+  @@index([createdAt])
+  @@index([isScheduled])
+}
+
+// ============================================================================
+// EXPORT_TEMPLATE (قوالب التصدير المحفوظة)
+// ============================================================================
+model ExportTemplate {
+  id                String      @id @default(uuid())
+  tenantId          String
+  name              String      // اسم القالب
+  format            String      // csv | excel | pdf | json
+  entityType        String      // reports | companies | watchlist
+
+  // الإعدادات المحفوظة
+  filters           Json?
+  columns           String[]
+
+  // الأولويات
+  isDefault         Boolean     @default(false)
+  sortOrder         Int         @default(0)
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("export_templates")
+  @@index([tenantId])
+  @@index([format])
+  @@index([entityType])
+}

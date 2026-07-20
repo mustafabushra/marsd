@@ -1,0 +1,337 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  pre-deployment-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      should-deploy: ${{ steps.checks.outputs.should-deploy }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -pe "require('./backend/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Run all checks
+        id: checks
+        run: |
+          set -e
+
+          echo "Running pre-deployment checks..."
+
+          # Install dependencies
+          npm ci
+          cd backend && npm ci
+          cd ../agents && npm ci
+          cd ..
+
+          # Type checking
+          echo "✓ Type checking backend..."
+          cd backend && npm run build || exit 1
+          cd ..
+
+          echo "✓ Type checking agents..."
+          cd agents && npm run build || exit 1
+          cd ..
+
+          # Run tests
+          echo "✓ Running tests..."
+          cd backend && npm run test -- --passWithNoTests || exit 1
+          cd ..
+
+          echo "✓ All pre-deployment checks passed!"
+          echo "should-deploy=true" >> $GITHUB_OUTPUT
+
+      - name: Notify on check failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Pre-deployment checks failed. Please review the logs.'
+            })
+
+  deploy-production:
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      # Build Backend
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      - name: Build backend
+        run: cd backend && npm run build
+        env:
+          NODE_ENV: production
+
+      # Build Agents
+      - name: Install agents dependencies
+        run: cd agents && npm ci
+
+      - name: Build agents
+        run: cd agents && npm run build
+
+      # Build Frontend
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          VITE_ENV: production
+
+      # Deploy to Vercel (Frontend)
+      - name: Deploy frontend to Vercel (Production)
+        uses: amondnet/vercel-action@v25
+        if: success()
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_FRONTEND_PRODUCTION }}
+          vercel-args: '--prod --env NODE_ENV=production'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          working-directory: ./
+        env:
+          VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+
+      # Deploy Backend
+      - name: Deploy backend to production
+        if: success()
+        run: |
+          echo "Deploying backend to production environment..."
+          # Add your backend deployment command here
+          # Example for Railway: railway up --environment production
+          # Example for Render: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}
+          # Example for Vercel serverless: vercel --prod --env NODE_ENV=production
+
+      # Health check
+      - name: Health check
+        if: success()
+        run: |
+          echo "Running health checks..."
+          max_attempts=5
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_API_URL }}/health" || echo "000")
+            if [ "$response" = "200" ] || [ "$response" = "204" ]; then
+              echo "✓ Health check passed"
+              exit 0
+            fi
+
+            echo "Attempt $attempt/$max_attempts: Health check returned $response"
+            if [ $attempt -lt $max_attempts ]; then
+              sleep 10
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "❌ Health check failed after $max_attempts attempts"
+          exit 1
+
+      # Create release
+      - name: Create GitHub Release
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace(/refs\/tags\//, '');
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Release ${tag}`,
+              draft: false,
+              prerelease: tag.includes('-beta') || tag.includes('-rc'),
+              body: `## Production Deployment\n\n- **Version**: ${tag}\n- **Frontend URL**: ${{ secrets.PRODUCTION_FRONTEND_URL }}\n- **API URL**: ${{ secrets.PRODUCTION_API_URL }}`
+            });
+
+      # Create deployment annotation
+      - name: Create GitHub deployment
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              auto_merge: false,
+              required_contexts: []
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: '${{ secrets.PRODUCTION_FRONTEND_URL }}',
+              description: 'Production deployment completed successfully'
+            });
+
+      # Slack notification on success
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "✅ Production Deployment Successful",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Production Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n`main`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n`${{ needs.pre-deployment-checks.outputs.version }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n`${{ github.sha }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*URLs:*\n• Frontend: ${{ secrets.PRODUCTION_FRONTEND_URL }}\n• API: ${{ secrets.PRODUCTION_API_URL }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Deployment"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      # Slack notification on failure
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "❌ Production Deployment Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Production Deployment Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n`main`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n`${{ github.sha }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* Review logs and rollback if necessary"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

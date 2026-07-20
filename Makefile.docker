@@ -1,0 +1,341 @@
+# ============================================================================
+# MARSAD DOCKER MAKEFILE
+# Convenient commands for Docker operations
+#
+# USAGE:
+#   make docker-up              # Start development environment
+#   make docker-prod            # Start production environment
+#   make docker-down            # Stop all services
+#   make docker-logs            # View all logs
+#   make docker-build           # Build images
+#   make docker-clean           # Remove containers and volumes
+# ============================================================================
+
+.PHONY: help docker-up docker-down docker-logs docker-build docker-clean \
+        docker-prod docker-dev docker-restart docker-status docker-shell-* \
+        docker-db-backup docker-db-restore docker-migrate docker-seed
+
+# Default target
+help:
+	@echo "Marsad Docker Makefile Commands:"
+	@echo ""
+	@echo "Development:"
+	@echo "  make docker-up              Start development environment"
+	@echo "  make docker-down            Stop development environment"
+	@echo "  make docker-restart         Restart all services"
+	@echo "  make docker-status          Show service status"
+	@echo "  make docker-logs            View logs (follow mode)"
+	@echo "  make docker-shell-backend   Open backend container shell"
+	@echo "  make docker-shell-frontend  Open frontend container shell"
+	@echo "  make docker-shell-db        Open PostgreSQL shell"
+	@echo ""
+	@echo "Production:"
+	@echo "  make docker-prod            Start production environment"
+	@echo "  make docker-prod-down       Stop production environment"
+	@echo ""
+	@echo "Building:"
+	@echo "  make docker-build           Build all Docker images"
+	@echo "  make docker-build-nocache   Build without cache"
+	@echo ""
+	@echo "Database:"
+	@echo "  make docker-migrate         Run database migrations"
+	@echo "  make docker-seed            Seed database with test data"
+	@echo "  make docker-db-backup       Backup PostgreSQL database"
+	@echo "  make docker-db-restore      Restore from backup.sql"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  make docker-clean           Remove containers and volumes"
+	@echo "  make docker-clean-images    Remove all Docker images"
+	@echo "  make docker-logs-backend    View backend logs only"
+	@echo "  make docker-logs-frontend   View frontend logs only"
+
+# ============================================================================
+# DEVELOPMENT ENVIRONMENT
+# ============================================================================
+
+docker-dev: docker-up
+
+docker-up:
+	@echo "Starting Marsad development environment..."
+	docker-compose up -d
+	@echo "Waiting for services to be healthy..."
+	@sleep 5
+	@make docker-status
+
+docker-down:
+	@echo "Stopping Marsad development environment..."
+	docker-compose down
+
+docker-restart:
+	@echo "Restarting all services..."
+	docker-compose restart
+	@make docker-status
+
+docker-status:
+	@echo "Service Status:"
+	@docker-compose ps
+
+docker-logs:
+	docker-compose logs -f
+
+docker-logs-backend:
+	docker-compose logs -f backend
+
+docker-logs-frontend:
+	docker-compose logs -f frontend
+
+docker-logs-db:
+	docker-compose logs -f postgres
+
+docker-logs-redis:
+	docker-compose logs -f redis
+
+# ============================================================================
+# PRODUCTION ENVIRONMENT
+# ============================================================================
+
+docker-prod: docker-prod-build docker-prod-up
+
+docker-prod-build:
+	@echo "Building production images..."
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+docker-prod-up:
+	@echo "Starting Marsad production environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	@echo "Waiting for services to be healthy..."
+	@sleep 5
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+docker-prod-down:
+	@echo "Stopping Marsad production environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+
+docker-prod-logs:
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+
+# ============================================================================
+# BUILDING
+# ============================================================================
+
+docker-build:
+	@echo "Building Docker images..."
+	docker-compose build
+
+docker-build-nocache:
+	@echo "Building Docker images (no cache)..."
+	docker-compose build --no-cache
+
+docker-build-prod:
+	@echo "Building production Docker images..."
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+# ============================================================================
+# DATABASE OPERATIONS
+# ============================================================================
+
+docker-migrate:
+	@echo "Running database migrations..."
+	docker-compose exec backend npm run prisma:migrate
+
+docker-seed:
+	@echo "Seeding database..."
+	docker-compose exec backend npm run prisma:seed
+
+docker-db-backup:
+	@echo "Backing up PostgreSQL database..."
+	docker-compose exec postgres pg_dump -U marsad -d marsad > backup-$$(date +%Y%m%d-%H%M%S).sql
+	@echo "Backup completed: backup-$$(date +%Y%m%d-%H%M%S).sql"
+
+docker-db-restore:
+	@if [ -f "backup.sql" ]; then \
+		echo "Restoring PostgreSQL database from backup.sql..."; \
+		docker-compose exec -T postgres psql -U marsad -d marsad < backup.sql; \
+		echo "Restore completed"; \
+	else \
+		echo "Error: backup.sql not found"; \
+	fi
+
+docker-db-shell:
+	docker-compose exec postgres psql -U marsad -d marsad
+
+# ============================================================================
+# SHELL ACCESS
+# ============================================================================
+
+docker-shell-backend:
+	docker-compose exec backend sh
+
+docker-shell-frontend:
+	docker-compose exec frontend sh
+
+docker-shell-db:
+	docker-compose exec postgres psql -U marsad -d marsad
+
+docker-shell-redis:
+	docker-compose exec redis redis-cli
+
+# ============================================================================
+# TESTING
+# ============================================================================
+
+docker-test-backend:
+	@echo "Running backend tests..."
+	docker-compose exec backend npm test
+
+docker-test-backend-watch:
+	@echo "Running backend tests (watch mode)..."
+	docker-compose exec backend npm run test:watch
+
+docker-test-backend-coverage:
+	@echo "Running backend tests with coverage..."
+	docker-compose exec backend npm run test:cov
+
+docker-test-frontend:
+	@echo "Running frontend tests..."
+	docker-compose exec frontend npm test
+
+# ============================================================================
+# MAINTENANCE
+# ============================================================================
+
+docker-clean:
+	@echo "Removing containers and data volumes..."
+	docker-compose down -v
+
+docker-clean-images:
+	@echo "Removing all Marsad Docker images..."
+	docker-compose down --rmi all
+
+docker-prune:
+	@echo "Pruning Docker system (removing unused resources)..."
+	docker system prune -a --volumes
+
+docker-volume-list:
+	@echo "Marsad Docker volumes:"
+	docker volume ls | grep marsad
+
+docker-volume-inspect-db:
+	@echo "Inspecting PostgreSQL volume..."
+	docker volume inspect marsad_postgres_data
+
+docker-volume-inspect-redis:
+	@echo "Inspecting Redis volume..."
+	docker volume inspect marsad_redis_data
+
+# ============================================================================
+# MONITORING & DEBUGGING
+# ============================================================================
+
+docker-stats:
+	@echo "Container resource usage:"
+	docker stats --no-stream
+
+docker-inspect-backend:
+	docker inspect $$(docker-compose ps -q backend)
+
+docker-inspect-frontend:
+	docker inspect $$(docker-compose ps -q frontend)
+
+docker-network-inspect:
+	docker network inspect marsad_marsad-network
+
+# ============================================================================
+# HEALTH CHECKS
+# ============================================================================
+
+docker-health:
+	@echo "Checking service health..."
+	@echo "Frontend: " && curl -s http://localhost:3000/health || echo "FAILED"
+	@echo "Backend: " && curl -s http://localhost:3001/health || echo "FAILED"
+	@echo "Database: " && docker-compose exec -T postgres pg_isready -U marsad -d marsad && echo "OK" || echo "FAILED"
+	@echo "Redis: " && docker-compose exec -T redis redis-cli ping && echo "OK" || echo "FAILED"
+
+# ============================================================================
+# PERFORMANCE
+# ============================================================================
+
+docker-optimize:
+	@echo "Running Docker system optimization..."
+	docker system prune --filter "until=240h" -f
+	docker builder prune -a -f
+
+docker-disk-usage:
+	@echo "Docker disk usage:"
+	docker system df
+
+# ============================================================================
+# DEVELOPMENT HELPERS
+# ============================================================================
+
+docker-install-deps:
+	@echo "Installing dependencies in containers..."
+	docker-compose exec backend npm install
+	docker-compose exec frontend npm install
+
+docker-lint-backend:
+	@echo "Running backend linter..."
+	docker-compose exec backend npm run lint
+
+docker-format-backend:
+	@echo "Formatting backend code..."
+	docker-compose exec backend npm run format
+
+docker-build-frontend:
+	@echo "Building frontend application..."
+	docker-compose exec frontend npm run build
+
+docker-preview-frontend:
+	@echo "Previewing frontend build..."
+	docker-compose exec frontend npm run preview
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+
+docker-troubleshoot:
+	@echo "=== Docker System Info ==="
+	docker version
+	@echo ""
+	@echo "=== Docker Compose Version ==="
+	docker-compose version
+	@echo ""
+	@echo "=== Marsad Services ==="
+	docker-compose ps
+	@echo ""
+	@echo "=== Docker Disk Usage ==="
+	docker system df
+	@echo ""
+	@echo "=== Recent Logs (last 50 lines) ==="
+	docker-compose logs --tail=50
+
+docker-reset:
+	@echo "WARNING: This will remove all Marsad containers, images, and data!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose down -v --rmi all; \
+		echo "Reset complete. Run 'make docker-up' to start fresh."; \
+	else \
+		echo "Reset cancelled."; \
+	fi
+
+# ============================================================================
+# CI/CD HELPERS
+# ============================================================================
+
+docker-ci-build:
+	@echo "Building images for CI/CD..."
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+docker-ci-test:
+	@echo "Running CI tests..."
+	docker-compose exec -T backend npm test
+	docker-compose exec -T frontend npm test
+
+docker-ci-push:
+	@echo "Pushing images to registry (configure registry URL in environment)..."
+	docker tag marsad-backend:latest $${REGISTRY}/marsad-backend:latest
+	docker tag marsad-frontend:latest $${REGISTRY}/marsad-frontend:latest
+	docker push $${REGISTRY}/marsad-backend:latest
+	docker push $${REGISTRY}/marsad-frontend:latest

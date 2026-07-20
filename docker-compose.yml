@@ -1,0 +1,167 @@
+# ============================================================================
+# MARSAD DOCKER COMPOSE - DEVELOPMENT CONFIGURATION
+# Full stack setup: Frontend (Vite), Backend (NestJS), PostgreSQL, Redis
+#
+# USAGE:
+#   Development:  docker-compose up
+#   Production:   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+#   Build:        docker-compose build
+# ============================================================================
+
+version: '3.9'
+
+services:
+  # ========================================================================
+  # FRONTEND SERVICE - VITE DEV SERVER
+  # React application with hot-reload support
+  # ========================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: marsad-frontend-dev
+    environment:
+      - VITE_API_URL=http://backend:3000
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./vite.config.js:/app/vite.config.js
+      - ./index.html:/app/index.html
+      - ./public:/app/public
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - marsad-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    command: npm run dev
+
+  # ========================================================================
+  # BACKEND SERVICE - NESTJS APPLICATION
+  # API server with database integration
+  # ========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: marsad-backend-dev
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://marsad:marsad-dev-password@postgres:5432/marsad
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-secret-key-here-min-32-chars-required-at-least-32-characters
+      - JWT_EXPIRATION=900s
+      - JWT_REFRESH_EXPIRATION=604800s
+      - LOG_LEVEL=debug
+      - AWS_REGION=me-south-1
+    ports:
+      - "3001:3000"
+      - "9229:9229"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - marsad-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    command: npm run start:dev
+
+  # ========================================================================
+  # POSTGRESQL DATABASE SERVICE
+  # Primary data store with persistence
+  # ========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: marsad-postgres-dev
+    environment:
+      - POSTGRES_USER=marsad
+      - POSTGRES_PASSWORD=marsad-dev-password
+      - POSTGRES_DB=marsad
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - marsad-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marsad -d marsad"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+
+  # ========================================================================
+  # REDIS CACHE SERVICE
+  # In-memory data store for caching and sessions
+  # ========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: marsad-redis-dev
+    environment:
+      - REDIS_PASSWORD=
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - marsad-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    sysctls:
+      - net.core.somaxconn=511
+
+# ============================================================================
+# VOLUMES
+# Persistent storage for databases
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# Shared network for service communication
+# ============================================================================
+networks:
+  marsad-network:
+    driver: bridge

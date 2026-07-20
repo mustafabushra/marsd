@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مرصد - منصة تقييم موثوقية الأعمال</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: #F8FAFC; color: #0F172A; -webkit-font-smoothing: antialiased; }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 28px;
+        }
+
+        header {
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 20px 28px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .logo svg { width: 32px; height: 32px; }
+        .logo span { font-weight: 900; font-size: 21px; color: #1E2A52; }
+
+        .version {
+            font-size: 12px;
+            color: #94A3B8;
+            font-weight: 600;
+        }
+
+        main {
+            padding: 60px 28px;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 900;
+            color: #0F172A;
+            margin: 0 0 16px;
+            letter-spacing: -1px;
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: #475569;
+            margin: 0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+            margin-bottom: 80px;
+        }
+
+        .section-card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 20px;
+            padding: 40px 32px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .section-card:hover {
+            border-color: #16A34A;
+            box-shadow: 0 20px 40px rgba(22, 163, 74, 0.15);
+            transform: translateY(-4px);
+        }
+
+        .section-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px;
+        }
+
+        .section-card:nth-child(1) .section-icon {
+            background: linear-gradient(135deg, #16A34A, #4ADE80);
+            color: #fff;
+        }
+
+        .section-card:nth-child(2) .section-icon {
+            background: linear-gradient(135deg, #1E2A52, #3B82F6);
+            color: #fff;
+        }
+
+        .section-card:nth-child(3) .section-icon {
+            background: linear-gradient(135deg, #F59E0B, #FBBF24);
+            color: #fff;
+        }
+
+        .section-card h2 {
+            font-size: 24px;
+            font-weight: 900;
+            color: #0F172A;
+            margin: 0 0 12px;
+        }
+
+        .section-card p {
+            font-size: 15px;
+            color: #64748B;
+            line-height: 1.6;
+            margin: 0 0 24px;
+        }
+
+        .section-badge {
+            display: inline-block;
+            background: #F1F5F9;
+            color: #475569;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .features-list {
+            text-align: right;
+            margin: 20px 0;
+        }
+
+        .features-list li {
+            font-size: 13px;
+            color: #64748B;
+            margin: 8px 0;
+        }
+
+        .features-list li:before {
+            content: "✓ ";
+            color: #16A34A;
+            font-weight: 800;
+            margin-left: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #16A34A, #0E7C3A);
+            color: #fff;
+            border: 0;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-block;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(22, 163, 74, 0.3);
+        }
+
+        .section-card:nth-child(2) .btn-primary {
+            background: linear-gradient(135deg, #1E2A52, #334155);
+        }
+
+        .section-card:nth-child(3) .btn-primary {
+            background: linear-gradient(135deg, #F59E0B, #D97706);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 60px;
+            padding-top: 60px;
+            border-top: 1px solid #E2E8F0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 900;
+            color: #1E2A52;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #64748B;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        footer {
+            background: #0F172A;
+            color: #CBD5E1;
+            padding: 40px 28px;
+            text-align: center;
+            margin-top: 80px;
+        }
+
+        footer p {
+            font-size: 14px;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .sections-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .hero h1 { font-size: 32px; }
+            .hero p { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0" y1="1" x2="1" y2="0">
+                            <stop offset="0" stop-color="#1E2A52"></stop>
+                            <stop offset=".55" stop-color="#1F6E43"></stop>
+                            <stop offset="1" stop-color="#16A34A"></stop>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="32" cy="32" r="22.5" fill="none" stroke="url(#logoGrad)" stroke-width="6.4" stroke-linecap="round" stroke-dasharray="118 24" transform="rotate(-46 32 32)"></circle>
+                    <path d="M22.5 33 l6.5 6.5 L41 26.5" fill="none" stroke="#16A34A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>مرصد</span>
+            </div>
+            <div class="version">v1.0.0 - منصة تقييم موثوقية الأعمال</div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="hero">
+                <h1>منصة مرصد المتكاملة</h1>
+                <p>منصة متخصصة لتقييم موثوقية شركاء الأعمال بثلاث واجهات مختلفة</p>
+            </div>
+
+            <div class="sections-grid">
+                <!-- Section 1: Landing Website -->
+                <div class="section-card">
+                    <div class="section-icon">🌐</div>
+                    <div class="section-badge">للزوار والمستخدمين الجدد</div>
+                    <h2>الموقع التعريفي</h2>
+                    <p>موقع عام يعرّف بمنصة مرصد ومميزاتها وخططها. مدخل أساسي للمستخدمين الجدد والزوار.</p>
+
+                    <ul class="features-list" style="list-style: none; padding: 0; margin: 0;">
+                        <li>الصفحة الرئيسية والبطل</li>
+                        <li>شرح كيفية العمل</li>
+                        <li>عرض الباقات والأسعار</li>
+                        <li>صفحة تسجيل الدخول والتسجيل</li>
+                        <li>مركز المساعدة والأسئلة الشائعة</li>
+                        <li>صفحة التواصل معنا</li>
+                    </ul>
+
+                    <a href="/index.html" class="btn-primary">الدخول للموقع</a>
+                </div>
+
+                <!-- Section 2: Company Dashboard -->
+                <div class="section-card">
+                    <div class="section-icon">🏢</div>
+                    <div class="section-badge">للشركات والمساهمين</div>
+                    <h2>لوحة تحكم الشركات</h2>
+                    <p>واجهة متكاملة للشركات المسجلة للبحث عن الشركات وإضافة التقارير وإدارة حسابهم.</p>
+
+                    <ul class="features-list" style="list-style: none; padding: 0; margin: 0;">
+                        <li>لوحة التحكم الرئيسية</li>
+                        <li>البحث عن الشركات</li>
+                        <li>عرض تقارير الشركات</li>
+                        <li>إضافة تقارير جديدة</li>
+                        <li>إدارة قوائس المراقبة</li>
+                        <li>مقارنة الشركات وإدارة الفريق</li>
+                    </ul>
+
+                    <a href="/dashboard" class="btn-primary">الدخول لوحة الشركات</a>
+                </div>
+
+                <!-- Section 3: Admin Dashboard -->
+                <div class="section-card">
+                    <div class="section-icon">🔐</div>
+                    <div class="section-badge">لمسؤولي النظام</div>
+                    <h2>لوحة تحكم الإدارة</h2>
+                    <p>واجهة متقدمة لمسؤولي مرصد لإدارة المنصة والموافقة على الطلبات والتقارير والمستخدمين.</p>
+
+                    <ul class="features-list" style="list-style: none; padding: 0; margin: 0;">
+                        <li>لوحة الإدارة الرئيسية</li>
+                        <li>مراجعة طلبات الشركات</li>
+                        <li>مراجعة وقبول التقارير</li>
+                        <li>رفع دفعات شركات</li>
+                        <li>إدارة المستخدمين والاشتراكات</li>
+                        <li>سجل العمليات والأنشطة</li>
+                    </ul>
+
+                    <a href="/dashboard#admin-dashboard" class="btn-primary">الدخول لوحة الإدارة</a>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">12,400+</div>
+                    <div class="stat-label">شركة مُقيّمة</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">38,900+</div>
+                    <div class="stat-label">تقرير معتمد</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">3,450+</div>
+                    <div class="stat-label">مستخدم نشط</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">99.2%</div>
+                    <div class="stat-label">دقة البيانات</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 مرصد - منصة تقييم موثوقية الأعمال · جميع الحقوق محفوظة</p>
+    </footer>
+</body>
+</html>

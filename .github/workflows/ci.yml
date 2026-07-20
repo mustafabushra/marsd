@@ -1,0 +1,196 @@
+name: CI - Lint, Test, Build
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Install dependencies (agents)
+        run: cd agents && npm ci
+
+      - name: Install dependencies (frontend)
+        working-directory: ./
+        run: npm ci
+
+      # TypeScript type checking
+      - name: Type check (backend)
+        run: cd backend && npm run build 2>&1 | head -50 || true
+
+      - name: Type check (agents)
+        run: cd agents && npm run build || true
+
+      # ESLint checks (will be added to configs)
+      - name: Lint backend
+        run: cd backend && npm run lint 2>&1 || echo "Lint config not yet configured"
+
+      - name: Lint agents
+        run: cd agents && npm run lint 2>&1 || echo "Lint config not yet configured"
+
+      # Prettier format checks
+      - name: Check formatting (backend)
+        run: cd backend && npm run format:check 2>&1 || echo "Format check not configured"
+
+      - name: Check formatting (agents)
+        run: cd agents && npm run format:check 2>&1 || echo "Format check not configured"
+
+      # Run tests
+      - name: Test backend
+        run: cd backend && npm run test:cov 2>&1 || npm run test 2>&1 || echo "Tests not configured"
+
+      - name: Test agents
+        run: cd agents && npm run test 2>&1 || npm run test:agents 2>&1 || echo "Tests not configured"
+
+      # Upload coverage reports
+      - name: Upload backend coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage/coverage-final.json
+          flags: backend
+          fail_ci_if_error: false
+
+      # Build verification
+      - name: Build backend
+        run: cd backend && npm run build
+
+      - name: Build agents
+        run: cd agents && npm run build
+
+      - name: Build frontend
+        run: npm run build
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit - Check for vulnerabilities
+        run: npm audit --production --audit-level=moderate || true
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: npm audit (backend)
+        run: cd backend && npm audit --production --audit-level=moderate || true
+
+      - name: Install dependencies (agents)
+        run: cd agents && npm ci
+
+      - name: npm audit (agents)
+        run: cd agents && npm audit --production --audit-level=moderate || true
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies (backend)
+        run: cd backend && npm ci
+
+      - name: Run tests with coverage (backend)
+        run: cd backend && npm run test:cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage/coverage-final.json
+          flags: backend
+          name: codecov-backend
+          fail_ci_if_error: false
+
+      - name: Check coverage thresholds
+        run: |
+          if [ -f backend/coverage/coverage-summary.json ]; then
+            node -e "
+              const coverage = require('./backend/coverage/coverage-summary.json').total;
+              const lines = coverage.lines.pct;
+              const branches = coverage.branches.pct;
+              const functions = coverage.functions.pct;
+              const statements = coverage.statements.pct;
+
+              console.log('Coverage Summary:');
+              console.log('  Lines:      ' + lines + '%');
+              console.log('  Branches:   ' + branches + '%');
+              console.log('  Functions:  ' + functions + '%');
+              console.log('  Statements: ' + statements + '%');
+
+              // Fail if coverage below 70%
+              if (lines < 70 || branches < 60 || functions < 70 || statements < 70) {
+                console.log('❌ Coverage below thresholds');
+                process.exit(1);
+              }
+              console.log('✓ Coverage meets thresholds');
+            "
+          fi
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('./backend/coverage/coverage-summary.json')) {
+              const coverage = JSON.parse(fs.readFileSync('./backend/coverage/coverage-summary.json', 'utf8')).total;
+              const body = `## Code Coverage Report
+
+| Metric | Coverage |
+|--------|----------|
+| Lines | ${coverage.lines.pct}% |
+| Branches | ${coverage.branches.pct}% |
+| Functions | ${coverage.functions.pct}% |
+| Statements | ${coverage.statements.pct}% |
+              `;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }

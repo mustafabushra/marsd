@@ -1,0 +1,36 @@
+# This is a comment.
+# Each line is a file pattern followed by one or more owners.
+
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# @global-owner1 and @global-owner2 will be requested for
+# review when someone opens a pull request.
+
+* @mustafabushra1779
+
+# Backend code
+/backend/ @mustafabushra1779
+/backend/src/auth/** @mustafabushra1779
+/backend/src/modules/** @mustafabushra1779
+
+# Frontend code
+/src/ @mustafabushra1779
+/src/components/** @mustafabushra1779
+/src/pages/** @mustafabushra1779
+
+# Agents system
+/agents/ @mustafabushra1779
+/agents/orchestrator/** @mustafabushra1779
+
+# Infrastructure
+/infrastructure/ @mustafabushra1779
+/.github/ @mustafabushra1779
+
+# Documentation
+*.md @mustafabushra1779
+
+# Configuration files
+package.json @mustafabushra1779
+package-lock.json @mustafabushra1779
+tsconfig.json @mustafabushra1779
+vite.config.js @mustafabushra1779

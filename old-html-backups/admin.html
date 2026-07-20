@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مرصد - لوحة تحكم الإدارة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: #F8FAFC; color: #0F172A; -webkit-font-smoothing: antialiased; }
+        button { font-family: inherit; cursor: pointer; }
+        input, select, textarea { font-family: inherit; }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
+
+        .dashboard-container { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        aside {
+            width: 268px;
+            background: #1E2A52;
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            padding: 22px 16px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            color: white;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 0 8px 22px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            margin-bottom: 16px;
+        }
+
+        .sidebar-logo svg { width: 26px; height: 26px; flex: none; }
+        .sidebar-logo span { font-weight: 900; font-size: 22px; }
+
+        nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+        nav button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            border-radius: 11px;
+            font-size: 14.5px;
+            font-weight: 600;
+            border: 0;
+            width: 100%;
+            text-align: right;
+            background: transparent;
+            color: #CBD5E1;
+            transition: all 0.2s;
+        }
+
+        nav button:hover { background: rgba(255,255,255,0.1); }
+        nav button.active { background: #16A34A; color: #fff; font-weight: 800; }
+
+        nav button svg { width: 19px; height: 19px; }
+
+        .admin-badge {
+            background: rgba(255,59,48,0.2);
+            color: #FF3B30;
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 800;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        /* Main Content */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title { font-size: 18px; font-weight: 900; color: #0F172A; }
+        .admin-label { background: rgba(255,59,48,0.1); color: #FF3B30; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #DC2626;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 15px;
+        }
+
+        /* Main Content Area */
+        main {
+            padding: 28px 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-header { margin-bottom: 22px; }
+        .page-header h1 { font-size: 25px; font-weight: 900; color: #0F172A; margin: 0 0 4px; }
+        .page-header p { font-size: 15px; color: #64748B; margin: 0; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .kpi-card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 22px;
+        }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .kpi-label { font-size: 13.5px; color: #64748B; font-weight: 700; }
+        .kpi-icon { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .kpi-value { font-size: 32px; font-weight: 900; line-height: 1; }
+        .kpi-sub { font-size: 12.5px; color: #94A3B8; font-weight: 600; margin-top: 6px; }
+
+        .card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 18px;
+        }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .dashboard-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+
+        .activity-list { display: flex; flex-direction: column; gap: 12px; }
+        .activity-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+        }
+
+        .activity-content { flex: 1; }
+        .activity-title { font-size: 15px; font-weight: 800; color: #0F172A; }
+        .activity-desc { font-size: 13px; color: #94A3B8; margin-top: 4px; }
+
+        .action-btn {
+            background: #16A34A;
+            color: #fff;
+            border: 0;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .action-btn.danger {
+            background: #DC2626;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            text-align: right;
+            padding: 12px;
+            background: #F8FAFC;
+            border-bottom: 1px solid #E2E8F0;
+            font-weight: 800;
+            font-size: 13px;
+            color: #64748B;
+        }
+
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid #F1F5F9;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .badge.pending {
+            background: #FFFBEB;
+            color: #B45309;
+        }
+
+        .badge.approved {
+            background: #ECFDF5;
+            color: #15803D;
+        }
+
+        .badge.rejected {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container { flex-direction: column; }
+            aside { width: 100%; height: auto; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside>
+            <div class="sidebar-logo" onclick="showPage('dashboard')">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="adminLogo" x1="0" y1="1" x2="1" y2="0">
+                            <stop offset="0" stop-color="#1E2A52"></stop>
+                            <stop offset=".55" stop-color="#1F6E43"></stop>
+                            <stop offset="1" stop-color="#16A34A"></stop>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="32" cy="32" r="22.5" fill="none" stroke="url(#adminLogo)" stroke-width="6.4" stroke-linecap="round" stroke-dasharray="118 24" transform="rotate(-46 32 32)"></circle>
+                    <path d="M22.5 33 l6.5 6.5 L41 26.5" fill="none" stroke="#16A34A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>مرصد</span>
+            </div>
+            <div class="admin-badge">🔐 نمط المسؤول</div>
+
+            <nav>
+                <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    لوحة الإدارة
+                </button>
+                <button class="nav-btn" data-page="requests" onclick="showPage('requests')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                    طلبات الشركات
+                </button>
+                <button class="nav-btn" data-page="reports" onclick="showPage('reports')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>
+                    مراجعة التقارير
+                </button>
+                <button class="nav-btn" data-page="bulk" onclick="showPage('bulk')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                    رفع دفعة شركات
+                </button>
+                <button class="nav-btn" data-page="companies" onclick="showPage('companies')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path></svg>
+                    إدارة الشركات
+                </button>
+                <button class="nav-btn" data-page="users" onclick="showPage('users')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path></svg>
+                    المستخدمون
+                </button>
+                <button class="nav-btn" data-page="logs" onclick="showPage('logs')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h5"></path></svg>
+                    سجل العمليات
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="content-area">
+            <!-- Header -->
+            <header>
+                <div class="header-left">
+                    <div class="header-title" id="pageTitle">لوحة الإدارة</div>
+                    <div class="admin-label">🔐 مسؤول</div>
+                </div>
+                <div class="header-actions">
+                    <div class="user-info">
+                        <div class="user-avatar">أ</div>
+                        <div style="text-align: right; font-size: 13px;">
+                            <div style="font-weight: 800; color: #0F172A;">أحمد المديري</div>
+                            <div style="color: #94A3B8;">مسؤول النظام</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Pages -->
+            <main>
+                <!-- Dashboard -->
+                <section id="dashboard" class="section active">
+                    <div class="page-header">
+                        <h1>🔐 لوحة تحكم الإدارة</h1>
+                        <p>نظرة عامة على عمليات المنصة والمهام المعلقة</p>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">طلبات معلقة</span>
+                                <div class="kpi-icon">⏳</div>
+                            </div>
+                            <div class="kpi-value" style="color: #F59E0B;">12</div>
+                            <div class="kpi-sub">تنتظر المراجعة</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">تقارير قيد المراجعة</span>
+                                <div class="kpi-icon">📋</div>
+                            </div>
+                            <div class="kpi-value" style="color: #F59E0B;">28</div>
+                            <div class="kpi-sub">تحتاج موافقة</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">إجمالي الشركات</span>
+                                <div class="kpi-icon">🏢</div>
+                            </div>
+                            <div class="kpi-value" style="color: #1E2A52;">12,400</div>
+                            <div class="kpi-sub">في النظام</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">المستخدمون</span>
+                                <div class="kpi-icon">👥</div>
+                            </div>
+                            <div class="kpi-value" style="color: #16A34A;">3,450</div>
+                            <div class="kpi-sub">نشطون هذا الشهر</div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <h3 style="font-size: 17px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">المهام المعلقة</h3>
+                            <div class="activity-list">
+                                <div class="activity-item">
+                                    <button class="action-btn" onclick="showPage('requests')">راجع</button>
+                                    <div class="activity-content">
+                                        <div class="activity-title">12 طلب شركة جديدة</div>
+                                        <div class="activity-desc">تنتظر التحقق والموافقة</div>
+                                    </div>
+                                </div>
+                                <div class="activity-item">
+                                    <button class="action-btn" onclick="showPage('reports')">راجع</button>
+                                    <div class="activity-content">
+                                        <div class="activity-title">28 تقرير معلق</div>
+                                        <div class="activity-desc">5 منها عاجلة</div>
+                                    </div>
+                                </div>
+                                <div class="activity-item">
+                                    <button class="action-btn danger">رد</button>
+                                    <div class="activity-content">
+                                        <div class="activity-title">3 شكاوى من المستخدمين</div>
+                                        <div class="activity-desc">تحتاج متابعة فورية</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 style="font-size: 15px; font-weight: 900; color: #0F172A; margin: 0 0 14px;">إجراءات سريعة</h3>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <button class="action-btn" style="width: 100%; padding: 13px; font-size: 14px;" onclick="showPage('requests')">⏳ مراجعة الطلبات</button>
+                                <button class="action-btn" style="width: 100%; padding: 13px; font-size: 14px;" onclick="showPage('reports')">📋 مراجعة التقارير</button>
+                                <button class="action-btn" style="width: 100%; padding: 13px; font-size: 14px;" onclick="showPage('bulk')">📁 رفع دفعة</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Requests -->
+                <section id="requests" class="section">
+                    <div class="page-header">
+                        <h1>⏳ مراجعة طلبات الشركات الجديدة</h1>
+                        <p>12 طلب معلق ينتظر المراجعة</p>
+                    </div>
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>اسم الشركة</th>
+                                    <th>السجل التجاري</th>
+                                    <th>تاريخ الطلب</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>شركة الخليج العربي</td>
+                                    <td>2050987654</td>
+                                    <td>2026-06-20</td>
+                                    <td><span class="badge pending">معلق</span></td>
+                                    <td><button class="action-btn" style="padding: 6px 12px; font-size: 11px;">موافقة</button></td>
+                                </tr>
+                                <tr>
+                                    <td>مؤسسة الرياض للخدمات</td>
+                                    <td>1010555666</td>
+                                    <td>2026-06-19</td>
+                                    <td><span class="badge pending">معلق</span></td>
+                                    <td><button class="action-btn" style="padding: 6px 12px; font-size: 11px;">موافقة</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Reports -->
+                <section id="reports" class="section">
+                    <div class="page-header">
+                        <h1>📋 مراجعة التقارير المرسلة</h1>
+                        <p>28 تقرير قيد المراجعة</p>
+                    </div>
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>من الشركة</th>
+                                    <th>عن الشركة</th>
+                                    <th>التاريخ</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>شركة نجد</td>
+                                    <td>الخليج للتجارة</td>
+                                    <td>2026-06-20</td>
+                                    <td><span class="badge pending">قيد المراجعة</span></td>
+                                    <td><button class="action-btn" style="padding: 6px 12px; font-size: 11px;">اعتماد</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Bulk Import -->
+                <section id="bulk" class="section">
+                    <div class="page-header">
+                        <h1>📁 رفع دفعة شركات</h1>
+                        <p>استيراد عدة شركات من ملف CSV</p>
+                    </div>
+                    <div class="card">
+                        <div style="border: 2px dashed #CBD5E1; border-radius: 12px; padding: 60px; text-align: center; background: #F8FAFC;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+                            <div style="font-size: 18px; font-weight: 800; color: #0F172A; margin-bottom: 8px;">اسحب ملف CSV هنا</div>
+                            <div style="font-size: 14px; color: #94A3B8; margin-bottom: 24px;">أو اضغط للاختيار</div>
+                            <button style="background: #16A34A; color: #fff; border: 0; border-radius: 10px; padding: 12px 32px; font-size: 15px; font-weight: 800;">اختيار ملف</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Companies -->
+                <section id="companies" class="section">
+                    <div class="page-header">
+                        <h1>🏢 إدارة الشركات</h1>
+                        <p>12,400 شركة مسجلة</p>
+                    </div>
+                    <div class="card">
+                        <div style="margin-bottom: 16px;">
+                            <input placeholder="ابحث عن شركة..." style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>اسم الشركة</th>
+                                    <th>السجل</th>
+                                    <th>التقارير</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>شركة نجد للمقاولات</td>
+                                    <td>1010234567</td>
+                                    <td>34</td>
+                                    <td><span class="badge approved">نشطة</span></td>
+                                    <td><button class="action-btn" style="padding: 6px 12px; font-size: 11px;">تعديل</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Users -->
+                <section id="users" class="section">
+                    <div class="page-header">
+                        <h1>👥 إدارة المستخدمين والاشتراكات</h1>
+                        <p>3,450 مستخدم نشط</p>
+                    </div>
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>اسم المستخدم</th>
+                                    <th>البريد الإلكتروني</th>
+                                    <th>الباقة</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>عبدالله الحربي</td>
+                                    <td>abdullah@company.sa</td>
+                                    <td>احترافية</td>
+                                    <td><span class="badge approved">نشط</span></td>
+                                    <td><button class="action-btn" style="padding: 6px 12px; font-size: 11px;">إدارة</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Audit Logs -->
+                <section id="logs" class="section">
+                    <div class="page-header">
+                        <h1>📜 سجل العمليات</h1>
+                        <p>سجل شامل لجميع أنشطة النظام</p>
+                    </div>
+                    <div class="card">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #E2E8F0; border-radius: 12px;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 800; color: #0F172A;">موافقة على تقرير</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">من: أحمد المديري · 2026-06-20 14:35</div>
+                                </div>
+                                <span class="badge approved">موافق</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

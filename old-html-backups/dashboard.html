@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مرصد - لوحة تحكم الشركات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: #F8FAFC; color: #0F172A; -webkit-font-smoothing: antialiased; }
+        button { font-family: inherit; cursor: pointer; }
+        input, select, textarea { font-family: inherit; }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
+
+        .dashboard-container { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        aside {
+            width: 268px;
+            background: #1E2A52;
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            padding: 22px 16px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            color: white;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 0 8px 22px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            margin-bottom: 16px;
+        }
+
+        .sidebar-logo svg { width: 26px; height: 26px; flex: none; }
+        .sidebar-logo span { font-weight: 900; font-size: 22px; }
+
+        nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+        nav button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            border-radius: 11px;
+            font-size: 14.5px;
+            font-weight: 600;
+            border: 0;
+            width: 100%;
+            text-align: right;
+            background: transparent;
+            color: #CBD5E1;
+            transition: all 0.2s;
+        }
+
+        nav button:hover { background: rgba(255,255,255,0.1); }
+        nav button.active { background: #16A34A; color: #fff; font-weight: 800; }
+
+        nav button svg { width: 19px; height: 19px; }
+
+        .subscription-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            padding: 16px;
+            margin-top: 14px;
+        }
+
+        .sub-title { font-size: 14px; font-weight: 800; margin-bottom: 5px; }
+        .sub-desc { font-size: 12.5px; color: #94A3B8; margin-bottom: 12px; }
+        .sub-btn { width: 100%; background: #16A34A; color: #fff; border: 0; border-radius: 9px; padding: 9px; font-size: 13px; font-weight: 800; cursor: pointer; }
+
+        /* Main Content */
+        .content-area { flex: 1; display: flex; flex-direction: column; }
+
+        /* Header */
+        header {
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+        }
+
+        .header-title { font-size: 18px; font-weight: 900; color: #0F172A; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            background: #F1F5F9;
+            border: 0;
+            border-radius: 10px;
+            padding: 9px 16px;
+            font-size: 14px;
+            color: #64748B;
+            min-width: 240px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #1E2A52;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 15px;
+        }
+
+        .user-details div:first-child { font-size: 13.5px; font-weight: 800; color: #0F172A; line-height: 1.2; }
+        .user-details div:last-child { font-size: 12px; color: #94A3B8; }
+
+        /* Main */
+        main {
+            padding: 28px 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-header { margin-bottom: 22px; }
+        .page-header h1 { font-size: 25px; font-weight: 900; color: #0F172A; margin: 0 0 4px; }
+        .page-header p { font-size: 15px; color: #64748B; margin: 0; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .kpi-card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 22px;
+        }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .kpi-label { font-size: 13.5px; color: #64748B; font-weight: 700; }
+        .kpi-icon { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .kpi-value { font-size: 32px; font-weight: 900; line-height: 1; }
+        .kpi-sub { font-size: 12.5px; color: #94A3B8; font-weight: 600; margin-top: 6px; }
+
+        .card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 18px;
+        }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        @media (max-width: 768px) {
+            .dashboard-container { flex-direction: column; }
+            aside { width: 100%; height: auto; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside>
+            <div class="sidebar-logo" onclick="showPage('dashboard')">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="mkSide" x1="0" y1="1" x2="1" y2="0">
+                            <stop offset="0" stop-color="#1E2A52"></stop>
+                            <stop offset=".55" stop-color="#1F6E43"></stop>
+                            <stop offset="1" stop-color="#16A34A"></stop>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="32" cy="32" r="22.5" fill="none" stroke="url(#mkSide)" stroke-width="6.4" stroke-linecap="round" stroke-dasharray="118 24" transform="rotate(-46 32 32)"></circle>
+                    <path d="M22.5 33 l6.5 6.5 L41 26.5" fill="none" stroke="#16A34A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>مرصد</span>
+            </div>
+
+            <nav>
+                <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    لوحة التحكم
+                </button>
+                <button class="nav-btn" data-page="search" onclick="showPage('search')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                    البحث عن الشركات
+                </button>
+                <button class="nav-btn" data-page="add-company" onclick="showPage('add-company')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                    إضافة شركة
+                </button>
+                <button class="nav-btn" data-page="add-report" onclick="showPage('add-report')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M12 12v6M9 15h6"></path></svg>
+                    إضافة تقرير
+                </button>
+                <button class="nav-btn" data-page="my-reports" onclick="showPage('my-reports')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h5"></path></svg>
+                    تقاريري
+                </button>
+                <button class="nav-btn" data-page="watchlist" onclick="showPage('watchlist')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    قوائس المراقبة
+                </button>
+                <button class="nav-btn" data-page="compare" onclick="showPage('compare')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="20" x2="6" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="18" y1="20" x2="18" y2="14"></line></svg>
+                    مقارنة الشركات
+                </button>
+                <button class="nav-btn" data-page="users" onclick="showPage('users')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 20 11"></path></svg>
+                    إدارة الفريق
+                </button>
+                <button class="nav-btn" data-page="subscription" onclick="showPage('subscription')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                    الاشتراك
+                </button>
+                <button class="nav-btn" data-page="profile" onclick="showPage('profile')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>
+                    الملف الشخصي
+                </button>
+            </nav>
+
+            <div class="subscription-card">
+                <div class="sub-title">باقتك: الاحترافية</div>
+                <div class="sub-desc">تتجدد في 14 يوليو 2026</div>
+                <button class="sub-btn">إدارة الباقة</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="content-area">
+            <!-- Header -->
+            <header>
+                <div class="header-title" id="pageTitle">لوحة التحكم</div>
+                <div class="header-actions">
+                    <div class="search-bar" onclick="showPage('search')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                        ابحث عن شركة...
+                    </div>
+                    <div class="user-info">
+                        <div class="user-avatar">ن</div>
+                        <div class="user-details">
+                            <div>شركة نجد للمقاولات</div>
+                            <div>عبدالله الحربي · مدير</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Pages -->
+            <main>
+                <!-- 1. Dashboard -->
+                <section id="dashboard" class="section active">
+                    <div class="page-header">
+                        <h1>أهلاً، شركة نجد للمقاولات 👋</h1>
+                        <p>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">عمليات البحث المتبقية</span>
+                                <div class="kpi-icon">🔍</div>
+                            </div>
+                            <div class="kpi-value" style="color: #1E2A52;">128</div>
+                            <div class="kpi-sub">من 200 هذا الشهر</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">تقاريري المعتمدة</span>
+                                <div class="kpi-icon">✓</div>
+                            </div>
+                            <div class="kpi-value" style="color: #16A34A;">34</div>
+                            <div class="kpi-sub">+3 هذا الأسبوع</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">شركات في قوائسي</span>
+                                <div class="kpi-icon">⭐</div>
+                            </div>
+                            <div class="kpi-value" style="color: #F59E0B;">12</div>
+                            <div class="kpi-sub">تحت المراقبة</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">مساهماتي</span>
+                                <div class="kpi-icon">📈</div>
+                            </div>
+                            <div class="kpi-value" style="color: #7C3AED;">17</div>
+                            <div class="kpi-sub">ضمن أعلى 15%</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="font-size: 17px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">إجراءات سريعة</h3>
+                        <div style="display: flex; gap: 12px;">
+                            <button onclick="showPage('search')" style="background: #1E2A52; color: #fff; border: 0; border-radius: 11px; padding: 12px 24px; font-weight: 800; cursor: pointer;">🔍 بحث جديد</button>
+                            <button onclick="showPage('add-report')" style="background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px 24px; font-weight: 800; cursor: pointer;">➕ إضافة تقرير</button>
+                            <button onclick="showPage('add-company')" style="background: #fff; color: #1E2A52; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 12px 24px; font-weight: 800; cursor: pointer;">🏢 إضافة شركة</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. Search -->
+                <section id="search" class="section">
+                    <div class="page-header">
+                        <h1>البحث عن الشركات</h1>
+                        <p>ابحث عن أي شركة وعرض مؤشر الثقة والتقارير</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                            <input id="searchInput" placeholder="ابحث بالاسم أو رقم السجل التجاري" style="flex: 1; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; font-size: 15px; outline: none;">
+                            <button style="background: #1E2A52; color: #fff; border: 0; border-radius: 12px; padding: 0 30px; font-weight: 800; cursor: pointer;">بحث</button>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <span style="font-size: 13.5px; color: #94A3B8; font-weight: 700;">الفلاتر:</span>
+                            <button style="background: #EEF2FF; color: #1E2A52; border: 0; border-radius: 20px; padding: 8px 16px; font-weight: 700; cursor: pointer;">القطاع ▾</button>
+                            <button style="background: #EEF2FF; color: #1E2A52; border: 0; border-radius: 20px; padding: 8px 16px; font-weight: 700; cursor: pointer;">المدينة ▾</button>
+                            <button style="background: #EEF2FF; color: #1E2A52; border: 0; border-radius: 20px; padding: 8px 16px; font-weight: 700; cursor: pointer;">مستوى المخاطر ▾</button>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;">
+                        <div class="card" style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#16A34A 0% 82%, #E2E8F0 82% 100%); margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #1E2A52;">82</div>
+                            </div>
+                            <div style="font-size: 15px; font-weight: 800; color: #0F172A; margin-bottom: 4px;">شركة نجد</div>
+                            <div style="font-size: 12px; color: #94A3B8; margin-bottom: 12px;">مقاولات · الرياض</div>
+                            <button onclick="showPage('trust-report')" style="width: 100%; background: #1E2A52; color: #fff; border: 0; border-radius: 10px; padding: 10px; font-weight: 800; cursor: pointer;">عرض التقرير</button>
+                        </div>
+
+                        <div class="card" style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#F59E0B 0% 65%, #E2E8F0 65% 100%); margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #1E2A52;">65</div>
+                            </div>
+                            <div style="font-size: 15px; font-weight: 800; color: #0F172A; margin-bottom: 4px;">الرياض للتجارة</div>
+                            <div style="font-size: 12px; color: #94A3B8; margin-bottom: 12px;">تجارة · الرياض</div>
+                            <button style="width: 100%; background: #1E2A52; color: #fff; border: 0; border-radius: 10px; padding: 10px; font-weight: 800; cursor: pointer;">عرض التقرير</button>
+                        </div>
+
+                        <div class="card" style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#16A34A 0% 91%, #E2E8F0 91% 100%); margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #1E2A52;">91</div>
+                            </div>
+                            <div style="font-size: 15px; font-weight: 800; color: #0F172A; margin-bottom: 4px;">الخليج للخدمات</div>
+                            <div style="font-size: 12px; color: #94A3B8; margin-bottom: 12px;">خدمات · الرياض</div>
+                            <button style="width: 100%; background: #1E2A52; color: #fff; border: 0; border-radius: 10px; padding: 10px; font-weight: 800; cursor: pointer;">عرض التقرير</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Add Company -->
+                <section id="add-company" class="section">
+                    <div class="page-header">
+                        <h1>أضِف شركة للسجل</h1>
+                        <p>بيانات دقيقة = موافقة أسرع</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+                            <div style="grid-column: 1/3;">
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">اسم الشركة</label>
+                                <input placeholder="مثال: شركة الرياض للتجارة" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">رقم السجل التجاري</label>
+                                <input placeholder="1010XXXXXX" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">القطاع</label>
+                                <input placeholder="تجارة" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">المدينة</label>
+                                <input placeholder="الرياض" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 11px; margin-top: 26px;">
+                            <button style="background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 13px 30px; font-weight: 800; cursor: pointer;">إرسال الطلب</button>
+                            <button style="background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 13px 28px; font-weight: 800; cursor: pointer;">إلغاء</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. Add Report (معالج 4 خطوات) -->
+                <section id="add-report" class="section">
+                    <div class="page-header">
+                        <h1>إضافة تقرير</h1>
+                        <p>ساهم بتقريرك وساعد الآخرين على اتخاذ قرارات أفضل</p>
+                    </div>
+
+                    <div id="reportWizard">
+                        <!-- Wizard Steps Indicator -->
+                        <div class="card" style="display: flex; gap: 8px; margin-bottom: 20px; justify-content: center;">
+                            <div id="step1" style="width: 50px; height: 50px; border-radius: 50%; background: #16A34A; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; transition: all 0.3s;">1</div>
+                            <div id="step2" style="width: 50px; height: 50px; border-radius: 50%; background: #E2E8F0; color: #64748B; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; transition: all 0.3s;">2</div>
+                            <div id="step3" style="width: 50px; height: 50px; border-radius: 50%; background: #E2E8F0; color: #64748B; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; transition: all 0.3s;">3</div>
+                            <div id="step4" style="width: 50px; height: 50px; border-radius: 50%; background: #E2E8F0; color: #64748B; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; transition: all 0.3s;">4</div>
+                        </div>
+
+                        <!-- Step 1: Select Company -->
+                        <div id="wizardStep1" class="card">
+                            <h3 style="font-size: 18px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">الخطوة 1: اختر الشركة</h3>
+                            <input placeholder="ابحث عن الشركة" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none; margin-bottom: 18px;">
+                            <div style="display: grid; gap: 10px; margin-bottom: 20px;">
+                                <div style="padding: 14px; border: 1.5px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; cursor: pointer; transition: all 0.2s;">
+                                    <div style="font-weight: 900; color: #0F172A;">شركة نجد للمقاولات</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">1010123456 · الرياض</div>
+                                </div>
+                                <div style="padding: 14px; border: 1.5px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; cursor: pointer; transition: all 0.2s;">
+                                    <div style="font-weight: 900; color: #0F172A;">الرياض للتجارة</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">1010789456 · الرياض</div>
+                                </div>
+                            </div>
+                            <button onclick="moveWizardStep(2)" style="width: 100%; background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">التالي</button>
+                        </div>
+
+                        <!-- Step 2: Transaction Details -->
+                        <div id="wizardStep2" class="card" style="display: none;">
+                            <h3 style="font-size: 18px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">الخطوة 2: تفاصيل التعامل</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                                <div>
+                                    <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">قيمة التعامل (ر.س)</label>
+                                    <input placeholder="100,000" type="number" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">نوع التعامل</label>
+                                    <select style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                                        <option>بيع/شراء</option>
+                                        <option>خدمات</option>
+                                        <option>توريد</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column: 1/3;">
+                                    <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">الالتزام بالسداد</label>
+                                    <select style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                                        <option>ممتاز</option>
+                                        <option>جيد</option>
+                                        <option>متوسط</option>
+                                        <option>ضعيف</option>
+                                        <option>تعثر</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px; justify-content: space-between;">
+                                <button onclick="moveWizardStep(1)" style="flex: 1; background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">العودة</button>
+                                <button onclick="moveWizardStep(3)" style="flex: 1; background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">التالي</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Review -->
+                        <div id="wizardStep3" class="card" style="display: none;">
+                            <h3 style="font-size: 18px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">الخطوة 3: المراجعة</h3>
+                            <div style="background: #F8FAFC; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                                <div><strong>الشركة:</strong> شركة نجد للمقاولات</div>
+                                <div style="margin-top: 10px;"><strong>القيمة:</strong> 100,000 ر.س</div>
+                                <div style="margin-top: 10px;"><strong>النوع:</strong> بيع/شراء</div>
+                                <div style="margin-top: 10px;"><strong>السداد:</strong> ممتاز</div>
+                            </div>
+                            <p style="color: #64748B; margin-bottom: 18px;">هل البيانات صحيحة؟</p>
+                            <div style="display: flex; gap: 12px; justify-content: space-between;">
+                                <button onclick="moveWizardStep(2)" style="flex: 1; background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">تعديل</button>
+                                <button onclick="moveWizardStep(4)" style="flex: 1; background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">التالي</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Confirmation -->
+                        <div id="wizardStep4" class="card" style="display: none;">
+                            <h3 style="font-size: 18px; font-weight: 900; color: #0F172A; margin: 0 0 18px;">الخطوة 4: الإقرار والإرسال</h3>
+                            <div style="background: #FEF08A; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 8px; margin-bottom: 18px;">
+                                <p style="margin: 0; font-size: 14px; color: #78350F;">أقر بأن البيانات صحيقة وموثوقة وأتحمل مسؤولية أي معلومات غير دقيقة.</p>
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px; cursor: pointer;">
+                                <input type="checkbox" style="width: 18px; height: 18px;">
+                                <span style="font-weight: 700; color: #334155;">أوافق على الشروط</span>
+                            </label>
+                            <div style="display: flex; gap: 12px; justify-content: space-between;">
+                                <button onclick="moveWizardStep(3)" style="flex: 1; background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">العودة</button>
+                                <button onclick="submitReport()" style="flex: 1; background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px; font-weight: 800; cursor: pointer;">✓ إرسال التقرير</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. My Reports -->
+                <section id="my-reports" class="section">
+                    <div class="page-header">
+                        <h1>تقاريري المرسلة</h1>
+                        <p>كل التقارير التي ساهمت بها</p>
+                    </div>
+
+                    <div style="display: grid; gap: 12px;">
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 900; color: #0F172A;">شركة نجد للمقاولات</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">250,000 ر.س · 2026-06-15</div>
+                                </div>
+                                <span style="background: #DCFCE7; color: #166534; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800;">✓ معتمد</span>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 900; color: #0F172A;">الخليج للتجارة</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">150,000 ر.س · 2026-05-20</div>
+                                </div>
+                                <span style="background: #DCFCE7; color: #166534; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800;">✓ معتمد</span>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 900; color: #0F172A;">شركة التقنية المتقدمة</div>
+                                    <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">80,000 ر.س · 2026-04-10</div>
+                                </div>
+                                <span style="background: #FEF08A; color: #78350F; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800;">⏳ قيد المراجعة</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 6. Trust Report -->
+                <section id="trust-report" class="section">
+                    <div class="page-header">
+                        <h1>تقرير الشركة الشامل</h1>
+                        <p>مؤشر الثقة والإحصائيات التفصيلية</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 30px; align-items: start;">
+                            <div>
+                                <h2 style="font-size: 24px; font-weight: 900; color: #0F172A; margin: 0 0 8px;">شركة نجد للمقاولات</h2>
+                                <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #64748B; margin-bottom: 20px;">
+                                    <span><strong>السجل:</strong> 1010123456</span>
+                                    <span><strong>القطاع:</strong> مقاولات</span>
+                                    <span><strong>المدينة:</strong> الرياض</span>
+                                </div>
+                                <div style="background: #F8FAFC; border-radius: 12px; padding: 16px;">
+                                    <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 6px;">مستوى الموثوقية</div>
+                                    <div style="height: 8px; background: #E2E8F0; border-radius: 6px; overflow: hidden;">
+                                        <div style="width: 88%; height: 100%; background: linear-gradient(90deg, #16A34A, #4ADE80);"></div>
+                                    </div>
+                                    <div style="font-size: 12px; color: #16A34A; font-weight: 700; margin-top: 4px;">عالٍ جداً - 34 تقرير معتمد</div>
+                                </div>
+                            </div>
+
+                            <div style="text-align: center;">
+                                <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#16A34A 0% 82%, #E2E8F0 82% 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                                    <div style="width: 95px; height: 95px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                        <div style="font-size: 32px; font-weight: 900; color: #16A34A;">82</div>
+                                        <div style="font-size: 9px; color: #94A3B8; font-weight: 700;">من 100</div>
+                                    </div>
+                                </div>
+                                <div style="background: #DCFCE7; color: #166534; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800;">● موثوق</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;">
+                        <div class="card" style="text-align: center; margin-bottom: 0;">
+                            <div style="font-size: 12px; color: #64748B; font-weight: 700;">التقارير</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #1E2A52; margin-top: 8px;">34</div>
+                        </div>
+                        <div class="card" style="text-align: center; margin-bottom: 0;">
+                            <div style="font-size: 12px; color: #64748B; font-weight: 700;">الالتزام بالسداد</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #16A34A; margin-top: 8px;">94%</div>
+                        </div>
+                        <div class="card" style="text-align: center; margin-bottom: 0;">
+                            <div style="font-size: 12px; color: #64748B; font-weight: 700;">حالات التعثر</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #166534; margin-top: 8px;">0</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin: 0 0 16px; font-weight: 900;">أحدث التقارير المعتمدة</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                <th style="text-align: right; padding: 12px; font-weight: 800; font-size: 13px;">التاريخ</th>
+                                <th style="text-align: right; padding: 12px; font-weight: 800; font-size: 13px;">القيمة</th>
+                                <th style="text-align: right; padding: 12px; font-weight: 800; font-size: 13px;">النوع</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800; font-size: 13px;">الحالة</th>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="text-align: right; padding: 12px; font-size: 13px;">2026-06-18</td>
+                                <td style="text-align: right; padding: 12px; font-weight: 800;">250,000 ر.س</td>
+                                <td style="text-align: right; padding: 12px;">بيع/شراء</td>
+                                <td style="text-align: center;"><span style="background: #DCFCE7; color: #166534; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 800;">معتمد</span></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: right; padding: 12px; font-size: 13px;">2026-05-29</td>
+                                <td style="text-align: right; padding: 12px; font-weight: 800;">180,000 ر.س</td>
+                                <td style="text-align: right; padding: 12px;">توريد</td>
+                                <td style="text-align: center;"><span style="background: #DCFCE7; color: #166534; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 800;">معتمد</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 7. Watchlist -->
+                <section id="watchlist" class="section">
+                    <div class="page-header">
+                        <h1>قوائس المراقبة</h1>
+                        <p>الشركات التي تراقبها وتتابع تطورها</p>
+                    </div>
+
+                    <div style="display: grid; gap: 18px;">
+                        <div class="card" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: center;">
+                            <div>
+                                <div style="font-weight: 900; color: #0F172A; margin-bottom: 4px;">شركة نجد</div>
+                                <div style="font-size: 12px; color: #94A3B8;">مقاولات · الرياض</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#16A34A 0% 82%, #E2E8F0 82% 100%); margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #1E2A52;">82</div>
+                                </div>
+                            </div>
+                            <button style="background: #fff; color: #DC2626; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 8px 16px; font-weight: 800; cursor: pointer;">حذف</button>
+                        </div>
+
+                        <div class="card" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: center;">
+                            <div>
+                                <div style="font-weight: 900; color: #0F172A; margin-bottom: 4px;">الرياض للتجارة</div>
+                                <div style="font-size: 12px; color: #94A3B8;">تجارة · الرياض</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#F59E0B 0% 65%, #E2E8F0 65% 100%); margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #1E2A52;">65</div>
+                                </div>
+                            </div>
+                            <button style="background: #fff; color: #DC2626; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 8px 16px; font-weight: 800; cursor: pointer;">حذف</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 7. Compare -->
+                <section id="compare" class="section">
+                    <div class="page-header">
+                        <h1>مقارنة الشركات</h1>
+                        <p>قارن بين حتى 3 شركات جنباً إلى جنب</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;">
+                            <input placeholder="اختر شركة 1" style="border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px; font-size: 14px; outline: none;">
+                            <input placeholder="اختر شركة 2" style="border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px; font-size: 14px; outline: none;">
+                            <input placeholder="اختر شركة 3" style="border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px; font-size: 14px; outline: none;">
+                        </div>
+                        <button style="width: 100%; background: #1E2A52; color: #fff; border: 0; border-radius: 10px; padding: 12px; font-weight: 800; cursor: pointer;">قارن الآن</button>
+                    </div>
+
+                    <div class="card">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                <th style="text-align: right; padding: 12px; font-weight: 800;">المؤشر</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800;">الشركة 1</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800;">الشركة 2</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800;">الشركة 3</th>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="text-align: right; padding: 12px;">مؤشر الثقة</td>
+                                <td style="text-align: center; padding: 12px; font-weight: 800;">82 ↑</td>
+                                <td style="text-align: center; padding: 12px; font-weight: 800;">65 ↔</td>
+                                <td style="text-align: center; padding: 12px; font-weight: 800;">-</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="text-align: right; padding: 12px;">التقارير</td>
+                                <td style="text-align: center; padding: 12px;">12</td>
+                                <td style="text-align: center; padding: 12px;">5</td>
+                                <td style="text-align: center; padding: 12px;">-</td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: right; padding: 12px;">الالتزام بالسداد</td>
+                                <td style="text-align: center; padding: 12px;">ممتاز</td>
+                                <td style="text-align: center; padding: 12px;">جيد</td>
+                                <td style="text-align: center; padding: 12px;">-</td>
+                            </tr>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 8. Team Management -->
+                <section id="users" class="section">
+                    <div class="page-header">
+                        <h1>إدارة الفريق</h1>
+                        <p>ادعُ أعضاء الفريق وحدد صلاحياتهم</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">البريد الإلكتروني</label>
+                                <input placeholder="example@company.com" type="email" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">الصلاحية</label>
+                                <select style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                                    <option>عرض فقط</option>
+                                    <option>موظف</option>
+                                    <option>مدير</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button style="width: 100%; background: #16A34A; color: #fff; border: 0; border-radius: 10px; padding: 12px; font-weight: 800; cursor: pointer;">+ إرسال دعوة</button>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin: 0 0 18px; font-weight: 900;">أعضاء الفريق</h3>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px;">
+                                <div>
+                                    <div style="font-weight: 900; color: #0F172A;">محمد السلطان</div>
+                                    <div style="font-size: 12px; color: #94A3B8;">moh@company.com</div>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <span style="background: #EEF2FF; color: #3730A3; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 800;">مدير</span>
+                                    <button style="background: #FEE2E2; color: #DC2626; border: 0; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 800; cursor: pointer;">حذف</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 9. Subscription -->
+                <section id="subscription" class="section">
+                    <div class="page-header">
+                        <h1>الاشتراك والفواتير</h1>
+                        <p>إدارة باقتك والاطلاع على الفواتير</p>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin: 0 0 18px; font-weight: 900;">الباقة الحالية</h3>
+                        <div style="background: #DCFCE7; border: 2px solid #16A34A; border-radius: 12px; padding: 20px; margin-bottom: 18px;">
+                            <div style="font-size: 18px; font-weight: 900; color: #166534; margin-bottom: 4px;">الاحترافية</div>
+                            <div style="font-size: 14px; color: #166534;">تتجدد في 14 يوليو 2026</div>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <button style="flex: 1; background: #16A34A; color: #fff; border: 0; border-radius: 10px; padding: 12px; font-weight: 800; cursor: pointer;">📈 ترقية</button>
+                            <button style="flex: 1; background: #fff; color: #1E2A52; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px; font-weight: 800; cursor: pointer;">📉 تخفيض</button>
+                            <button style="flex: 1; background: #FEE2E2; color: #DC2626; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 12px; font-weight: 800; cursor: pointer;">❌ إلغاء</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin: 0 0 18px; font-weight: 900;">الفواتير</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                <th style="text-align: right; padding: 12px; font-weight: 800;">التاريخ</th>
+                                <th style="text-align: right; padding: 12px; font-weight: 800;">المبلغ</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800;">الحالة</th>
+                                <th style="text-align: center; padding: 12px; font-weight: 800;">الإجراء</th>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="text-align: right; padding: 12px;">2026-06-14</td>
+                                <td style="text-align: right; padding: 12px; font-weight: 800;">299 ر.س</td>
+                                <td style="text-align: center;"><span style="background: #DCFCE7; color: #166534; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 800;">مدفوعة</span></td>
+                                <td style="text-align: center;"><button style="background: transparent; border: 0; color: #1E2A52; font-weight: 800; cursor: pointer;">⬇ PDF</button></td>
+                            </tr>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 10. Profile -->
+                <section id="profile" class="section">
+                    <div class="page-header">
+                        <h1>الملف الشخصي</h1>
+                        <p>تعديل بيانات شركتك والإعدادات</p>
+                    </div>
+
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                            <div style="grid-column: 1/3;">
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">اسم الشركة</label>
+                                <input value="شركة نجد للمقاولات" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">السجل التجاري</label>
+                                <input value="1010123456" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">القطاع</label>
+                                <input value="مقاولات" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">المدينة</label>
+                                <input value="الرياض" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                            </div>
+                        </div>
+                        <button style="background: #16A34A; color: #fff; border: 0; border-radius: 10px; padding: 12px 30px; font-weight: 800; cursor: pointer;">💾 حفظ التغييرات</button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+            // Show selected section
+            const page = document.getElementById(pageId);
+            if (page) page.classList.add('active');
+
+            // Update nav button
+            const navBtn = document.querySelector(`.nav-btn[data-page="${pageId}"]`);
+            if (navBtn) navBtn.classList.add('active');
+
+            // Update header title
+            const titles = {
+                'dashboard': 'لوحة التحكم',
+                'search': 'البحث عن الشركات',
+                'add-company': 'إضافة شركة',
+                'add-report': 'إضافة تقرير',
+                'my-reports': 'تقاريري المرسلة',
+                'watchlist': 'قوائس المراقبة',
+                'compare': 'مقارنة الشركات',
+                'users': 'إدارة الفريق',
+                'subscription': 'الاشتراك والفواتير',
+                'profile': 'الملف الشخصي'
+            };
+            document.getElementById('pageTitle').textContent = titles[pageId] || 'مرصد';
+
+            // Scroll to top
+            document.querySelector('main').scrollTo(0, 0);
+        }
+
+        // Wizard functions
+        let currentStep = 1;
+
+        function moveWizardStep(step) {
+            // Hide all steps
+            for (let i = 1; i <= 4; i++) {
+                const stepDiv = document.getElementById(`wizardStep${i}`);
+                if (stepDiv) stepDiv.style.display = 'none';
+            }
+
+            // Show current step
+            document.getElementById(`wizardStep${step}`).style.display = 'block';
+
+            // Update step indicators
+            for (let i = 1; i <= 4; i++) {
+                const indicator = document.getElementById(`step${i}`);
+                if (i <= step) {
+                    indicator.style.background = '#16A34A';
+                    indicator.style.color = '#fff';
+                } else {
+                    indicator.style.background = '#E2E8F0';
+                    indicator.style.color = '#64748B';
+                }
+            }
+
+            currentStep = step;
+        }
+
+        function submitReport() {
+            alert('✅ تم إرسال التقرير بنجاح! سيتم مراجعته من قبل فريقنا.');
+            currentStep = 1;
+            moveWizardStep(1);
+            showPage('dashboard');
+        }
+    </script>
+
+</body>
+</html>

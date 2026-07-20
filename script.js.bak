@@ -1,0 +1,626 @@
+/**
+ * مرصد - منصة تقييم موثوقية الأعمال
+ * JavaScript Interactive Features
+ * ====================================
+ */
+
+// ============================================
+// 1. MOCK DATA - بيانات وهمية للتطوير
+// ============================================
+
+const mockCompanies = [
+  { id: 1, name: 'شركة نجد للمقاولات', sector: 'مقاولات', city: 'الرياض', registry: '1010123456', trustScore: 82, reports: 12, risk: 'منخفض', lastUpdate: '2026-07-10' },
+  { id: 2, name: 'الرياض للتجارة', sector: 'تجارة', city: 'الرياض', registry: '1010789456', trustScore: 65, reports: 5, risk: 'متوسط', lastUpdate: '2026-07-08' },
+  { id: 3, name: 'التقنية المتقدمة', sector: 'تقنية', city: 'جدة', registry: '1010456789', trustScore: 45, reports: 2, risk: 'عالي', lastUpdate: '2026-07-05' },
+  { id: 4, name: 'الشرق للتوريد', sector: 'توريد', city: 'الدمام', registry: '1010111222', trustScore: 78, reports: 8, risk: 'منخفض', lastUpdate: '2026-07-09' },
+  { id: 5, name: 'الخليج للخدمات', sector: 'خدمات', city: 'الرياض', registry: '1010333444', trustScore: 91, reports: 15, risk: 'منخفض جداً', lastUpdate: '2026-07-11' },
+];
+
+const mockReports = [
+  { id: 1, companyId: 1, amount: 150000, type: 'بيع/شراء', payment: 'ممتاز', days: 0, date: '2026-07-10', status: 'معتمد' },
+  { id: 2, companyId: 1, amount: 200000, type: 'خدمات', payment: 'جيد', days: 0, date: '2026-07-08', status: 'معتمد' },
+  { id: 3, companyId: 2, amount: 80000, type: 'توريد', payment: 'متوسط', days: 5, date: '2026-07-07', status: 'معتمد' },
+  { id: 4, companyId: 3, amount: 50000, type: 'خدمات', payment: 'ضعيف', days: 30, date: '2026-07-05', status: 'معتمد' },
+];
+
+
+// ============================================
+// 2. STATE MANAGEMENT
+// ============================================
+
+const appState = {
+  currentPage: 'dashboard',
+  reportWizardStep: 1,
+  selectedCompanyForReport: null,
+  reportFormData: {},
+  filteredCompanies: [...mockCompanies],
+  watchlist: [],
+  businessRequestsTab: 'inbox',
+};
+
+// ============================================
+// 3. PAGE NAVIGATION
+// ============================================
+
+function showPage(pageName) {
+  // إخفاء جميع الأقسام
+  const sections = document.querySelectorAll('.section');
+  sections.forEach(s => s.classList.remove('active'));
+
+  // إظهار القسم المطلوب
+  const targetSection = document.getElementById(pageName);
+  if (targetSection) {
+    targetSection.classList.add('active');
+
+    // تحديث العنوان
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => btn.classList.remove('active'));
+
+    const activeBtn = document.querySelector(`[data-page="${pageName}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // تحديث عنوان الصفحة
+    updatePageTitle(pageName);
+
+    // تحديث الحالة
+    appState.currentPage = pageName;
+
+    // إعادة تحميل البيانات إن لزم الأمر
+    if (pageName === 'search') {
+      initializeSearch();
+    } else if (pageName === 'trust-report') {
+      initializeTrustReport();
+    } else if (pageName === 'my-reports') {
+      initializeMyReports();
+    }
+  }
+}
+
+function updatePageTitle(pageName) {
+  const titles = {
+    dashboard: 'لوحة التحكم',
+    search: 'البحث عن الشركات',
+    'add-company': 'إضافة شركة',
+    'add-report': 'إضافة تقرير',
+    'my-reports': 'تقاريري المرسلة',
+    watchlist: 'قوائس المراقبة',
+    compare: 'مقارنة الشركات',
+    users: 'إدارة الفريق',
+    subscription: 'الاشتراك',
+    profile: 'الملف الشخصي',
+    'trust-report': 'تقرير الشركة',
+    'business-requests': 'طلبات الأعمال',
+    'admin-dashboard': 'لوحة الإدارة',
+    'company-requests': 'مراجعة الطلبات',
+    'review-reports': 'مراجعة التقارير',
+    'bulk-import': 'رفع دفعة',
+    'manage-companies': 'إدارة الشركات',
+    'admin-users': 'إدارة المستخدمين',
+    'audit-logs': 'سجل العمليات',
+  };
+
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) {
+    pageTitle.textContent = titles[pageName] || 'مرصد';
+  }
+}
+
+// ============================================
+// 4. REPORT WIZARD - معالج التقرير (4 خطوات)
+// ============================================
+
+function initializeReportWizard() {
+  const addReportSection = document.getElementById('add-report');
+  if (!addReportSection) return;
+
+  // إنشاء واجهة الـ Wizard
+  const wizardHTML = `
+    <style>
+      .wizard-container { max-width: 700px; margin: 0 auto; }
+      .wizard-steps {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 30px;
+        justify-content: center;
+      }
+      .wizard-step {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #E2E8F0;
+        color: #64748B;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 18px;
+        transition: all 0.3s;
+      }
+      .wizard-step.active {
+        background: #16A34A;
+        color: #fff;
+        transform: scale(1.1);
+      }
+      .wizard-step.completed {
+        background: #16A34A;
+        color: #fff;
+      }
+      .wizard-content { display: none; }
+      .wizard-content.active { display: block; animation: slideIn 0.3s; }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .wizard-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        justify-content: space-between;
+        padding-top: 20px;
+        border-top: 1px solid #F1F5F9;
+      }
+      .wizard-button {
+        padding: 12px 30px;
+        border-radius: 11px;
+        font-size: 15px;
+        font-weight: 800;
+        border: 0;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .wizard-button.next { background: #16A34A; color: #fff; }
+      .wizard-button.next:disabled { background: #CBD5E1; cursor: not-allowed; }
+      .wizard-button.back { background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; }
+      .wizard-button.submit { background: #16A34A; color: #fff; width: 100%; }
+      .success-message {
+        background: #DCFCE7;
+        border: 1.5px solid #16A34A;
+        color: #166534;
+        padding: 16px;
+        border-radius: 11px;
+        margin-bottom: 20px;
+        display: none;
+        animation: slideDown 0.3s;
+      }
+      .success-message.show { display: block; }
+      @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+
+    <div class="wizard-container">
+      <div class="wizard-steps">
+        <div class="wizard-step active" id="step-1-indicator">1</div>
+        <div class="wizard-step" id="step-2-indicator">2</div>
+        <div class="wizard-step" id="step-3-indicator">3</div>
+        <div class="wizard-step" id="step-4-indicator">4</div>
+      </div>
+
+      <div class="success-message" id="successMessage">
+        ✅ تم إرسال التقرير بنجاح! سيتم مراجعته من قبل فريقنا.
+      </div>
+
+      <!-- Step 1: Select Company -->
+      <div class="wizard-content active" id="step-1">
+        <div class="card">
+          <h3 style="font-size: 19px; font-weight: 900; color: #0F172A; margin: 0 0 22px;">الخطوة 1: اختر الشركة</h3>
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">ابحث عن الشركة</label>
+            <input id="companySearchInput" placeholder="اسم الشركة أو رقم السجل" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+          </div>
+          <div id="companySearchResults" style="display: grid; gap: 12px; margin-bottom: 20px;">
+          </div>
+          <div class="wizard-buttons">
+            <button class="wizard-button back" onclick="showPage('dashboard')">إلغاء</button>
+            <button class="wizard-button next" id="step1-next" onclick="goToWizardStep(2)" disabled>التالي</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Transaction Details -->
+      <div class="wizard-content" id="step-2">
+        <div class="card">
+          <h3 style="font-size: 19px; font-weight: 900; color: #0F172A; margin: 0 0 22px;">الخطوة 2: تفاصيل التعامل</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+            <div style="grid-column: 1/3;">
+              <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">قيمة التعامل (ر.س)</label>
+              <input id="reportAmount" placeholder="100,000" type="number" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+            </div>
+            <div>
+              <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">نوع التعامل</label>
+              <select id="reportType" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                <option value="">-- اختر --</option>
+                <option value="بيع/شراء">بيع/شراء</option>
+                <option value="خدمات">خدمات</option>
+                <option value="توريد">توريد</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">الالتزام بالسداد</label>
+              <select id="reportPayment" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+                <option value="">-- اختر --</option>
+                <option value="ممتاز">ممتاز</option>
+                <option value="جيد">جيد</option>
+                <option value="متوسط">متوسط</option>
+                <option value="ضعيف">ضعيف</option>
+                <option value="تعثر">تعثر</option>
+              </select>
+            </div>
+            <div id="delayDaysContainer" style="display: none;">
+              <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">أيام التأخير</label>
+              <input id="reportDelayDays" type="number" placeholder="0" style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;">
+            </div>
+            <div style="grid-column: 1/3;">
+              <label style="font-size: 14px; font-weight: 700; color: #334155; display: block; margin-bottom: 7px;">ملاحظات إضافية (اختياري)</label>
+              <textarea id="reportNotes" placeholder="أي معلومات إضافية مهمة..." style="width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none; min-height: 80px;"></textarea>
+            </div>
+          </div>
+          <div class="wizard-buttons">
+            <button class="wizard-button back" onclick="goToWizardStep(1)">العودة</button>
+            <button class="wizard-button next" id="step2-next" onclick="goToWizardStep(3)">التالي</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Review -->
+      <div class="wizard-content" id="step-3">
+        <div class="card">
+          <h3 style="font-size: 19px; font-weight: 900; color: #0F172A; margin: 0 0 22px;">الخطوة 3: المراجعة</h3>
+          <div style="background: #F8FAFC; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div>
+                <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 5px;">الشركة</div>
+                <div style="font-size: 16px; font-weight: 900; color: #0F172A;" id="review-company">-</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 5px;">قيمة التعامل</div>
+                <div style="font-size: 16px; font-weight: 900; color: #16A34A;" id="review-amount">-</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 5px;">نوع التعامل</div>
+                <div style="font-size: 16px; font-weight: 900; color: #0F172A;" id="review-type">-</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 5px;">الالتزام بالسداد</div>
+                <div style="font-size: 16px; font-weight: 900; color: #0F172A;" id="review-payment">-</div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size: 13.5px; color: #64748B; line-height: 1.6; margin-bottom: 16px;">هل البيانات صحيحة؟ يمكنك الرجوع للخطوة السابقة للتعديل قبل الإرسال.</p>
+          <div class="wizard-buttons">
+            <button class="wizard-button back" onclick="goToWizardStep(2)">العودة</button>
+            <button class="wizard-button next" onclick="goToWizardStep(4)">التالي</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Confirmation -->
+      <div class="wizard-content" id="step-4">
+        <div class="card">
+          <h3 style="font-size: 19px; font-weight: 900; color: #0F172A; margin: 0 0 22px;">الخطوة 4: الإقرار والإرسال</h3>
+          <div style="background: #FEF08A; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 8px; margin-bottom: 22px;">
+            <p style="font-size: 14px; color: #78350F; line-height: 1.6; margin: 0;">
+              <strong>إقرار التقرير:</strong> أؤكد بأن البيانات المدخلة صحيحة وموثوقة، وأتحمل مسؤولية أي معلومات غير دقيقة. البيانات ستُستخدم لتحديث مؤشر الثقة.
+            </p>
+          </div>
+          <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 30px; cursor: pointer;">
+            <input type="checkbox" id="confirmCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; font-weight: 700; color: #334155;">أوافق على الشروط والإقرار</span>
+          </label>
+          <div class="wizard-buttons">
+            <button class="wizard-button back" onclick="goToWizardStep(3)">العودة</button>
+            <button class="wizard-button submit" id="submitReportBtn" onclick="submitReport()" disabled>✓ إرسال التقرير</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // استبدال محتوى الصفحة
+  addReportSection.innerHTML = wizardHTML;
+
+  // إضافة معالجات الأحداث
+  setupReportWizardHandlers();
+}
+
+function setupReportWizardHandlers() {
+  const companySearch = document.getElementById('companySearchInput');
+  const confirmCheckbox = document.getElementById('confirmCheckbox');
+  const submitBtn = document.getElementById('submitReportBtn');
+  const paymentSelect = document.getElementById('reportPayment');
+
+  // معالج البحث عن الشركات
+  companySearch?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const results = mockCompanies.filter(c =>
+      c.name.includes(query) || c.registry.includes(query)
+    );
+
+    const resultsDiv = document.getElementById('companySearchResults');
+    resultsDiv.innerHTML = results.map(c => `
+      <button onclick="selectCompanyForReport(${c.id}, '${c.name}')" style="text-align: right; padding: 14px; border: 1.5px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; cursor: pointer; transition: all 0.2s;">
+        <div style="font-weight: 900; color: #0F172A; margin-bottom: 4px;">${c.name}</div>
+        <div style="font-size: 12px; color: #94A3B8;">${c.registry} • ${c.city}</div>
+      </button>
+    `).join('');
+
+    if (results.length === 0 && query) {
+      resultsDiv.innerHTML = '<div style="color: #94A3B8; padding: 20px; text-align: center;">لم يتم العثور على نتائج</div>';
+    }
+  });
+
+  // معالج الدفع
+  paymentSelect?.addEventListener('change', (e) => {
+    const delayContainer = document.getElementById('delayDaysContainer');
+    if (e.target.value === 'ضعيف' || e.target.value === 'تعثر') {
+      delayContainer.style.display = 'block';
+    } else {
+      delayContainer.style.display = 'none';
+    }
+  });
+
+  // معالج الموافقة
+  confirmCheckbox?.addEventListener('change', (e) => {
+    submitBtn.disabled = !e.target.checked;
+  });
+}
+
+function selectCompanyForReport(companyId, companyName) {
+  appState.selectedCompanyForReport = { id: companyId, name: companyName };
+  document.getElementById('step1-next').disabled = false;
+
+  // تحديث البحث
+  const searchInput = document.getElementById('companySearchInput');
+  if (searchInput) searchInput.value = companyName;
+
+  // إخفاء النتائج
+  document.getElementById('companySearchResults').innerHTML = '';
+}
+
+function goToWizardStep(step) {
+  appState.reportWizardStep = step;
+
+  // إخفاء جميع الخطوات
+  for (let i = 1; i <= 4; i++) {
+    const stepDiv = document.getElementById(`step-${i}`);
+    const stepIndicator = document.getElementById(`step-${i}-indicator`);
+    if (stepDiv) stepDiv.classList.remove('active');
+    if (stepIndicator) stepIndicator.classList.remove('active', 'completed');
+  }
+
+  // إظهار الخطوة الحالية
+  const currentStep = document.getElementById(`step-${step}`);
+  if (currentStep) currentStep.classList.add('active');
+
+  // تحديث المؤشرات
+  for (let i = 1; i <= step; i++) {
+    const indicator = document.getElementById(`step-${i}-indicator`);
+    if (indicator) indicator.classList.add(i === step ? 'active' : 'completed');
+  }
+
+  // تحديث البيانات
+  if (step === 3) updateReviewStep();
+}
+
+function updateReviewStep() {
+  const company = mockCompanies.find(c => c.id === appState.selectedCompanyForReport.id);
+  const amount = document.getElementById('reportAmount')?.value || '0';
+  const type = document.getElementById('reportType')?.value || '-';
+  const payment = document.getElementById('reportPayment')?.value || '-';
+
+  document.getElementById('review-company').textContent = company?.name || '-';
+  document.getElementById('review-amount').textContent = `${amount} ر.س`;
+  document.getElementById('review-type').textContent = type;
+  document.getElementById('review-payment').textContent = payment;
+}
+
+function submitReport() {
+  const successMsg = document.getElementById('successMessage');
+  if (successMsg) {
+    successMsg.classList.add('show');
+
+    // إعادة تعيين النموذج
+    setTimeout(() => {
+      appState.reportWizardStep = 1;
+      appState.selectedCompanyForReport = null;
+      initializeReportWizard();
+      successMsg.classList.remove('show');
+      showPage('my-reports');
+    }, 2000);
+  }
+}
+
+// ============================================
+// 5. SEARCH & FILTERS
+// ============================================
+
+function initializeSearch() {
+  // سيتم تنفيذ البحث والفلاتر
+  console.log('Search page initialized');
+}
+
+// ============================================
+// 6. TRUST REPORT PAGE
+// ============================================
+
+function initializeTrustReport() {
+  const company = mockCompanies[0]; // الشركة الأولى كمثال
+  if (!company) return;
+
+  const section = document.getElementById('trust-report');
+  if (!section) return;
+
+  // تحديد الحالة بناءً على عدد التقارير
+  let status, statusColor, trustGauge, recommendations;
+
+  if (company.reports >= 5) {
+    status = 'موثوق (Reliable)';
+    statusColor = '#16A34A';
+    recommendations = 'بيانات كافية وموثوقة جداً - يمكن المتابعة مع هذه الشركة';
+  } else if (company.reports >= 2) {
+    status = 'أولي (Initial)';
+    statusColor = '#F59E0B';
+    recommendations = 'بيانات أولية - يُنصح بطلب مزيد من المعلومات';
+  } else {
+    status = 'بيانات غير كافية (Insufficient)';
+    statusColor = '#94A3B8';
+    recommendations = 'بيانات غير كافية - يُرجى إضافة المزيد من التقارير';
+  }
+
+  section.innerHTML = `
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
+        <div>
+          <h1 style="font-size: 28px; font-weight: 900; color: #0F172A; margin: 0 0 8px;">${company.name}</h1>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <span style="font-size: 14px; color: #64748B; font-weight: 700;">السجل التجاري: ${company.registry}</span>
+            <span style="font-size: 14px; color: #64748B; font-weight: 700;">${company.sector} • ${company.city}</span>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <div style="width: 100px; height: 100px; border-radius: 50%; background: conic-gradient(${statusColor} 0% ${company.trustScore}%, #E2E8F0 ${company.trustScore}% 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+            <div style="width: 85px; height: 85px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center;">
+              <div style="text-align: center;">
+                <div style="font-size: 32px; font-weight: 900; color: ${statusColor};">${company.trustScore}</div>
+                <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">من 100</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size: 14px; font-weight: 800; color: ${statusColor};">${status}</div>
+        </div>
+      </div>
+
+      <div style="background: ${statusColor}15; border-left: 4px solid ${statusColor}; padding: 16px; border-radius: 8px; margin-bottom: 30px;">
+        <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.6;">
+          ${recommendations}
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px;">
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 16px; text-align: center;">
+          <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 8px;">عدد التقارير</div>
+          <div style="font-size: 28px; font-weight: 900; color: #1E2A52;">${company.reports}</div>
+        </div>
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 16px; text-align: center;">
+          <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 8px;">مستوى المخاطر</div>
+          <div style="font-size: 14px; font-weight: 800; color: ${company.risk.includes('منخفض') ? '#16A34A' : company.risk.includes('متوسط') ? '#F59E0B' : '#DC2626'}; padding: 8px; background: white; border-radius: 8px;">${company.risk}</div>
+        </div>
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 16px; text-align: center;">
+          <div style="font-size: 12px; color: #94A3B8; font-weight: 700; margin-bottom: 8px;">آخر تحديث</div>
+          <div style="font-size: 14px; font-weight: 800; color: #0F172A;">${company.lastUpdate}</div>
+        </div>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 900; color: #0F172A; margin: 30px 0 16px;">التقارير المسجلة</h3>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">التاريخ</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">القيمة</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">النوع</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">السداد</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">الحالة</th>
+          </tr>
+          ${mockReports.filter(r => r.companyId === company.id).map(r => `
+            <tr style="border-bottom: 1px solid #F1F5F9;">
+              <td style="padding: 12px; font-size: 13px; color: #0F172A;">${r.date}</td>
+              <td style="padding: 12px; font-size: 13px; font-weight: 800; color: #16A34A;">${r.amount.toLocaleString()} ر.س</td>
+              <td style="padding: 12px; font-size: 13px; color: #0F172A;">${r.type}</td>
+              <td style="padding: 12px; font-size: 13px; color: #0F172A;">${r.payment}</td>
+              <td style="padding: 12px;"><span style="background: #DCFCE7; color: #166534; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 800;">${r.status}</span></td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #F1F5F9;">
+        <button onclick="showPage('add-report')" style="background: #16A34A; color: #fff; border: 0; border-radius: 11px; padding: 12px 30px; font-size: 14px; font-weight: 800; cursor: pointer;">➕ إضافة تقرير</button>
+        <button onclick="showPage('dashboard')" style="background: #fff; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 11px; padding: 12px 28px; font-size: 14px; font-weight: 800; cursor: pointer;">← العودة</button>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// 7. MY REPORTS PAGE
+// ============================================
+
+function initializeMyReports() {
+  const section = document.getElementById('my-reports');
+  if (!section) return;
+
+  section.innerHTML = `
+    <div class="card">
+      <h2 style="font-size: 21px; font-weight: 900; color: #0F172A; margin: 0 0 22px;">تقاريري المرسلة</h2>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">الشركة</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">القيمة</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">التاريخ</th>
+            <th style="text-align: right; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">الحالة</th>
+            <th style="text-align: center; padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">الإجراء</th>
+          </tr>
+          ${mockReports.map(r => {
+            const company = mockCompanies.find(c => c.id === r.companyId);
+            const statusColor = r.status === 'معتمد' ? '#DCFCE7' : r.status === 'قيد المراجعة' ? '#FEF08A' : '#FEE2E2';
+            const statusTextColor = r.status === 'معتمد' ? '#166534' : r.status === 'قيد المراجعة' ? '#78350F' : '#991B1B';
+            return `
+              <tr style="border-bottom: 1px solid #F1F5F9;">
+                <td style="padding: 12px; font-size: 13px; font-weight: 700; color: #0F172A;">${company?.name}</td>
+                <td style="padding: 12px; font-size: 13px; font-weight: 800; color: #16A34A;">${r.amount.toLocaleString()} ر.س</td>
+                <td style="padding: 12px; font-size: 13px; color: #0F172A;">${r.date}</td>
+                <td style="padding: 12px;"><span style="background: ${statusColor}; color: ${statusTextColor}; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 800;">${r.status}</span></td>
+                <td style="padding: 12px; text-align: center;"><button onclick="alert('عرض التفاصيل')" style="background: transparent; border: 0; color: #1E2A52; cursor: pointer; font-weight: 800; text-decoration: underline;">عرض</button></td>
+              </tr>
+            `;
+          }).join('')}
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+
+// ============================================
+// 9. INITIALIZATION
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  // بناء معالج التقرير
+  initializeReportWizard();
+
+  console.log('✅ مرصد JavaScript initialized successfully');
+});
+
+// ============================================
+// 10. UTILITY FUNCTIONS
+// ============================================
+
+// Animation on KPI Cards
+function animateKPIs() {
+  const kpiValues = document.querySelectorAll('.kpi-value');
+  kpiValues.forEach(el => {
+    const value = parseInt(el.textContent);
+    let current = 0;
+    const increment = Math.ceil(value / 20);
+
+    const interval = setInterval(() => {
+      current += increment;
+      if (current >= value) {
+        current = value;
+        clearInterval(interval);
+      }
+      el.textContent = current;
+    }, 50);
+  });
+}
+
+// تشغيل الرسوميات عند تحميل الصفحة
+setTimeout(animateKPIs, 200);
+
+// إضافة Smooth Scroll
+document.addEventListener('click', (e) => {
+  if (e.target.tagName === 'A' && e.target.href.includes('#')) {
+    e.preventDefault();
+    const target = document.querySelector(e.target.getAttribute('href'));
+    target?.scrollIntoView({ behavior: 'smooth' });
+  }
+});
+
+console.log('✅ Script.js loaded successfully');

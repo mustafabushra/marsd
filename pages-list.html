@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>قائمة الصفحات - مرصد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Tajawal', system-ui;
+      background: #F8FAFC;
+      color: #0F172A;
+      padding: 40px 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 {
+      text-align: center;
+      color: #0F172A;
+      margin-bottom: 8px;
+      font-size: 32px;
+      font-weight: 900;
+    }
+    .subtitle {
+      text-align: center;
+      color: #64748B;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    thead {
+      background: #0F172A;
+      color: white;
+    }
+    th {
+      padding: 16px;
+      text-align: right;
+      font-weight: 700;
+      border-bottom: 2px solid #E2E8F0;
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    tbody tr:hover {
+      background: #F1F5F9;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .url {
+      font-family: monospace;
+      background: #F1F5F9;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #1E2A52;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-public {
+      background: #D1FAE5;
+      color: #047857;
+    }
+    .badge-company {
+      background: #DBEAFE;
+      color: #1E40AF;
+    }
+    .badge-admin {
+      background: #FEE2E2;
+      color: #991B1B;
+    }
+    .badge-auth {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .badge-error {
+      background: #F3E8FF;
+      color: #6B21A8;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stat-number {
+      font-size: 32px;
+      font-weight: 900;
+      color: #0F172A;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #64748B;
+      margin-top: 8px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 قائمة الصفحات والروتات</h1>
+    <p class="subtitle">منصة مرصد - نظام تقييم موثوقية الأعمال</p>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number">60</div>
+        <div class="stat-label">إجمالي الصفحات</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">8</div>
+        <div class="stat-label">صفحات عامة</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">14</div>
+        <div class="stat-label">صفحات شركات</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">23</div>
+        <div class="stat-label">صفحات إدارية</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">2</div>
+        <div class="stat-label">صفحات أخطاء</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>الوصف</th>
+          <th>النوع</th>
+          <th>الرابط (URL)</th>
+          <th>الحماية</th>
+          <th>#</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- صفحات عامة (زوار) -->
+        <tr>
+          <td>الصفحة الرئيسية</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/</span></td>
+          <td>بدون حماية</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>عن المنصة</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/about</span></td>
+          <td>بدون حماية</td>
+          <td>2</td>
+        </tr>
+        <tr>
+          <td>الباقات والأسعار</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/pricing</span></td>
+          <td>بدون حماية</td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td>الشركاء</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/partners</span></td>
+          <td>بدون حماية</td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td>الأسئلة الشائعة</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/faq</span></td>
+          <td>بدون حماية</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>تواصل معنا</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/contact</span></td>
+          <td>بدون حماية</td>
+          <td>6</td>
+        </tr>
+        <tr>
+          <td>تسجيل حساب جديد</td>
+          <td><span class="badge badge-auth">حساب جديد</span></td>
+          <td><span class="url">/register</span></td>
+          <td>بدون حماية</td>
+          <td>7</td>
+        </tr>
+        <tr>
+          <td>تسجيل الدخول</td>
+          <td><span class="badge badge-auth">تسجيل دخول</span></td>
+          <td><span class="url">/login</span></td>
+          <td>بدون حماية</td>
+          <td>8</td>
+        </tr>
+        <tr>
+          <td>إعادة تعيين كلمة المرور</td>
+          <td><span class="badge badge-auth">تسجيل دخول</span></td>
+          <td><span class="url">/forgot-password</span></td>
+          <td>بدون حماية</td>
+          <td>9</td>
+        </tr>
+
+        <!-- صفحات الشركات (محمية) -->
+        <tr style="background: #DBEAFE;">
+          <td colspan="5" style="font-weight: 700; color: #1E40AF;">📊 صفحات لوحة التحكم - الشركات (محمية)</td>
+        </tr>
+        <tr>
+          <td>لوحة التحكم الرئيسية</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/dashboard</span></td>
+          <td>حماية شركة</td>
+          <td>10</td>
+        </tr>
+        <tr>
+          <td>البحث عن الشركات</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/search</span></td>
+          <td>حماية شركة</td>
+          <td>11</td>
+        </tr>
+        <tr>
+          <td>إضافة شركة</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/add-company</span></td>
+          <td>حماية شركة</td>
+          <td>12</td>
+        </tr>
+        <tr>
+          <td>إضافة تقرير</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/add-report</span></td>
+          <td>حماية شركة</td>
+          <td>13</td>
+        </tr>
+        <tr>
+          <td>التقارير الخاصة بي</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/my-reports</span></td>
+          <td>حماية شركة</td>
+          <td>14</td>
+        </tr>
+        <tr>
+          <td>عرض التقرير</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/trust-report/:id</span></td>
+          <td>حماية شركة</td>
+          <td>15</td>
+        </tr>
+        <tr>
+          <td>قائمة المراقبة</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/watchlist</span></td>
+          <td>حماية شركة</td>
+          <td>16</td>
+        </tr>
+        <tr>
+          <td>مقارنة الشركات</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/compare</span></td>
+          <td>حماية شركة</td>
+          <td>17</td>
+        </tr>
+        <tr>
+          <td>إدارة مستخدمي الشركة</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/users</span></td>
+          <td>حماية شركة</td>
+          <td>18</td>
+        </tr>
+        <tr>
+          <td>الاشتراك والباقات</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/subscription</span></td>
+          <td>حماية شركة</td>
+          <td>19</td>
+        </tr>
+        <tr>
+          <td>الملف الشخصي</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/profile</span></td>
+          <td>حماية شركة</td>
+          <td>20</td>
+        </tr>
+        <tr>
+          <td>الإشعارات</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/notifications</span></td>
+          <td>حماية شركة</td>
+          <td>21</td>
+        </tr>
+        <tr>
+          <td>طلبات العمل</td>
+          <td><span class="badge badge-company">شركة</span></td>
+          <td><span class="url">/business-requests</span></td>
+          <td>حماية شركة</td>
+          <td>22</td>
+        </tr>
+
+        <!-- صفحات الإدارة (محمية بشدة) -->
+        <tr style="background: #FEE2E2;">
+          <td colspan="5" style="font-weight: 700; color: #991B1B;">⚙️ لوحة التحكم - الإدارة (محمية بشدة - مسؤولين فقط)</td>
+        </tr>
+        <tr>
+          <td>لوحة التحكم الإدارية</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin</span></td>
+          <td>حماية إدارية</td>
+          <td>23</td>
+        </tr>
+        <tr>
+          <td>طلبات الشركات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/requests</span></td>
+          <td>حماية إدارية</td>
+          <td>24</td>
+        </tr>
+        <tr>
+          <td>مراجعة التقارير</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/reports</span></td>
+          <td>حماية إدارية</td>
+          <td>25</td>
+        </tr>
+        <tr>
+          <td>استيراد دفعة شركات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/bulk-import</span></td>
+          <td>حماية إدارية</td>
+          <td>26</td>
+        </tr>
+        <tr>
+          <td>إدارة الشركات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/companies</span></td>
+          <td>حماية إدارية</td>
+          <td>27</td>
+        </tr>
+        <tr>
+          <td>إدارة المستخدمين</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/users</span></td>
+          <td>حماية إدارية</td>
+          <td>28</td>
+        </tr>
+        <tr>
+          <td>سجل العمليات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/logs</span></td>
+          <td>حماية إدارية</td>
+          <td>29</td>
+        </tr>
+        <tr>
+          <td>الإعدادات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/settings</span></td>
+          <td>حماية إدارية</td>
+          <td>30</td>
+        </tr>
+        <tr>
+          <td>إدارة المستأجرين</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/tenants</span></td>
+          <td>حماية إدارية</td>
+          <td>31</td>
+        </tr>
+        <tr>
+          <td>الاشتراكات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/subscriptions</span></td>
+          <td>حماية إدارية</td>
+          <td>32</td>
+        </tr>
+        <tr>
+          <td>مسؤولي المنصة</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/admin-users</span></td>
+          <td>حماية إدارية</td>
+          <td>33</td>
+        </tr>
+        <tr>
+          <td>الباقات والخطط</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/plans</span></td>
+          <td>حماية إدارية</td>
+          <td>34</td>
+        </tr>
+        <tr>
+          <td>المدفوعات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/payments</span></td>
+          <td>حماية إدارية</td>
+          <td>35</td>
+        </tr>
+        <tr>
+          <td>مؤشر الثقة (Trust Score)</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/trust-score</span></td>
+          <td>حماية إدارية</td>
+          <td>36</td>
+        </tr>
+        <tr>
+          <td>تحليلات التقارير</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/report-analytics</span></td>
+          <td>حماية إدارية</td>
+          <td>37</td>
+        </tr>
+        <tr>
+          <td>نماذج البريد الإلكتروني</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/email-templates</span></td>
+          <td>حماية إدارية</td>
+          <td>38</td>
+        </tr>
+        <tr>
+          <td>تصدير البيانات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/data-export</span></td>
+          <td>حماية إدارية</td>
+          <td>39</td>
+        </tr>
+        <tr>
+          <td>إدارة النزاعات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/disputes</span></td>
+          <td>حماية إدارية</td>
+          <td>40</td>
+        </tr>
+        <tr>
+          <td>حالة النظام</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/system-health</span></td>
+          <td>حماية إدارية</td>
+          <td>41</td>
+        </tr>
+        <tr>
+          <td>كشف الاحتيال</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/fraud-detection</span></td>
+          <td>حماية إدارية</td>
+          <td>42</td>
+        </tr>
+        <tr>
+          <td>التكاملات الخارجية</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/integrations</span></td>
+          <td>حماية إدارية</td>
+          <td>43</td>
+        </tr>
+        <tr>
+          <td>تحليلات الشركات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/tenant-analytics</span></td>
+          <td>حماية إدارية</td>
+          <td>44</td>
+        </tr>
+        <tr>
+          <td>التحقق من الشركات</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/company-verification</span></td>
+          <td>حماية إدارية</td>
+          <td>45</td>
+        </tr>
+        <tr>
+          <td>النسخ الاحتياطية والاستعادة</td>
+          <td><span class="badge badge-admin">إدارة</span></td>
+          <td><span class="url">/admin/backup</span></td>
+          <td>حماية إدارية</td>
+          <td>46</td>
+        </tr>
+
+        <!-- صفحات الأخطاء -->
+        <tr style="background: #F3E8FF;">
+          <td colspan="5" style="font-weight: 700; color: #6B21A8;">⚠️ صفحات الأخطاء والمعلومات</td>
+        </tr>
+        <tr>
+          <td>صفحة غير مصرح (403)</td>
+          <td><span class="badge badge-error">خطأ</span></td>
+          <td><span class="url">/unauthorized</span></td>
+          <td>بدون حماية</td>
+          <td>47</td>
+        </tr>
+        <tr>
+          <td>صفحة غير موجودة (404)</td>
+          <td><span class="badge badge-error">خطأ</span></td>
+          <td><span class="url">/404</span></td>
+          <td>بدون حماية</td>
+          <td>48</td>
+        </tr>
+
+        <!-- أخرى -->
+        <tr style="background: #F1F5F9;">
+          <td colspan="5" style="font-weight: 700; color: #0F172A;">📋 أخرى</td>
+        </tr>
+        <tr>
+          <td>عرض الـ Modals</td>
+          <td><span class="badge badge-public">عام</span></td>
+          <td><span class="url">/modals-demo</span></td>
+          <td>بدون حماية</td>
+          <td>49</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
