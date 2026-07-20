@@ -1,19 +1,20 @@
 /**
  * API Client — يربط React مع Backend
- * Backend API: http://localhost:3333
+ * يستخدم Mock Server محلياً للتطوير
  *
- * Updated: JWT Token Management + Interceptors
- * - Automatically attaches JWT to all requests
- * - Validates token expiration
- * - Handles 401 responses
- * - Refreshes expired tokens
+ * Updated: Mock Server Integration
+ * - Local development with mock data
+ * - No external API dependency
  */
+
+import { mockAPI } from '../api/mockServer'
 
 // ============================================================================
 // API CONFIGURATION
 // ============================================================================
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+const USE_MOCK_API = true // استخدم Mock API للتطوير
 
 // ============================================================================
 // TOKEN MANAGEMENT
