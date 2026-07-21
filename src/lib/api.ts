@@ -221,38 +221,54 @@ const mockCompanies = [
 
 /**
  * Login with email and password
- * Makes POST request to backend API
+ * Uses Supabase Auth directly
  * Stores tokens and user data in localStorage
  */
 export async function login(email: string, password: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
+    const { createClient } = await import('@supabase/supabase-js')
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase configuration missing')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || 'فشل تسجيل الدخول')
+    if (error) {
+      throw new Error(error.message || 'فشل تسجيل الدخول')
     }
 
-    const data = await response.json()
+    if (!data.session) {
+      throw new Error('No session returned from login')
+    }
 
     // Store tokens and user
-    if (data.accessToken) {
-      setToken(data.accessToken)
-    }
-    if (data.refreshToken) {
-      setRefreshToken(data.refreshToken)
-    }
-    if (data.user) {
-      setUser(data.user)
+    const user = {
+      id: data.user?.id,
+      email: data.user?.email,
+      role: 'user',
+      isAdmin: false,
     }
 
-    return data
+    setToken(data.session.access_token)
+    if (data.session.refresh_token) {
+      setRefreshToken(data.session.refresh_token)
+    }
+    setUser(user)
+
+    return {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      user,
+    }
   } catch (error) {
     if (error instanceof Error) {
       throw error
@@ -263,51 +279,63 @@ export async function login(email: string, password: string) {
 
 /**
  * Register new company account
- * Makes POST request to backend API
+ * Uses Supabase Auth directly
  * Stores tokens and user data in localStorage
  */
 export async function register(data: any) {
   try {
-    // Map form fields to API payload
-    const payload = {
+    const { createClient } = await import('@supabase/supabase-js')
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase configuration missing')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+    })
+
+    if (error) {
+      throw new Error(error.message || 'فشل إنشاء الحساب')
+    }
+
+    if (!authData.user) {
+      throw new Error('Failed to create user account')
+    }
+
+    // Create user object
+    const user = {
+      id: authData.user.id,
+      email: authData.user.email,
       company: data.company || data.name,
       commercialNumber: data.commercialNumber || data.crNumber,
       sector: data.sector,
       city: data.city,
       phone: data.phone,
-      email: data.email,
-      password: data.password,
+      role: 'user',
+      isAdmin: false,
     }
-
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || 'فشل إنشاء الحساب')
-    }
-
-    const responseData = await response.json()
 
     // Store tokens and user
-    if (responseData.accessToken) {
-      setToken(responseData.accessToken)
+    if (authData.session) {
+      setToken(authData.session.access_token)
+      if (authData.session.refresh_token) {
+        setRefreshToken(authData.session.refresh_token)
+      }
     }
-    if (responseData.refreshToken) {
-      setRefreshToken(responseData.refreshToken)
-    }
-    if (responseData.tenant) {
-      setUser(responseData.tenant)
-    } else if (responseData.user) {
-      setUser(responseData.user)
-    }
+    setUser(user)
 
-    return responseData
+    return {
+      accessToken: authData.session?.access_token || '',
+      refreshToken: authData.session?.refresh_token || '',
+      tenant: user,
+      user,
+    }
   } catch (error) {
     if (error instanceof Error) {
       throw error
