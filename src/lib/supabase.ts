@@ -10,12 +10,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // ============================================================================
 
 export async function getCompanies() {
+  console.log('🔗 Supabase: Fetching companies...')
   const { data, error } = await supabase
     .from('companies')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) throw new Error(`Failed to fetch companies: ${error.message}`)
+  if (error) {
+    console.error('❌ Supabase Error:', error.message)
+    throw new Error(`Failed to fetch companies: ${error.message}`)
+  }
+  console.log('✅ Supabase: Companies fetched', data)
   return data || []
 }
 

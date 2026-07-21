@@ -7,3 +7,18 @@ Port 3000 is in use, trying another one...
   [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m1181[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3001[22m/[39m
+[2m10:20:26[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m10:20:27[22m [36m[1m[vite][22m[39m server restarted.
+[2m10:52:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/context/AuthContext.jsx, /src/pages/Search.jsx, /src/pages/AdminUsers.jsx, /src/pages/AdminLogs.jsx, /src/pages/AdminCompanies.jsx, /src/pages/AdminReports.jsx, /src/pages/AdminRequests.jsx[22m
+[2m10:52:19[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m10:52:19[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m10:52:20[22m [36m[1m[vite][22m[39m server restarted.
+[2m11:13:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/context/AuthContext.jsx, /src/pages/AdminUsers.jsx, /src/pages/AdminReports.jsx, /src/pages/Search.jsx, /src/pages/AdminRequests.jsx, /src/pages/AdminLogs.jsx, /src/pages/AdminCompanies.jsx[22m
+[2m13:54:23[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m13:54:23[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+Re-optimizing dependencies because lockfile has changed
+[2m13:54:25[22m [36m[1m[vite][22m[39m server restarted.
+[2m14:18:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
+[2m14:18:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
+[2m14:23:06[22m [36m[1m[vite][22m[39m [32m✨ new dependencies optimized: [33m@supabase/supabase-js[32m[39m
+[2m14:23:06[22m [36m[1m[vite][22m[39m [32m✨ optimized dependencies changed. reloading[39m

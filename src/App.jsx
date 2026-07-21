@@ -53,6 +53,7 @@ import AdminTenantAnalytics from './pages/AdminTenantAnalytics'
 import AdminCompanyVerification from './pages/AdminCompanyVerification'
 import AdminBackup from './pages/AdminBackup'
 import ModalDemo from './pages/ModalDemo'
+import SupabaseTest from './pages/SupabaseTest'
 
 /**
  * AppContent Component
@@ -81,6 +82,9 @@ function AppContent() {
       <Routes>
         {/* Modal Demo Route */}
         <Route path="/modals-demo" element={<ModalDemo />} />
+
+        {/* Supabase Test Route */}
+        <Route path="/supabase-test" element={<SupabaseTest />} />
 
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>
