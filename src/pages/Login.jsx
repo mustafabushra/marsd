@@ -259,15 +259,25 @@ export default function Login() {
           textAlign: 'center',
           marginTop: '24px',
           padding: '12px',
-          background: '#F8FAFC',
+          background: '#FEF2F2',
           borderRadius: '8px',
           cursor: 'pointer',
           fontSize: '13px',
           fontWeight: 700,
-          color: '#16A34A'
+          color: '#DC2626',
+          border: '1px solid #FECACA',
+          transition: 'all 0.2s'
         }}
-        onClick={handleAdminLogin}>
-          دخول الإدارة
+        onClick={() => navigate('/admin-login')}
+        onMouseEnter={(e) => {
+          e.target.style.background = '#FEE2E2'
+          e.target.style.borderColor = '#FCA5A5'
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = '#FEF2F2'
+          e.target.style.borderColor = '#FECACA'
+        }}>
+          🔐 دخول لوحة التحكم الإدارية
         </div>
       </div>
     </main>
