@@ -13,14 +13,33 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const dashRes = await fetch('/api/admin/dashboard')
-      const dashData = await dashRes.json()
-      setDashboard(dashData)
+      // Mock dashboard data
+      const mockDashboard = {
+        overview: {
+          totalTenants: 47,
+          activeSubscriptions: 38,
+          pendingReports: 12,
+          approvedReports: 145,
+          totalRevenue: 125400,
+        },
+        recentActivity: [
+          { id: 1, type: 'new_report', description: 'تقرير جديد من شركة النور', date: new Date().toISOString() },
+          { id: 2, type: 'subscription', description: 'تجديد اشتراك شركة الرؤية', date: new Date(Date.now() - 3600000).toISOString() },
+        ],
+      }
 
-      const analyticsRes = await fetch('/api/admin/analytics')
-      const analyticsData = await analyticsRes.json()
-      setAnalytics(analyticsData)
+      const mockAnalytics = {
+        topCompanies: [
+          { name: 'شركة نجد للمقاولات', reports: 15, trustScore: 94 },
+          { name: 'الرياض للتجارة', reports: 12, trustScore: 88 },
+          { name: 'التقنية المتقدمة', reports: 10, trustScore: 92 },
+        ],
+        pendingReviews: 12,
+        reportsByStatus: { approved: 145, pending: 12, rejected: 8 },
+      }
 
+      setDashboard(mockDashboard)
+      setAnalytics(mockAnalytics)
       setLoading(false)
     } catch (error) {
       console.error('Error fetching dashboard:', error)

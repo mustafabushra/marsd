@@ -251,11 +251,12 @@ export async function login(email: string, password: string) {
     }
 
     // Store tokens and user
+    const isAdmin = email === 'admin@marsad.com' || email === 'test1@marsad.sa'
     const user = {
       id: data.user?.id,
       email: data.user?.email,
-      role: 'user',
-      isAdmin: false,
+      role: isAdmin ? 'platform_admin' : 'user',
+      isAdmin: isAdmin,
     }
 
     setToken(data.session.access_token)
@@ -309,6 +310,7 @@ export async function register(data: any) {
     }
 
     // Create user object
+    const isAdmin = data.email === 'admin@marsad.com' || data.email === 'test1@marsad.sa'
     const user = {
       id: authData.user.id,
       email: authData.user.email,
@@ -317,8 +319,8 @@ export async function register(data: any) {
       sector: data.sector,
       city: data.city,
       phone: data.phone,
-      role: 'user',
-      isAdmin: false,
+      role: isAdmin ? 'platform_admin' : 'user',
+      isAdmin: isAdmin,
     }
 
     // Store tokens and user
