@@ -14,6 +14,7 @@ import FAQ from './pages/FAQ'
 import Contact from './pages/Contact'
 import Register from './pages/Register'
 import Login from './pages/Login'
+import AdminLogin from './pages/AdminLogin'
 import ForgotPassword from './pages/ForgotPassword'
 import CompanyDashboard from './pages/CompanyDashboard'
 import Search from './pages/Search'
@@ -33,6 +34,7 @@ import AdminRequests from './pages/AdminRequests'
 import AdminReports from './pages/AdminReports'
 import AdminBulkImport from './pages/AdminBulkImport'
 import AdminCompanies from './pages/AdminCompanies'
+import AdminCompaniesManagement from './pages/AdminCompaniesManagement'
 import AdminUsers from './pages/AdminUsers'
 import AdminLogs from './pages/AdminLogs'
 import AdminSettings from './pages/AdminSettings'
@@ -99,6 +101,7 @@ function AppContent() {
         </Route>
 
         {/* Auth Routes - No layout */}
+        <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Company Routes - Protected */}
@@ -124,7 +127,7 @@ function AppContent() {
           <Route path="/admin/requests" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminRequests /></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminReports /></AdminRoute>} />
           <Route path="/admin/bulk-import" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminBulkImport /></AdminRoute>} />
-          <Route path="/admin/companies" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminCompanies /></AdminRoute>} />
+          <Route path="/admin/companies" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminCompaniesManagement /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminUsers /></AdminRoute>} />
           <Route path="/admin/logs" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminLogs /></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminSettings /></AdminRoute>} />
