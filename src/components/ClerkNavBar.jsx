@@ -42,46 +42,85 @@ export default function ClerkNavBar() {
             <span style={{ fontWeight: 900, fontSize: '23px', color: '#1E2A52', letterSpacing: '-0.5px' }}>مرصد</span>
           </div>
 
-          {!isSignedIn && (
-            <nav style={{ display: 'flex', gap: '28px' }}>
-              {[
-                { label: 'الرئيسية', path: '/' },
-                { label: 'عن المنصة', path: '/about' },
-                { label: 'الباقات', path: '/pricing' },
-                { label: 'الشركاء', path: '/partners' },
-                { label: 'الأسئلة الشائعة', path: '/faq' },
-              ].map(nav => (
-                <span
-                  key={nav.path}
-                  onClick={() => navigate(nav.path)}
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    color: '#475569',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {nav.label}
-                </span>
-              ))}
-            </nav>
-          )}
+          <nav style={{ display: 'flex', gap: '28px' }}>
+            {[
+              { label: 'الرئيسية', path: '/' },
+              { label: 'عن المنصة', path: '/about' },
+              { label: 'الباقات', path: '/pricing' },
+              { label: 'الشركاء', path: '/partners' },
+              { label: 'الأسئلة الشائعة', path: '/faq' },
+            ].map(nav => (
+              <span
+                key={nav.path}
+                onClick={() => navigate(nav.path)}
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                {nav.label}
+              </span>
+            ))}
+          </nav>
         </div>
 
         {/* Auth Section */}
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {isSignedIn ? (
-            <UserButton
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  avatarBox: 'w-10 h-10',
-                  userButtonBox: 'flex-row-reverse',
-                }
-              }}
-            />
+            <>
+              <button
+                onClick={() => navigate('/admin')}
+                style={{
+                  background: '#DC2626',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
+                onMouseLeave={(e) => e.target.style.background = '#DC2626'}
+                title="لوحة الإدارة (مرصد فقط)"
+              >
+                الإدارة
+              </button>
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: 'w-10 h-10',
+                    userButtonBox: 'flex-row-reverse',
+                  }
+                }}
+              />
+            </>
           ) : (
             <>
+              <button
+                onClick={() => navigate('/admin-login')}
+                style={{
+                  background: '#DC2626',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
+                onMouseLeave={(e) => e.target.style.background = '#DC2626'}
+                title="تسجيل دخول الإدارة"
+              >
+                إدارة
+              </button>
+
               <SignInButton mode="modal">
                 <button style={{
                   background: '#fff',
