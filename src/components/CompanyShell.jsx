@@ -15,7 +15,7 @@ import {
   BellIcon
 } from './icons'
 
-export default function CompanyShell({ user, onLogout }) {
+export default function CompanyShell({ user }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { organizationName, userRole } = useClerkOrganization()

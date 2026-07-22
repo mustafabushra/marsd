@@ -113,7 +113,7 @@ function AppContent() {
         <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected */}
-        <Route element={<CompanyShell user={user} onLogout={logout} />}>
+        <Route element={<CompanyShell user={user} />}>
           <Route path="/dashboard" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><CompanyDashboard /></CompanyRoute>} />
           <Route path="/search" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Search /></CompanyRoute>} />
           <Route path="/add-company" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AddCompany /></CompanyRoute>} />
@@ -130,7 +130,7 @@ function AppContent() {
         </Route>
 
         {/* Admin Routes - Protected */}
-        <Route element={<AdminShell user={user} onLogout={logout} />}>
+        <Route element={<AdminShell user={user} />}>
           <Route path="/admin" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/requests" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminRequests /></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminReports /></AdminRoute>} />

@@ -11,7 +11,7 @@ import {
   LogIcon
 } from './icons'
 
-export default function AdminShell({ user, onLogout }) {
+export default function AdminShell({ user }) {
   const navigate = useNavigate()
   const { organizationName, userRole } = useClerkOrganization()
 
