@@ -1,6 +1,6 @@
 {
-    "outputDirectory":  "dist",
-    "buildCommand":  "rm -rf node_modules && npm install --prefer-offline && chmod +x node_modules/.bin/* 2>/dev/null && npm run build",
-    "devCommand":  "npm run dev",
-    "framework":  "vite"
+    "outputDirectory": "dist",
+    "buildCommand": "npm install && npm run build",
+    "devCommand": "npm run dev",
+    "framework": "vite"
 }
