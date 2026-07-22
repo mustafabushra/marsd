@@ -158,9 +158,16 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     let crNumber = companyData.crNumber?.trim()
 
     if (!crNumber) {
-      // If not provided, generate a unique one based on user ID
-      crNumber = `CR-${userId.substring(0, 8)}-${Date.now()}`
+      // If not provided, generate a unique one based on user ID + timestamp
+      // Max length is 20 chars, so use short format: CRXXXXXXXX (CR + 8 chars of timestamp)
+      const shortTimestamp = Date.now().toString().slice(-8)
+      crNumber = `CR${shortTimestamp}`
     } else {
+      // Trim to max 20 chars if needed
+      if (crNumber.length > 20) {
+        crNumber = crNumber.substring(0, 20)
+      }
+
       // Check if CR number already exists
       const { data: existing } = await supabase
         .from('tenants')
@@ -169,8 +176,9 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         .limit(1)
 
       if (existing && existing.length > 0) {
-        // CR number exists, append timestamp to make it unique
-        crNumber = `${crNumber}-${Date.now()}`
+        // CR number exists, generate new one with timestamp
+        const shortTimestamp = Date.now().toString().slice(-8)
+        crNumber = `CR${shortTimestamp}`
       }
     }
 
