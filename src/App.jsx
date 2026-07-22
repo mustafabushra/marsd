@@ -56,6 +56,7 @@ import AdminCompanyVerification from './pages/AdminCompanyVerification'
 import AdminBackup from './pages/AdminBackup'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
+import TestSupabase from './pages/TestSupabase'
 
 /**
  * AppContent Component
@@ -103,6 +104,7 @@ function AppContent() {
         {/* Auth Routes - No layout */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected */}
         <Route element={<CompanyShell user={user} onLogout={logout} />}>
