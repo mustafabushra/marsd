@@ -1,6 +1,7 @@
 {
     "outputDirectory": "dist",
-    "buildCommand": "npm install && npm run build",
+    "buildCommand": "bash build.sh",
     "devCommand": "npm run dev",
-    "framework": "vite"
+    "framework": "vite",
+    "nodeVersion": "24.x"
 }
