@@ -1,4 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom'
+import { UserButton } from '@clerk/react'
 import {
   DashboardIcon,
   DocumentIcon,
@@ -149,29 +150,24 @@ export default function AdminShell({ user, onLogout }) {
           })}
         </nav>
 
-        {/* Logout */}
+        {/* Clerk UserButton */}
         <div style={{
           position: 'absolute',
           bottom: '20px',
           left: '16px',
-          right: '16px'
+          right: '16px',
+          display: 'flex',
+          justifyContent: 'center'
         }}>
-          <button
-            onClick={onLogout}
-            style={{
-              width: '100%',
-              background: 'rgba(220, 38, 38, .15)',
-              border: '1.5px solid rgba(220, 38, 38, .3)',
-              color: '#FCA5A5',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer'
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                avatarBox: 'w-10 h-10',
+                userButtonBox: 'flex-row-reverse',
+              }
             }}
-          >
-            تسجيل الخروج
-          </button>
+          />
         </div>
       </aside>
 
@@ -189,29 +185,16 @@ export default function AdminShell({ user, onLogout }) {
           top: 0,
           zIndex: 30
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              background: '#DC2626',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '16px'
-            }}>
-              {user?.name?.[0] || 'A'}
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
-                {user?.name || 'مسؤول'}
-              </div>
-              <div style={{ fontSize: '13px', color: '#64748B' }}>
-                {user?.email}
-              </div>
-            </div>
+          <div>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: 'w-10 h-10',
+                  userButtonBox: 'flex-row-reverse',
+                }
+              }}
+            />
           </div>
           <div style={{
             display: 'flex',

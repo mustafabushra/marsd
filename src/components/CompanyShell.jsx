@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { UserButton } from '@clerk/react'
 import {
   DashboardIcon,
   SearchIcon,
@@ -16,6 +17,18 @@ import {
 export default function CompanyShell({ user, onLogout }) {
   const navigate = useNavigate()
   const location = useLocation()
+
+  const handleSignOut = async () => {
+    try {
+      // Clerk's UserButton handles signOut in the dropdown menu
+      // This is for manual logout button - Clerk doesn't expose signOut directly
+      // We'll use the UserButton component instead
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+      window.location.href = '/'
+    } catch (err) {
+      console.error('Logout failed:', err)
+    }
+  }
 
   const screenLabels = {
     '/dashboard': 'لوحة تحكم الشركة',
@@ -127,24 +140,18 @@ export default function CompanyShell({ user, onLogout }) {
           <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>إدارة الباقة</button>
         </div>
 
-        {/* Logout */}
-        <button
-          onClick={onLogout}
-          style={{
-            width: '100%',
-            background: 'rgba(220, 38, 38, .15)',
-            border: '1.5px solid rgba(220, 38, 38, .3)',
-            color: '#FCA5A5',
-            borderRadius: '8px',
-            padding: '10px 12px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            marginTop: '12px'
-          }}
-        >
-          تسجيل الخروج
-        </button>
+        {/* Clerk UserButton */}
+        <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                avatarBox: 'w-10 h-10',
+                userButtonBox: 'flex-row-reverse',
+              }
+            }}
+          />
+        </div>
       </aside>
 
       {/* Main */}
@@ -176,19 +183,15 @@ export default function CompanyShell({ user, onLogout }) {
               <BellIcon />
               <span style={{ position: 'absolute', top: '-3px', left: '-3px', width: '9px', height: '9px', background: '#DC2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '15px' }}>
-                ن
-              </div>
-              <div>
-                <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                  شركة نجد للمقاولات
-                </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                  عبدالله الحربي · مدير
-                </div>
-              </div>
-            </div>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: 'w-10 h-10',
+                  userButtonBox: 'flex-row-reverse',
+                }
+              }}
+            />
           </div>
         </header>
 

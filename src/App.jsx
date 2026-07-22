@@ -83,7 +83,7 @@ function AppContent() {
   }
 
   const isLoggedIn = isSignedIn
-  const isAdmin = false // TODO: Check user organization role from Clerk
+  const isAdmin = user?.publicMetadata?.role === 'admin'
   const isLoading = !isLoaded
 
   return (
