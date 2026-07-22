@@ -1,30 +1,124 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
 
 export default function CompanyDashboard() {
   const navigate = useNavigate()
-  const [kpis] = useState([
-    { label: 'مساهماتي', value: '17', icon: '📋', color: '#7C3AED', sub: 'ضمن أعلى 15%' },
-    { label: 'شركات في قوائسي', value: '12', icon: '⭐', color: '#F59E0B', sub: 'تحت المراقبة' },
-    { label: 'تقاريري المعتمدة', value: '34', icon: '✓', color: '#16A34A', sub: '+3 هذا الأسبوع' },
-    { label: 'عمليات البحث المتبقية', value: '128', icon: '🔍', color: '#1E2A52', sub: 'من 200 هذا الشهر' }
+  const { user } = useUser()
+  const [loading, setLoading] = useState(true)
+  const [companyName, setCompanyName] = useState('الشركة')
+  const [kpis, setKpis] = useState([
+    { label: 'مساهماتي', value: '—', icon: '📋', color: '#7C3AED', sub: '' },
+    { label: 'شركات في قوائسي', value: '—', icon: '⭐', color: '#F59E0B', sub: '' },
+    { label: 'تقاريري المعتمدة', value: '—', icon: '✓', color: '#16A34A', sub: '' },
+    { label: 'رصيدي من النقاط', value: '—', icon: '💎', color: '#1E2A52', sub: '' }
   ])
+  const [activity, setActivity] = useState([])
+  const [contribPct, setContribPct] = useState('0')
 
-  const [activity] = useState([
-    { title: 'تقرير جديد معتمد من قبل الإدارة', time: 'منذ ساعتين', dot: '#16A34A' },
-    { title: 'حصلت على مستوى مساهم جديد', time: 'منذ 5 ساعات', dot: '#F59E0B' },
-    { title: 'تم البحث عن شركة نجد 14 مرة', time: 'منذ يوم', dot: '#3B82F6' },
-    { title: 'أضفت شركة جديدة للسجل', time: 'منذ يومين', dot: '#8B5CF6' },
-    { title: 'وصلت لـ 50 مساهمة هذا الشهر', time: 'منذ 3 أيام', dot: '#10B981' }
-  ])
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const supabase = getSupabase()
 
-  const [contribPct] = useState('78')
-  const [contribCount] = useState('89')
+        // Get current user's tenant info
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tenant_id, first_name, last_name')
+          .eq('id', user?.id)
+          .single()
+
+        if (!userData?.tenant_id) {
+          setLoading(false)
+          return
+        }
+
+        // Get tenant (company) name
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('name')
+          .eq('id', userData.tenant_id)
+          .single()
+
+        if (tenantData) setCompanyName(tenantData.name)
+
+        // Get submitted reports count
+        const { count: reportsCount } = await supabase
+          .from('reports')
+          .select('id', { count: 'exact' })
+          .eq('reporter_tenant_id', userData.tenant_id)
+
+        // Get approved reports count
+        const { count: approvedCount } = await supabase
+          .from('reports')
+          .select('id', { count: 'exact' })
+          .eq('reporter_tenant_id', userData.tenant_id)
+          .eq('status', 'approved')
+
+        // Get watchlist count
+        const { count: watchlistCount } = await supabase
+          .from('watchlist_items')
+          .select('id', { count: 'exact' })
+          .eq('tenant_id', userData.tenant_id)
+
+        // Get credits balance
+        const { data: creditsData } = await supabase
+          .rpc('get_credit_balance', { p_tenant_id: userData.tenant_id })
+
+        // Get recent notifications (activity)
+        const { data: notificationsData } = await supabase
+          .from('notifications')
+          .select('id, type, message, created_at')
+          .eq('tenant_id', userData.tenant_id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+
+        setKpis([
+          { label: 'مساهماتي', value: (reportsCount || 0).toString(), icon: '📋', color: '#7C3AED', sub: `${approvedCount || 0} معتمدة` },
+          { label: 'شركات في قوائسي', value: (watchlistCount || 0).toString(), icon: '⭐', color: '#F59E0B', sub: 'تحت المراقبة' },
+          { label: 'تقاريري المعتمدة', value: (approvedCount || 0).toString(), icon: '✓', color: '#16A34A', sub: 'من إجمالي مساهماتي' },
+          { label: 'رصيدي من النقاط', value: (creditsData || 0).toString(), icon: '💎', color: '#1E2A52', sub: 'نقاط متراكمة' }
+        ])
+
+        const formattedActivity = (notificationsData || []).map(n => ({
+          title: n.message || 'تحديث جديد',
+          time: new Date(n.created_at).toLocaleDateString('ar-SA'),
+          dot: '#16A34A'
+        }))
+
+        if (formattedActivity.length === 0) {
+          formattedActivity.push(
+            { title: 'أهلاً بك في مرصد! ابدأ بالبحث عن شركات', time: 'الآن', dot: '#3B82F6' }
+          )
+        }
+
+        setActivity(formattedActivity)
+        setContribPct(Math.min(Math.floor((approvedCount || 0) * 10 / 10), 100))
+      } catch (err) {
+        console.error('Error loading dashboard:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user?.id) {
+      loadDashboardData()
+    }
+  }, [user?.id])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        جاري التحميل...
+      </div>
+    )
+  }
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px' }}>
       <div style={{ marginBottom: '22px' }}>
-        <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', letterSpacing: '-0.5px', textAlign: 'right' }}>أهلاً، شركة نجد للمقاولات 👋</h1>
+        <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', letterSpacing: '-0.5px', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
         <p style={{ fontSize: '15px', color: '#64748B', margin: 0, fontWeight: 600, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
       </div>
 
@@ -98,13 +192,13 @@ export default function CompanyDashboard() {
           {/* Give to Get */}
           <div style={{ background: 'linear-gradient(135deg,#1E2A52,#16A34A)', borderRadius: '16px', padding: '24px', color: '#fff' }}>
             <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '8px', textAlign: 'right' }}>فلسفة Give to Get</div>
-            <p style={{ fontSize: '13.5px', color: '#DCFCE7', margin: '0 0 16px 0', lineHeight: 1.6, textAlign: 'right' }}>كل ما ساهمت أكثر، استفدت أكثر — أنت ضمن أعلى 15% من المساهمين</p>
+            <p style={{ fontSize: '13.5px', color: '#DCFCE7', margin: '0 0 16px 0', lineHeight: 1.6, textAlign: 'right' }}>كل ما ساهمت أكثر، استفدت أكثر — {contribPct >= 50 ? 'أنت مساهم مميز!' : 'استمر في المساهمة'}</p>
             <div style={{ height: '12px', background: 'rgba(255,255,255,.1)', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
               <div style={{ width: `${contribPct}%`, height: '100%', background: 'linear-gradient(90deg,#16A34A,#4ADE80)', borderRadius: '8px' }}></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: 600, textAlign: 'right' }}>
               <span>{contribPct}%</span>
-              <span>مساهم نشط</span>
+              <span>من أهداف المساهمة</span>
             </div>
           </div>
 
