@@ -1,20 +1,27 @@
 /**
- * API Client — يربط React مع Backend
- * يستخدم Mock Server محلياً للتطوير
- *
- * Updated: Mock Server Integration
- * - Local development with mock data
- * - No external API dependency
+ * API Client — يربط React مع Supabase مباشرة
+ * Real-time database access with Row-Level Security
+ * Replaced: Mock API → Real Supabase
  */
 
-import { mockAPI } from '../api/mockServer'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// ============================================================================
-// API CONFIGURATION
-// ============================================================================
+let supabaseClient: SupabaseClient | null = null
 
-const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
-const USE_MOCK_API = true // استخدم Mock API للتطوير
+function getSupabase(): SupabaseClient {
+  if (!supabaseClient) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase configuration missing')
+    }
+
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+  }
+
+  return supabaseClient
+}
 
 // ============================================================================
 // TOKEN MANAGEMENT
@@ -23,95 +30,33 @@ const USE_MOCK_API = true // استخدم Mock API للتطوير
 const TOKEN_KEY = 'accessToken'
 const REFRESH_TOKEN_KEY = 'refreshToken'
 const USER_KEY = 'user'
-const TOKEN_EXPIRY_KEY = 'tokenExpiry'
 
-/**
- * Decodes JWT token payload (without verification)
- * Used client-side for expiration checking
- */
-function decodeToken(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-
-    const decoded = JSON.parse(atob(parts[1]))
-    return decoded
-  } catch {
-    return null
-  }
-}
-
-/**
- * Checks if token is expired
- */
-function isTokenExpired(token: string | null): boolean {
-  if (!token) return true
-
-  const decoded = decodeToken(token)
-  if (!decoded || !decoded.exp) return true
-
-  // If exp is in seconds (JWT standard), convert to milliseconds
-  const expiryTime = decoded.exp * 1000
-  const currentTime = Date.now()
-
-  // Consider token expired if less than 1 minute remaining
-  return expiryTime - currentTime < 60000
-}
-
-/**
- * Get token from localStorage
- */
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
 
-/**
- * Set token in localStorage
- */
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token)
-
-  // Calculate and store expiry time
-  const decoded = decodeToken(token)
-  if (decoded && decoded.exp) {
-    localStorage.setItem(TOKEN_EXPIRY_KEY, decoded.exp.toString())
-  }
 }
 
-/**
- * Set refresh token
- */
 export function setRefreshToken(token: string): void {
   localStorage.setItem(REFRESH_TOKEN_KEY, token)
 }
 
-/**
- * Get refresh token
- */
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY)
 }
 
-/**
- * Clear all auth data from localStorage
- */
 export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(TOKEN_EXPIRY_KEY)
 }
 
-/**
- * Store user data
- */
 export function setUser(user: Record<string, any>): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
-/**
- * Get user data from localStorage
- */
 export function getUser(): Record<string, any> | null {
   try {
     const userStr = localStorage.getItem(USER_KEY)
@@ -121,229 +66,171 @@ export function getUser(): Record<string, any> | null {
   }
 }
 
-/**
- * API Request wrapper with JWT interceptor
- * Automatically attaches Bearer token to all requests
- * Handles 401 errors
- */
-async function apiRequest(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  const token = getToken()
-
-  // Add authorization header if token exists
-  const headers = new Headers(options.headers || {})
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-  }
-  headers.set('Content-Type', 'application/json')
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  })
-
-  // Handle 401 Unauthorized (token expired)
-  if (response.status === 401) {
-    clearAuth()
-    // Trigger logout by dispatching custom event
-    window.dispatchEvent(new Event('auth:logout'))
-    throw new Error('Token expired. Please login again.')
-  }
-
-  return response
-}
-
-// ============================================================================
-// MOCK DATA — من Smoke Test results
-// ============================================================================
-
-const mockTrustScores: Record<string, any> = {
-  '1': { score: 94, riskBand: 'low', tier: 'full', approvedReports: 5 },
-  '2': { score: 74, riskBand: 'low', tier: 'full', approvedReports: 5 },
-  '3': { score: 52, riskBand: 'medium', tier: 'full', approvedReports: 5 },
-  '4': { score: 78, riskBand: 'low', tier: 'full', approvedReports: 5 },
-  '5': { score: 91, riskBand: 'low', tier: 'full', approvedReports: 5 },
-}
-
-const mockCompanies = [
-  {
-    id: '1',
-    name: 'شركة نجد للمقاولات',
-    crNumber: '1010123456',
-    sector: 'مقاولات',
-    city: 'الرياض',
-    foundedYear: 2014,
-    crStatus: 'active',
-  },
-  {
-    id: '2',
-    name: 'الرياض للتجارة',
-    crNumber: '1010789456',
-    sector: 'تجارة',
-    city: 'الرياض',
-    foundedYear: 2018,
-    crStatus: 'active',
-  },
-  {
-    id: '3',
-    name: 'التقنية المتقدمة',
-    crNumber: '1010456789',
-    sector: 'تقنية',
-    city: 'جدة',
-    foundedYear: 2020,
-    crStatus: 'active',
-  },
-  {
-    id: '4',
-    name: 'الشرق للتوريد',
-    crNumber: '1010111222',
-    sector: 'توريد',
-    city: 'الدمام',
-    foundedYear: 2016,
-    crStatus: 'active',
-  },
-  {
-    id: '5',
-    name: 'الخليج للخدمات',
-    crNumber: '1010333444',
-    sector: 'خدمات',
-    city: 'الرياض',
-    foundedYear: 2012,
-    crStatus: 'active',
-  },
-]
-
 // ============================================================================
 // AUTH API
 // ============================================================================
 
-/**
- * Login with email and password
- * Uses Supabase Auth directly
- * Stores tokens and user data in localStorage
- */
 export async function login(email: string, password: string) {
-  try {
-    const { createClient } = await import('@supabase/supabase-js')
+  const supabase = getSupabase()
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase configuration missing')
-    }
+  if (error) {
+    throw new Error(error.message || 'فشل تسجيل الدخول')
+  }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+  if (!data.session) {
+    throw new Error('No session returned')
+  }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+  // Fetch user profile from public.users
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('id, email, first_name, last_name, role, tenant_id, status')
+    .eq('id', data.user?.id)
+    .single()
 
-    if (error) {
-      throw new Error(error.message || 'فشل تسجيل الدخول')
-    }
+  if (userError) {
+    throw new Error('User profile not found')
+  }
 
-    if (!data.session) {
-      throw new Error('No session returned from login')
-    }
+  const user = {
+    id: userData.id,
+    email: userData.email,
+    firstName: userData.first_name,
+    lastName: userData.last_name,
+    role: userData.role,
+    tenantId: userData.tenant_id,
+    status: userData.status,
+  }
 
-    // Store tokens and user
-    const isAdmin = email === 'admin@marsad.com' || email === 'test1@marsad.sa'
-    const user = {
-      id: data.user?.id,
-      email: data.user?.email,
-      role: isAdmin ? 'platform_admin' : 'user',
-      isAdmin: isAdmin,
-    }
+  setToken(data.session.access_token)
+  if (data.session.refresh_token) {
+    setRefreshToken(data.session.refresh_token)
+  }
+  setUser(user)
 
-    setToken(data.session.access_token)
-    if (data.session.refresh_token) {
-      setRefreshToken(data.session.refresh_token)
-    }
-    setUser(user)
-
-    return {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      user,
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error
-    }
-    throw new Error('خطأ في الاتصال بالخادم')
+  return {
+    accessToken: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    user,
   }
 }
 
-/**
- * Register new company account
- * Uses Supabase Auth directly
- * Stores tokens and user data in localStorage
- */
 export async function register(data: any) {
-  try {
-    const { createClient } = await import('@supabase/supabase-js')
+  const supabase = getSupabase()
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  // 1. Create auth user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: data.email,
+    password: data.password,
+  })
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase configuration missing')
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-    const { data: authData, error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-    })
-
-    if (error) {
-      throw new Error(error.message || 'فشل إنشاء الحساب')
-    }
-
-    if (!authData.user) {
-      throw new Error('Failed to create user account')
-    }
-
-    // Create user object
-    const isAdmin = data.email === 'admin@marsad.com' || data.email === 'test1@marsad.sa'
-    const user = {
-      id: authData.user.id,
-      email: authData.user.email,
-      company: data.company || data.name,
-      commercialNumber: data.commercialNumber || data.crNumber,
-      sector: data.sector,
-      city: data.city,
-      phone: data.phone,
-      role: isAdmin ? 'platform_admin' : 'user',
-      isAdmin: isAdmin,
-    }
-
-    // Store tokens and user
-    if (authData.session) {
-      setToken(authData.session.access_token)
-      if (authData.session.refresh_token) {
-        setRefreshToken(authData.session.refresh_token)
-      }
-    }
-    setUser(user)
-
-    return {
-      accessToken: authData.session?.access_token || '',
-      refreshToken: authData.session?.refresh_token || '',
-      tenant: user,
-      user,
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error
-    }
-    throw new Error('خطأ في الاتصال بالخادم')
+  if (authError) {
+    throw new Error(authError.message || 'فشل إنشاء الحساب')
   }
+
+  if (!authData.user) {
+    throw new Error('Failed to create user')
+  }
+
+  // 2. Create tenant record
+  const { data: tenantData, error: tenantError } = await supabase
+    .from('tenants')
+    .insert([
+      {
+        name: data.companyName || data.name,
+        cr_number: data.crNumber,
+        email: data.email,
+        phone: data.phone,
+        city: data.city,
+        sector: data.sector,
+        status: 'active',
+      },
+    ])
+    .select()
+    .single()
+
+  if (tenantError) {
+    throw new Error('Failed to create tenant: ' + tenantError.message)
+  }
+
+  // 3. Create user record (linked to auth.users)
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .insert([
+      {
+        id: authData.user.id,
+        tenant_id: tenantData.id,
+        email: authData.user.email,
+        first_name: data.firstName || '',
+        last_name: data.lastName || '',
+        role: 'company_admin', // First user is admin
+        status: 'active',
+      },
+    ])
+    .select()
+    .single()
+
+  if (userError) {
+    throw new Error('Failed to create user profile: ' + userError.message)
+  }
+
+  // 4. Create default subscription (Free plan)
+  const { data: plansData } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('name', 'مجاني')
+    .limit(1)
+
+  if (plansData && plansData.length > 0) {
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + 30)
+
+    await supabase
+      .from('subscriptions')
+      .insert([
+        {
+          tenant_id: tenantData.id,
+          plan_id: plansData[0].id,
+          status: 'active',
+          current_period_start: new Date().toISOString(),
+          current_period_end: futureDate.toISOString(),
+        },
+      ])
+  }
+
+  const user = {
+    id: userData.id,
+    email: userData.email,
+    firstName: userData.first_name,
+    lastName: userData.last_name,
+    role: userData.role,
+    tenantId: userData.tenant_id,
+  }
+
+  if (authData.session) {
+    setToken(authData.session.access_token)
+    if (authData.session.refresh_token) {
+      setRefreshToken(authData.session.refresh_token)
+    }
+  }
+  setUser(user)
+
+  return {
+    accessToken: authData.session?.access_token || '',
+    refreshToken: authData.session?.refresh_token || '',
+    user,
+  }
+}
+
+export async function logout() {
+  const supabase = getSupabase()
+  await supabase.auth.signOut()
+  clearAuth()
 }
 
 // ============================================================================
@@ -351,62 +238,97 @@ export async function register(data: any) {
 // ============================================================================
 
 export async function searchCompanies(q: string, page = 1, limit = 20) {
-  await new Promise(resolve => setTimeout(resolve, 300))
+  const supabase = getSupabase()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  const offset = (page - 1) * limit
 
-  const filtered = mockCompanies.filter(
-    c =>
-      c.name.includes(q) ||
-      c.crNumber.includes(q) ||
-      c.sector.includes(q)
-  )
+  // Search companies with trust scores
+  const { data: companies, count, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      trust_scores(*)
+    `, { count: 'exact' })
+    .ilike('name', `%${q}%`)
+    .or(`cr_number.ilike.%${q}%,sector.ilike.%${q}%`)
+    .range(offset, offset + limit - 1)
 
-  // Merge company data with trust scores
-  const enrichedData = filtered.slice(0, limit).map(company => ({
-    ...company,
-    trust_score: mockTrustScores[company.id] || null,
-  }))
+  if (error) {
+    throw new Error('Search failed: ' + error.message)
+  }
 
   return {
-    data: enrichedData,
+    data: companies?.map(c => ({
+      ...c,
+      trust_score: c.trust_scores?.[0] || null,
+    })) || [],
     pagination: {
       page,
       limit,
-      total: filtered.length,
-      pages: Math.ceil(filtered.length / limit),
+      total: count || 0,
+      pages: Math.ceil((count || 0) / limit),
     },
   }
 }
 
-export async function getCompanyReport(companyId: string, planName = 'احترافي') {
-  await new Promise(resolve => setTimeout(resolve, 400))
+export async function getCompanyReport(companyId: string) {
+  const supabase = getSupabase()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  // Get company + trust score + approved reports count
+  const { data: company, error: companyError } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      trust_scores(score, risk_band, tier, approved_reports, breakdown)
+    `)
+    .eq('id', companyId)
+    .single()
 
-  const company = mockCompanies.find(c => c.id === companyId)
-  if (!company) throw new Error('شركة غير موجودة')
+  if (companyError) {
+    throw new Error('Company not found')
+  }
 
-  const trustScore = mockTrustScores[companyId]
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', (await supabase.auth.getUser()).data.user?.id)
+    .single()
 
-  // Gating: Check if plan allows viewing
+  // Get user's subscription
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('plan_id')
+    .eq('tenant_id', userData?.tenant_id)
+    .single()
+
+  // Get plan details
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('name, limits')
+    .eq('id', subscription?.plan_id)
+    .single()
+
+  const trustScore = company.trust_scores?.[0]
+  const planName = plan?.name || 'مجاني'
+
+  // Gating logic based on plan
   if (planName === 'مجاني') {
     return {
       company,
-      status: 'locked',
-      message: 'المؤشر مقفل في الباقة المجانية',
-      tier: 'none',
+      status: 'limited',
+      tier: trustScore?.tier || 'none',
+      score: null,
+      message: 'المؤشر محدود في الباقة المجانية',
     }
   }
 
   return {
     company,
-    trustScore,
     status: 'full',
-    tier: 'full',
-    approvedReports: trustScore.approvedReports,
+    tier: trustScore?.tier || 'none',
+    score: trustScore?.score || 0,
+    riskBand: trustScore?.risk_band || 'high',
+    approvedReports: trustScore?.approved_reports || 0,
   }
 }
 
@@ -414,45 +336,122 @@ export async function getCompanyReport(companyId: string, planName = 'احترا
 // REPORTS API
 // ============================================================================
 
-export async function submitReport(data: any) {
-  await new Promise(resolve => setTimeout(resolve, 500))
+export async function submitReport(reportData: any) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
-
-  return {
-    id: 'report-' + Math.random().toString(36).substring(7),
-    status: 'pending_review',
-    ...data,
-    submittedAt: new Date(),
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
   }
+
+  // Get user's tenant
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user.id)
+    .single()
+
+  // Check BR-05: Prevent duplicate reports within 90 days
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+  const { data: existingReport } = await supabase
+    .from('reports')
+    .select('id')
+    .eq('reporter_tenant_id', userData?.tenant_id)
+    .eq('target_company_id', reportData.targetCompanyId)
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .limit(1)
+
+  if (existingReport && existingReport.length > 0) {
+    throw new Error('لا يمكن رفع تقريرين عن نفس الشركة خلال 90 يوماً (BR-05)')
+  }
+
+  // Check credits balance
+  const { data: creditBalance } = await supabase
+    .rpc('get_credit_balance', { p_tenant_id: userData?.tenant_id })
+
+  if ((creditBalance || 0) < 1) {
+    throw new Error('رصيد كافي غير متوفر')
+  }
+
+  // Insert report
+  const { data: report, error } = await supabase
+    .from('reports')
+    .insert([
+      {
+        reporter_tenant_id: userData?.tenant_id,
+        target_company_id: reportData.targetCompanyId,
+        status: 'pending_review',
+        deal_amount_range: reportData.dealAmountRange,
+        payment_commitment: reportData.paymentCommitment,
+        delay_days: reportData.delayDays || 0,
+        defaulted: reportData.defaulted || false,
+        dealt_at: reportData.dealtAt || new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error('Failed to submit report: ' + error.message)
+  }
+
+  // Deduct credits immediately
+  await supabase
+    .from('credits_ledger')
+    .insert([
+      {
+        tenant_id: userData?.tenant_id,
+        report_id: report.id,
+        amount: -1,
+        reason: 'report_approved',
+      },
+    ])
+
+  return report
 }
 
-export async function getMyReports() {
-  await new Promise(resolve => setTimeout(resolve, 300))
+export async function getMyReports(page = 1, limit = 10) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user.id)
+    .single()
+
+  const offset = (page - 1) * limit
+
+  const { data: reports, count, error } = await supabase
+    .from('reports')
+    .select(`
+      *,
+      target_company:companies(id, name, cr_number, sector),
+      review_actions(*)
+    `, { count: 'exact' })
+    .eq('reporter_tenant_id', userData?.tenant_id)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error('Failed to fetch reports: ' + error.message)
+  }
 
   return {
-    data: [
-      {
-        id: 'report-1',
-        targetCompany: mockCompanies[0],
-        status: 'approved',
-        paymentCommitment: 'full',
-        delayDays: 0,
-        submittedAt: new Date('2026-07-10'),
-      },
-      {
-        id: 'report-2',
-        targetCompany: mockCompanies[1],
-        status: 'pending_review',
-        paymentCommitment: 'partial',
-        delayDays: 15,
-        submittedAt: new Date('2026-07-08'),
-      },
-    ],
+    data: reports || [],
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      pages: Math.ceil((count || 0) / limit),
+    },
   }
 }
 
@@ -461,277 +460,493 @@ export async function getMyReports() {
 // ============================================================================
 
 export async function addToWatchlist(companyId: string) {
-  await new Promise(resolve => setTimeout(resolve, 300))
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
 
-  return {
-    id: 'watchlist-' + Math.random().toString(36).substring(7),
-    companyId,
-    createdAt: new Date(),
+  const { error } = await supabase
+    .from('watchlist_items')
+    .insert([
+      {
+        tenant_id: userData?.tenant_id,
+        company_id: companyId,
+        created_by: user.data.user?.id,
+      },
+    ])
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Already in watchlist')
+    }
+    throw new Error('Failed to add to watchlist: ' + error.message)
   }
+
+  return { success: true }
 }
 
-export async function getWatchlist() {
-  await new Promise(resolve => setTimeout(resolve, 300))
+export async function removeFromWatchlist(companyId: string) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
+
+  const { error } = await supabase
+    .from('watchlist_items')
+    .delete()
+    .eq('tenant_id', userData?.tenant_id)
+    .eq('company_id', companyId)
+
+  if (error) {
+    throw new Error('Failed to remove from watchlist: ' + error.message)
+  }
+
+  return { success: true }
+}
+
+export async function getWatchlist(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
+
+  const offset = (page - 1) * limit
+
+  const { data: watchlist, count, error } = await supabase
+    .from('watchlist_items')
+    .select(`
+      *,
+      company:companies(
+        *,
+        trust_scores(*)
+      )
+    `, { count: 'exact' })
+    .eq('tenant_id', userData?.tenant_id)
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error('Failed to fetch watchlist: ' + error.message)
+  }
 
   return {
-    data: [
-      { ...mockCompanies[0], watchlistId: 'w-1' },
-      { ...mockCompanies[2], watchlistId: 'w-2' },
-    ],
+    data: watchlist?.map(w => ({
+      id: w.id,
+      ...w.company,
+      trust_score: w.company?.trust_scores?.[0] || null,
+    })) || [],
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      pages: Math.ceil((count || 0) / limit),
+    },
   }
 }
 
 // ============================================================================
-// ADMIN API - All endpoints require platform_admin role
+// NOTIFICATIONS API
 // ============================================================================
+
+export async function listNotifications(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
+
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const offset = (page - 1) * limit
+
+  const { data: notifications, count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact' })
+    .eq('user_id', user.data.user.id)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error('Failed to fetch notifications: ' + error.message)
+  }
+
+  return {
+    data: notifications || [],
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      pages: Math.ceil((count || 0) / limit),
+    },
+  }
+}
+
+export async function markNotificationRead(notificationId: string) {
+  const supabase = getSupabase()
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', notificationId)
+
+  if (error) {
+    throw new Error('Failed to mark notification: ' + error.message)
+  }
+
+  return { success: true }
+}
+
+// ============================================================================
+// BUSINESS REQUESTS API
+// ============================================================================
+
+export async function listBusinessRequests() {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
+
+  const { data: requests, error } = await supabase
+    .from('business_requests')
+    .select(`
+      *,
+      from_tenant:tenants!business_requests_from_tenant_id_fkey(id, name),
+      to_tenant:tenants!business_requests_to_tenant_id_fkey(id, name)
+    `)
+    .or(`from_tenant_id.eq.${userData?.tenant_id},to_tenant_id.eq.${userData?.tenant_id}`)
+
+  if (error) {
+    throw new Error('Failed to fetch requests: ' + error.message)
+  }
+
+  return { data: requests || [] }
+}
+
+export async function createBusinessRequest(toTenantId: string, subject: string, body: string) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
+
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 30)
+
+  const { error } = await supabase
+    .from('business_requests')
+    .insert([
+      {
+        from_tenant_id: userData?.tenant_id,
+        to_tenant_id: toTenantId,
+        subject,
+        body,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+      },
+    ])
+
+  if (error) {
+    throw new Error('Failed to create request: ' + error.message)
+  }
+
+  return { success: true }
+}
+
+export async function respondToBusinessRequest(requestId: string, accept: boolean) {
+  const supabase = getSupabase()
+
+  const { error } = await supabase
+    .from('business_requests')
+    .update({ status: accept ? 'accepted' : 'rejected' })
+    .eq('id', requestId)
+
+  if (error) {
+    throw new Error('Failed to respond: ' + error.message)
+  }
+
+  return { success: true }
+}
+
+// ============================================================================
+// ADMIN API
+// ============================================================================
+
+export async function getAdminDashboard() {
+  const supabase = getSupabase()
+
+  const { data: tenants } = await supabase.from('tenants').select('*', { count: 'exact' })
+  const { data: reports } = await supabase.from('reports').select('status', { count: 'exact' })
+  const { data: users } = await supabase.from('users').select('*', { count: 'exact' })
+
+  return {
+    totalCompanies: (await supabase.from('companies').select('*', { count: 'exact' })).count || 0,
+    totalTenants: tenants?.length || 0,
+    totalUsers: users?.length || 0,
+    pendingReports: reports?.filter(r => r.status === 'pending_review').length || 0,
+    approvedReports: reports?.filter(r => r.status === 'approved').length || 0,
+  }
+}
+
+export async function getAdminRequests(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
+
+  const { data: requests, count, error } = await supabase
+    .from('business_requests')
+    .select(`
+      *,
+      from_tenant:tenants!business_requests_from_tenant_id_fkey(id, name),
+      to_tenant:tenants!business_requests_to_tenant_id_fkey(id, name)
+    `, { count: 'exact' })
+    .range(offset, offset + limit - 1)
+
+  if (error) throw new Error('Failed to fetch requests: ' + error.message)
+
+  return {
+    data: requests || [],
+    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+  }
+}
 
 export async function getAdminReports(page = 1, limit = 20) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
-
-  const response = await apiRequest(
-    `/admin/reports?page=${page}&limit=${limit}`,
-    {
-      method: 'GET',
-    }
-  )
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch reports: ${response.statusText}`)
-  }
-
-  return response.json()
+  return listAdminReports(page, limit)
 }
 
-export async function approveReport(reportId: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function getAdminCompanies(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
 
-  const response = await apiRequest(`/admin/reports/${reportId}/approve`, {
-    method: 'PATCH',
-  })
+  const { data: companies, count, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      trust_scores(*)
+    `, { count: 'exact' })
+    .range(offset, offset + limit - 1)
 
-  if (!response.ok) {
-    throw new Error(`Failed to approve report: ${response.statusText}`)
+  if (error) throw new Error('Failed to fetch companies: ' + error.message)
+
+  return {
+    data: companies?.map(c => ({ ...c, trust_score: c.trust_scores?.[0] || null })) || [],
+    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
-
-  return response.json()
-}
-
-export async function rejectReport(reportId: string, reason?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
-
-  const response = await apiRequest(`/admin/reports/${reportId}/reject`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to reject report: ${response.statusText}`)
-  }
-
-  return response.json()
-}
-
-export async function batchApproveReports(reportIds: string[]) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
-
-  const response = await apiRequest('/admin/reports/batch-approve', {
-    method: 'POST',
-    body: JSON.stringify({ reportIds }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to batch approve reports: ${response.statusText}`)
-  }
-
-  return response.json()
-}
-
-export async function getAdminCompanies(page = 1, limit = 20, status?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
-
-  const statusParam = status ? `&status=${status}` : ''
-  const response = await apiRequest(
-    `/admin/companies?page=${page}&limit=${limit}${statusParam}`,
-    {
-      method: 'GET',
-    }
-  )
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch companies: ${response.statusText}`)
-  }
-
-  return response.json()
 }
 
 export async function approveCompany(companyId: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+  const supabase = getSupabase()
 
-  const response = await apiRequest(`/admin/companies/${companyId}/approve`, {
-    method: 'POST',
-  })
+  const { error } = await supabase
+    .from('companies')
+    .update({ approved: true })
+    .eq('id', companyId)
 
-  if (!response.ok) {
-    throw new Error(`Failed to approve company: ${response.statusText}`)
-  }
+  if (error) throw new Error('Failed to approve: ' + error.message)
 
-  return response.json()
+  return { success: true }
 }
 
-export async function rejectCompany(companyId: string, reason?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function getAdminUsers(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
 
-  const response = await apiRequest(`/admin/companies/${companyId}/reject`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  })
+  const { data: users, count, error } = await supabase
+    .from('users')
+    .select('*', { count: 'exact' })
+    .range(offset, offset + limit - 1)
 
-  if (!response.ok) {
-    throw new Error(`Failed to reject company: ${response.statusText}`)
+  if (error) throw new Error('Failed to fetch users: ' + error.message)
+
+  return {
+    data: users || [],
+    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
-
-  return response.json()
 }
 
-export async function getAdminUsers(page = 1, limit = 20, role?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function getAuditLogs(page = 1, limit = 20) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
 
-  const roleParam = role ? `&role=${role}` : ''
-  const response = await apiRequest(`/admin/users?page=${page}&limit=${limit}${roleParam}`, {
-    method: 'GET',
-  })
+  const { data: logs, count, error } = await supabase
+    .from('audit_logs')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch users: ${response.statusText}`)
+  if (error) throw new Error('Failed to fetch logs: ' + error.message)
+
+  return {
+    data: logs || [],
+    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
-
-  return response.json()
 }
 
-export async function updateUserStatus(userId: string, status: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function listAdminReports(page = 1, limit = 20) {
+  const supabase = getSupabase()
 
-  const response = await apiRequest(`/admin/users/${userId}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  })
+  const offset = (page - 1) * limit
 
-  if (!response.ok) {
-    throw new Error(`Failed to update user status: ${response.statusText}`)
+  const { data: reports, count, error } = await supabase
+    .from('reports')
+    .select(`
+      *,
+      target_company:companies(id, name, cr_number),
+      review_actions(*)
+    `, { count: 'exact' })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error('Failed to fetch reports: ' + error.message)
   }
 
-  return response.json()
+  return {
+    data: reports || [],
+    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+  }
 }
 
-export async function getAuditLogs(
-  page = 1,
-  limit = 20,
-  action?: string,
-  entity?: string,
-  startDate?: string,
-  endDate?: string
-) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function approveReport(reportId: string) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  })
+  const { error } = await supabase
+    .from('reports')
+    .update({ status: 'approved', approved_at: new Date().toISOString() })
+    .eq('id', reportId)
 
-  if (action) params.append('action', action)
-  if (entity) params.append('entity', entity)
-  if (startDate) params.append('startDate', startDate)
-  if (endDate) params.append('endDate', endDate)
-
-  const response = await apiRequest(`/admin/audit-logs?${params.toString()}`, {
-    method: 'GET',
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch audit logs: ${response.statusText}`)
+  if (error) {
+    throw new Error('Failed to approve: ' + error.message)
   }
 
-  return response.json()
+  await supabase
+    .from('review_actions')
+    .insert([
+      {
+        report_id: reportId,
+        reviewer_id: user.data.user?.id,
+        action: 'approved',
+      },
+    ])
+
+  return { success: true }
 }
 
-export async function getAdminRequests(page = 1, limit = 20, status?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function rejectReport(reportId: string, reason: string) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const statusParam = status ? `&status=${status}` : ''
-  const response = await apiRequest(
-    `/admin/requests?page=${page}&limit=${limit}${statusParam}`,
-    {
-      method: 'GET',
-    }
-  )
+  const { error } = await supabase
+    .from('reports')
+    .update({ status: 'rejected', rejected_at: new Date().toISOString() })
+    .eq('id', reportId)
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch requests: ${response.statusText}`)
+  if (error) {
+    throw new Error('Failed to reject: ' + error.message)
   }
 
-  return response.json()
+  await supabase
+    .from('review_actions')
+    .insert([
+      {
+        report_id: reportId,
+        reviewer_id: user.data.user?.id,
+        action: 'rejected',
+        reason,
+      },
+    ])
+
+  return { success: true }
 }
 
-export async function approveBusinessRequest(requestId: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+// ============================================================================
+// COMPANY USERS API
+// ============================================================================
 
-  const response = await apiRequest(`/admin/requests/${requestId}/approve`, {
-    method: 'POST',
-  })
+export async function listCompanyUsers() {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  if (!response.ok) {
-    throw new Error(`Failed to approve request: ${response.statusText}`)
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
+
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, email, first_name, last_name, role, status')
+    .eq('tenant_id', userData?.tenant_id)
+
+  if (error) {
+    throw new Error('Failed to fetch users: ' + error.message)
   }
 
-  return response.json()
+  return { data: users || [] }
 }
 
-export async function rejectBusinessRequest(requestId: string, reason?: string) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+export async function inviteCompanyUser(email: string, role: string) {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  const response = await apiRequest(`/admin/requests/${requestId}/reject`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  })
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
 
-  if (!response.ok) {
-    throw new Error(`Failed to reject request: ${response.statusText}`)
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 30)
+
+  const { error } = await supabase
+    .from('pending_invites')
+    .insert([
+      {
+        tenant_id: userData?.tenant_id,
+        email,
+        role,
+        invited_by: user.data.user?.id,
+        expires_at: expiresAt.toISOString(),
+      },
+    ])
+
+  if (error) {
+    throw new Error('Failed to send invite: ' + error.message)
   }
 
-  return response.json()
+  return { success: true }
 }
 
-export async function bulkImportCompanies(companies: any[]) {
-  const token = getToken()
-  if (!token) throw new Error('Unauthorized: Please login')
+// ============================================================================
+// CREDITS API
+// ============================================================================
 
-  const response = await apiRequest('/admin/bulk-upload', {
-    method: 'POST',
-    body: JSON.stringify({ companies }),
-  })
+export async function getCreditsBalance() {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
 
-  if (!response.ok) {
-    throw new Error(`Failed to bulk import companies: ${response.statusText}`)
-  }
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.data.user?.id)
+    .single()
 
-  return response.json()
+  const balance = await supabase.rpc('get_credit_balance', { p_tenant_id: userData?.tenant_id })
+
+  return { balance: balance || 0 }
 }
