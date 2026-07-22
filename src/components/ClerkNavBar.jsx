@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 export default function ClerkNavBar() {
   const navigate = useNavigate()
-  const { isSignedIn } = useUser()
+  const { isSignedIn, user } = useUser()
+  const isAdmin = user?.publicMetadata?.role === 'admin'
 
   return (
     <header style={{
@@ -70,10 +71,11 @@ export default function ClerkNavBar() {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {isSignedIn ? (
             <>
+              {/* Show Dashboard button for logged-in users */}
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate('/dashboard')}
                 style={{
-                  background: '#DC2626',
+                  background: '#16A34A',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '10px',
@@ -83,12 +85,35 @@ export default function ClerkNavBar() {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
-                onMouseLeave={(e) => e.target.style.background = '#DC2626'}
-                title="لوحة الإدارة (مرصد فقط)"
+                onMouseEnter={(e) => e.target.style.background = '#15803D'}
+                onMouseLeave={(e) => e.target.style.background = '#16A34A'}
               >
-                الإدارة
+                لوحة التحكم
               </button>
+
+              {/* Show Admin button only for admin users */}
+              {isAdmin && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  style={{
+                    background: '#DC2626',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 16px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
+                  onMouseLeave={(e) => e.target.style.background = '#DC2626'}
+                  title="لوحة الإدارة"
+                >
+                  الإدارة
+                </button>
+              )}
+
               <UserButton
                 afterSignOutUrl="/"
                 appearance={{
@@ -101,26 +126,6 @@ export default function ClerkNavBar() {
             </>
           ) : (
             <>
-              <button
-                onClick={() => navigate('/admin-login')}
-                style={{
-                  background: '#DC2626',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 16px',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
-                onMouseLeave={(e) => e.target.style.background = '#DC2626'}
-                title="تسجيل دخول الإدارة"
-              >
-                إدارة
-              </button>
-
               <SignInButton mode="modal">
                 <button style={{
                   background: '#fff',
