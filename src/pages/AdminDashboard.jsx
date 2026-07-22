@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getSupabase } from '../lib/api'
 import { Building2, CreditCard, FileText, TrendingUp, AlertCircle, Users } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -13,33 +14,64 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Mock dashboard data
-      const mockDashboard = {
+      const supabase = getSupabase()
+
+      // Get counts
+      const { count: tenantCount } = await supabase.from('tenants').select('id', { count: 'exact' })
+      const { count: activeSubCount } = await supabase.from('subscriptions').select('id', { count: 'exact' }).eq('status', 'active')
+      const { count: pendingReportCount } = await supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'pending_review')
+      const { count: approvedReportCount } = await supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'approved')
+
+      // Get top companies by reports
+      const { data: topCompaniesData } = await supabase
+        .from('reports')
+        .select(`
+          target_company_id,
+          companies (name),
+          trust_scores (score)
+        `)
+        .eq('status', 'approved')
+        .limit(50)
+
+      const companyMap = {}
+      topCompaniesData?.forEach(r => {
+        const companyId = r.target_company_id
+        if (!companyMap[companyId]) {
+          companyMap[companyId] = {
+            id: companyId,
+            name: r.companies?.name || 'مجهولة',
+            reports: 0,
+            trustScore: r.trust_scores?.score || 0
+          }
+        }
+        companyMap[companyId].reports++
+      })
+
+      const topCompanies = Object.values(companyMap)
+        .sort((a, b) => b.reports - a.reports)
+        .slice(0, 5)
+
+      setDashboard({
         overview: {
-          totalTenants: 47,
-          activeSubscriptions: 38,
-          pendingReports: 12,
-          approvedReports: 145,
-          totalRevenue: 125400,
+          totalTenants: tenantCount || 0,
+          activeSubscriptions: activeSubCount || 0,
+          pendingReports: pendingReportCount || 0,
+          approvedReports: approvedReportCount || 0,
+          totalRevenue: 0
         },
-        recentActivity: [
-          { id: 1, type: 'new_report', description: 'تقرير جديد من شركة النور', date: new Date().toISOString() },
-          { id: 2, type: 'subscription', description: 'تجديد اشتراك شركة الرؤية', date: new Date(Date.now() - 3600000).toISOString() },
-        ],
-      }
+        recentActivity: []
+      })
 
-      const mockAnalytics = {
-        topCompanies: [
-          { name: 'شركة نجد للمقاولات', reports: 15, trustScore: 94 },
-          { name: 'الرياض للتجارة', reports: 12, trustScore: 88 },
-          { name: 'التقنية المتقدمة', reports: 10, trustScore: 92 },
-        ],
-        pendingReviews: 12,
-        reportsByStatus: { approved: 145, pending: 12, rejected: 8 },
-      }
+      setAnalytics({
+        topCompanies: topCompanies,
+        pendingReviews: pendingReportCount || 0,
+        reportsByStatus: {
+          approved: approvedReportCount || 0,
+          pending: pendingReportCount || 0,
+          rejected: 0
+        }
+      })
 
-      setDashboard(mockDashboard)
-      setAnalytics(mockAnalytics)
       setLoading(false)
     } catch (error) {
       console.error('Error fetching dashboard:', error)
