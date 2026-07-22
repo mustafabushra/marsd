@@ -22,23 +22,50 @@ export default function ClerkNavBar() {
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        {/* Logo */}
-        <div
-          onClick={() => navigate('/')}
-          style={{ display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer' }}
-        >
-          <svg width="40" height="40" viewBox="0 0 64 64">
-            <defs>
-              <linearGradient id="mkHdr" x1="0" y1="1" x2="1" y2="0">
-                <stop offset="0" stopColor="#1E2A52" />
-                <stop offset=".55" stopColor="#1F6E43" />
-                <stop offset="1" stopColor="#16A34A" />
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="22.5" fill="none" stroke="url(#mkHdr)" strokeWidth="6.4" strokeLinecap="round" strokeDasharray="118 24" transform="rotate(-46 32 32)" />
-            <path d="M22.5 33 l6.5 6.5 L41 26.5" fill="none" stroke="#16A34A" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span style={{ fontWeight: 900, fontSize: '23px', color: '#1E2A52', letterSpacing: '-0.5px' }}>مرصد</span>
+        {/* Logo & Navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '38px' }}>
+          <div
+            onClick={() => navigate('/')}
+            style={{ display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer' }}
+          >
+            <svg width="40" height="40" viewBox="0 0 64 64">
+              <defs>
+                <linearGradient id="mkHdr" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0" stopColor="#1E2A52" />
+                  <stop offset=".55" stopColor="#1F6E43" />
+                  <stop offset="1" stopColor="#16A34A" />
+                </linearGradient>
+              </defs>
+              <circle cx="32" cy="32" r="22.5" fill="none" stroke="url(#mkHdr)" strokeWidth="6.4" strokeLinecap="round" strokeDasharray="118 24" transform="rotate(-46 32 32)" />
+              <path d="M22.5 33 l6.5 6.5 L41 26.5" fill="none" stroke="#16A34A" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={{ fontWeight: 900, fontSize: '23px', color: '#1E2A52', letterSpacing: '-0.5px' }}>مرصد</span>
+          </div>
+
+          {!isSignedIn && (
+            <nav style={{ display: 'flex', gap: '28px' }}>
+              {[
+                { label: 'الرئيسية', path: '/' },
+                { label: 'عن المنصة', path: '/about' },
+                { label: 'الباقات', path: '/pricing' },
+                { label: 'الشركاء', path: '/partners' },
+                { label: 'الأسئلة الشائعة', path: '/faq' },
+              ].map(nav => (
+                <span
+                  key={nav.path}
+                  onClick={() => navigate(nav.path)}
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {nav.label}
+                </span>
+              ))}
+            </nav>
+          )}
         </div>
 
         {/* Auth Section */}
