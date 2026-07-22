@@ -10,7 +10,7 @@ export default function CompanyDashboard() {
   const [companyName, setCompanyName] = useState('الشركة')
   const [kpis, setKpis] = useState([
     { label: 'مساهماتي', value: '—', icon: '📋', color: '#7C3AED', sub: '' },
-    { label: 'شركات في قوائسي', value: '—', icon: '⭐', color: '#F59E0B', sub: '' },
+    { label: 'شركات في قوائمي', value: '—', icon: '⭐', color: '#F59E0B', sub: '' },
     { label: 'تقاريري المعتمدة', value: '—', icon: '✓', color: '#16A34A', sub: '' },
     { label: 'رصيدي من النقاط', value: '—', icon: '💎', color: '#1E2A52', sub: '' }
   ])
@@ -76,7 +76,7 @@ export default function CompanyDashboard() {
 
         setKpis([
           { label: 'مساهماتي', value: (reportsCount || 0).toString(), icon: '📋', color: '#7C3AED', sub: `${approvedCount || 0} معتمدة` },
-          { label: 'شركات في قوائسي', value: (watchlistCount || 0).toString(), icon: '⭐', color: '#F59E0B', sub: 'تحت المراقبة' },
+          { label: 'شركات في قوائمي', value: (watchlistCount || 0).toString(), icon: '⭐', color: '#F59E0B', sub: 'تحت المراقبة' },
           { label: 'تقاريري المعتمدة', value: (approvedCount || 0).toString(), icon: '✓', color: '#16A34A', sub: 'من إجمالي مساهماتي' },
           { label: 'رصيدي من النقاط', value: (creditsData || 0).toString(), icon: '💎', color: '#1E2A52', sub: 'نقاط متراكمة' }
         ])
