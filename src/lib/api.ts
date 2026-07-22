@@ -82,27 +82,44 @@ export async function login(email: string, password: string) {
     throw new Error(error.message || 'فشل تسجيل الدخول')
   }
 
-  if (!data.session) {
-    throw new Error('No session returned')
+  if (!data.session || !data.user) {
+    throw new Error('فشل تسجيل الدخول: لم يتم الحصول على جلسة')
   }
+
+  // Wait a moment for trigger to create user profile
+  await new Promise(resolve => setTimeout(resolve, 500))
 
   // Fetch user profile from public.users
   const { data: userData, error: userError } = await supabase
     .from('users')
     .select('id, email, first_name, last_name, role, tenant_id, status')
-    .eq('id', data.user?.id)
+    .eq('id', data.user.id)
     .single()
 
-  if (userError) {
-    throw new Error('User profile not found')
+  if (userError || !userData) {
+    // Create minimal user profile if not found (fallback)
+    await supabase
+      .from('users')
+      .upsert([
+        {
+          id: data.user.id,
+          email: data.user.email,
+          role: 'company_member',
+          status: 'active',
+        },
+      ])
+      .select()
+      .single()
+
+    throw new Error('User profile being created, please login again')
   }
 
   const user = {
     id: userData.id,
     email: userData.email,
-    firstName: userData.first_name,
-    lastName: userData.last_name,
-    role: userData.role,
+    firstName: userData.first_name || '',
+    lastName: userData.last_name || '',
+    role: userData.role || 'company_member',
     tenantId: userData.tenant_id,
     status: userData.status,
   }
@@ -134,96 +151,96 @@ export async function register(data: any) {
   }
 
   if (!authData.user) {
-    throw new Error('Failed to create user')
+    throw new Error('فشل إنشاء المستخدم')
   }
 
-  // 2. Create tenant record
-  const { data: tenantData, error: tenantError } = await supabase
-    .from('tenants')
-    .insert([
-      {
-        name: data.companyName || data.name,
-        cr_number: data.crNumber,
-        email: data.email,
-        phone: data.phone,
-        city: data.city,
-        sector: data.sector,
-        status: 'active',
-      },
-    ])
-    .select()
-    .single()
-
-  if (tenantError) {
-    throw new Error('Failed to create tenant: ' + tenantError.message)
-  }
-
-  // 3. Create user record (linked to auth.users)
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .insert([
-      {
-        id: authData.user.id,
-        tenant_id: tenantData.id,
-        email: authData.user.email,
-        first_name: data.firstName || '',
-        last_name: data.lastName || '',
-        role: 'company_admin', // First user is admin
-        status: 'active',
-      },
-    ])
-    .select()
-    .single()
-
-  if (userError) {
-    throw new Error('Failed to create user profile: ' + userError.message)
-  }
-
-  // 4. Create default subscription (Free plan)
-  const { data: plansData } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('name', 'مجاني')
-    .limit(1)
-
-  if (plansData && plansData.length > 0) {
-    const futureDate = new Date()
-    futureDate.setDate(futureDate.getDate() + 30)
-
-    await supabase
-      .from('subscriptions')
+  try {
+    // 2. Create tenant record
+    const { data: tenantData, error: tenantError } = await supabase
+      .from('tenants')
       .insert([
         {
-          tenant_id: tenantData.id,
-          plan_id: plansData[0].id,
+          name: data.companyName || data.name,
+          cr_number: data.crNumber || '',
+          email: data.email,
+          phone: data.phone || '',
+          city: data.city || '',
+          sector: data.sector || '',
           status: 'active',
-          current_period_start: new Date().toISOString(),
-          current_period_end: futureDate.toISOString(),
         },
       ])
-  }
+      .select()
+      .single()
 
-  const user = {
-    id: userData.id,
-    email: userData.email,
-    firstName: userData.first_name,
-    lastName: userData.last_name,
-    role: userData.role,
-    tenantId: userData.tenant_id,
-  }
-
-  if (authData.session) {
-    setToken(authData.session.access_token)
-    if (authData.session.refresh_token) {
-      setRefreshToken(authData.session.refresh_token)
+    if (tenantError || !tenantData) {
+      throw new Error('فشل إنشاء الشركة: ' + tenantError?.message)
     }
-  }
-  setUser(user)
 
-  return {
-    accessToken: authData.session?.access_token || '',
-    refreshToken: authData.session?.refresh_token || '',
-    user,
+    // 3. Update user record with tenant_id (trigger creates basic user, we update it)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .update({
+        tenant_id: tenantData.id,
+        first_name: data.firstName || '',
+        last_name: data.lastName || '',
+        role: 'company_admin',
+      })
+      .eq('id', authData.user.id)
+      .select()
+      .single()
+
+    if (userError) {
+      throw new Error('فشل تحديث ملف المستخدم: ' + userError.message)
+    }
+
+    // 4. Create default subscription (Free plan)
+    const { data: plansData } = await supabase
+      .from('plans')
+      .select('id')
+      .eq('name', 'مجاني')
+      .limit(1)
+
+    if (plansData && plansData.length > 0) {
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 30)
+
+      await supabase
+        .from('subscriptions')
+        .insert([
+          {
+            tenant_id: tenantData.id,
+            plan_id: plansData[0].id,
+            status: 'active',
+            current_period_start: new Date().toISOString(),
+            current_period_end: futureDate.toISOString(),
+          },
+        ])
+    }
+
+    const user = {
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.first_name || '',
+      lastName: userData.last_name || '',
+      role: userData.role,
+      tenantId: userData.tenant_id,
+    }
+
+    if (authData.session) {
+      setToken(authData.session.access_token)
+      if (authData.session.refresh_token) {
+        setRefreshToken(authData.session.refresh_token)
+      }
+    }
+    setUser(user)
+
+    return {
+      accessToken: authData.session?.access_token || '',
+      refreshToken: authData.session?.refresh_token || '',
+      user,
+    }
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'خطأ في إنشاء الحساب')
   }
 }
 
