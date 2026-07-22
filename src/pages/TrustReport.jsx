@@ -1,34 +1,80 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { getCompanyReport, searchCompanies } from '../lib/api'
 import { DocumentIcon } from '../components/icons'
 
 export default function TrustReport() {
-  const [tier, setTier] = useState('full')
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [company, setCompany] = useState(null)
+  const [report, setReport] = useState(null)
+
+  useEffect(() => {
+    const loadReport = async () => {
+      try {
+        if (!id) {
+          setError('معرّف الشركة مفقود')
+          setLoading(false)
+          return
+        }
+
+        const data = await getCompanyReport(id)
+        setReport(data)
+
+        // Get company details
+        const companyResult = await searchCompanies('', 1, 1000)
+        const comp = companyResult.data?.find(c => c.id === id)
+        setCompany(comp || { name: 'شركة', city: '—', sector: '—' })
+      } catch (err) {
+        setError(err.message || 'خطأ في تحميل البيانات')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadReport()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        جاري التحميل...
+      </div>
+    )
+  }
+
+  if (error || !report) {
+    return (
+      <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
+        <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#991B1B' }}>⚠️ {error || 'لم يتم العثور على البيانات'}</div>
+          <button onClick={() => navigate('/search')} style={{ marginTop: '12px', background: '#991B1B', color: '#fff', border: 0, borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>العودة للبحث</button>
+        </div>
+      </main>
+    )
+  }
+
+  const tier = report.status === 'full' ? 'full' : report.status === 'limited' ? 'locked' : report.tier === 'preliminary' ? 'prelim' : 'none'
+  const score = report.score || 0
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', background: '#0F172A', borderRadius: '12px', padding: '10px 16px' }}>
-        <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700 }}>عرض توضيحي — حالة البيانات:</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setTier('full')} style={{ background: tier === 'full' ? '#16A34A' : '#334155', color: '#fff', border: 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>تقييم موثوق</button>
-          <button onClick={() => setTier('prelim')} style={{ background: tier === 'prelim' ? '#F59E0B' : '#334155', color: '#fff', border: 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>تقييم أولي</button>
-          <button onClick={() => setTier('none')} style={{ background: tier === 'none' ? '#EF4444' : '#334155', color: '#fff', border: 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>بيانات غير كافية</button>
-          <button onClick={() => setTier('locked')} style={{ background: tier === 'locked' ? '#3B82F6' : '#334155', color: '#fff', border: 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>باقة مجانية (مقفل)</button>
-        </div>
-      </div>
-
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '30px', marginBottom: '18px' }}>
         <div style={{ display: 'flex', gap: '28px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ width: '66px', height: '66px', borderRadius: '16px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 900, flex: 'none' }}>ن</div>
+          <div style={{ width: '66px', height: '66px', borderRadius: '16px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 900, flex: 'none' }}>
+            {company?.name.charAt(0)}
+          </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>شركة نجد للمقاولات المحدودة</h1>
+              <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>{company?.name}</h1>
               <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>● سجل نشط</span>
             </div>
             <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap', fontSize: '14px', color: '#64748B', fontWeight: 600 }}>
-              <span>القطاع: مقاولات</span>
-              <span>المدينة: الرياض</span>
-              <span>السجل: 1010234567</span>
-              <span>عمر الشركة: 14 سنة</span>
+              <span>القطاع: {company?.sector || '—'}</span>
+              <span>المدينة: {company?.city || '—'}</span>
+              <span>السجل: {company?.cr_number || '—'}</span>
             </div>
           </div>
 
@@ -41,9 +87,9 @@ export default function TrustReport() {
 
           {tier === 'full' && (
             <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: 'conic-gradient(#16A34A 0% 82%,#E2E8F0 82% 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>82</span>
+                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
                   <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
                 </div>
               </div>
@@ -53,9 +99,9 @@ export default function TrustReport() {
 
           {tier === 'prelim' && (
             <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: 'conic-gradient(#F59E0B 0% 71%,#E2E8F0 71% 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#F59E0B 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>71</span>
+                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
                   <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
                 </div>
               </div>
@@ -65,7 +111,7 @@ export default function TrustReport() {
 
           {tier === 'locked' && (
             <div style={{ textAlign: 'center', flex: 'none', position: 'relative' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: 'conic-gradient(#16A34A 0% 82%,#E2E8F0 82% 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(7px)' }}>
+              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% 50%,#E2E8F0 50% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(7px)' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff' }}></div>
               </div>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>🔒</div>
