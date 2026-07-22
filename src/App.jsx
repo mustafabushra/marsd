@@ -110,47 +110,47 @@ function AppContent() {
 
         {/* Company Routes - Protected */}
         <Route element={<CompanyShell user={user} />}>
-          <Route path="/dashboard" element={<CompanyRoute isLoggedIn={true} isAdmin={false}><CompanyDashboard /></CompanyRoute>} />
-          <Route path="/search" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Search /></CompanyRoute>} />
-          <Route path="/add-company" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AddCompany /></CompanyRoute>} />
-          <Route path="/add-report" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AddReport /></CompanyRoute>} />
-          <Route path="/my-reports" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><MyReports /></CompanyRoute>} />
-          <Route path="/trust-report/:id" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><TrustReport /></CompanyRoute>} />
-          <Route path="/watchlist" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Watchlist /></CompanyRoute>} />
-          <Route path="/compare" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Compare /></CompanyRoute>} />
-          <Route path="/users" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><CompanyUsers /></CompanyRoute>} />
-          <Route path="/subscription" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Subscription /></CompanyRoute>} />
-          <Route path="/profile" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Profile /></CompanyRoute>} />
-          <Route path="/notifications" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Notifications /></CompanyRoute>} />
-          <Route path="/business-requests" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><BusinessRequests /></CompanyRoute>} />
+          <Route path="/dashboard" element={<CompanyRoute><CompanyDashboard /></CompanyRoute>} />
+          <Route path="/search" element={<CompanyRoute><Search /></CompanyRoute>} />
+          <Route path="/add-company" element={<CompanyRoute><AddCompany /></CompanyRoute>} />
+          <Route path="/add-report" element={<CompanyRoute><AddReport /></CompanyRoute>} />
+          <Route path="/my-reports" element={<CompanyRoute><MyReports /></CompanyRoute>} />
+          <Route path="/trust-report/:id" element={<CompanyRoute><TrustReport /></CompanyRoute>} />
+          <Route path="/watchlist" element={<CompanyRoute><Watchlist /></CompanyRoute>} />
+          <Route path="/compare" element={<CompanyRoute><Compare /></CompanyRoute>} />
+          <Route path="/users" element={<CompanyRoute><CompanyUsers /></CompanyRoute>} />
+          <Route path="/subscription" element={<CompanyRoute><Subscription /></CompanyRoute>} />
+          <Route path="/profile" element={<CompanyRoute><Profile /></CompanyRoute>} />
+          <Route path="/notifications" element={<CompanyRoute><Notifications /></CompanyRoute>} />
+          <Route path="/business-requests" element={<CompanyRoute><BusinessRequests /></CompanyRoute>} />
         </Route>
 
         {/* Admin Routes - Protected */}
         <Route element={<AdminShell user={user} />}>
-          <Route path="/admin" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
-          <Route path="/admin/requests" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminRequests /></AdminRoute>} />
-          <Route path="/admin/reports" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminReports /></AdminRoute>} />
-          <Route path="/admin/bulk-import" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminBulkImport /></AdminRoute>} />
-          <Route path="/admin/companies" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminCompaniesManagement /></AdminRoute>} />
-          <Route path="/admin/users" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminUsers /></AdminRoute>} />
-          <Route path="/admin/logs" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminLogs /></AdminRoute>} />
-          <Route path="/admin/settings" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminSettings /></AdminRoute>} />
-          <Route path="/admin/tenants" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminTenants /></AdminRoute>} />
-          <Route path="/admin/subscriptions" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminSubscriptions /></AdminRoute>} />
-          <Route path="/admin/admin-users" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminAdminUsers /></AdminRoute>} />
-          <Route path="/admin/plans" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminPlans /></AdminRoute>} />
-          <Route path="/admin/payments" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminPayments /></AdminRoute>} />
-          <Route path="/admin/trust-score" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminTrustScore /></AdminRoute>} />
-          <Route path="/admin/report-analytics" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminReportAnalytics /></AdminRoute>} />
-          <Route path="/admin/email-templates" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminEmailTemplates /></AdminRoute>} />
-          <Route path="/admin/data-export" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminDataExport /></AdminRoute>} />
-          <Route path="/admin/disputes" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminDisputes /></AdminRoute>} />
-          <Route path="/admin/system-health" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminSystemHealth /></AdminRoute>} />
-          <Route path="/admin/fraud-detection" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminFraudDetection /></AdminRoute>} />
-          <Route path="/admin/integrations" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminIntegrations /></AdminRoute>} />
-          <Route path="/admin/tenant-analytics" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminTenantAnalytics /></AdminRoute>} />
-          <Route path="/admin/company-verification" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminCompanyVerification /></AdminRoute>} />
-          <Route path="/admin/backup" element={<AdminRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AdminBackup /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/requests" element={<AdminRoute><AdminRequests /></AdminRoute>} />
+          <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />
+          <Route path="/admin/bulk-import" element={<AdminRoute><AdminBulkImport /></AdminRoute>} />
+          <Route path="/admin/companies" element={<AdminRoute><AdminCompaniesManagement /></AdminRoute>} />
+          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+          <Route path="/admin/logs" element={<AdminRoute><AdminLogs /></AdminRoute>} />
+          <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+          <Route path="/admin/tenants" element={<AdminRoute><AdminTenants /></AdminRoute>} />
+          <Route path="/admin/subscriptions" element={<AdminRoute><AdminSubscriptions /></AdminRoute>} />
+          <Route path="/admin/admin-users" element={<AdminRoute><AdminAdminUsers /></AdminRoute>} />
+          <Route path="/admin/plans" element={<AdminRoute><AdminPlans /></AdminRoute>} />
+          <Route path="/admin/payments" element={<AdminRoute><AdminPayments /></AdminRoute>} />
+          <Route path="/admin/trust-score" element={<AdminRoute><AdminTrustScore /></AdminRoute>} />
+          <Route path="/admin/report-analytics" element={<AdminRoute><AdminReportAnalytics /></AdminRoute>} />
+          <Route path="/admin/email-templates" element={<AdminRoute><AdminEmailTemplates /></AdminRoute>} />
+          <Route path="/admin/data-export" element={<AdminRoute><AdminDataExport /></AdminRoute>} />
+          <Route path="/admin/disputes" element={<AdminRoute><AdminDisputes /></AdminRoute>} />
+          <Route path="/admin/system-health" element={<AdminRoute><AdminSystemHealth /></AdminRoute>} />
+          <Route path="/admin/fraud-detection" element={<AdminRoute><AdminFraudDetection /></AdminRoute>} />
+          <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
+          <Route path="/admin/tenant-analytics" element={<AdminRoute><AdminTenantAnalytics /></AdminRoute>} />
+          <Route path="/admin/company-verification" element={<AdminRoute><AdminCompanyVerification /></AdminRoute>} />
+          <Route path="/admin/backup" element={<AdminRoute><AdminBackup /></AdminRoute>} />
         </Route>
 
         {/* Error Pages */}

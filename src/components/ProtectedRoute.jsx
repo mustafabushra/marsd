@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useUser, useOrganization, useOrganizationList } from '@clerk/react'
 
-export function AdminRoute({ isLoggedIn, isAdmin, children }) {
+export function AdminRoute({ children }) {
   const { isLoaded, user } = useUser()
   const { organization } = useOrganization()
 
@@ -25,7 +25,7 @@ export function AdminRoute({ isLoggedIn, isAdmin, children }) {
   return children
 }
 
-export function CompanyRoute({ isLoggedIn, isAdmin, children }) {
+export function CompanyRoute({ children }) {
   const { isLoaded, user } = useUser()
   const { organization } = useOrganization()
 
