@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { ClerkProvider } from './context/ClerkProvider'
+import { useUser, useAuth as useClerkAuth } from '@clerk/react'
 import VisitorShell from './components/VisitorShell'
 import CompanyShell from './components/CompanyShell'
 import AdminShell from './components/AdminShell'
@@ -63,10 +64,11 @@ import TestSupabase from './pages/TestSupabase'
  * Separated from App to allow useAuth hook access within provider
  */
 function AppContent() {
-  const { isLoggedIn, isAdmin, user, logout, isLoading } = useAuth()
+  const { isLoaded, isSignedIn } = useClerkAuth()
+  const { user } = useUser()
 
   // Show loading state while initializing auth
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <div style={{
         display: 'flex',
@@ -79,6 +81,10 @@ function AppContent() {
       </div>
     )
   }
+
+  const isLoggedIn = isSignedIn
+  const isAdmin = false // TODO: Check user organization role from Clerk
+  const isLoading = !isLoaded
 
   return (
     <BrowserRouter>
@@ -164,13 +170,13 @@ function AppContent() {
 
 /**
  * App Component
- * Wraps the entire application with AuthProvider
- * This enables all components to use the useAuth hook
+ * Wraps the entire application with ClerkProvider
+ * This enables all components to use Clerk auth
  */
 export default function App() {
   return (
-    <AuthProvider>
+    <ClerkProvider>
       <AppContent />
-    </AuthProvider>
+    </ClerkProvider>
   )
 }
