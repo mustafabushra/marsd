@@ -182,18 +182,20 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       }
     }
 
-    // 1. Create Tenant record
+    // 1. Create or update Tenant record (UPSERT on email)
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
-      .insert([{
+      .upsert([{
+        email: companyData.email,
         name: companyData.name,
         cr_number: crNumber,
-        email: companyData.email,
         phone: companyData.phone || '',
         city: companyData.city || '',
         sector: companyData.sector || '',
         status: 'active'
-      }])
+      }], {
+        onConflict: 'email'
+      })
       .select()
       .single()
 
