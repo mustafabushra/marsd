@@ -1,39 +1,87 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
+import { getSupabase } from '../lib/api'
 
 export default function BusinessRequests() {
   const navigate = useNavigate()
-  const [requests, setRequests] = useState([
-    {
-      id: 1,
-      from: 'شركة الراجحي للتجارة',
-      type: 'sent',
-      subject: 'طلب تعاون توريد',
-      message: 'نرغب في التعاون كموردين للمنتجات الإلكترونية',
-      date: '2026-07-15',
-      status: 'pending',
-    },
-    {
-      id: 2,
-      from: 'شركة الدرع الذهبي',
-      type: 'received',
-      subject: 'عرض خدمات استشارية',
-      message: 'نقدم خدمات استشارية متخصصة في إدارة المشاريع',
-      date: '2026-07-14',
-      status: 'pending',
-    },
-    {
-      id: 3,
-      from: 'مجموعة النور للاستثمار',
-      type: 'received',
-      subject: 'شراكة استراتيجية',
-      message: 'هل تهتمون بالشراكة الاستراتيجية في السوق الخليجي؟',
-      date: '2026-07-13',
-      status: 'accepted',
-    },
-  ])
+  const { user } = useUser()
+  const [loading, setLoading] = useState(true)
+  const [requests, setRequests] = useState([])
+
+  useEffect(() => {
+    const loadRequests = async () => {
+      try {
+        const supabase = getSupabase()
+
+        // Get current user's tenant
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tenant_id')
+          .eq('id', user?.id)
+          .single()
+
+        if (!userData?.tenant_id) {
+          setLoading(false)
+          return
+        }
+
+        // Get sent and received requests
+        const { data: sentRequests } = await supabase
+          .from('business_requests')
+          .select('*')
+          .eq('from_tenant_id', userData.tenant_id)
+          .order('created_at', { ascending: false })
+
+        const { data: receivedRequests } = await supabase
+          .from('business_requests')
+          .select('*')
+          .eq('to_tenant_id', userData.tenant_id)
+          .order('created_at', { ascending: false })
+
+        const formatted = [
+          ...(sentRequests || []).map(r => ({
+            id: r.id,
+            from: r.subject || 'طلب تعاون',
+            type: 'sent',
+            subject: r.subject || 'طلب',
+            message: r.description || '',
+            date: new Date(r.created_at).toLocaleDateString('ar-SA'),
+            status: r.status || 'pending'
+          })),
+          ...(receivedRequests || []).map(r => ({
+            id: r.id,
+            from: r.subject || 'طلب تعاون',
+            type: 'received',
+            subject: r.subject || 'طلب',
+            message: r.description || '',
+            date: new Date(r.created_at).toLocaleDateString('ar-SA'),
+            status: r.status || 'pending'
+          }))
+        ]
+
+        setRequests(formatted)
+      } catch (err) {
+        console.error('Error loading requests:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user?.id) {
+      loadRequests()
+    }
+  }, [user?.id])
 
   const [tab, setTab] = useState('all')
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        جاري التحميل...
+      </div>
+    )
+  }
 
   const filteredRequests = tab === 'all'
     ? requests
@@ -41,12 +89,30 @@ export default function BusinessRequests() {
     ? requests.filter(r => r.type === 'sent')
     : requests.filter(r => r.type === 'received')
 
-  const handleAccept = (id) => {
-    setRequests(requests.map(r => r.id === id ? { ...r, status: 'accepted' } : r))
+  const handleAccept = async (id) => {
+    try {
+      const supabase = getSupabase()
+      await supabase
+        .from('business_requests')
+        .update({ status: 'accepted' })
+        .eq('id', id)
+      setRequests(requests.map(r => r.id === id ? { ...r, status: 'accepted' } : r))
+    } catch (err) {
+      console.error('Error accepting request:', err)
+    }
   }
 
-  const handleReject = (id) => {
-    setRequests(requests.map(r => r.id === id ? { ...r, status: 'rejected' } : r))
+  const handleReject = async (id) => {
+    try {
+      const supabase = getSupabase()
+      await supabase
+        .from('business_requests')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+      setRequests(requests.map(r => r.id === id ? { ...r, status: 'rejected' } : r))
+    } catch (err) {
+      console.error('Error rejecting request:', err)
+    }
   }
 
   return (
