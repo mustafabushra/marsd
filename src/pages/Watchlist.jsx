@@ -1,18 +1,105 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
 import { AlertIcon } from '../components/icons'
 
 export default function Watchlist() {
-  const [companies] = useState([
-    { name: 'مؤسسة الخليج للتجارة', score: '82', gaugeBg: 'conic-gradient(#16A34A 0% 82%,#E2E8F0 82% 100%)', pts: '10,25 20,18 30,22 40,15 50,20 60,12 70,18 80,10', lineColor: '#16A34A', trend: '↑ +2', tBg: '#F0FDF4', tColor: '#15803D' },
-    { name: 'شركة واحة الابتكار', score: '75', gaugeBg: 'conic-gradient(#16A34A 0% 75%,#E2E8F0 75% 100%)', pts: '10,20 20,22 30,18 40,24 50,19 60,23 70,20 80,18', lineColor: '#16A34A', trend: '↑ +5', tBg: '#F0FDF4', tColor: '#15803D' },
-    { name: 'شركة نجد للمقاولات', score: '78', gaugeBg: 'conic-gradient(#16A34A 0% 78%,#E2E8F0 78% 100%)', pts: '10,18 20,20 30,17 40,19 50,16 60,18 70,17 80,16', lineColor: '#16A34A', trend: '→ ±0', tBg: '#F1F5F9', tColor: '#64748B' }
-  ])
+  const { user } = useUser()
+  const [loading, setLoading] = useState(true)
+  const [companies, setCompanies] = useState([])
+  const [alerts, setAlerts] = useState([])
 
-  const [alerts] = useState([
-    { title: 'انخفض تقييم "مؤسسة الخليج للتجارة" بمقدار 8 نقاط', time: 'قبل 4 ساعات', color: '#DC2626' },
-    { title: 'ارتفع تقييم "شركة واحة الابتكار" بمقدار 5 نقاط', time: 'أمس', color: '#16A34A' },
-    { title: 'ارتفع تقييم "شركة نجد للمقاولات" بمقدار نقطتين', time: 'قبل يومين', color: '#16A34A' }
-  ])
+  useEffect(() => {
+    const loadWatchlist = async () => {
+      try {
+        const supabase = getSupabase()
+
+        // Get current user's tenant
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tenant_id')
+          .eq('id', user?.id)
+          .single()
+
+        if (!userData?.tenant_id) {
+          setLoading(false)
+          return
+        }
+
+        // Get watchlist items with company and trust score data
+        const { data: watchlistData } = await supabase
+          .from('watchlist_items')
+          .select(`
+            id,
+            company_id,
+            companies (
+              id,
+              name,
+              cr_number,
+              city
+            ),
+            trust_scores (
+              score,
+              risk_band,
+              tier,
+              approved_reports
+            )
+          `)
+          .eq('tenant_id', userData.tenant_id)
+
+        const formatted = (watchlistData || []).map(w => {
+          const score = w.trust_scores?.score || 0
+          return {
+            id: w.id,
+            name: w.companies?.name || 'شركة مجهولة',
+            crNumber: w.companies?.cr_number,
+            city: w.companies?.city,
+            score: score.toString(),
+            gaugeBg: `conic-gradient(#16A34A 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`,
+            pts: '10,25 20,18 30,22 40,15 50,20 60,12 70,18 80,10',
+            lineColor: score >= 70 ? '#16A34A' : score >= 40 ? '#F59E0B' : '#DC2626',
+            trend: '→ ±0',
+            tBg: '#F1F5F9',
+            tColor: '#64748B'
+          }
+        })
+
+        setCompanies(formatted)
+
+        // Simple alerts based on scores
+        if (formatted.length > 0) {
+          const alertsList = formatted
+            .filter(c => parseInt(c.score) < 50)
+            .map((c, idx) => ({
+              title: `${c.name} — مؤشر ثقة منخفض (${c.score})`,
+              time: 'مراقبة جارية',
+              color: '#DC2626'
+            }))
+            .slice(0, 5)
+
+          setAlerts(alertsList.length > 0 ? alertsList : [
+            { title: 'جميع الشركات في قائمتك تتمتع بمؤشرات ثقة جيدة', time: 'الآن', color: '#16A34A' }
+          ])
+        }
+      } catch (err) {
+        console.error('Error loading watchlist:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user?.id) {
+      loadWatchlist()
+    }
+  }, [user?.id])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        جاري التحميل...
+      </div>
+    )
+  }
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px 32px' }}>
@@ -20,26 +107,33 @@ export default function Watchlist() {
         {/* Left side: Companies */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexDirection: 'row-reverse' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>الشركات المُتابَعة</h3>
-            <button style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer' }}>+ إضافة شركة</button>
+            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>الشركات المُتابَعة ({companies.length})</h3>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {companies.map((w, idx) => (
-              <div key={idx} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '18px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: w.gaugeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 900, color: '#1E2A52' }}>{w.score}</div>
+          {companies.length === 0 ? (
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '32px', textAlign: 'center' }}>
+              <div style={{ color: '#94A3B8', marginBottom: '8px' }}>📋</div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>لا توجد شركات في قائمتك</div>
+              <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '4px' }}>ابدأ بالبحث عن شركات وأضفها للمراقبة</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {companies.map((w) => (
+                <div key={w.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '18px' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: w.gaugeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 900, color: '#1E2A52' }}>{w.score}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{w.name}</div>
+                    <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>{w.city}</div>
+                  </div>
+                  <svg viewBox="0 0 90 32" style={{ width: '96px', height: '34px', flex: 'none' }}>
+                    <polyline points={w.pts} fill="none" stroke={w.lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline>
+                  </svg>
+                  <span style={{ background: w.tBg, color: w.tColor, borderRadius: '8px', padding: '6px 13px', fontSize: '13.5px', fontWeight: 800, flex: 'none' }}>{w.trend}</span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{w.name}</div>
-                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>مؤشر الثقة الحالي</div>
-                </div>
-                <svg viewBox="0 0 90 32" style={{ width: '96px', height: '34px', flex: 'none' }}>
-                  <polyline points={w.pts} fill="none" stroke={w.lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                </svg>
-                <span style={{ background: w.tBg, color: w.tColor, borderRadius: '8px', padding: '6px 13px', fontSize: '13.5px', fontWeight: 800, flex: 'none' }}>{w.trend}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right side: Alerts */}
