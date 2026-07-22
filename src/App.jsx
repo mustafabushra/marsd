@@ -82,10 +82,6 @@ function AppContent() {
     )
   }
 
-  const isLoggedIn = isSignedIn
-  const isAdmin = user?.publicMetadata?.role === 'admin'
-  const isLoading = !isLoaded
-
   return (
     <BrowserRouter>
       <Routes>
@@ -114,7 +110,7 @@ function AppContent() {
 
         {/* Company Routes - Protected */}
         <Route element={<CompanyShell user={user} />}>
-          <Route path="/dashboard" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><CompanyDashboard /></CompanyRoute>} />
+          <Route path="/dashboard" element={<CompanyRoute isLoggedIn={true} isAdmin={false}><CompanyDashboard /></CompanyRoute>} />
           <Route path="/search" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><Search /></CompanyRoute>} />
           <Route path="/add-company" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AddCompany /></CompanyRoute>} />
           <Route path="/add-report" element={<CompanyRoute isLoggedIn={isLoggedIn} isAdmin={isAdmin}><AddReport /></CompanyRoute>} />

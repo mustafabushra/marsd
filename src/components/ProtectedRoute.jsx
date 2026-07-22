@@ -30,14 +30,14 @@ export function CompanyRoute({ isLoggedIn, isAdmin, children }) {
   const { organization } = useOrganization()
 
   if (!isLoaded) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>جاري التحميل...</div>
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px' }}>جاري التحميل...</div>
   }
 
   if (!user) {
     return <Navigate to="/login" replace />
   }
 
-  // Check if user is admin
+  // Check if user is admin - only redirect if explicitly marked as admin
   const userRole = organization?.membership?.role
   const isAdminUser = userRole === 'admin' || user?.publicMetadata?.role === 'admin'
 
@@ -45,5 +45,6 @@ export function CompanyRoute({ isLoggedIn, isAdmin, children }) {
     return <Navigate to="/admin" replace />
   }
 
+  // Allow company users with or without organization
   return children
 }
