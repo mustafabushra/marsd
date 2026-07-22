@@ -1,14 +1,15 @@
 /**
  * API Client — يربط React مع Supabase مباشرة
  * Real-time database access with Row-Level Security
- * Replaced: Mock API → Real Supabase
+ * Authentication: Clerk (for user login/signup)
+ * Database: Supabase (PostgreSQL with RLS)
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 let supabaseClient: SupabaseClient | null = null
 
-function getSupabase(): SupabaseClient {
+export function getSupabase(): SupabaseClient {
   if (!supabaseClient) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY

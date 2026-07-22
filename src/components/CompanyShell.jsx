@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
+import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import {
   DashboardIcon,
   SearchIcon,
@@ -17,18 +18,7 @@ import {
 export default function CompanyShell({ user, onLogout }) {
   const navigate = useNavigate()
   const location = useLocation()
-
-  const handleSignOut = async () => {
-    try {
-      // Clerk's UserButton handles signOut in the dropdown menu
-      // This is for manual logout button - Clerk doesn't expose signOut directly
-      // We'll use the UserButton component instead
-      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-      window.location.href = '/'
-    } catch (err) {
-      console.error('Logout failed:', err)
-    }
-  }
+  const { organizationName, userRole } = useClerkOrganization()
 
   const screenLabels = {
     '/dashboard': 'لوحة تحكم الشركة',
@@ -135,8 +125,12 @@ export default function CompanyShell({ user, onLogout }) {
 
         {/* Subscription Box */}
         <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: '14px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>باقتك: الاحترافية</div>
-          <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>تتجدد في 14 يوليو 2026</div>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>
+            {organizationName || 'الشركة'}
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>
+            دور: {userRole || 'عضو'}
+          </div>
           <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>إدارة الباقة</button>
         </div>
 

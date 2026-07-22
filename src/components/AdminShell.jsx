@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
+import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import {
   DashboardIcon,
   DocumentIcon,
@@ -12,6 +13,7 @@ import {
 
 export default function AdminShell({ user, onLogout }) {
   const navigate = useNavigate()
+  const { organizationName, userRole } = useClerkOrganization()
 
   const menuItems = [
     { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
@@ -86,7 +88,8 @@ export default function AdminShell({ user, onLogout }) {
           color: '#FCA5A5',
           textAlign: 'center'
         }}>
-          لوحة الإدارة
+          <div style={{ marginBottom: '4px' }}>لوحة الإدارة</div>
+          <div style={{ fontSize: '11px', opacity: 0.9 }}>{userRole || 'admin'}</div>
         </div>
 
         {/* Nav Items */}
