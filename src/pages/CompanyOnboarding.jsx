@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { getSupabase } from '../lib/api'
+import { createTenantAndUser } from '../lib/api'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -86,53 +86,19 @@ export default function CompanyOnboarding() {
       if (!companyData.sector.trim()) throw new Error('القطاع مطلوب')
       if (!companyData.city.trim()) throw new Error('المدينة مطلوبة')
 
-      const supabase = getSupabase()
-
-      // 1. Create Tenant
-      const { data: tenantData, error: tenantError } = await supabase
-        .from('tenants')
-        .insert([{
-          name: companyData.name,
-          cr_number: companyData.crNumber,
-          email: companyData.email,
-          phone: companyData.phone,
-          city: companyData.city,
-          sector: companyData.sector,
-          status: 'active'
-        }])
-        .select()
-        .single()
-
-      if (tenantError) throw new Error(tenantError.message)
-
-      const tenantId = tenantData.id
-
-      // 2. Update User with tenant_id
-      const { error: userError } = await supabase
-        .from('users')
-        .upsert([{
-          id: user.id,
-          tenant_id: tenantId,
-          email: user.primaryEmailAddress?.emailAddress,
-          role: 'company_admin',
-          status: 'active'
-        }])
-
-      if (userError) throw new Error(userError.message)
-
-      // 3. Create Company Record
-      await supabase
-        .from('companies')
-        .insert([{
-          name: companyData.name,
-          cr_number: companyData.crNumber,
-          sector: companyData.sector,
-          city: companyData.city,
-          founded_year: companyData.foundedYear,
-          cr_status: companyData.crStatus,
-          source: 'self_registered',
-          approved: true
-        }])
+      // Use the new API function that handles Clerk users
+      await createTenantAndUser(user.id, {
+        name: companyData.name,
+        crNumber: companyData.crNumber,
+        email: companyData.email || user.primaryEmailAddress?.emailAddress,
+        phone: companyData.phone,
+        city: companyData.city,
+        sector: companyData.sector,
+        foundedYear: companyData.foundedYear,
+        crStatus: companyData.crStatus,
+        firstName: user.firstName,
+        lastName: user.lastName
+      })
 
       // Success
       navigate('/dashboard')

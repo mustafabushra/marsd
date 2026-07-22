@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { getSupabase } from '../lib/api'
+import { createTenantAndUser } from '../lib/api'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -114,67 +114,19 @@ export default function CompanyRegister() {
         return
       }
 
-      const supabase = getSupabase()
-
-      // 1. Create Tenant
-      const { data: tenantData, error: tenantError } = await supabase
-        .from('tenants')
-        .insert([{
-          name: companyData.name,
-          cr_number: companyData.crNumber,
-          email: companyData.email,
-          phone: companyData.phone,
-          city: companyData.city,
-          sector: companyData.sector,
-          status: 'active'
-        }])
-        .select()
-        .single()
-
-      if (tenantError) {
-        setError(`خطأ في إنشاء الحساب: ${tenantError.message}`)
-        setLoading(false)
-        return
-      }
-
-      const tenantId = tenantData.id
-
-      // 2. Create User record
-      const { error: userError } = await supabase
-        .from('users')
-        .upsert([{
-          id: user.id,
-          tenant_id: tenantId,
-          email: user.primaryEmailAddress?.emailAddress,
-          role: 'company_admin',
-          status: 'active'
-        }])
-
-      if (userError) {
-        setError(`خطأ في إنشاء ملف المستخدم: ${userError.message}`)
-        setLoading(false)
-        return
-      }
-
-      // 3. Create Company Record (searchable)
-      const { error: companyError } = await supabase
-        .from('companies')
-        .insert([{
-          name: companyData.name,
-          cr_number: companyData.crNumber,
-          sector: companyData.sector,
-          city: companyData.city,
-          founded_year: companyData.foundedYear,
-          cr_status: companyData.crStatus,
-          source: 'self_registered',
-          approved: true
-        }])
-
-      if (companyError) {
-        setError(`خطأ في إنشاء ملف الشركة: ${companyError.message}`)
-        setLoading(false)
-        return
-      }
+      // Use the new API function that handles Clerk users
+      await createTenantAndUser(user.id, {
+        name: companyData.name,
+        crNumber: companyData.crNumber,
+        email: companyData.email || user.primaryEmailAddress?.emailAddress,
+        phone: companyData.phone,
+        city: companyData.city,
+        sector: companyData.sector,
+        foundedYear: companyData.foundedYear,
+        crStatus: companyData.crStatus,
+        firstName: user.firstName,
+        lastName: user.lastName
+      })
 
       // Success - redirect to dashboard
       navigate('/dashboard')

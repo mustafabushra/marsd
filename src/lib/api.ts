@@ -139,73 +139,10 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(data: any) {
-  const supabase = getSupabase()
-
-  // 1. Create auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-  })
-
-  if (authError) {
-    console.error('Auth signup error:', authError)
-    throw new Error(authError.message || 'فشل إنشاء الحساب')
-  }
-
-  if (!authData.user) {
-    throw new Error('فشل إنشاء المستخدم')
-  }
-
-  console.log('Auth user created:', authData.user.id)
-
-  try {
-    // 2. Create tenant record
-    const tenantPayload = {
-      name: data.companyName || data.name,
-      cr_number: data.crNumber || 'temp-' + Date.now(),
-      email: data.email,
-      phone: data.phone || '',
-      city: data.city || '',
-      sector: data.sector || '',
-      status: 'active',
-    }
-
-    console.log('Creating tenant with payload:', tenantPayload)
-
-    const { data: tenantData, error: tenantError } = await supabase
-      .from('tenants')
-      .insert([tenantPayload])
-      .select()
-      .single()
-
-    if (tenantError || !tenantData) {
-      console.error('Tenant creation error:', tenantError)
-      throw new Error('فشل إنشاء الشركة: ' + tenantError?.message)
-    }
-
-    console.log('Tenant created:', tenantData.id)
-
-    // 3. Update user record with tenant_id (trigger creates basic user, we update it)
-    await new Promise(resolve => setTimeout(resolve, 300))
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .update({
-        tenant_id: tenantData.id,
-        first_name: data.firstName || '',
-        last_name: data.lastName || '',
-        role: 'company_admin',
-      })
-      .eq('id', authData.user.id)
-      .select()
-      .single()
-
-    if (userError) {
-      console.error('User update error:', userError)
-      throw new Error('فشل تحديث ملف المستخدم: ' + userError.message)
-    }
-
-    console.log('User updated:', userData.id)
+  // NOTE: This function is deprecated with Clerk authentication
+  // Use the Clerk SDK for signup instead, then create tenant/user records via Supabase
+  throw new Error('Use Clerk authentication for signup')
+}
 
     // 4. Create default subscription (Free plan)
     const { data: plansData } = await supabase
@@ -262,6 +199,88 @@ export async function logout() {
   const supabase = getSupabase()
   await supabase.auth.signOut()
   clearAuth()
+}
+
+export async function createTenantAndUser(userId: string, companyData: any) {
+  const supabase = getSupabase()
+
+  try {
+    // 1. Create Tenant record
+    const { data: tenantData, error: tenantError } = await supabase
+      .from('tenants')
+      .insert([{
+        name: companyData.name,
+        cr_number: companyData.crNumber || 'temp-' + Date.now(),
+        email: companyData.email,
+        phone: companyData.phone || '',
+        city: companyData.city || '',
+        sector: companyData.sector || '',
+        status: 'active'
+      }])
+      .select()
+      .single()
+
+    if (tenantError || !tenantData) {
+      throw new Error('فشل إنشاء الشركة: ' + tenantError?.message)
+    }
+
+    // 2. Create/Update User record with tenant_id
+    const { error: userError } = await supabase
+      .from('users')
+      .upsert([{
+        id: userId,
+        tenant_id: tenantData.id,
+        email: companyData.email,
+        first_name: companyData.firstName || '',
+        last_name: companyData.lastName || '',
+        role: 'company_admin',
+        status: 'active'
+      }])
+
+    if (userError) {
+      throw new Error('فشل تحديث ملف المستخدم: ' + userError.message)
+    }
+
+    // 3. Create Company Record (for searchability)
+    await supabase
+      .from('companies')
+      .insert([{
+        name: companyData.name,
+        cr_number: companyData.crNumber,
+        sector: companyData.sector,
+        city: companyData.city,
+        founded_year: companyData.foundedYear,
+        cr_status: companyData.crStatus || 'active',
+        source: 'self_registered',
+        approved: true
+      }])
+
+    // 4. Create default subscription (Free plan)
+    const { data: plansData } = await supabase
+      .from('plans')
+      .select('id')
+      .eq('name', 'مجاني')
+      .limit(1)
+
+    if (plansData && plansData.length > 0) {
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 30)
+
+      await supabase
+        .from('subscriptions')
+        .insert([{
+          tenant_id: tenantData.id,
+          plan_id: plansData[0].id,
+          status: 'active',
+          current_period_start: new Date().toISOString(),
+          current_period_end: futureDate.toISOString()
+        }])
+    }
+
+    return { success: true, tenantId: tenantData.id }
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'خطأ في إنشاء الحساب')
+  }
 }
 
 // ============================================================================
