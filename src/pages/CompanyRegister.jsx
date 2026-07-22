@@ -3,6 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 
+const SAUDI_CITIES = [
+  'الرياض',
+  'جدة',
+  'مكة المكرمة',
+  'المدينة المنورة',
+  'الدمام',
+  'الخبر',
+  'الظهران',
+  'القصيم',
+  'عسير',
+  'أبها',
+  'تبوك',
+  'حائل',
+  'جيزان',
+  'نجران',
+  'الباحة',
+  'الحدود الشمالية',
+  'الأحساء',
+  'ينبع',
+  'الدوادمي',
+  'شقراء'
+]
+
 export default function CompanyRegister() {
   const navigate = useNavigate()
   const { user, isLoaded } = useUser()
@@ -292,11 +315,9 @@ export default function CompanyRegister() {
               }}>
                 المدينة *
               </label>
-              <input
-                type="text"
+              <select
                 value={companyData.city}
                 onChange={(e) => handleCompanyChange('city', e.target.value)}
-                placeholder="مثال: الرياض"
                 style={{
                   width: '100%',
                   border: '1.5px solid #E2E8F0',
@@ -304,9 +325,15 @@ export default function CompanyRegister() {
                   padding: '10px 12px',
                   fontSize: '14px',
                   outline: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit'
                 }}
-              />
+              >
+                <option value="">اختر المدينة</option>
+                {SAUDI_CITIES.map(city => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
             </div>
           </div>
 
