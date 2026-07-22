@@ -14,6 +14,7 @@ import Partners from './pages/Partners'
 import FAQ from './pages/FAQ'
 import Contact from './pages/Contact'
 import Register from './pages/Register'
+import CompanyRegister from './pages/CompanyRegister'
 import Login from './pages/Login'
 import AdminLogin from './pages/AdminLogin'
 import ForgotPassword from './pages/ForgotPassword'
@@ -100,6 +101,7 @@ function AppContent() {
           <Route path="/faq" element={<FAQ />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/company-register" element={<CompanyRegister />} />
           <Route path="/login" element={<Login />} />
         </Route>
 

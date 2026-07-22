@@ -41,7 +41,7 @@ export default function Register() {
               formFieldInput: 'border border-gray-200 rounded-lg px-4 py-3',
             }
           }}
-          redirectUrl="/dashboard"
+          redirectUrl="/company-register"
           signInUrl="/login"
         />
 
