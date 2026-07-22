@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
-import { useUser, useOrganization, useOrganizationList } from '@clerk/react'
+import { useUser, useOrganization } from '@clerk/react'
+import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 
 export function AdminRoute({ children }) {
   const { isLoaded, user } = useUser()
@@ -28,13 +29,19 @@ export function AdminRoute({ children }) {
 export function CompanyRoute({ children }) {
   const { isLoaded, user } = useUser()
   const { organization } = useOrganization()
+  const { needsOnboarding, loading: onboardingLoading } = useCompanyOnboarding()
 
-  if (!isLoaded) {
+  if (!isLoaded || onboardingLoading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px' }}>جاري التحميل...</div>
   }
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // Check if user needs to complete onboarding (old users without tenant)
+  if (needsOnboarding) {
+    return <Navigate to="/company-onboarding" replace />
   }
 
   // Check if user is admin - only redirect if explicitly marked as admin

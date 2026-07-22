@@ -15,6 +15,7 @@ import FAQ from './pages/FAQ'
 import Contact from './pages/Contact'
 import Register from './pages/Register'
 import CompanyRegister from './pages/CompanyRegister'
+import CompanyOnboarding from './pages/CompanyOnboarding'
 import Login from './pages/Login'
 import AdminLogin from './pages/AdminLogin'
 import ForgotPassword from './pages/ForgotPassword'
@@ -102,6 +103,7 @@ function AppContent() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/register" element={<Register />} />
           <Route path="/company-register" element={<CompanyRegister />} />
+          <Route path="/company-onboarding" element={<CompanyOnboarding />} />
           <Route path="/login" element={<Login />} />
         </Route>
 

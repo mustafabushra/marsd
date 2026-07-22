@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
+import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import {
   DashboardIcon,
   SearchIcon,
@@ -19,6 +20,16 @@ export default function CompanyShell({ user }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { organizationName, userRole } = useClerkOrganization()
+  const { needsOnboarding, loading } = useCompanyOnboarding()
+
+  // Redirect to onboarding if needed (except if already on dashboard/etc)
+  if (!loading && needsOnboarding && location.pathname.startsWith('/dashboard')) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        جاري التحميل...
+      </div>
+    )
+  }
 
   const screenLabels = {
     '/dashboard': 'لوحة تحكم الشركة',
