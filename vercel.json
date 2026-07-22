@@ -2,6 +2,5 @@
     "outputDirectory": "dist",
     "buildCommand": "bash build.sh",
     "devCommand": "npm run dev",
-    "framework": "vite",
-    "nodeVersion": "24.x"
+    "framework": "vite"
 }
