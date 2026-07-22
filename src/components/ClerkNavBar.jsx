@@ -71,11 +71,11 @@ export default function ClerkNavBar() {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {isSignedIn ? (
             <>
-              {/* Show Dashboard button for logged-in users */}
+              {/* Show Dashboard button - goes to /admin for admins, /dashboard for regular users */}
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
                 style={{
-                  background: '#16A34A',
+                  background: isAdmin ? '#DC2626' : '#16A34A',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '10px',
@@ -85,34 +85,11 @@ export default function ClerkNavBar() {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#15803D'}
-                onMouseLeave={(e) => e.target.style.background = '#16A34A'}
+                onMouseEnter={(e) => e.target.style.background = isAdmin ? '#B91C1C' : '#15803D'}
+                onMouseLeave={(e) => e.target.style.background = isAdmin ? '#DC2626' : '#16A34A'}
               >
-                لوحة التحكم
+                {isAdmin ? 'الإدارة' : 'لوحة التحكم'}
               </button>
-
-              {/* Show Admin button only for admin users */}
-              {isAdmin && (
-                <button
-                  onClick={() => navigate('/admin')}
-                  style={{
-                    background: '#DC2626',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '10px 16px',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#B91C1C'}
-                  onMouseLeave={(e) => e.target.style.background = '#DC2626'}
-                  title="لوحة الإدارة"
-                >
-                  الإدارة
-                </button>
-              )}
 
               <UserButton
                 afterSignOutUrl="/"
