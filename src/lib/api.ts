@@ -154,12 +154,32 @@ export async function createTenantAndUser(userId: string, companyData: any) {
   const supabase = getSupabase()
 
   try {
+    // Generate unique CR number if not provided or if it exists
+    let crNumber = companyData.crNumber?.trim()
+
+    if (!crNumber) {
+      // If not provided, generate a unique one based on user ID
+      crNumber = `CR-${userId.substring(0, 8)}-${Date.now()}`
+    } else {
+      // Check if CR number already exists
+      const { data: existing } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('cr_number', crNumber)
+        .limit(1)
+
+      if (existing && existing.length > 0) {
+        // CR number exists, append timestamp to make it unique
+        crNumber = `${crNumber}-${Date.now()}`
+      }
+    }
+
     // 1. Create Tenant record
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
       .insert([{
         name: companyData.name,
-        cr_number: companyData.crNumber || 'temp-' + Date.now(),
+        cr_number: crNumber,
         email: companyData.email,
         phone: companyData.phone || '',
         city: companyData.city || '',
