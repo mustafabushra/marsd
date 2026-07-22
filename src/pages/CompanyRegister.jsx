@@ -26,6 +26,29 @@ const SAUDI_CITIES = [
   'شقراء'
 ]
 
+const SECTORS = [
+  'البناء والمقاولات',
+  'النقل واللوجستيات',
+  'التجارة والبيع بالتجزئة',
+  'الصناعة والتصنيع',
+  'الخدمات المالية',
+  'السياحة والضيافة',
+  'التكنولوجيا والاتصالات',
+  'الطاقة والنفط والغاز',
+  'الرعاية الصحية',
+  'التعليم',
+  'العقارات',
+  'الزراعة والثروة السمكية',
+  'الإعلام والنشر',
+  'الخدمات الاستشارية',
+  'الاستيراد والتصدير',
+  'الكهرباء والمياه',
+  'الاتصالات',
+  'الترفيه والثقافة',
+  'الخدمات الحكومية',
+  'أخرى'
+]
+
 export default function CompanyRegister() {
   const navigate = useNavigate()
   const { user, isLoaded } = useUser()
@@ -289,11 +312,9 @@ export default function CompanyRegister() {
               }}>
                 القطاع *
               </label>
-              <input
-                type="text"
+              <select
                 value={companyData.sector}
                 onChange={(e) => handleCompanyChange('sector', e.target.value)}
-                placeholder="مثال: المقاولات"
                 style={{
                   width: '100%',
                   border: '1.5px solid #E2E8F0',
@@ -301,9 +322,15 @@ export default function CompanyRegister() {
                   padding: '10px 12px',
                   fontSize: '14px',
                   outline: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit'
                 }}
-              />
+              >
+                <option value="">اختر القطاع</option>
+                {SECTORS.map(sector => (
+                  <option key={sector} value={sector}>{sector}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label style={{
