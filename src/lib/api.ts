@@ -147,6 +147,7 @@ export async function register(data: any) {
   })
 
   if (authError) {
+    console.error('Auth signup error:', authError)
     throw new Error(authError.message || 'فشل إنشاء الحساب')
   }
 
@@ -154,29 +155,38 @@ export async function register(data: any) {
     throw new Error('فشل إنشاء المستخدم')
   }
 
+  console.log('Auth user created:', authData.user.id)
+
   try {
     // 2. Create tenant record
+    const tenantPayload = {
+      name: data.companyName || data.name,
+      cr_number: data.crNumber || 'temp-' + Date.now(),
+      email: data.email,
+      phone: data.phone || '',
+      city: data.city || '',
+      sector: data.sector || '',
+      status: 'active',
+    }
+
+    console.log('Creating tenant with payload:', tenantPayload)
+
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
-      .insert([
-        {
-          name: data.companyName || data.name,
-          cr_number: data.crNumber || '',
-          email: data.email,
-          phone: data.phone || '',
-          city: data.city || '',
-          sector: data.sector || '',
-          status: 'active',
-        },
-      ])
+      .insert([tenantPayload])
       .select()
       .single()
 
     if (tenantError || !tenantData) {
+      console.error('Tenant creation error:', tenantError)
       throw new Error('فشل إنشاء الشركة: ' + tenantError?.message)
     }
 
+    console.log('Tenant created:', tenantData.id)
+
     // 3. Update user record with tenant_id (trigger creates basic user, we update it)
+    await new Promise(resolve => setTimeout(resolve, 300))
+
     const { data: userData, error: userError } = await supabase
       .from('users')
       .update({
@@ -190,8 +200,11 @@ export async function register(data: any) {
       .single()
 
     if (userError) {
+      console.error('User update error:', userError)
       throw new Error('فشل تحديث ملف المستخدم: ' + userError.message)
     }
+
+    console.log('User updated:', userData.id)
 
     // 4. Create default subscription (Free plan)
     const { data: plansData } = await supabase
