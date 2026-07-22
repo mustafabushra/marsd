@@ -144,57 +144,6 @@ export async function register(data: any) {
   throw new Error('Use Clerk authentication for signup')
 }
 
-    // 4. Create default subscription (Free plan)
-    const { data: plansData } = await supabase
-      .from('plans')
-      .select('id')
-      .eq('name', 'مجاني')
-      .limit(1)
-
-    if (plansData && plansData.length > 0) {
-      const futureDate = new Date()
-      futureDate.setDate(futureDate.getDate() + 30)
-
-      await supabase
-        .from('subscriptions')
-        .insert([
-          {
-            tenant_id: tenantData.id,
-            plan_id: plansData[0].id,
-            status: 'active',
-            current_period_start: new Date().toISOString(),
-            current_period_end: futureDate.toISOString(),
-          },
-        ])
-    }
-
-    const user = {
-      id: userData.id,
-      email: userData.email,
-      firstName: userData.first_name || '',
-      lastName: userData.last_name || '',
-      role: userData.role,
-      tenantId: userData.tenant_id,
-    }
-
-    if (authData.session) {
-      setToken(authData.session.access_token)
-      if (authData.session.refresh_token) {
-        setRefreshToken(authData.session.refresh_token)
-      }
-    }
-    setUser(user)
-
-    return {
-      accessToken: authData.session?.access_token || '',
-      refreshToken: authData.session?.refresh_token || '',
-      user,
-    }
-  } catch (err) {
-    throw new Error(err instanceof Error ? err.message : 'خطأ في إنشاء الحساب')
-  }
-}
-
 export async function logout() {
   const supabase = getSupabase()
   await supabase.auth.signOut()
