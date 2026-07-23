@@ -1,16 +1,15 @@
 /**
- * Centralized constants for company status values
- * Single source of truth to prevent spelling errors and mismatches
+ * ⚠️ DEPRECATED كنقطة تعريف — القيم انتقلت إلى `enums.ts` (المصدر الوحيد للحقيقة).
+ *
+ * هذا الملف يعيد التصدير فقط للحفاظ على توافق الاستيرادات القديمة:
+ *   import { COMPANY_STATUS } from '../lib/constants'
+ *
+ * للكود الجديد: استورد مباشرةً من `../lib/enums`.
  */
 
-export const COMPANY_STATUS = {
-  PENDING: 'pending',
-  APPROVED: 'approved',
-  REJECTED: 'rejected',
-  SUSPENDED: 'suspended',
-  ACTIVE: 'active',
-} as const;
+export {
+  COMPANY_STATUS,
+  COMPANY_STATUS_VALUES,
+} from './enums'
 
-export type CompanyStatusType = typeof COMPANY_STATUS[keyof typeof COMPANY_STATUS];
-
-export const COMPANY_STATUS_VALUES = Object.values(COMPANY_STATUS);
+export type { CompanyStatus, CompanyStatus as CompanyStatusType } from './enums'

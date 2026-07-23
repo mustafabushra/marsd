@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { getSupabase, smartCompanyDetection, ensureStorageBucket } from '../lib/api'
-import { COMPANY_STATUS } from '../lib/constants'
+import { getSupabase, smartCompanyDetection, ensureStorageBucket, buildCompanyInsert } from '../lib/api'
+import { COMPANY_STATUS, COMPANY_SOURCE, REQUEST_STATUS, USER_ROLE, USER_STATUS, TENANT_STATUS } from '../lib/enums'
 
 const SAUDI_CITIES = [
   'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام',
@@ -178,7 +178,7 @@ export default function CompanyOnboarding() {
             company_id: existingCompany.id,
             user_id: user.id,
             supporting_documents: { crFile: crFileUrl },
-            status: 'pending'
+            status: REQUEST_STATUS.PENDING
           }])
           .select()
           .single()
@@ -193,8 +193,8 @@ export default function CompanyOnboarding() {
             email: formData.officialEmail || user.primaryEmailAddress?.emailAddress,
             first_name: user.firstName || '',
             last_name: user.lastName || '',
-            role: 'company_member',
-            status: 'active'
+            role: USER_ROLE.COMPANY_MEMBER,
+            status: USER_STATUS.ACTIVE
           }], { onConflict: 'id' })
 
         // Notify admin
@@ -216,19 +216,19 @@ export default function CompanyOnboarding() {
         // CASE A: New company — create full registration
         const { data: newCompany, error: companyError } = await supabase
           .from('companies')
-          .insert([{
+          .insert([buildCompanyInsert({
             name: formData.name,
-            cr_number: formData.crNumber,
-            unified_number: formData.unifiedNumber || null,
-            license_number: formData.licenseNumber || null,
-            official_email: formData.officialEmail || null,
+            crNumber: formData.crNumber,
+            unifiedNumber: formData.unifiedNumber,
+            licenseNumber: formData.licenseNumber,
+            officialEmail: formData.officialEmail,
             sector: formData.sector,
             city: formData.city,
-            founded_year: formData.foundedYear,
+            foundedYear: formData.foundedYear,
             status: COMPANY_STATUS.PENDING,
-            cr_file_url: crFileUrl,
-            source: 'community'
-          }])
+            source: COMPANY_SOURCE.COMMUNITY,
+            crFileUrl: crFileUrl,
+          })])
           .select('id')
           .single()
 
@@ -245,7 +245,7 @@ export default function CompanyOnboarding() {
             sector: formData.sector,
             city: formData.city,
             company_id: newCompany.id,
-            status: 'active'
+            status: TENANT_STATUS.ACTIVE
           }])
           .select('id')
           .single()
@@ -262,8 +262,8 @@ export default function CompanyOnboarding() {
             email: user.primaryEmailAddress?.emailAddress,
             first_name: user.firstName || '',
             last_name: user.lastName || '',
-            role: 'company_admin',
-            status: 'active'
+            role: USER_ROLE.COMPANY_ADMIN,
+            status: USER_STATUS.ACTIVE
           }])
 
         // Create registration request
@@ -274,7 +274,7 @@ export default function CompanyOnboarding() {
             tenant_id: tenantData.id,
             user_id: user.id,
             cr_document_url: crFileUrl,
-            status: 'pending'
+            status: REQUEST_STATUS.PENDING
           }])
 
         // Notify admin

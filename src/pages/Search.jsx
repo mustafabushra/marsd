@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchKnowledgeGraph, getAutocompleteCompanies } from '../lib/api'
+import { searchKnowledgeGraph, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
 import { Search as SearchIcon, X, Filter } from 'lucide-react'
 
 export default function Search() {
@@ -169,15 +169,14 @@ export default function Search() {
         }
 
         // Add new company
+        // كان هنا source: 'manual_addition' وهي قيمة غير مسموحة — تسبب
+        // companies_source_check violation. المصدر الصحيح: community.
         const { data: newCompany, error } = await supabase
           .from('companies')
-          .insert([{
+          .insert([buildCompanyInsert({
             name: query,
-            sector: null,
-            city: null,
-            source: 'manual_addition',
-            approved: false
-          }])
+            approved: false,
+          })])
           .select()
           .single()
 

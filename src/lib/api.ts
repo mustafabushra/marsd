@@ -6,8 +6,97 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import {
+  COMPANY_STATUS,
+  COMPANY_STATUS_VALUES,
+  COMPANY_CR_STATUS,
+  COMPANY_CR_STATUS_VALUES,
+  COMPANY_SOURCE,
+  COMPANY_SOURCE_VALUES,
+  assertEnum,
+  type CompanyStatus,
+  type CompanyCrStatus,
+  type CompanySource,
+} from './enums'
 
 let supabaseClient: SupabaseClient | null = null
+
+// ============================================================================
+// COMPANY INSERT BUILDER — نقطة الدخول الوحيدة لإدراج الشركات
+// ============================================================================
+//
+// السبب الجذري للمشكلة المتكررة (companies_*_check violations):
+// كان كل ملف يبني كائن الإدراج يدوياً ويكتب القيم كنصوص مباشرة، فتنحرف
+// عن الـ CHECK constraints في قاعدة البيانات (خاصة `source` المسموح فيه
+// فقط official | community). كل مرة نكتشف حقلاً مختلفاً بعد فشل الإدراج.
+//
+// الحل: كل إدراج في جدول companies يمرّ عبر هذه الدالة. تقوم بـ:
+//   1. تحويل أسماء الحقول من camelCase إلى أعمدة قاعدة البيانات.
+//   2. تطبيق القيم الافتراضية الصحيحة.
+//   3. التحقق من كل حقل مقيّد مقابل القيم المسموحة (assertEnum) قبل
+//      لمس قاعدة البيانات — فيظهر خطأ عربي واضح بدل خطأ Postgres الغامض.
+//
+// النتيجة: يستحيل إرسال قيمة تخالف الـ constraint دون أن يُكتشف فوراً
+// عند نقطة النداء، لا بعد الوصول لقاعدة البيانات.
+
+export interface CompanyInsertInput {
+  name: string
+  crNumber?: string | null
+  unifiedNumber?: string | null
+  licenseNumber?: string | null
+  officialEmail?: string | null
+  sector?: string | null
+  city?: string | null
+  foundedYear?: number | null
+  crFileUrl?: string | null
+  /** الحالة — تُتحقق مقابل COMPANY_STATUS_VALUES. الافتراضي: pending */
+  status?: CompanyStatus
+  /** حالة السجل التجاري — تُتحقق مقابل COMPANY_CR_STATUS_VALUES. الافتراضي: active */
+  crStatus?: CompanyCrStatus
+  /** المصدر — official | community فقط. الافتراضي: community */
+  source?: CompanySource
+  approved?: boolean
+}
+
+/**
+ * يبني ويتحقق من صف إدراج جدول companies.
+ * ⚠️ استخدم هذه الدالة حصراً لأي `.from('companies').insert(...)`.
+ * لا تبنِ كائن الإدراج يدوياً في أي مكان آخر.
+ */
+export function buildCompanyInsert(input: CompanyInsertInput): Record<string, any> {
+  if (!input.name?.trim()) {
+    throw new Error('❌ اسم الشركة مطلوب')
+  }
+
+  return {
+    name: input.name.trim(),
+    cr_number: input.crNumber?.trim() || null,
+    unified_number: input.unifiedNumber?.trim() || null,
+    license_number: input.licenseNumber?.trim() || null,
+    official_email: input.officialEmail?.trim().toLowerCase() || null,
+    sector: input.sector ?? null,
+    city: input.city ?? null,
+    founded_year: input.foundedYear ?? null,
+    cr_file_url: input.crFileUrl ?? null,
+    // الحقول المقيّدة — تحقق قبل الإدراج
+    status: assertEnum(
+      input.status ?? COMPANY_STATUS.PENDING,
+      COMPANY_STATUS_VALUES,
+      'companies.status'
+    ),
+    cr_status: assertEnum(
+      input.crStatus ?? COMPANY_CR_STATUS.ACTIVE,
+      COMPANY_CR_STATUS_VALUES,
+      'companies.cr_status'
+    ),
+    source: assertEnum(
+      input.source ?? COMPANY_SOURCE.COMMUNITY,
+      COMPANY_SOURCE_VALUES,
+      'companies.source'
+    ),
+    approved: input.approved ?? false,
+  }
+}
 
 export function getSupabase(): SupabaseClient {
   if (!supabaseClient) {
@@ -478,20 +567,23 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // 3. Create Company Record (for searchability)
+    // يمرّ عبر buildCompanyInsert لضمان مطابقة كل الـ CHECK constraints.
+    // ملاحظة: كان هنا source: 'self_registered' وهي قيمة غير مسموحة
+    // (المسموح official | community) وكانت تسبب companies_source_check violation.
     const { data: companyInsertData, error: companyError } = await supabase
       .from('companies')
-      .insert([{
+      .insert([buildCompanyInsert({
         name: companyData.name,
-        cr_number: companyData.crNumber,
+        crNumber: companyData.crNumber,
         sector: companyData.sector,
         city: companyData.city,
-        founded_year: companyData.foundedYear,
-        cr_status: companyData.crStatus || 'active',
-        source: 'self_registered',
-        status: companyData.status || 'pending',
-        cr_file_url: companyData.crFileUrl || null,
-        approved: true
-      }])
+        foundedYear: companyData.foundedYear,
+        crStatus: companyData.crStatus,
+        source: COMPANY_SOURCE.COMMUNITY,
+        status: companyData.status,
+        crFileUrl: companyData.crFileUrl || null,
+        approved: true,
+      })])
       .select('id')
       .single()
 
@@ -999,16 +1091,18 @@ export async function submitReport(reportData: any) {
       targetCompanyId = existingCompany[0].id
     } else {
       // Create company
+      // كان هنا source: 'from_report' وهي قيمة غير مسموحة — تسبب
+      // companies_source_check violation. المصدر الصحيح: community.
       const { data: newCompany, error: companyError } = await supabase
         .from('companies')
-        .insert([{
+        .insert([buildCompanyInsert({
           name: reportData.companyName,
-          cr_number: reportData.companyCrNumber || null,
+          crNumber: reportData.companyCrNumber || null,
           sector: reportData.companySector || null,
           city: reportData.companyCity || null,
-          source: 'from_report',
-          approved: false
-        }])
+          source: COMPANY_SOURCE.COMMUNITY,
+          approved: false,
+        })])
         .select()
         .single()
 
