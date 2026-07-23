@@ -379,48 +379,57 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // 5. Initialize Credits Ledger (0 initial balance, companies earn credits by submitting approved reports)
-    await supabase
-      .from('credits_ledger')
-      .insert([{
-        tenant_id: tenantData.id,
-        amount: 0,
-        reason: 'initial',
-        created_at: new Date().toISOString()
-      }])
-      .catch(err => console.warn('Credits initialization warning:', err))
+    try {
+      await supabase
+        .from('credits_ledger')
+        .insert([{
+          tenant_id: tenantData.id,
+          amount: 0,
+          reason: 'initial',
+          created_at: new Date().toISOString()
+        }])
+    } catch (err) {
+      console.warn('Credits initialization warning:', err)
+    }
 
     // 6. Send Welcome Notification
-    await supabase
-      .from('notifications')
-      .insert([{
-        tenant_id: tenantData.id,
-        type: 'welcome',
-        title: 'أهلاً وسهلاً في مرصد',
-        message: `مرحباً بـ ${companyData.name}! تم تفعيل حسابك بنجاح. ابدأ بإرسال التقارير والبحث عن الشركات.`,
-        is_read: false,
-        created_at: new Date().toISOString()
-      }])
-      .catch(err => console.warn('Welcome notification warning:', err))
+    try {
+      await supabase
+        .from('notifications')
+        .insert([{
+          tenant_id: tenantData.id,
+          type: 'welcome',
+          title: 'أهلاً وسهلاً في مرصد',
+          message: `مرحباً بـ ${companyData.name}! تم تفعيل حسابك بنجاح. ابدأ بإرسال التقارير والبحث عن الشركات.`,
+          is_read: false,
+          created_at: new Date().toISOString()
+        }])
+    } catch (err) {
+      console.warn('Welcome notification warning:', err)
+    }
 
     // 7. Log registration in audit logs
-    await supabase
-      .from('audit_logs')
-      .insert([{
-        tenant_id: tenantData.id,
-        actor_id: userId,
-        action: 'company_registered',
-        resource_type: 'company',
-        resource_id: tenantData.id,
-        details: JSON.stringify({
-          company_name: companyData.name,
-          cr_number: crNumber,
-          sector: companyData.sector,
-          city: companyData.city,
-          auto_created: !companyData.crNumber ? 'cr_number_generated' : 'cr_provided'
-        }),
-        created_at: new Date().toISOString()
-      }])
-      .catch(err => console.warn('Audit log warning:', err))
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert([{
+          tenant_id: tenantData.id,
+          actor_id: userId,
+          action: 'company_registered',
+          resource_type: 'company',
+          resource_id: tenantData.id,
+          details: JSON.stringify({
+            company_name: companyData.name,
+            cr_number: crNumber,
+            sector: companyData.sector,
+            city: companyData.city,
+            auto_created: !companyData.crNumber ? 'cr_number_generated' : 'cr_provided'
+          }),
+          created_at: new Date().toISOString()
+        }])
+    } catch (err) {
+      console.warn('Audit log warning:', err)
+    }
 
     return { success: true, tenantId: tenantData.id }
   } catch (err) {
@@ -888,48 +897,57 @@ export async function submitReport(reportData: any) {
   }
 
   // Deduct credits immediately (1 credit per report submission)
-  await supabase
-    .from('credits_ledger')
-    .insert([
-      {
-        tenant_id: userData?.tenant_id,
-        report_id: report.id,
-        amount: -1,
-        reason: 'report_submitted',
-        created_at: new Date().toISOString()
-      },
-    ])
-    .catch(err => console.warn('Credit deduction warning:', err))
+  try {
+    await supabase
+      .from('credits_ledger')
+      .insert([
+        {
+          tenant_id: userData?.tenant_id,
+          report_id: report.id,
+          amount: -1,
+          reason: 'report_submitted',
+          created_at: new Date().toISOString()
+        },
+      ])
+  } catch (err) {
+    console.warn('Credit deduction warning:', err)
+  }
 
   // BR-09: Log in audit logs
-  await supabase
-    .from('audit_logs')
-    .insert([{
-      tenant_id: userData?.tenant_id,
-      actor_id: user.data.user.id,
-      action: 'report_submitted',
-      resource_type: 'report',
-      resource_id: report.id,
-      details: JSON.stringify({
-        target_company_id: targetCompanyId,
-        type: reportData.type,
-        status: 'pending_review'
-      }),
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Audit log warning:', err))
+  try {
+    await supabase
+      .from('audit_logs')
+      .insert([{
+        tenant_id: userData?.tenant_id,
+        actor_id: user.data.user.id,
+        action: 'report_submitted',
+        resource_type: 'report',
+        resource_id: report.id,
+        details: JSON.stringify({
+          target_company_id: targetCompanyId,
+          type: reportData.type,
+          status: 'pending_review'
+        }),
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Audit log warning:', err)
+  }
 
   // BR-09: Send notification to admins
-  await supabase
-    .from('notifications')
-    .insert([{
-      type: 'new_report_pending',
-      title: 'تقرير جديد ينتظر المراجعة',
-      message: `تقرير جديد من شركة ينتظر المراجعة`,
-      is_read: false,
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Notification warning:', err))
+  try {
+    await supabase
+      .from('notifications')
+      .insert([{
+        type: 'new_report_pending',
+        title: 'تقرير جديد ينتظر المراجعة',
+        message: `تقرير جديد من شركة ينتظر المراجعة`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Notification warning:', err)
+  }
 
   return report
 }
@@ -1372,63 +1390,78 @@ export async function approveReport(reportId: string) {
   }
 
   // Award 10 credits to reporter
-  await supabase
-    .from('credits_ledger')
-    .insert([{
-      tenant_id: report.reporter_tenant_id,
-      report_id: reportId,
-      amount: 10,
-      reason: 'report_approved',
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Credit award warning:', err))
+  try {
+    await supabase
+      .from('credits_ledger')
+      .insert([{
+        tenant_id: report.reporter_tenant_id,
+        report_id: reportId,
+        amount: 10,
+        reason: 'report_approved',
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Credit award warning:', err)
+  }
 
   // Trigger: Recalculate trust score for the company
   // This would be a trigger in the database, but we can call an RPC
-  await supabase
-    .rpc('compute_trust_score', { p_company_id: report.target_company_id })
-    .catch(err => console.warn('Trust score calculation warning:', err))
+  try {
+    await supabase
+      .rpc('compute_trust_score', { p_company_id: report.target_company_id })
+  } catch (err) {
+    console.warn('Trust score calculation warning:', err)
+  }
 
   // Send notification to reporter
-  await supabase
-    .from('notifications')
-    .insert([{
-      tenant_id: report.reporter_tenant_id,
-      type: 'report_approved',
-      title: '✅ تم اعتماد تقريرك!',
-      message: 'تقريرك تمت الموافقة عليه بنجاح وحصلت على 10 نقاط ائتمان.',
-      is_read: false,
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Notification warning:', err))
+  try {
+    await supabase
+      .from('notifications')
+      .insert([{
+        tenant_id: report.reporter_tenant_id,
+        type: 'report_approved',
+        title: '✅ تم اعتماد تقريرك!',
+        message: 'تقريرك تمت الموافقة عليه بنجاح وحصلت على 10 نقاط ائتمان.',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Notification warning:', err)
+  }
 
   // Log review action
-  await supabase
-    .from('review_actions')
-    .insert([{
-      report_id: reportId,
-      reviewer_id: user.data.user.id,
-      action: 'approved',
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Review action warning:', err))
+  try {
+    await supabase
+      .from('review_actions')
+      .insert([{
+        report_id: reportId,
+        reviewer_id: user.data.user.id,
+        action: 'approved',
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Review action warning:', err)
+  }
 
   // Audit log
-  await supabase
-    .from('audit_logs')
-    .insert([{
-      actor_id: user.data.user.id,
-      action: 'report_approved',
-      resource_type: 'report',
-      resource_id: reportId,
-      details: JSON.stringify({
-        reporter_tenant_id: report.reporter_tenant_id,
-        target_company_id: report.target_company_id,
-        credits_awarded: 10
-      }),
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Audit log warning:', err))
+  try {
+    await supabase
+      .from('audit_logs')
+      .insert([{
+        actor_id: user.data.user.id,
+        action: 'report_approved',
+        resource_type: 'report',
+        resource_id: reportId,
+        details: JSON.stringify({
+          reporter_tenant_id: report.reporter_tenant_id,
+          target_company_id: report.target_company_id,
+          credits_awarded: 10
+        }),
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Audit log warning:', err)
+  }
 
   return { success: true }
 }
@@ -1467,58 +1500,70 @@ export async function rejectReport(reportId: string, reason: string) {
   }
 
   // Refund the 1 credit deducted during submission
-  await supabase
-    .from('credits_ledger')
-    .insert([{
-      tenant_id: report.reporter_tenant_id,
-      report_id: reportId,
-      amount: 1,
-      reason: 'report_rejected_refund',
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Credit refund warning:', err))
+  try {
+    await supabase
+      .from('credits_ledger')
+      .insert([{
+        tenant_id: report.reporter_tenant_id,
+        report_id: reportId,
+        amount: 1,
+        reason: 'report_rejected_refund',
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Credit refund warning:', err)
+  }
 
   // Send notification to reporter
-  await supabase
-    .from('notifications')
-    .insert([{
-      tenant_id: report.reporter_tenant_id,
-      type: 'report_rejected',
-      title: '❌ تم رفض تقريرك',
-      message: `تقريرك لم يتم قبوله. السبب: ${reason}`,
-      is_read: false,
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Notification warning:', err))
+  try {
+    await supabase
+      .from('notifications')
+      .insert([{
+        tenant_id: report.reporter_tenant_id,
+        type: 'report_rejected',
+        title: '❌ تم رفض تقريرك',
+        message: `تقريرك لم يتم قبوله. السبب: ${reason}`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Notification warning:', err)
+  }
 
   // Log review action
-  await supabase
-    .from('review_actions')
-    .insert([{
-      report_id: reportId,
-      reviewer_id: user.data.user.id,
-      action: 'rejected',
-      reason,
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Review action warning:', err))
+  try {
+    await supabase
+      .from('review_actions')
+      .insert([{
+        report_id: reportId,
+        reviewer_id: user.data.user.id,
+        action: 'rejected',
+        reason,
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Review action warning:', err)
+  }
 
   // Audit log
-  await supabase
-    .from('audit_logs')
-    .insert([{
-      actor_id: user.data.user.id,
-      action: 'report_rejected',
-      resource_type: 'report',
-      resource_id: reportId,
-      details: JSON.stringify({
-        reporter_tenant_id: report.reporter_tenant_id,
-        rejection_reason: reason,
-        credit_refunded: 1
-      }),
-      created_at: new Date().toISOString()
-    }])
-    .catch(err => console.warn('Audit log warning:', err))
+  try {
+    await supabase
+      .from('audit_logs')
+      .insert([{
+        actor_id: user.data.user.id,
+        action: 'report_rejected',
+        resource_type: 'report',
+        resource_id: reportId,
+        details: JSON.stringify({
+          reporter_tenant_id: report.reporter_tenant_id,
+          rejection_reason: reason,
+          credit_refunded: 1
+        }),
+        created_at: new Date().toISOString()
+      }])
+  } catch (err) {
+    console.warn('Audit log warning:', err)
+  }
 
   return { success: true }
 }
