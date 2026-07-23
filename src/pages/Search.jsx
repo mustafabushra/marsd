@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
-import { Search as SearchIcon, X, Filter } from 'lucide-react'
+import { Search as SearchIcon, X } from 'lucide-react'
 
 export default function Search() {
   const navigate = useNavigate()
@@ -14,34 +14,32 @@ export default function Search() {
   const [toast, setToast] = useState('')
   const autocompleteRef = useRef(null)
 
-  // Filter states
   const [filters, setFilters] = useState({ sector: null, city: null, risk: null, score: null })
   const [showFilters, setShowFilters] = useState({ sector: false, city: false, risk: false, score: false })
 
-  // Mock data for filters
   const sectors = ['تقنية', 'مقاولات', 'صناعات', 'نقل', 'خدمات']
   const cities = ['الرياض', 'جدة', 'الدمام', 'الخبر', 'الدعيان']
   const risks = ['مخاطر منخفضة', 'مخاطر متوسطة', 'مخاطر عالية']
   const scores = ['70+', '40-70', '<40']
 
-  // Utility functions
   function showToastMessage(msg, duration = 3000) {
     setToast(msg)
     setTimeout(() => setToast(''), duration)
   }
 
   function getRiskInfo(score) {
-    if (score >= 70) return { label: 'مخاطر منخفضة', bg: '#ECFDF5', color: '#15803D' }
-    if (score >= 40) return { label: 'مخاطر متوسطة', bg: '#FFFBEB', color: '#B45309' }
-    return { label: 'مخاطر عالية', bg: '#FEE2E2', color: '#DC2626' }
+    if (score >= 70) return { label: 'مخاطر منخفضة', color: '#15803D' }
+    if (score >= 40) return { label: 'مخاطر متوسطة', color: '#B45309' }
+    return { label: 'مخاطر عالية', color: '#DC2626' }
   }
 
   function getGaugeGradient(score) {
     const percent = Math.min(Math.max(score, 0), 100)
-    return `conic-gradient(#16A34A 0% ${percent}%, #E2E8F0 ${percent}% 100%)`
+    return `conic-gradient(${
+      score >= 70 ? '#16A34A' : score >= 40 ? '#F59E0B' : '#EF4444'
+    } 0deg ${percent * 3.6}deg, #E0E0E0 ${percent * 3.6}deg 360deg)`
   }
 
-  // Autocomplete
   async function handleAutocomplete(q) {
     if (q.length < 1) {
       setAutocomplete([])
@@ -53,7 +51,6 @@ export default function Search() {
       setShowAutocomplete(true)
     } catch (err) {
       console.error('Autocomplete error:', err)
-      setAutocomplete([])
     }
   }
 
@@ -62,7 +59,6 @@ export default function Search() {
     setShowAutocomplete(false)
   }
 
-  // BUTTON #1: Clear Search
   function handleClearSearch() {
     setQuery('')
     setCompanies([])
@@ -71,7 +67,6 @@ export default function Search() {
     setError('')
   }
 
-  // BUTTON #2: Search Knowledge Graph via Knowledge Base
   async function handleSearch() {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل نص البحث')
@@ -80,7 +75,6 @@ export default function Search() {
     setLoading(true)
     setError('')
     try {
-      // Search in Knowledge Base (centralized company registry)
       const result = await searchCompaniesKnowledgeBase(query, filters, 1, 50)
       let formatted = result.data.map(c => ({
         id: c.id,
@@ -89,15 +83,12 @@ export default function Search() {
         city: c.city || '—',
         scoreText: c.trust_score?.toString() || '—',
         score: c.trust_score || 0,
-        gaugeBg: c.trust_score ? getGaugeGradient(c.trust_score) : 'conic-gradient(#E2E8F0 0% 100%)',
+        gaugeBg: c.trust_score ? getGaugeGradient(c.trust_score) : 'conic-gradient(#E0E0E0 0deg 360deg)',
         riskLabel: c.trust_score ? getRiskInfo(c.trust_score).label : 'بيانات غير كافية',
-        bg: c.trust_score ? getRiskInfo(c.trust_score).bg : '#F3F4F6',
-        color: c.trust_score ? getRiskInfo(c.trust_score).color : '#6B7280',
-        reports: c.total_reports_count || 0,  // Total reports from Knowledge Base
-        hasData: c.total_reports_count > 0,
+        color: c.trust_score ? getRiskInfo(c.trust_score).color : '#9CA3AF',
+        reports: c.total_reports_count || 0,
       }))
 
-      // Apply additional filters if needed (beyond what RPC provides)
       if (filters.risk) formatted = formatted.filter(c => c.riskLabel === filters.risk)
       if (filters.score) {
         formatted = formatted.filter(c => {
@@ -107,7 +98,6 @@ export default function Search() {
         })
       }
 
-      // Sort by report count then by score
       formatted.sort((a, b) => {
         if (b.reports !== a.reports) return b.reports - a.reports
         return b.score - a.score
@@ -115,33 +105,21 @@ export default function Search() {
 
       setCompanies(formatted)
       showToastMessage(`✅ تم العثور على ${formatted.length} شركة`)
-
-      // Audit log
-      console.log(`[AUDIT] Knowledge Base Search: query="${query}" filters=${JSON.stringify(filters)} companies=${formatted.length}`)
     } catch (err) {
       setError(err.message || 'فشل البحث')
       showToastMessage('❌ حدث خطأ أثناء البحث')
-      console.error('Search error:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // BUTTON #3-6: Filters
   function handleApplyFilter(filterType, value) {
     const newFilters = { ...filters, [filterType]: filters[filterType] === value ? null : value }
     setFilters(newFilters)
     setShowFilters({ ...showFilters, [filterType]: false })
-
-    // Re-search with new filters
-    if (companies.length > 0) {
-      handleSearch()
-    }
-    showToastMessage(`✅ تم تطبيق التصفية`)
-    console.log(`[AUDIT] Filter applied: ${filterType}=${value}`)
+    if (companies.length > 0) handleSearch()
   }
 
-  // BUTTON #7: Add Company
   async function handleAddCompany() {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل اسم الشركة أولاً')
@@ -152,63 +130,28 @@ export default function Search() {
       try {
         setLoading(true)
         const supabase = getSupabase()
-
-        // Check if company already exists
-        const { data: existing } = await supabase
-          .from('companies')
-          .select('id')
-          .or(`name.ilike.%${query}%`)
-          .limit(1)
-
-        if (existing && existing.length > 0) {
+        const { data: existing } = await supabase.from('companies').select('id').or(`name.ilike.%${query}%`).limit(1)
+        if (existing?.length) {
           showToastMessage('⚠️ الشركة موجودة بالفعل')
           return
         }
 
-        // Add new company
-        // كان هنا source: 'manual_addition' وهي قيمة غير مسموحة — تسبب
-        // companies_source_check violation. المصدر الصحيح: community.
-        const { data: newCompany, error } = await supabase
-          .from('companies')
-          .insert([buildCompanyInsert({
-            name: query,
-            approved: false,
-          })])
-          .select()
-          .single()
-
-        if (error) {
-          throw new Error('فشل إضافة الشركة: ' + error.message)
-        }
-
-        showToastMessage(`✅ تم إضافة الشركة: ${query}`)
-        console.log(`[AUDIT] Company added: ${query}`)
-
-        // Refresh search results
+        const { error } = await supabase.from('companies').insert([buildCompanyInsert({ name: query, approved: false })]).select().single()
+        if (error) throw new Error('فشل إضافة الشركة')
+        showToastMessage(`✅ تم إضافة الشركة`)
         await handleSearch()
       } catch (err) {
-        showToastMessage('❌ ' + (err.message || 'فشل إضافة الشركة'))
-        console.error('Error adding company:', err)
+        showToastMessage('❌ فشل إضافة الشركة')
       } finally {
         setLoading(false)
       }
     }
   }
 
-  // BUTTON #8: View Report
   function handleViewReport(companyId) {
-    console.log(`[AUDIT] View company report: ${companyId}`)
-    navigate(`/company/${companyId}`)
+    navigate(`/trust-report/${companyId}`)
   }
 
-  // BUTTON #9: Send Report
-  function handleSendReport(companyId, companyName) {
-    console.log(`[AUDIT] Send report for: ${companyName} (${companyId})`)
-    navigate('/add-report', { state: { companyId, companyName } })
-    showToastMessage('📋 اذهب لنموذج التقرير')
-  }
-
-  // Auto-search on query change
   useEffect(() => {
     if (query.length === 0) {
       setCompanies([])
@@ -226,7 +169,6 @@ export default function Search() {
     }
   }, [query])
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(e) {
       if (autocompleteRef.current && !autocompleteRef.current.contains(e.target)) {
@@ -238,403 +180,209 @@ export default function Search() {
   }, [])
 
   return (
-    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px 28px' }}>
+    <main style={{ background: '#fff', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', top: '20px', left: '20px', right: '20px',
-          background: 'linear-gradient(135deg, #1E2A52 0%, #16A34A 100%)',
-          color: '#fff', border: 'none', borderRadius: '12px',
-          padding: '16px', fontWeight: 700, zIndex: 100, textAlign: 'center',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-          animation: 'slideIn 0.3s ease-out'
+          position: 'fixed', bottom: '20px', left: '20px',
+          background: '#1E2A52', color: '#fff',
+          borderRadius: '6px', padding: '12px 16px',
+          fontSize: '13px', fontWeight: '600', zIndex: 100,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}>
           {toast}
         </div>
       )}
 
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ marginBottom: '32px', animation: 'fadeIn 0.5s ease-out' }}>
-        <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>
-          🔍 البحث عن الشركات
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: '0', textAlign: 'right', lineHeight: '1.6' }}>
-          ابحث عن أي شركة لعرض درجة الثقة والمخاطر والتقارير السابقة
-        </p>
+      {/* HEADER */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '20px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1E2A52', margin: 0, textAlign: 'right' }}>البحث</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: '#16A34A', color: '#fff', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700' }}>✓</div>
+          <span style={{ fontSize: '18px', fontWeight: '700', color: '#1E2A52' }}>مرصد</span>
+        </div>
       </div>
 
-      {/* Search Box */}
-      <div style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '28px', marginBottom: '28px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', animation: 'fadeIn 0.6s ease-out' }}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
-          <div style={{
-            flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
-            background: '#F8FAFC',
-            border: '2px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'),
-            borderRadius: '14px', padding: '0 18px',
-            flexDirection: 'row-reverse', position: 'relative',
-            transition: 'all 0.3s ease',
-            boxShadow: showAutocomplete ? '0 4px 12px rgba(22, 163, 74, 0.1)' : 'none'
-          }}>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => query.length > 0 && setShowAutocomplete(true)}
-              placeholder="ابحث باسم الشركة أو رقم السجل (مثل: الراجحي أو 1010012345)..."
-              style={{ flex: 1, border: 0, background: 'transparent', padding: '16px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontWeight: '500' }}
-            />
-            {query ? (
-              <button onClick={handleClearSearch} title="مسح البحث" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <X size={18} color="#94A3B8" />
-              </button>
-            ) : (
-              <SearchIcon size={20} color="#94A3B8" />
-            )}
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, padding: '40px 32px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          {/* HERO SECTION */}
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+            <h2 style={{ fontSize: '32px', fontWeight: '700', color: '#1E2A52', margin: '0 0 8px 0' }}>البحث عن الشركات</h2>
+            <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>ابحث عن أي شركة لعرض درجة الثقة والمخاطر والتقارير السابقة</p>
+          </div>
 
-            {/* Autocomplete Dropdown */}
-            {showAutocomplete && autocomplete.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #E2E8F0', borderRadius: '0 0 12px 12px', maxHeight: '300px', overflowY: 'auto', zIndex: 10, marginTop: '-2px' }}>
-                {autocomplete.map((item, idx) => (
-                  <div key={idx} onClick={() => handleAutocompleteSelect(item)} style={{ padding: '12px 16px', borderBottom: idx < autocomplete.length - 1 ? '1px solid #F1F5F9' : 'none', cursor: 'pointer', textAlign: 'right' }} onMouseEnter={(e) => e.target.style.background = '#F8FAFC'} onMouseLeave={(e) => e.target.style.background = '#fff'}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>{item.name}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.cr_number}</div>
+          {/* SEARCH BOX */}
+          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }} ref={autocompleteRef}>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', position: 'relative', flexDirection: 'row-reverse' }}>
+              <div style={{
+                flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
+                border: '1px solid #D1D5DB', borderRadius: '6px', padding: '12px 14px',
+                background: '#fff', position: 'relative', flexDirection: 'row-reverse'
+              }}>
+                <SearchIcon size={16} color="#9CA3AF" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => query.length > 0 && setShowAutocomplete(true)}
+                  placeholder="...ابحث باسم الشركة أو رقم السجل (مثل: الراجحي - 1010012345)"
+                  style={{
+                    flex: 1, border: '0', background: 'transparent', padding: '0', fontSize: '13px', outline: 'none', textAlign: 'right'
+                  }}
+                />
+
+                {/* Autocomplete */}
+                {showAutocomplete && autocomplete.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0,
+                    background: '#fff', border: '1px solid #E5E7EB',
+                    borderRadius: '0 0 6px 6px', maxHeight: '250px', overflowY: 'auto', zIndex: 10, marginTop: '-1px'
+                  }}>
+                    {autocomplete.map((item, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleAutocompleteSelect(item)}
+                        style={{
+                          padding: '10px 12px', borderBottom: idx < autocomplete.length - 1 ? '1px solid #F3F4F6' : 'none',
+                          cursor: 'pointer', textAlign: 'right', fontSize: '13px', color: '#1F2937'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#F9FAFB'}
+                        onMouseLeave={(e) => e.target.style.background = '#fff'}>
+                        {item.name}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
 
-          {/* BUTTON #2: Search Button */}
-          <button
-            onClick={handleSearch}
-            disabled={!query || loading}
-            title={!query ? 'أدخل نص البحث' : 'بحث'}
-            style={{
-              background: query && !loading ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' : '#D1D5DB',
-              color: '#fff', border: '0', borderRadius: '14px', padding: '0 32px',
-              fontSize: '15px', fontWeight: 800, cursor: query && !loading ? 'pointer' : 'not-allowed',
-              transition: 'all 0.3s ease',
-              boxShadow: query && !loading ? '0 4px 12px rgba(22, 163, 74, 0.3)' : 'none',
-              transform: 'translateY(0)'
-            }}
-            onMouseEnter={(e) => {
-              if (query && !loading) {
-                e.target.style.transform = 'translateY(-2px)'
-                e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.4)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (query && !loading) {
-                e.target.style.transform = 'translateY(0)'
-                e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)'
-              }
-            }}>
-            {loading ? '⏳ جاري...' : '🔍 بحث'}
-          </button>
-        </div>
-
-        {/* BUTTONS #3-6: Filters */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-          {[
-            { key: 'sector', label: 'القطاع', options: sectors },
-            { key: 'city', label: 'المدينة', options: cities },
-            { key: 'risk', label: 'المخاطر', options: risks },
-            { key: 'score', label: 'الثقة', options: scores },
-          ].map(filter => (
-            <div key={filter.key} style={{ position: 'relative' }}>
               <button
-                onClick={() => setShowFilters({ ...showFilters, [filter.key]: !showFilters[filter.key] })}
-                title={`فلتر حسب ${filter.label}`}
+                onClick={handleSearch}
+                disabled={!query || loading}
                 style={{
-                  background: filters[filter.key] ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' : '#EEF2FF',
-                  color: filters[filter.key] ? '#fff' : '#1E2A52',
-                  border: 'none',
-                  borderRadius: '999px',
-                  padding: '10px 18px',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: filters[filter.key] ? '0 2px 8px rgba(22, 163, 74, 0.2)' : 'none'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = filters[filter.key] ? 'translateY(-2px)' : 'scale(1.05)'
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)'
+                  background: '#9CA3AF', color: '#fff', border: 'none', borderRadius: '6px',
+                  padding: '12px 24px', fontSize: '13px', fontWeight: '700', cursor: query ? 'pointer' : 'not-allowed',
+                  opacity: query ? 1 : 0.6, transition: 'all 0.2s'
                 }}>
-                {filters[filter.key] ? '✓ ' : ''}{filter.label} ▾
+                بحث
               </button>
-
-              {/* Filter Dropdown */}
-              {showFilters[filter.key] && (
-                <div style={{ position: 'absolute', top: '100%', right: 0, background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', marginTop: '4px', zIndex: 10, minWidth: '200px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                  {filter.options.map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => handleApplyFilter(filter.key, opt)}
-                      style={{
-                        width: '100%', textAlign: 'right', padding: '10px 14px',
-                        border: 'none', background: filters[filter.key] === opt ? '#F0FDF4' : '#fff',
-                        borderBottom: '1px solid #F1F5F9', cursor: 'pointer', fontSize: '13px'
-                      }}>
-                      {filters[filter.key] === opt ? '✓ ' : ''}{opt}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Results header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 700 }}>
-          {loading ? '⏳ جاري البحث...' : `${companies.length} ${companies.length === 1 ? 'شركة واحدة' : 'نتائج'}`}
-        </div>
+            {/* FILTERS */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
+              {[
+                { key: 'score', label: 'الثقة', options: scores },
+                { key: 'risk', label: 'المخاطر', options: risks },
+                { key: 'city', label: 'المدينة', options: cities },
+                { key: 'sector', label: 'القطاع', options: sectors },
+              ].map(filter => (
+                <div key={filter.key} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowFilters({ ...showFilters, [filter.key]: !showFilters[filter.key] })}
+                    style={{
+                      background: '#EFF6FF', color: '#1E40AF', border: 'none', borderRadius: '4px',
+                      padding: '8px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
+                    }}>
+                    {filter.label} ▼
+                  </button>
 
-        {/* BUTTON #7: Add Company */}
-        <button
-          onClick={handleAddCompany}
-          title="أضف شركة جديدة"
-          style={{
-            background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
-            color: '#fff',
-            border: '0',
-            borderRadius: '12px',
-            padding: '12px 20px',
-            fontSize: '13px',
-            fontWeight: 800,
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'translateY(-2px)'
-            e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0)'
-            e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
-          }}>
-          ➕ إضافة شركة
-        </button>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', fontSize: '14px', color: '#DC2626', fontWeight: 600 }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {/* No results message - IMPROVED UI */}
-      {!loading && query && companies.length === 0 && !error && (
-        <div style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FEE2E2 100%)', border: '1px solid #FECACA', borderRadius: '16px', padding: '32px 24px', marginBottom: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>😕</div>
-          <div style={{ fontSize: '16px', color: '#92400E', fontWeight: 800, marginBottom: '8px' }}>
-            لم نجد "{query}"
-          </div>
-          <div style={{ fontSize: '13px', color: '#A16207', marginBottom: '20px' }}>
-            قد تكون الشركة مسجلة باسم مختلف أو لم تسجل بعد
+                  {showFilters[filter.key] && (
+                    <div style={{
+                      position: 'absolute', top: '100%', right: 0, background: '#fff', border: '1px solid #E5E7EB',
+                      borderRadius: '4px', marginTop: '4px', zIndex: 10, minWidth: '140px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      {filter.options.map(opt => (
+                        <button
+                          key={opt}
+                          onClick={() => handleApplyFilter(filter.key, opt)}
+                          style={{
+                            width: '100%', textAlign: 'right', padding: '8px 10px', border: 'none', background: filters[filter.key] === opt ? '#F0FDF4' : '#fff',
+                            borderBottom: '1px solid #F3F4F6', cursor: 'pointer', fontSize: '12px', color: '#1F2937'
+                          }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Quick Actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '20px' }}>
-            {/* Action 1: Add New Company */}
+          {/* RESULTS INFO & ADD BUTTON */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', gap: '12px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#64748B' }}>نتائج {companies.length}</span>
             <button
               onClick={handleAddCompany}
-              title="أضف الشركة للمنصة"
               style={{
-                background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
-                padding: '12px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.background = '#15803D'}
-              onMouseLeave={(e) => e.target.style.background = '#16A34A'}
-            >
-              ➕ تسجيل شركة جديدة
-            </button>
-
-            {/* Action 2: Search Tips */}
-            <button
-              onClick={() => setQuery('')}
-              title="امسح البحث وحاول مرة أخرى"
-              style={{
-                background: '#3B82F6', color: '#fff', border: 0, borderRadius: '10px',
-                padding: '12px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.background = '#2563EB'}
-              onMouseLeave={(e) => e.target.style.background = '#3B82F6'}
-            >
-              🔄 بحث جديد
+                background: '#16A34A', color: '#fff', border: 'none', borderRadius: '6px',
+                padding: '10px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+              }}>
+              + إضافة شركة
             </button>
           </div>
 
-          {/* Helpful tips */}
-          <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(255,255,255,0.6)', borderRadius: '8px', fontSize: '12px', color: '#92400E', lineHeight: '1.6' }}>
-            <strong>💡 نصائح البحث:</strong><br/>
-            • ابحث برقم السجل التجاري (مثل: 1010012345)<br/>
-            • جرّب اسم مختلف أو أقصر (مثل: "الراجحي" بدل "شركة الراجحي للمقاولات")<br/>
-            • إذا كنت متأكد الشركة غير موجودة، أضفها للمنصة
-          </div>
-        </div>
-      )}
+          {/* ERROR */}
+          {error && (
+            <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 14px', borderRadius: '6px', marginBottom: '24px', fontSize: '12px' }}>
+              ❌ {error}
+            </div>
+          )}
 
-      {/* Results grid */}
-      {companies.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-          gap: '20px',
-          animation: 'fadeIn 0.5s ease-out'
-        }}>
-          {companies.map((c, idx) => (
-            <div
-              key={c.id}
-              style={{
-                background: '#fff',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer',
-                animation: `fadeIn 0.5s ease-out ${idx * 0.05}s both`,
-                transform: 'translateY(0)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.12)'
-                e.currentTarget.style.transform = 'translateY(-4px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#1E2A52' }}>
-                    {c.scoreText}
+          {/* EMPTY STATE */}
+          {!loading && query && companies.length === 0 && !error && (
+            <div style={{ background: '#F3F4F6', border: '1px dashed #D1D5DB', borderRadius: '8px', padding: '48px 32px', textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', marginBottom: '8px' }}>لم يتم العثور على نتائج</div>
+              <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px' }}>جرب اسم شركة أخرى أو رقم سجل مختلف</div>
+              <button onClick={handleAddCompany} style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+ طلب إضافة شركة</button>
+            </div>
+          )}
+
+          {/* RESULTS GRID */}
+          {companies.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              {companies.map((c) => (
+                <div key={c.id} style={{
+                  background: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '16px',
+                  cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'translateY(0)' }}>
+
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start', flexDirection: 'row-reverse' }}>
+                    <div style={{
+                      width: '60px', height: '60px', borderRadius: '50%',
+                      background: c.gaugeBg, flex: 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '20px', fontWeight: '700', color: c.color
+                    }}>
+                      {c.scoreText}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0', textAlign: 'right' }}>{c.name}</h3>
+                      <div style={{ fontSize: '11px', color: '#9CA3AF', textAlign: 'right' }}>{c.sector} • {c.city}</div>
+                    </div>
                   </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>{c.name}</h3>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 700 }}>{c.sector}</span>
-                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 700 }}>{c.city}</span>
-                  </div>
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', fontSize: '12px', color: '#64748B' }}>
-                <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '4px 12px', fontWeight: 700 }}>● {c.riskLabel}</span>
-                <span>{c.reports} تقرير</span>
-              </div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: c.color, marginBottom: '10px', textAlign: 'right' }}>● {c.riskLabel}</div>
 
-              {c.hasData ? (
-                <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
-                  {/* BUTTON #8: View Report */}
                   <button
                     onClick={() => handleViewReport(c.id)}
-                    title="عرض التقرير"
                     style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #1E2A52 0%, #2D3A66 100%)',
-                      color: '#fff',
-                      border: '0',
-                      borderRadius: '10px',
-                      padding: '12px',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
+                      width: '100%', background: '#1E2A52', color: '#fff', border: 'none', borderRadius: '6px',
+                      padding: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
                     }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)'
-                      e.target.style.boxShadow = '0 4px 12px rgba(30, 42, 82, 0.3)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)'
-                      e.target.style.boxShadow = 'none'
-                    }}>
-                    📊 عرض التقرير
-                  </button>
-
-                  {/* BUTTON #9: Send Report */}
-                  <button
-                    onClick={() => handleSendReport(c.id, c.name)}
-                    title="إرسال تقرير جديد"
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                      color: '#fff',
-                      border: '0',
-                      borderRadius: '10px',
-                      padding: '12px',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)'
-                      e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)'
-                      e.target.style.boxShadow = 'none'
-                    }}>
-                    ✏️ إرسال تقرير
+                    onMouseEnter={(e) => e.target.style.background = '#0F172A'}
+                    onMouseLeave={(e) => e.target.style.background = '#1E2A52'}>
+                    عرض التقرير
                   </button>
                 </div>
-              ) : (
-                <button
-                  onClick={() => handleAddCompany()}
-                  title="أضف بيانات عن هذه الشركة"
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                    color: '#fff',
-                    border: '0',
-                    borderRadius: '10px',
-                    padding: '12px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-2px)'
-                    e.target.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = 'none'
-                  }}>
-                  ⚠️ بيانات ناقصة
-                </button>
-              )}
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </main>
   )
 }
