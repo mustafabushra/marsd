@@ -84,13 +84,21 @@ export default function CompanyOnboarding() {
     // Validate file type (PDF, JPG, PNG only)
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png']
     if (!allowedTypes.includes(file.type)) {
-      setError('نوع الملف غير مدعوم. استخدم PDF أو صورة فقط')
+      setError('❌ نوع الملف غير مدعوم. استخدم PDF أو صورة فقط')
       return
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('حجم الملف كبير جداً. الحد الأقصى 5MB')
+    // Validate file size (max 5MB, but base64 will be ~1.33x larger)
+    const maxSize = 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      const sizeMB = (file.size / 1024 / 1024).toFixed(2)
+      setError(`❌ حجم الملف كبير جداً (${sizeMB}MB). الحد الأقصى 5MB`)
+      return
+    }
+
+    // Validate file name length
+    if (file.name.length > 255) {
+      setError('❌ اسم الملف طويل جداً')
       return
     }
 
@@ -106,64 +114,90 @@ export default function CompanyOnboarding() {
     setLoading(true)
 
     try {
-      // Validate
-      if (!companyData.name.trim()) throw new Error('اسم الشركة مطلوب')
-      if (!companyData.crNumber.trim()) throw new Error('رقم السجل التجاري مطلوب')
-      if (!companyData.sector.trim()) throw new Error('القطاع مطلوب')
-      if (!companyData.city.trim()) throw new Error('المدينة مطلوبة')
-      if (!crFile) throw new Error('رفع السجل التجاري مطلوب')
+      // ===== COMPREHENSIVE VALIDATION =====
+      if (!companyData.name?.trim()) throw new Error('❌ اسم الشركة مطلوب')
+      if (companyData.name.trim().length < 3) throw new Error('❌ اسم الشركة يجب أن يكون 3 أحرف على الأقل')
+      if (companyData.name.trim().length > 255) throw new Error('❌ اسم الشركة طويل جداً')
 
-      // Upload CR file (try Supabase Storage first, fallback to base64)
+      if (!companyData.sector?.trim()) throw new Error('❌ القطاع مطلوب')
+      if (!companyData.city?.trim()) throw new Error('❌ المدينة مطلوبة')
+      if (!companyData.email?.trim()) throw new Error('❌ البريد الإلكتروني مطلوب')
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(companyData.email)) throw new Error('❌ صيغة البريد الإلكتروني غير صحيحة')
+
+      if (!crFile) throw new Error('❌ رفع السجل التجاري مطلوب')
+      if (crFile.size === 0) throw new Error('❌ الملف فارغ')
+
+      // ===== FILE UPLOAD =====
       let crFileUrl = null
       const supabase = getSupabase()
-      const fileName = `cr_${Date.now()}_${crFile.name}`
 
       try {
-        // Try to ensure bucket exists
-        await ensureStorageBucket('company-documents')
+        // Try Supabase Storage first
+        const fileName = `cr_${Date.now()}_${crFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
-        // Try to upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('company-documents')
-          .upload(`cr-files/${fileName}`, crFile)
+        try {
+          await ensureStorageBucket('company-documents')
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('company-documents')
+            .upload(`cr-files/${fileName}`, crFile)
 
-        if (!uploadError && uploadData?.path) {
-          crFileUrl = uploadData.path
+          if (!uploadError && uploadData?.path) {
+            crFileUrl = uploadData.path
+          }
+        } catch (storageError) {
+          console.warn('⚠️ Storage fallback:', storageError)
         }
-      } catch (storageError) {
-        console.warn('Storage upload failed, will use base64 fallback:', storageError)
+
+        // If storage failed, use base64
+        if (!crFileUrl) {
+          const reader = new FileReader()
+          crFileUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result
+              if (typeof result === 'string' && result.length > 13 * 1024 * 1024) {
+                reject(new Error('❌ الملف كبير جداً حتى بعد التحويل'))
+              } else {
+                resolve(result)
+              }
+            }
+            reader.onerror = () => reject(new Error('❌ فشل قراءة الملف'))
+            reader.readAsDataURL(crFile)
+          })
+        }
+      } catch (fileError) {
+        throw new Error('❌ فشل معالجة الملف: ' + fileError.message)
       }
 
-      // If storage upload failed, use base64 as fallback
-      if (!crFileUrl) {
-        const reader = new FileReader()
-        crFileUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result)
-          reader.onerror = () => reject(new Error('Failed to read file'))
-          reader.readAsDataURL(crFile)
+      // ===== CREATE TENANT =====
+      try {
+        await createTenantAndUser(user.id, {
+          name: companyData.name.trim(),
+          crNumber: companyData.crNumber?.trim() || '',
+          email: (companyData.email || user.primaryEmailAddress?.emailAddress).toLowerCase().trim(),
+          phone: companyData.phone?.trim() || '',
+          city: companyData.city?.trim() || '',
+          sector: companyData.sector?.trim() || '',
+          foundedYear: companyData.foundedYear,
+          crStatus: companyData.crStatus || 'active',
+          crFileUrl: crFileUrl,
+          status: 'pending_approval',
+          firstName: user.firstName || '',
+          lastName: user.lastName || ''
         })
+      } catch (tenantError) {
+        throw new Error(tenantError.message)
       }
-      await createTenantAndUser(user.id, {
-        name: companyData.name,
-        crNumber: companyData.crNumber,
-        email: companyData.email || user.primaryEmailAddress?.emailAddress,
-        phone: companyData.phone,
-        city: companyData.city,
-        sector: companyData.sector,
-        foundedYear: companyData.foundedYear,
-        crStatus: companyData.crStatus,
-        crFileUrl: crFileUrl,
-        status: 'pending_approval',  // ← الحساب معلق بانتظار الموافقة
-        firstName: user.firstName,
-        lastName: user.lastName
-      })
 
-      // Show success message
-      setError('') // Clear errors
-      alert('✅ تم رفع بيانات شركتك بنجاح!\n\nسيتم مراجعة السجل التجاري من قبل فريق مرصد\nستتلقى إشعار عند اكتمال المراجعة')
+      // ===== SUCCESS =====
+      setError('')
+      alert('✅ تم رفع بيانات شركتك بنجاح!\n\n⏳ سيتم مراجعة السجل التجاري من قبل فريق مرصد\n📧 ستتلقى إشعار عند اكتمال المراجعة')
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message || 'حدث خطأ')
+      setError(err.message || '❌ حدث خطأ غير متوقع')
+      console.error('Registration error:', err)
     } finally {
       setLoading(false)
     }

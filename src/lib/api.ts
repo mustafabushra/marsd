@@ -301,44 +301,55 @@ export async function createTenantAndUser(userId: string, companyData: any) {
   const supabase = getSupabase()
 
   try {
-    // Generate unique CR number if not provided or if it exists
+    // ===== INPUT VALIDATION =====
+    if (!userId) throw new Error('معرّف المستخدم مفقود')
+    if (!companyData.email?.trim()) throw new Error('البريد الإلكتروني مطلوب')
+    if (!companyData.name?.trim()) throw new Error('اسم الشركة مطلوب')
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(companyData.email)) throw new Error('صيغة البريد الإلكتروني غير صحيحة')
+
+    // Validate cr_file_url size (max 10MB base64)
+    if (companyData.crFileUrl && companyData.crFileUrl.length > 13 * 1024 * 1024) {
+      throw new Error('حجم السجل التجاري كبير جداً (أكثر من 10MB)')
+    }
+
+    // ===== CR NUMBER GENERATION =====
     let crNumber = companyData.crNumber?.trim()
 
     if (!crNumber) {
-      // If not provided, generate a unique one based on user ID + timestamp
-      // Max length is 20 chars, so use short format: CRXXXXXXXX (CR + 8 chars of timestamp)
       const shortTimestamp = Date.now().toString().slice(-8)
       crNumber = `CR${shortTimestamp}`
     } else {
-      // Trim to max 20 chars if needed
-      if (crNumber.length > 20) {
-        crNumber = crNumber.substring(0, 20)
-      }
+      // Limit to 20 chars
+      crNumber = crNumber.substring(0, 20).toUpperCase()
 
       // Check if CR number already exists
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from('tenants')
         .select('id')
         .eq('cr_number', crNumber)
         .limit(1)
 
-      if (existing && existing.length > 0) {
-        // CR number exists, generate new one with timestamp
+      if (checkError) {
+        console.warn('CR check warning:', checkError)
+      } else if (existing && existing.length > 0) {
         const shortTimestamp = Date.now().toString().slice(-8)
         crNumber = `CR${shortTimestamp}`
       }
     }
 
-    // 1. Create or update Tenant record (UPSERT on email)
+    // ===== TENANT CREATION =====
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
       .upsert([{
-        email: companyData.email,
-        name: companyData.name,
+        email: companyData.email.toLowerCase().trim(),
+        name: companyData.name.substring(0, 255),
         cr_number: crNumber,
-        phone: companyData.phone || '',
-        city: companyData.city || '',
-        sector: companyData.sector || '',
+        phone: (companyData.phone || '').substring(0, 20),
+        city: (companyData.city || '').substring(0, 100),
+        sector: (companyData.sector || '').substring(0, 100),
         status: 'active',
         cr_file_url: companyData.crFileUrl || null,
         approval_status: companyData.status || 'active'
@@ -349,7 +360,11 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       .single()
 
     if (tenantError || !tenantData) {
-      throw new Error('فشل إنشاء الشركة: ' + tenantError?.message)
+      // Parse error messages for better UX
+      const errorMsg = tenantError?.message || 'فشل إنشاء الشركة'
+      if (errorMsg.includes('duplicate key')) throw new Error('هذا البريد الإلكتروني مسجل بالفعل')
+      if (errorMsg.includes('unique')) throw new Error('البيانات مكررة (بريد أو رقم سجل)')
+      throw new Error('فشل إنشاء الشركة: ' + errorMsg)
     }
 
     // 2. Create/Update User record with tenant_id
