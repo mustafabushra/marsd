@@ -5,6 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    host: 'localhost'
+    host: 'localhost',
+    middlewareMode: false
+  },
+  // SPA routing fallback for all routes
+  preview: {
+    middlewareMode: false
   }
 })
