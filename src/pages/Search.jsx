@@ -238,38 +238,60 @@ export default function Search() {
   }, [])
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
+    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px 28px' }}>
       {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', top: '20px', left: '20px', right: '20px',
-          background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px',
-          padding: '16px', fontWeight: 700, zIndex: 100, textAlign: 'center'
+          background: 'linear-gradient(135deg, #1E2A52 0%, #16A34A 100%)',
+          color: '#fff', border: 'none', borderRadius: '12px',
+          padding: '16px', fontWeight: 700, zIndex: 100, textAlign: 'center',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          animation: 'slideIn 0.3s ease-out'
         }}>
           {toast}
         </div>
       )}
 
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateY(-20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>
+      <div style={{ marginBottom: '32px', animation: 'fadeIn 0.5s ease-out' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>
           🔍 البحث عن الشركات
         </h1>
-        <p style={{ fontSize: '13px', color: '#64748B', margin: '0', textAlign: 'right' }}>
-          ابحث عن شركة لعرض درجة الثقة وإرسال تقرير
+        <p style={{ fontSize: '14px', color: '#64748B', margin: '0', textAlign: 'right', lineHeight: '1.6' }}>
+          ابحث عن أي شركة لعرض درجة الثقة والمخاطر والتقارير السابقة
         </p>
       </div>
 
       {/* Search Box */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', border: '1.5px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'), borderRadius: '12px', padding: '0 16px', flexDirection: 'row-reverse', position: 'relative' }}>
+      <div style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '28px', marginBottom: '28px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', animation: 'fadeIn 0.6s ease-out' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
+            background: '#F8FAFC',
+            border: '2px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'),
+            borderRadius: '14px', padding: '0 18px',
+            flexDirection: 'row-reverse', position: 'relative',
+            transition: 'all 0.3s ease',
+            boxShadow: showAutocomplete ? '0 4px 12px rgba(22, 163, 74, 0.1)' : 'none'
+          }}>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => query.length > 0 && setShowAutocomplete(true)}
-              placeholder="ابحث باسم الشركة أو رقم السجل..."
-              style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', textAlign: 'right' }}
+              placeholder="ابحث باسم الشركة أو رقم السجل (مثل: الراجحي أو 1010012345)..."
+              style={{ flex: 1, border: 0, background: 'transparent', padding: '16px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontWeight: '500' }}
             />
             {query ? (
               <button onClick={handleClearSearch} title="مسح البحث" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
@@ -298,16 +320,31 @@ export default function Search() {
             disabled={!query || loading}
             title={!query ? 'أدخل نص البحث' : 'بحث'}
             style={{
-              background: query && !loading ? '#1E2A52' : '#D1D5DB',
-              color: '#fff', border: 0, borderRadius: '12px', padding: '0 30px',
-              fontSize: '15px', fontWeight: 800, cursor: query && !loading ? 'pointer' : 'not-allowed'
+              background: query && !loading ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' : '#D1D5DB',
+              color: '#fff', border: '0', borderRadius: '14px', padding: '0 32px',
+              fontSize: '15px', fontWeight: 800, cursor: query && !loading ? 'pointer' : 'not-allowed',
+              transition: 'all 0.3s ease',
+              boxShadow: query && !loading ? '0 4px 12px rgba(22, 163, 74, 0.3)' : 'none',
+              transform: 'translateY(0)'
+            }}
+            onMouseEnter={(e) => {
+              if (query && !loading) {
+                e.target.style.transform = 'translateY(-2px)'
+                e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.4)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (query && !loading) {
+                e.target.style.transform = 'translateY(0)'
+                e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)'
+              }
             }}>
-            {loading ? '⏳' : '🔍'} بحث
+            {loading ? '⏳ جاري...' : '🔍 بحث'}
           </button>
         </div>
 
         {/* BUTTONS #3-6: Filters */}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
           {[
             { key: 'sector', label: 'القطاع', options: sectors },
             { key: 'city', label: 'المدينة', options: cities },
@@ -319,10 +356,22 @@ export default function Search() {
                 onClick={() => setShowFilters({ ...showFilters, [filter.key]: !showFilters[filter.key] })}
                 title={`فلتر حسب ${filter.label}`}
                 style={{
-                  background: filters[filter.key] ? '#16A34A' : '#EEF2FF',
+                  background: filters[filter.key] ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' : '#EEF2FF',
                   color: filters[filter.key] ? '#fff' : '#1E2A52',
-                  border: 'none', borderRadius: '999px', padding: '8px 16px',
-                  fontSize: '13.5px', fontWeight: 700, cursor: 'pointer'
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '10px 18px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: filters[filter.key] ? '0 2px 8px rgba(22, 163, 74, 0.2)' : 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = filters[filter.key] ? 'translateY(-2px)' : 'scale(1.05)'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)'
                 }}>
                 {filters[filter.key] ? '✓ ' : ''}{filter.label} ▾
               </button>
@@ -350,9 +399,9 @@ export default function Search() {
       </div>
 
       {/* Results header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ fontSize: '14.5px', color: '#64748B', fontWeight: 700 }}>
-          {loading ? '⏳ جاري البحث...' : `${companies.length} نتائج`}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 700 }}>
+          {loading ? '⏳ جاري البحث...' : `${companies.length} ${companies.length === 1 ? 'شركة واحدة' : 'نتائج'}`}
         </div>
 
         {/* BUTTON #7: Add Company */}
@@ -360,10 +409,26 @@ export default function Search() {
           onClick={handleAddCompany}
           title="أضف شركة جديدة"
           style={{
-            background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
-            padding: '9px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer'
+            background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
+            color: '#fff',
+            border: '0',
+            borderRadius: '12px',
+            padding: '12px 20px',
+            fontSize: '13px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)'
+            e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)'
+            e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
           }}>
-          + إضافة شركة
+          ➕ إضافة شركة
         </button>
       </div>
 
@@ -432,9 +497,37 @@ export default function Search() {
 
       {/* Results grid */}
       {companies.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-          {companies.map(c => (
-            <div key={c.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+          gap: '20px',
+          animation: 'fadeIn 0.5s ease-out'
+        }}>
+          {companies.map((c, idx) => (
+            <div
+              key={c.id}
+              style={{
+                background: '#fff',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                animation: `fadeIn 0.5s ease-out ${idx * 0.05}s both`,
+                transform: 'translateY(0)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.12)'
+                e.currentTarget.style.transform = 'translateY(-4px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
               <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#1E2A52' }}>
@@ -456,12 +549,31 @@ export default function Search() {
               </div>
 
               {c.hasData ? (
-                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
                   {/* BUTTON #8: View Report */}
                   <button
                     onClick={() => handleViewReport(c.id)}
                     title="عرض التقرير"
-                    style={{ width: '100%', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #1E2A52 0%, #2D3A66 100%)',
+                      color: '#fff',
+                      border: '0',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'translateY(-2px)'
+                      e.target.style.boxShadow = '0 4px 12px rgba(30, 42, 82, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'translateY(0)'
+                      e.target.style.boxShadow = 'none'
+                    }}>
                     📊 عرض التقرير
                   </button>
 
@@ -469,7 +581,26 @@ export default function Search() {
                   <button
                     onClick={() => handleSendReport(c.id, c.name)}
                     title="إرسال تقرير جديد"
-                    style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                      color: '#fff',
+                      border: '0',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'translateY(-2px)'
+                      e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'translateY(0)'
+                      e.target.style.boxShadow = 'none'
+                    }}>
                     ✏️ إرسال تقرير
                   </button>
                 </div>
@@ -477,7 +608,26 @@ export default function Search() {
                 <button
                   onClick={() => handleAddCompany()}
                   title="أضف بيانات عن هذه الشركة"
-                  style={{ width: '100%', background: '#F59E0B', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#fff',
+                    border: '0',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)'
+                    e.target.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)'
+                    e.target.style.boxShadow = 'none'
+                  }}>
                   ⚠️ بيانات ناقصة
                 </button>
               )}
