@@ -161,16 +161,41 @@ export default function AddReport() {
 
   if (success) {
     return (
-      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F8FAFC', padding: '20px' }}>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '40px', textAlign: 'center', maxWidth: '400px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-          <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginBottom: '8px' }}>تم إرسال التقرير!</h2>
-          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>سيتم مراجعة تقريرك من قبل الفريق قريباً</p>
+      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', padding: '20px' }}>
+        <style>{`
+          @keyframes successBounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+          }
+        `}</style>
+        <div style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '48px', textAlign: 'center', maxWidth: '420px', boxShadow: '0 12px 32px rgba(0,0,0,0.12)' }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px', animation: 'successBounce 0.6s ease-out' }}>✅</div>
+          <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', marginBottom: '12px' }}>تم إرسال التقرير!</h2>
+          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px', lineHeight: '1.6' }}>شكراً لمساهمتك في بناء مجتمع آمن. سيتم مراجعة تقريرك من قبل فريقنا قريباً.</p>
           <button
             onClick={() => navigate('/my-reports')}
-            style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', width: '100%' }}
-          >
-            الذهاب لتقاريري
+            style={{
+              background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
+              color: '#fff',
+              border: '0',
+              borderRadius: '12px',
+              padding: '14px 24px',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              width: '100%',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)'
+              e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
+            }}>
+            📋 عرض تقاريري
           </button>
         </div>
       </main>
@@ -178,28 +203,52 @@ export default function AddReport() {
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
-      <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>إرسال تقرير جديد</h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 24px 0', textAlign: 'right' }}>شارك معنا تجربتك مع الشركات لمساعدة المجتمع</p>
+    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px 28px' }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+      <div style={{ maxWidth: '700px', margin: '0 auto', animation: 'fadeIn 0.5s ease-out' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>
+          📋 إرسال تقرير جديد
+        </h1>
+        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 28px 0', textAlign: 'right', lineHeight: '1.6' }}>
+          شارك معنا تجربتك مع الشركات لمساعدة المجتمع على اتخاذ قرارات أفضل
+        </p>
 
         {error && (
-          <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', fontSize: '14px', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: 'none', borderRadius: '12px', padding: '16px 18px', marginBottom: '24px', fontSize: '14px', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 2px 8px rgba(220, 38, 38, 0.1)' }}>
             <AlertCircle size={18} />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '28px' }}>
+        <form onSubmit={handleSubmit} style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '32px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
           {/* Company Selection */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>اختر الشركة</label>
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>🏢 اختر الشركة</label>
             <select
               name="companyId"
               value={formData.companyId}
               onChange={handleChange}
               disabled={companiesLoading}
-              style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', fontSize: '14px', textAlign: 'right', outline: 'none' }}
+              style={{
+                width: '100%',
+                border: '2px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '13px 16px',
+                fontSize: '14px',
+                textAlign: 'right',
+                outline: 'none',
+                background: '#F8FAFC',
+                transition: 'all 0.3s ease',
+                cursor: companiesLoading ? 'not-allowed' : 'pointer',
+                fontWeight: '500'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
+              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
             >
               <option value="">{companiesLoading ? 'جاري التحميل...' : '-- اختر شركة --'}</option>
               {companies.map(c => (
@@ -209,11 +258,17 @@ export default function AddReport() {
           </div>
 
           {/* Report Type */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>نوع التقرير</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '12px', textAlign: 'right' }}>📊 نوع التقرير</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
               {reportTypes.map(rt => (
-                <label key={rt.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', border: formData.type === rt.value ? '2px solid #16A34A' : '1px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', background: formData.type === rt.value ? '#F0FDF4' : '#fff' }}>
+                <label key={rt.value} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 12px',
+                  border: formData.type === rt.value ? '2px solid #16A34A' : '2px solid #E2E8F0',
+                  borderRadius: '12px', cursor: 'pointer',
+                  background: formData.type === rt.value ? 'linear-gradient(135deg, #F0FDF4 0%, #E8F9EE 100%)' : '#F8FAFC',
+                  transition: 'all 0.3s ease'
+                }}>
                   <input
                     type="radio"
                     name="type"
@@ -229,87 +284,141 @@ export default function AddReport() {
           </div>
 
           {/* Date */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>التاريخ</label>
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>📅 التاريخ</label>
             <input
               type="date"
               name="date"
               value={formData.date}
               onChange={handleChange}
-              style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', fontSize: '14px', outline: 'none' }}
+              style={{
+                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
+                fontSize: '14px', outline: 'none', background: '#F8FAFC', transition: 'all 0.3s ease', fontWeight: '500'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
+              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
             />
           </div>
 
           {/* Amount (optional) */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>المبلغ (اختياري)</label>
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>💰 المبلغ (اختياري)</label>
             <input
               type="number"
               name="amount"
               placeholder="0.00 ريال"
               value={formData.amount}
               onChange={handleChange}
-              style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', fontSize: '14px', textAlign: 'right', outline: 'none' }}
+              style={{
+                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
+                fontSize: '14px', textAlign: 'right', outline: 'none', background: '#F8FAFC',
+                transition: 'all 0.3s ease', fontWeight: '500'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
+              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
             />
           </div>
 
           {/* Description */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>تفاصيل التقرير</label>
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>📝 تفاصيل التقرير</label>
             <textarea
               name="description"
-              placeholder="اكتب التفاصيل هنا..."
+              placeholder="اكتب التفاصيل والملاحظات هنا... (20 حرف بالحد الأدنى)"
               value={formData.description}
               onChange={handleChange}
-              rows="4"
-              style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', fontSize: '14px', textAlign: 'right', outline: 'none', fontFamily: 'inherit', resize: 'none' }}
+              rows="5"
+              style={{
+                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
+                fontSize: '14px', textAlign: 'right', outline: 'none', fontFamily: 'inherit',
+                resize: 'none', background: '#F8FAFC', transition: 'all 0.3s ease', fontWeight: '500'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
+              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
             />
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px', textAlign: 'right' }}>
+              {formData.description.length}/500 حرف
+            </div>
           </div>
 
           {/* Submit Button */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
+          <div style={{ display: 'flex', gap: '14px', justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
             <button
               type="submit"
               disabled={loading}
               style={{
-                background: loading ? '#D1D5DB' : '#16A34A',
+                background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
                 color: '#fff',
-                border: 0,
-                borderRadius: '8px',
-                padding: '12px 24px',
+                border: '0',
+                borderRadius: '12px',
+                padding: '14px 28px',
                 fontSize: '14px',
                 fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                opacity: loading ? 0.6 : 1
+                transition: 'all 0.3s ease',
+                boxShadow: loading ? 'none' : '0 4px 12px rgba(22, 163, 74, 0.25)'
               }}
-            >
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.target.style.transform = 'translateY(-2px)'
+                  e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.target.style.transform = 'translateY(0)'
+                  e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
+                }
+              }}>
               <Send size={16} />
-              {loading ? 'جاري الإرسال...' : 'إرسال التقرير'}
+              {loading ? '⏳ جاري الإرسال...' : '✉️ إرسال التقرير'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/search')}
               style={{
-                background: '#E2E8F0',
-                color: '#64748B',
-                border: 0,
-                borderRadius: '8px',
-                padding: '12px 24px',
+                background: '#EEF2FF',
+                color: '#1E2A52',
+                border: '0',
+                borderRadius: '12px',
+                padding: '14px 28px',
                 fontSize: '14px',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
               }}
-            >
-              إلغاء
+              onMouseEnter={(e) => {
+                e.target.style.background = '#E0E7FF'
+                e.target.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#EEF2FF'
+                e.target.style.transform = 'translateY(0)'
+              }}>
+              ← إلغاء
             </button>
           </div>
 
           {/* Info */}
-          <div style={{ background: '#F0F4FF', border: '1px solid #E0E7FF', borderRadius: '8px', padding: '12px 14px', marginTop: '24px', fontSize: '13px', color: '#1E40AF', fontWeight: 600 }}>
-            ℹ️ تقريرك سيساعد المجتمع على اتخاذ قرارات أفضل. شكراً لتعاونك!
+          <div style={{
+            background: 'linear-gradient(135deg, #F0F4FF 0%, #EEF2FF 100%)',
+            border: '2px solid #E0E7FF',
+            borderRadius: '12px',
+            padding: '16px 18px',
+            marginTop: '28px',
+            fontSize: '13px',
+            color: '#1E40AF',
+            fontWeight: '600',
+            lineHeight: '1.6',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-start'
+          }}>
+            <span>ℹ️</span>
+            <span>تقريرك سيساعد المجتمع على اتخاذ قرارات آمنة وموثوقة. شكراً لمساهمتك في بناء مجتمع آمن!</span>
           </div>
         </form>
       </div>
