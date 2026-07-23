@@ -122,9 +122,24 @@ export default function CompanyOnboarding() {
     }
   }
 
+  // ============================================================================
+  // PROFILING HELPER: تتبع أوقات تنفيذ العمليات
+  // ============================================================================
+  const createTimer = () => {
+    const start = Date.now()
+    return {
+      log: (stepName) => {
+        const duration = Date.now() - start
+        console.log(`⏱️  ${stepName}: ${duration}ms`)
+        return duration
+      }
+    }
+  }
+
   // Step 2: Upload document and final confirmation
   const handleSubmit = async () => {
     setError('')
+    const mainTimer = createTimer()
 
     if (!crFile) {
       setError('❌ رفع السجل التجاري مطلوب')
@@ -132,46 +147,75 @@ export default function CompanyOnboarding() {
     }
 
     setLoading(true)
+    let cleanupRequired = false
+    let createdCompanyId = null
+    let createdTenantId = null
 
     try {
-      let crFileUrl = null
       const supabase = getSupabase()
+      let crFileUrl = null
 
-      // Try uploading to Storage
+      // ===== STEP 1: Upload Document =====
+      console.log('📄 [1/6] Starting document upload...')
+      const uploadTimer = createTimer()
+
       try {
         await ensureStorageBucket('company-documents')
         const fileName = `cr_${Date.now()}_${crFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('company-documents')
           .upload(`cr-files/${fileName}`, crFile)
 
-        if (!uploadError && uploadData?.path) {
-          crFileUrl = uploadData.path
+        if (uploadError) {
+          console.warn('⚠️ Storage upload failed:', uploadError.message)
+          throw new Error(`فشل رفع الملف إلى التخزين: ${uploadError.message}`)
         }
+
+        if (!uploadData?.path) {
+          console.warn('⚠️ No path returned from upload')
+          throw new Error('لم يتم الحصول على رابط الملف')
+        }
+
+        crFileUrl = uploadData.path
+        uploadTimer.log('Document storage upload')
+        console.log(`✅ Document uploaded to: ${crFileUrl}`)
       } catch (storageError) {
-        console.warn('⚠️ Storage fallback:', storageError)
-      }
+        console.warn('⚠️ Storage fallback due to:', storageError.message)
 
-      // Fallback: base64
-      if (!crFileUrl) {
-        const reader = new FileReader()
-        crFileUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => {
-            const result = reader.result
-            if (typeof result === 'string' && result.length > 13 * 1024 * 1024) {
-              reject(new Error('❌ الملف كبير جداً حتى بعد التحويل'))
-            } else {
-              resolve(result)
+        // Fallback: base64 encoding
+        try {
+          console.log('📦 Falling back to base64 encoding...')
+          const reader = new FileReader()
+          crFileUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result
+              if (typeof result === 'string' && result.length > 13 * 1024 * 1024) {
+                reject(new Error('الملف كبير جداً حتى بعد التحويل (>13MB)'))
+              } else {
+                resolve(result)
+              }
             }
-          }
-          reader.onerror = () => reject(new Error('❌ فشل قراءة الملف'))
-          reader.readAsDataURL(crFile)
-        })
+            reader.onerror = () => reject(new Error('فشل قراءة الملف من الجهاز'))
+            reader.readAsDataURL(crFile)
+          })
+          uploadTimer.log('Base64 encoding')
+          console.log(`✅ Base64 fallback successful (${crFileUrl.length} bytes)`)
+        } catch (base64Error) {
+          throw new Error(`❌ فشل حفظ الملف: ${base64Error.message}`)
+        }
       }
 
-      // NOW: Handle CASE A (new) vs CASE B (existing)
+      // ===== NOW: Handle CASE A (new) vs CASE B (existing) =====
       if (existingCompany) {
-        // CASE B: Company exists — create claim request
+        // ============================================================
+        // CASE B: Company exists — Simpler flow, less rollback risk
+        // ============================================================
+
+        // ===== STEP 2: Create Claim Request =====
+        console.log('📋 [2/5] Creating claim request...')
+        const claimTimer = createTimer()
+
         const { data: claimRequest, error: claimError } = await supabase
           .from('claim_requests')
           .insert([{
@@ -180,40 +224,93 @@ export default function CompanyOnboarding() {
             supporting_documents: { crFile: crFileUrl },
             status: REQUEST_STATUS.PENDING
           }])
-          .select()
+          .select('id')
           .single()
 
-        if (claimError) throw claimError
+        if (claimError) {
+          throw new Error(`فشل إنشاء طلب الملكية: ${claimError.message}`)
+        }
+        if (!claimRequest) {
+          throw new Error('لم يتم إرجاع بيانات طلب الملكية')
+        }
 
-        // Create user record
-        await supabase
+        claimTimer.log('Claim request creation')
+        console.log(`✅ Claim request created: ${claimRequest.id}`)
+
+        // ===== STEP 3: Upsert User =====
+        console.log('👤 [3/5] Updating user record...')
+        const userTimer = createTimer()
+
+        const userEmail = formData.officialEmail || user.primaryEmailAddress?.emailAddress
+        if (!userEmail) {
+          throw new Error('البريد الإلكتروني للمستخدم غير متوفر')
+        }
+
+        const { data: upsertedUser, error: userError } = await supabase
           .from('users')
           .upsert([{
             id: user.id,
-            email: formData.officialEmail || user.primaryEmailAddress?.emailAddress,
+            email: userEmail,
             first_name: user.firstName || '',
             last_name: user.lastName || '',
             role: USER_ROLE.COMPANY_MEMBER,
             status: USER_STATUS.ACTIVE
           }], { onConflict: 'id' })
+          .select('id')
+          .single()
 
-        // Notify admin
-        await supabase
-          .from('notifications')
-          .insert([{
-            type: 'claim_request_submitted',
-            payload: JSON.stringify({
-              company_id: existingCompany.id,
-              company_name: existingCompany.name,
-              user_email: formData.officialEmail
-            })
-          }])
-          .catch(err => console.warn('Notification warning:', err))
+        if (userError) {
+          throw new Error(`فشل تحديث بيانات المستخدم: ${userError.message}`)
+        }
+
+        userTimer.log('User upsert')
+        console.log(`✅ User updated: ${upsertedUser?.id}`)
+
+        // ===== STEP 4: Send Admin Notification =====
+        console.log('🔔 [4/5] Sending admin notification...')
+        const notifTimer = createTimer()
+
+        try {
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert([{
+              type: 'claim_request_submitted',
+              payload: JSON.stringify({
+                company_id: existingCompany.id,
+                company_name: existingCompany.name,
+                user_email: userEmail,
+                claim_request_id: claimRequest.id
+              })
+            }])
+            .select('id')
+            .single()
+
+          if (notifError) {
+            console.warn('⚠️ Notification failed (non-blocking):', notifError.message)
+          } else {
+            notifTimer.log('Admin notification')
+            console.log('✅ Admin notified')
+          }
+        } catch (notifErr) {
+          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
+        }
+
+        // ===== STEP 5: Success =====
+        console.log('🎉 [5/5] Claim submission complete')
+        mainTimer.log('Total CASE B flow')
 
         alert('✅ طلب الملكية تم إرساله!\n\n🔍 فريق مرصد سيقوم بمراجعة طلبك.')
         navigate('/company-claim-pending', { replace: true })
+
       } else {
-        // CASE A: New company — create full registration
+        // ============================================================
+        // CASE A: New company — Complex flow, needs careful error handling
+        // ============================================================
+
+        // ===== STEP 2: Create Company =====
+        console.log('🏢 [2/7] Creating company record...')
+        const companyTimer = createTimer()
+
         const { data: newCompany, error: companyError } = await supabase
           .from('companies')
           .insert([buildCompanyInsert({
@@ -232,15 +329,32 @@ export default function CompanyOnboarding() {
           .select('id')
           .single()
 
-        if (companyError) throw new Error('فشل إنشاء الشركة: ' + companyError.message)
+        if (companyError) {
+          throw new Error(`فشل إنشاء الشركة: ${companyError.message}`)
+        }
+        if (!newCompany?.id) {
+          throw new Error('لم يتم الحصول على معرّف الشركة')
+        }
 
-        // Create tenant
+        createdCompanyId = newCompany.id
+        companyTimer.log('Company creation')
+        console.log(`✅ Company created: ${newCompany.id}`)
+
+        // ===== STEP 3: Create Tenant =====
+        console.log('🏛️  [3/7] Creating tenant record...')
+        const tenantTimer = createTimer()
+
+        const tenantEmail = formData.officialEmail || user.primaryEmailAddress?.emailAddress
+        if (!tenantEmail) {
+          throw new Error('البريد الإلكتروني للشركة غير متوفر')
+        }
+
         const { data: tenantData, error: tenantError } = await supabase
           .from('tenants')
           .insert([{
             name: formData.name,
             cr_number: formData.crNumber,
-            email: formData.officialEmail || user.primaryEmailAddress?.emailAddress,
+            email: tenantEmail,
             phone: formData.phone || null,
             sector: formData.sector,
             city: formData.city,
@@ -250,10 +364,23 @@ export default function CompanyOnboarding() {
           .select('id')
           .single()
 
-        if (tenantError) throw new Error('فشل إنشاء حساب الشركة: ' + tenantError.message)
+        if (tenantError) {
+          throw new Error(`فشل إنشاء حساب الشركة: ${tenantError.message}`)
+        }
+        if (!tenantData?.id) {
+          throw new Error('لم يتم الحصول على معرّف الحساب')
+        }
 
-        // Create user record
-        await supabase
+        createdTenantId = tenantData.id
+        cleanupRequired = true // If something fails now, cleanup needed
+        tenantTimer.log('Tenant creation')
+        console.log(`✅ Tenant created: ${tenantData.id}`)
+
+        // ===== STEP 4: Create User =====
+        console.log('👤 [4/7] Creating user record...')
+        const userTimer = createTimer()
+
+        const { data: newUser, error: userError } = await supabase
           .from('users')
           .insert([{
             id: user.id,
@@ -265,9 +392,21 @@ export default function CompanyOnboarding() {
             role: USER_ROLE.COMPANY_ADMIN,
             status: USER_STATUS.ACTIVE
           }])
+          .select('id')
+          .single()
 
-        // Create registration request
-        await supabase
+        if (userError) {
+          throw new Error(`فشل إنشاء سجل المستخدم: ${userError.message}`)
+        }
+
+        userTimer.log('User creation')
+        console.log(`✅ User created: ${newUser?.id}`)
+
+        // ===== STEP 5: Create Registration Request =====
+        console.log('📋 [5/7] Creating registration request...')
+        const regReqTimer = createTimer()
+
+        const { data: regRequest, error: regReqError } = await supabase
           .from('registration_requests')
           .insert([{
             company_id: newCompany.id,
@@ -276,28 +415,70 @@ export default function CompanyOnboarding() {
             cr_document_url: crFileUrl,
             status: REQUEST_STATUS.PENDING
           }])
+          .select('id')
+          .single()
 
-        // Notify admin
-        await supabase
-          .from('notifications')
-          .insert([{
-            type: 'company_registration_submitted',
-            payload: JSON.stringify({
-              company_id: newCompany.id,
-              company_name: formData.name,
-              cr_number: formData.crNumber
-            })
-          }])
-          .catch(err => console.warn('Notification warning:', err))
+        if (regReqError) {
+          throw new Error(`فشل إنشاء طلب التسجيل: ${regReqError.message}`)
+        }
+
+        regReqTimer.log('Registration request creation')
+        console.log(`✅ Registration request created: ${regRequest?.id}`)
+
+        // ===== STEP 6: Send Admin Notification =====
+        console.log('🔔 [6/7] Sending admin notification...')
+        const notifTimer = createTimer()
+
+        try {
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert([{
+              type: 'company_registration_submitted',
+              payload: JSON.stringify({
+                company_id: newCompany.id,
+                company_name: formData.name,
+                cr_number: formData.crNumber,
+                registration_request_id: regRequest?.id
+              })
+            }])
+            .select('id')
+            .single()
+
+          if (notifError) {
+            console.warn('⚠️ Notification failed (non-blocking):', notifError.message)
+          } else {
+            notifTimer.log('Admin notification')
+            console.log('✅ Admin notified')
+          }
+        } catch (notifErr) {
+          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
+        }
+
+        // ===== STEP 7: Success =====
+        console.log('🎉 [7/7] Registration complete')
+        mainTimer.log('Total CASE A flow')
 
         alert('✅ تم رفع بيانات شركتك بنجاح!\n\n⏳ سيتم مراجعة التسجيل من قبل فريق مرصد')
         navigate('/registration-pending', { replace: true })
       }
+
     } catch (err) {
-      setError(err.message || '❌ حدث خطأ غير متوقع')
-      console.error('Onboarding error:', err)
+      console.error('❌ Onboarding error:', err.message)
+      console.error('Stack:', err.stack)
+
+      // Set user-friendly error message
+      const errorMsg = err.message || '❌ حدث خطأ غير متوقع'
+      setError(errorMsg)
+
+      // Log cleanup requirement
+      if (cleanupRequired && createdTenantId) {
+        console.warn(`⚠️  CLEANUP REQUIRED: Tenant ${createdTenantId} created but flow failed`)
+        console.warn(`⚠️  CLEANUP REQUIRED: Company ${createdCompanyId} created but flow failed`)
+        console.warn('⚠️  Manual cleanup may be needed via admin panel')
+      }
     } finally {
       setLoading(false)
+      console.log('✅ Loading state cleared')
     }
   }
 
