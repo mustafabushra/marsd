@@ -399,6 +399,61 @@ export async function login(email: string, password: string) {
   }
 }
 
+/**
+ * Ensure user record exists in Supabase after Clerk authentication.
+ * This is called from /auth/callback after Clerk has verified the user.
+ * Creates user record if missing, but does NOT create tenant/company.
+ * Tenant/company are created later when user fills onboarding form.
+ */
+export async function ensureUserExists(userId: string, email: string): Promise<{ id: string; email: string; tenant_id: string | null }> {
+  const supabase = getSupabase()
+
+  // Check if user exists
+  const { data: existingUser, error: checkError } = await supabase
+    .from('users')
+    .select('id, email, tenant_id')
+    .eq('id', userId)
+    .single()
+
+  // User found
+  if (existingUser) {
+    return {
+      id: existingUser.id,
+      email: existingUser.email,
+      tenant_id: existingUser.tenant_id
+    }
+  }
+
+  // User not found, but error is not "not found" — real error
+  if (checkError && checkError.code !== 'PGRST116') {
+    throw new Error('فشل البحث عن المستخدم: ' + checkError.message)
+  }
+
+  // Create new user record (WITHOUT tenant_id, WITHOUT company_id)
+  const { data: newUser, error: insertError } = await supabase
+    .from('users')
+    .insert([{
+      id: userId,
+      email: email.toLowerCase().trim(),
+      role: 'company_member',
+      status: 'active',
+      // tenant_id is NULL until user fills onboarding
+      // company_id is NULL until user fills onboarding
+    }])
+    .select()
+    .single()
+
+  if (insertError || !newUser) {
+    throw new Error('فشل إنشاء ملف المستخدم: ' + (insertError?.message || 'Unknown error'))
+  }
+
+  return {
+    id: newUser.id,
+    email: newUser.email,
+    tenant_id: newUser.tenant_id
+  }
+}
+
 export async function register(data: any) {
   // NOTE: This function is deprecated with Clerk authentication
   // Use the Clerk SDK for signup instead, then create tenant/user records via Supabase
@@ -411,6 +466,11 @@ export async function logout() {
   clearAuth()
 }
 
+/**
+ * Create tenant + company on onboarding submission.
+ * Called ONLY after user has authenticated and filled the onboarding form.
+ * Does NOT run during signup — Clerk handles authentication only.
+ */
 export async function createTenantAndUser(userId: string, companyData: any) {
   const supabase = getSupabase()
 
@@ -429,6 +489,17 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       throw new Error('حجم السجل التجاري كبير جداً (أكثر من 10MB)')
     }
 
+    // ===== CHECK: User already has tenant? =====
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single()
+
+    if (existingUser?.tenant_id) {
+      throw new Error('❌ لديك حساب شركة بالفعل. لا يمكن إنشاء حساب آخر.')
+    }
+
     // ===== CR NUMBER GENERATION =====
     let crNumber = companyData.crNumber?.trim()
 
@@ -440,25 +511,22 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       crNumber = crNumber.substring(0, 20).toUpperCase()
 
       // Check if CR number already exists
-      const { data: existing, error: checkError } = await supabase
+      const { data: existing } = await supabase
         .from('tenants')
         .select('id')
         .eq('cr_number', crNumber)
         .limit(1)
 
-      if (checkError) {
-        console.warn('CR check warning:', checkError)
-      } else if (existing && existing.length > 0) {
+      if (existing && existing.length > 0) {
         const shortTimestamp = Date.now().toString().slice(-8)
         crNumber = `CR${shortTimestamp}`
       }
     }
 
-    // ===== TENANT CREATION =====
-    // Note: approval_status removed - use companies.status as single source of truth
+    // ===== TENANT CREATION (INSERT ONLY, no upsert) =====
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
-      .upsert([{
+      .insert([{
         email: companyData.email.toLowerCase().trim(),
         name: companyData.name.substring(0, 255),
         cr_number: crNumber,
@@ -467,103 +535,32 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         sector: (companyData.sector || '').substring(0, 100),
         status: 'active',
         cr_file_url: companyData.crFileUrl || null
-      }], {
-        onConflict: 'email'
-      })
+      }])
       .select()
       .single()
 
     if (tenantError || !tenantData) {
       // Parse error messages for better UX
       const errorMsg = tenantError?.message || 'فشل إنشاء الشركة'
-      if (errorMsg.includes('duplicate key')) throw new Error('هذا البريد الإلكتروني مسجل بالفعل')
+      if (errorMsg.includes('duplicate key')) throw new Error('هذا البريد الإلكتروني مسجل بالفعل. استخدم بريد آخر.')
       if (errorMsg.includes('unique')) throw new Error('البيانات مكررة (بريد أو رقم سجل)')
       throw new Error('فشل إنشاء الشركة: ' + errorMsg)
     }
 
-    // 2. Create/Update User record with tenant_id
-    try {
-      // First check if user already exists by ID
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('id, email, tenant_id')
-        .eq('id', userId)
-        .single()
+    // ===== UPDATE User record with tenant_id =====
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        tenant_id: tenantData.id,
+        first_name: companyData.firstName || '',
+        last_name: companyData.lastName || '',
+        role: 'company_admin',
+        status: 'active'
+      })
+      .eq('id', userId)
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        // PGRST116 = not found, which is expected for new users
-        throw new Error('فشل البحث عن المستخدم: ' + checkError.message)
-      }
-
-      if (existingUser) {
-        // User exists - check if email changed
-        if (existingUser.email !== companyData.email) {
-          // Email changed - check if new email is unique
-          const { data: emailExists } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', companyData.email)
-            .limit(1)
-
-          if (emailExists && emailExists.length > 0) {
-            throw new Error('❌ هذا البريد الإلكتروني مسجل بالفعل')
-          }
-        }
-
-        // Update existing user
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            tenant_id: tenantData.id,
-            email: companyData.email,
-            first_name: companyData.firstName || '',
-            last_name: companyData.lastName || '',
-            role: 'company_admin',
-            status: 'active'
-          })
-          .eq('id', userId)
-
-        if (updateError) throw updateError
-      } else {
-        // New user - check if email is unique first
-        const { data: emailExists } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', companyData.email)
-          .limit(1)
-
-        if (emailExists && emailExists.length > 0) {
-          throw new Error('❌ هذا البريد الإلكتروني مسجل بالفعل')
-        }
-
-        // Insert new user
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert([{
-            id: userId,
-            tenant_id: tenantData.id,
-            email: companyData.email,
-            first_name: companyData.firstName || '',
-            last_name: companyData.lastName || '',
-            role: 'company_admin',
-            status: 'active'
-          }])
-
-        if (insertError) throw insertError
-      }
-
-      // Link Clerk user with Supabase tenant via Clerk metadata
-      try {
-        await linkClerkUserToTenant(userId, tenantData.id, companyData.crNumber || crNumber)
-      } catch (metadataError) {
-        console.warn('⚠️ Failed to update Clerk metadata:', metadataError)
-        // Don't fail the whole registration if metadata update fails
-      }
-    } catch (userError) {
-      if (userError.message.includes('هذا البريد')) {
-        throw userError
-      }
-      throw new Error('❌ فشل تحديث ملف المستخدم: ' + userError.message)
+    if (updateError) {
+      throw new Error('❌ فشل تحديث ملف المستخدم: ' + updateError.message)
     }
 
     // 3. Create Company Record (for searchability)
@@ -592,13 +589,13 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // Link company to tenant
-    const { error: updateError } = await supabase
+    const { error: tenantUpdateError } = await supabase
       .from('tenants')
       .update({ company_id: companyInsertData.id })
       .eq('id', tenantData.id)
 
-    if (updateError) {
-      throw new Error('فشل ربط الشركة بـ الحساب: ' + updateError.message)
+    if (tenantUpdateError) {
+      throw new Error('فشل ربط الشركة بـ الحساب: ' + tenantUpdateError.message)
     }
 
     // 4. Create default subscription (Free plan)

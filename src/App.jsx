@@ -68,6 +68,7 @@ import AdminClaimRequests from './pages/AdminClaimRequests'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
+import AuthCallback from './pages/AuthCallback'
 
 /**
  * AppContent Component
@@ -116,6 +117,7 @@ function AppContent() {
         </Route>
 
         {/* Auth Routes - No layout */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/account-pending" element={<AccountPendingApproval />} />
