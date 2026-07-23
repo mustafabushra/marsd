@@ -150,7 +150,7 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px' }}>
+    <main style={{ background: '#fff', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -161,12 +161,18 @@ export default function AdminDashboard() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>📊 لوحة التحكم الإدارية</h1>
-          <p style={{ color: '#64748B', fontSize: '14px', margin: '0 0 0 0', textAlign: 'right' }}>مرحباً بك في نظام إدارة مرصد — نظرة عامة شاملة على أداء المنصة</p>
+
+      {/* HEADER */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '20px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1E2A52', margin: 0, textAlign: 'right' }}>لوحة التحكم</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: '#16A34A', color: '#fff', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700' }}>✓</div>
+          <span style={{ fontSize: '18px', fontWeight: '700', color: '#1E2A52' }}>مرصد</span>
         </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '32px' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
