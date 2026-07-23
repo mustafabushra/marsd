@@ -99,6 +99,36 @@ export default function Watchlist() {
     }
   }, [user?.id])
 
+  const handleRemove = async (itemId, companyName) => {
+    try {
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('watchlist_items')
+        .delete()
+        .eq('id', itemId)
+
+      if (error) throw error
+
+      setCompanies(companies.filter(c => c.id !== itemId))
+
+      // Audit log
+      const { data: user } = await supabase.auth.getUser()
+      await supabase
+        .from('audit_logs')
+        .insert([{
+          actor_id: user.user?.id,
+          action: 'removed_from_watchlist',
+          entity: 'watchlist',
+          entity_id: itemId,
+          meta: JSON.stringify({ company_name: companyName }),
+          created_at: new Date().toISOString()
+        }])
+        .catch(err => console.warn('Audit log warning:', err))
+    } catch (err) {
+      console.error('Failed to remove from watchlist:', err)
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -155,10 +185,7 @@ export default function Watchlist() {
                   </svg>
                   <span style={{ background: w.tBg, color: w.tColor, borderRadius: '8px', padding: '6px 13px', fontSize: '13.5px', fontWeight: 800, flex: 'none' }}>{w.trend}</span>
                   <button
-                    onClick={() => {
-                      // Remove from watchlist
-                      setCompanies(companies.filter(c => c.id !== w.id))
-                    }}
+                    onClick={() => handleRemove(w.id, w.name)}
                     style={{
                       background: '#FEE2E2',
                       color: '#DC2626',

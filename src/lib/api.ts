@@ -314,7 +314,9 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         phone: companyData.phone || '',
         city: companyData.city || '',
         sector: companyData.sector || '',
-        status: 'active'
+        status: 'active',
+        cr_file_url: companyData.crFileUrl || null,
+        approval_status: companyData.status || 'active'
       }], {
         onConflict: 'email'
       })

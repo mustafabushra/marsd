@@ -36,6 +36,7 @@ export default function AdminShell({ user }) {
     { label: 'نماذج البريد', path: '/admin/email-templates' },
     { label: 'تصدير البيانات', path: '/admin/data-export' },
     { label: 'النزاعات', path: '/admin/disputes' },
+    { label: '⏳ مراجعة التسجيل', path: '/admin/company-approval' },
     { label: 'التحقق من الشركات', path: '/admin/company-verification' },
     { divider: true, label: 'المراقبة' },
     { label: 'حالة النظام', path: '/admin/system-health' },

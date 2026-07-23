@@ -1,30 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Send } from 'lucide-react'
+import { getSupabase } from '../lib/api'
 
 export default function AddReport() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    company: '',
+    companyId: '',
     type: 'delayed-payment',
     description: '',
     amount: '',
     date: new Date().toISOString().split('T')[0],
   })
+  const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-
-  const companies = [
-    'الراجحي للمقاولات',
-    'البناء الحديث',
-    'الصناعات المتقدمة',
-    'النقل السريع',
-    'الخدمات اللوجستية',
-    'الاتصالات العالمية',
-    'الطاقة والموارد',
-    'التسويق الرقمي'
-  ]
+  const [companiesLoading, setCompaniesLoading] = useState(true)
 
   const reportTypes = [
     { value: 'delayed-payment', label: '💳 دفع متأخر' },
@@ -32,6 +24,28 @@ export default function AddReport() {
     { value: 'excellent', label: '⭐ ممتاز' },
     { value: 'issues', label: '⚔️ قضايا' },
   ]
+
+  useEffect(() => {
+    fetchCompanies()
+  }, [])
+
+  const fetchCompanies = async () => {
+    try {
+      const supabase = getSupabase()
+      const { data, error: fetchError } = await supabase
+        .from('companies')
+        .select('id, name, sector')
+        .eq('approved', true)
+        .order('name', { ascending: true })
+
+      if (fetchError) throw fetchError
+      setCompanies(data || [])
+    } catch (err) {
+      console.error('Failed to fetch companies:', err)
+    } finally {
+      setCompaniesLoading(false)
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -44,35 +58,100 @@ export default function AddReport() {
     setLoading(true)
 
     // Validation
-    if (!formData.company.trim()) {
+    if (!formData.companyId.trim()) {
       setError('اختر شركة')
       setLoading(false)
       return
     }
-    if (!formData.description.trim()) {
-      setError('أضف وصف التقرير')
+    if (formData.description.length < 20) {
+      setError('وصف التقرير يجب أن يكون 20 حرف على الأقل (BR-07)')
+      setLoading(false)
+      return
+    }
+    if (!formData.date) {
+      setError('حدد التاريخ')
       setLoading(false)
       return
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const supabase = getSupabase()
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) throw new Error('Unauthorized')
+
+      // Get user's tenant
+      const { data: userData } = await supabase
+        .from('users')
+        .select('tenant_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!userData?.tenant_id) throw new Error('Tenant not found')
+
+      // BR-05: Check for duplicate reports in last 90 days
+      const ninetyDaysAgo = new Date()
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+      const { data: existingReport } = await supabase
+        .from('reports')
+        .select('id')
+        .eq('reporter_tenant_id', userData.tenant_id)
+        .eq('target_company_id', formData.companyId)
+        .gte('created_at', ninetyDaysAgo.toISOString())
+        .limit(1)
+
+      if (existingReport && existingReport.length > 0) {
+        throw new Error('❌ لا يمكن إرسال تقرير لنفس الشركة مرتين خلال 90 يوم (BR-05)')
+      }
+
+      // Submit report
+      const { data: reportData, error: submitError } = await supabase
+        .from('reports')
+        .insert([{
+          reporter_tenant_id: userData.tenant_id,
+          target_company_id: formData.companyId,
+          type: formData.type,
+          description: formData.description,
+          deal_amount_range: formData.amount ? `SAR ${formData.amount}` : null,
+          dealt_at: new Date(formData.date).toISOString(),
+          status: 'pending_review',
+          submitted_at: new Date().toISOString()
+        }])
+        .select()
+        .single()
+
+      if (submitError) throw submitError
+
+      // Deduct 1 credit (will be refunded if rejected)
+      await supabase
+        .from('credits_ledger')
+        .insert([{
+          tenant_id: userData.tenant_id,
+          report_id: reportData.id,
+          amount: -1,
+          reason: 'report_submitted',
+          created_at: new Date().toISOString()
+        }])
+        .catch(err => console.warn('Credit deduction warning:', err))
+
+      // Audit log
+      await supabase
+        .from('audit_logs')
+        .insert([{
+          tenant_id: userData.tenant_id,
+          actor_id: user.user.id,
+          action: 'report_submitted',
+          entity: 'report',
+          entity_id: reportData.id,
+          meta: JSON.stringify({ company_id: formData.companyId, type: formData.type }),
+          created_at: new Date().toISOString()
+        }])
+        .catch(err => console.warn('Audit log warning:', err))
 
       setSuccess(true)
-      setFormData({
-        company: '',
-        type: 'delayed-payment',
-        description: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-      })
-
-      setTimeout(() => {
-        navigate('/my-reports')
-      }, 2000)
+      setTimeout(() => navigate('/my-reports'), 2000)
     } catch (err) {
-      setError('فشل الإرسال: ' + (err.message || 'حاول مرة أخرى'))
+      setError(err.message || 'فشل الإرسال')
     } finally {
       setLoading(false)
     }
@@ -114,14 +193,15 @@ export default function AddReport() {
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '8px', textAlign: 'right' }}>اختر الشركة</label>
             <select
-              name="company"
-              value={formData.company}
+              name="companyId"
+              value={formData.companyId}
               onChange={handleChange}
+              disabled={companiesLoading}
               style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', fontSize: '14px', textAlign: 'right', outline: 'none' }}
             >
-              <option value="">-- اختر شركة --</option>
+              <option value="">{companiesLoading ? 'جاري التحميل...' : '-- اختر شركة --'}</option>
               {companies.map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>

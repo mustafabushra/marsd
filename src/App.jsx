@@ -57,6 +57,7 @@ import AdminIntegrations from './pages/AdminIntegrations'
 import AdminTenantAnalytics from './pages/AdminTenantAnalytics'
 import AdminCompanyVerification from './pages/AdminCompanyVerification'
 import AdminBackup from './pages/AdminBackup'
+import AdminCompanyApproval from './pages/AdminCompanyApproval'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -154,6 +155,7 @@ function AppContent() {
           <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
           <Route path="/admin/tenant-analytics" element={<AdminRoute><AdminTenantAnalytics /></AdminRoute>} />
           <Route path="/admin/company-verification" element={<AdminRoute><AdminCompanyVerification /></AdminRoute>} />
+          <Route path="/admin/company-approval" element={<AdminRoute><AdminCompanyApproval /></AdminRoute>} />
           <Route path="/admin/backup" element={<AdminRoute><AdminBackup /></AdminRoute>} />
         </Route>
 
