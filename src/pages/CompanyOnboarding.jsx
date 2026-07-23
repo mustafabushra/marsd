@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { createTenantAndUser, getSupabase } from '../lib/api'
+import { createTenantAndUser, getSupabase, ensureStorageBucket } from '../lib/api'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -113,17 +113,36 @@ export default function CompanyOnboarding() {
       if (!companyData.city.trim()) throw new Error('المدينة مطلوبة')
       if (!crFile) throw new Error('رفع السجل التجاري مطلوب')
 
-      // Upload CR file to Supabase Storage
-      const fileName = `cr_${Date.now()}_${crFile.name}`
+      // Upload CR file (try Supabase Storage first, fallback to base64)
+      let crFileUrl = null
       const supabase = getSupabase()
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('company-documents')
-        .upload(`cr-files/${fileName}`, crFile)
+      const fileName = `cr_${Date.now()}_${crFile.name}`
 
-      if (uploadError) throw new Error('فشل رفع السجل التجاري: ' + uploadError.message)
+      try {
+        // Try to ensure bucket exists
+        await ensureStorageBucket('company-documents')
 
-      // Create tenant with PENDING_APPROVAL status
-      const crFileUrl = uploadData?.path || `cr-files/${fileName}`
+        // Try to upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('company-documents')
+          .upload(`cr-files/${fileName}`, crFile)
+
+        if (!uploadError && uploadData?.path) {
+          crFileUrl = uploadData.path
+        }
+      } catch (storageError) {
+        console.warn('Storage upload failed, will use base64 fallback:', storageError)
+      }
+
+      // If storage upload failed, use base64 as fallback
+      if (!crFileUrl) {
+        const reader = new FileReader()
+        crFileUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = () => reject(new Error('Failed to read file'))
+          reader.readAsDataURL(crFile)
+        })
+      }
       await createTenantAndUser(user.id, {
         name: companyData.name,
         crNumber: companyData.crNumber,

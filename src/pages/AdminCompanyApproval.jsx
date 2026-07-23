@@ -287,19 +287,36 @@ export default function AdminCompanyApproval() {
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', marginBottom: '6px' }}>
                     السجل التجاري (المرفق)
                   </div>
-                  <a
-                    href={selectedCompany.cr_file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      fontSize: '13px',
-                      color: '#4F46E5',
-                      textDecoration: 'underline',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📄 عرض الملف
-                  </a>
+                  {selectedCompany.cr_file_url.startsWith('data:') ? (
+                    // Base64 embedded file
+                    <a
+                      href={selectedCompany.cr_file_url}
+                      download="cr-document"
+                      style={{
+                        fontSize: '13px',
+                        color: '#4F46E5',
+                        textDecoration: 'underline',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📥 تحميل الملف
+                    </a>
+                  ) : (
+                    // Storage URL
+                    <a
+                      href={selectedCompany.cr_file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: '13px',
+                        color: '#4F46E5',
+                        textDecoration: 'underline',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📄 عرض الملف
+                    </a>
+                  )}
                 </div>
               )}
 

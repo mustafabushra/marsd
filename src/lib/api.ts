@@ -24,6 +24,31 @@ export function getSupabase(): SupabaseClient {
   return supabaseClient
 }
 
+// Ensure storage bucket exists
+export async function ensureStorageBucket(bucketName: string): Promise<void> {
+  try {
+    const supabase = getSupabase()
+
+    // Try to get bucket info (will fail if not exists)
+    const { data: buckets } = await supabase.storage.listBuckets()
+    const bucketExists = buckets?.some(b => b.name === bucketName)
+
+    if (!bucketExists) {
+      // Create bucket if not found
+      const { error } = await supabase.storage.createBucket(bucketName, {
+        public: false,
+        fileSizeLimit: 52428800 // 50MB
+      })
+
+      if (error && !error.message.includes('already exists')) {
+        console.warn(`Warning: Could not create bucket ${bucketName}:`, error.message)
+      }
+    }
+  } catch (err) {
+    console.warn('Storage bucket check failed:', err)
+  }
+}
+
 // ============================================================================
 // TOKEN MANAGEMENT
 // ============================================================================
