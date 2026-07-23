@@ -1,132 +1,103 @@
 import { useState, useEffect } from 'react'
-import { getSupabase } from '../lib/api'
-import { Building2, CreditCard, FileText, TrendingUp, AlertCircle, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Building2, CreditCard, FileText, Users, BarChart3, Settings } from 'lucide-react'
 
 export default function AdminDashboard() {
-  const [dashboard, setDashboard] = useState(null)
-  const [analytics, setAnalytics] = useState(null)
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      const supabase = getSupabase()
-
-      // Get counts
-      const { count: tenantCount } = await supabase.from('tenants').select('id', { count: 'exact' })
-      const { count: activeSubCount } = await supabase.from('subscriptions').select('id', { count: 'exact' }).eq('status', 'active')
-      const { count: pendingReportCount } = await supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'pending_review')
-      const { count: approvedReportCount } = await supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'approved')
-
-      // Get top companies by reports
-      const { data: topCompaniesData } = await supabase
-        .from('reports')
-        .select(`
-          target_company_id,
-          companies (name),
-          trust_scores (score)
-        `)
-        .eq('status', 'approved')
-        .limit(50)
-
-      const companyMap = {}
-      topCompaniesData?.forEach(r => {
-        const companyId = r.target_company_id
-        if (!companyMap[companyId]) {
-          companyMap[companyId] = {
-            id: companyId,
-            name: r.companies?.name || 'مجهولة',
-            reports: 0,
-            trustScore: r.trust_scores?.score || 0
-          }
-        }
-        companyMap[companyId].reports++
-      })
-
-      const topCompanies = Object.values(companyMap)
-        .sort((a, b) => b.reports - a.reports)
-        .slice(0, 5)
-
-      setDashboard({
-        overview: {
-          totalTenants: tenantCount || 0,
-          activeSubscriptions: activeSubCount || 0,
-          pendingReports: pendingReportCount || 0,
-          approvedReports: approvedReportCount || 0,
-          totalRevenue: 0
-        },
-        recentActivity: []
-      })
-
-      setAnalytics({
-        topCompanies: topCompanies,
-        pendingReviews: pendingReportCount || 0,
-        reportsByStatus: {
-          approved: approvedReportCount || 0,
-          pending: pendingReportCount || 0,
-          rejected: 0
-        }
-      })
-
-      setLoading(false)
-    } catch (error) {
-      console.error('Error fetching dashboard:', error)
-      setLoading(false)
-    }
+  // Mock data - في الإنتاج ستأتي من Supabase
+  const stats = {
+    totalCompanies: 15,
+    activeSubscriptions: 3,
+    pendingReports: 5,
+    approvedReports: 28,
+    totalUsers: 12,
+    totalRevenue: 45000,
   }
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
-          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل لوحة التحكم...</p>
-        </div>
-      </div>
-    )
-  }
+  const quickActions = [
+    { id: 1, title: 'مراجعة التقارير المعلقة', desc: `${stats.pendingReports} تقارير بانتظار`, icon: FileText, color: '#F59E0B', path: '/admin/reports', btnText: 'عرض التقارير' },
+    { id: 2, title: 'إدارة الشركات', desc: `${stats.totalCompanies} شركة مسجلة`, icon: Building2, color: '#3B82F6', path: '/admin/companies', btnText: 'إدارة الشركات' },
+    { id: 3, title: 'الاشتراكات النشطة', desc: `${stats.activeSubscriptions} اشتراكات نشطة`, icon: CreditCard, color: '#16A34A', path: '/admin/subscriptions', btnText: 'عرض الاشتراكات' },
+    { id: 4, title: 'المستخدمون', desc: `${stats.totalUsers} مستخدم نشط`, icon: Users, color: '#8B5CF6', path: '/admin/users', btnText: 'إدارة المستخدمين' },
+  ]
 
-  const kpis = [
-    { label: 'إجمالي الشركات', value: dashboard?.overview?.totalTenants || 0, color: '#1E2A52', icon: Building2 },
-    { label: 'الاشتراكات النشطة', value: dashboard?.overview?.activeSubscriptions || 0, color: '#16A34A', icon: CreditCard },
-    { label: 'التقارير المعلقة', value: dashboard?.overview?.pendingReports || 0, color: '#F59E0B', icon: FileText },
-    { label: 'الإيراد الإجمالي', value: `﷼${(dashboard?.overview?.totalRevenue || 0).toLocaleString()}`, color: '#7C3AED', icon: TrendingUp }
+  const topCompanies = [
+    { name: 'الراجحي للمقاولات', reports: 12, score: 84 },
+    { name: 'البناء الحديث', reports: 8, score: 72 },
+    { name: 'الصناعات المتقدمة', reports: 6, score: 91 },
+    { name: 'النقل السريع', reports: 5, score: 68 },
+    { name: 'الخدمات اللوجستية', reports: 4, score: 75 },
   ]
 
   return (
-    <div style={{ background: '#F8FAFC', minHeight: '100vh', padding: '32px' }}>
+    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '32px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>لوحة التحكم</h1>
+          <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>لوحة التحكم الإدارية</h1>
           <p style={{ color: '#64748B', fontSize: '14px', margin: '0 0 0 0', textAlign: 'right' }}>مرحباً بك في نظام إدارة مرصد</p>
         </div>
 
         {/* KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
-          {kpis.map((k, i) => (
-            <div key={i} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: 'row-reverse' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#64748B', fontSize: '13px', fontWeight: 700, margin: '0 0 12px 0' }}>{k.label}</p>
-                  <p style={{ fontSize: '28px', fontWeight: 900, color: k.color, margin: 0 }}>{k.value}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {[
+            { label: 'الشركات المسجلة', value: stats.totalCompanies, color: '#3B82F6', icon: '🏢' },
+            { label: 'الاشتراكات النشطة', value: stats.activeSubscriptions, color: '#16A34A', icon: '💳' },
+            { label: 'التقارير المعلقة', value: stats.pendingReports, color: '#F59E0B', icon: '📋' },
+            { label: 'التقارير المعتمدة', value: stats.approvedReports, color: '#8B5CF6', icon: '✅' },
+          ].map((kpi, idx) => (
+            <div key={idx} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ fontSize: '28px' }}>{kpi.icon}</div>
+                <p style={{ color: '#64748B', fontSize: '12px', fontWeight: 700, margin: 0 }}>{kpi.label}</p>
+              </div>
+              <p style={{ fontSize: '32px', fontWeight: 900, color: kpi.color, margin: 0 }}>{kpi.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {quickActions.map((action) => (
+            <div key={action.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: action.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <action.icon size={24} color={action.color} />
                 </div>
-                <div style={{ width: '48px', height: '48px', background: `${k.color}15`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <k.icon size={24} color={k.color} />
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0 }}>{action.title}</h3>
+                  <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0 0' }}>{action.desc}</p>
                 </div>
               </div>
+              <button
+                onClick={() => navigate(action.path)}
+                style={{
+                  marginTop: 'auto',
+                  background: action.color,
+                  color: '#fff',
+                  border: 0,
+                  borderRadius: '8px',
+                  padding: '10px 16px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
+              >
+                {action.btnText} →
+              </button>
             </div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div style={{ marginBottom: '24px', borderBottom: '1px solid #E2E8F0' }}>
-          <div style={{ display: 'flex', gap: '32px' }}>
-            {['overview', 'analytics', 'alerts'].map((tab) => (
+        <div style={{ borderBottom: '1px solid #E2E8F0', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '24px' }}>
+            {['overview', 'analytics', 'settings'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -139,12 +110,13 @@ export default function AdminDashboard() {
                   fontWeight: activeTab === tab ? 600 : 500,
                   cursor: 'pointer',
                   fontSize: '14px',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
+                  textAlign: 'right'
                 }}
               >
-                {tab === 'overview' && 'نظرة عامة'}
-                {tab === 'analytics' && 'التحليلات'}
-                {tab === 'alerts' && 'التنبيهات'}
+                {tab === 'overview' && '📊 نظرة عامة'}
+                {tab === 'analytics' && '📈 التحليلات'}
+                {tab === 'settings' && '⚙️ الإعدادات'}
               </button>
             ))}
           </div>
@@ -152,104 +124,105 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Reports Status */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+            {/* Top Companies */}
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>حالة التقارير</h3>
-              <div style={{ space: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #E2E8F0', flexDirection: 'row-reverse' }}>
-                  <span style={{ color: '#64748B', fontSize: '14px' }}>قيد الانتظار</span>
-                  <span style={{ fontSize: '20px', fontWeight: 900, color: '#F59E0B' }}>{dashboard?.overview?.pendingReports || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', flexDirection: 'row-reverse' }}>
-                  <span style={{ color: '#64748B', fontSize: '14px' }}>معتمدة</span>
-                  <span style={{ fontSize: '20px', fontWeight: 900, color: '#16A34A' }}>{dashboard?.overview?.approvedReports || 0}</span>
-                </div>
-                <div style={{ marginTop: '16px', textAlign: 'right' }}>
-                  <a href="/admin/reports" style={{ color: '#16A34A', textDecoration: 'none', fontWeight: 600, fontSize: '14px' }}>
-                    ← عرض صف التقارير
-                  </a>
-                </div>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>أكثر الشركات تقارير</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {topCompanies.map((company, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#F8FAFC', borderRadius: '8px' }}>
+                    <div style={{ textAlign: 'right', flex: 1 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{company.name}</div>
+                      <div style={{ fontSize: '12px', color: '#94A3B8' }}>{company.reports} تقرير • {company.score}%</div>
+                    </div>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% ${company.score}%, #E2E8F0 ${company.score}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#16A34A' }}>
+                      {company.score}%
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Recent Activity */}
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إجراءات سريعة</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <a href="/admin/reports" style={{ display: 'block', padding: '12px', background: '#F1F5F9', borderRadius: '8px', textDecoration: 'none', cursor: 'pointer', transition: 'background 0.3s', textAlign: 'right' }} onMouseEnter={(e) => e.target.style.background = '#E2E8F0'} onMouseLeave={(e) => e.target.style.background = '#F1F5F9'}>
-                  <p style={{ fontWeight: 600, color: '#0F172A', margin: '0 0 4px 0', fontSize: '14px' }}>مراجعة التقارير المعلقة</p>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{dashboard?.overview?.pendingReports} تقارير بانتظار</p>
-                </a>
-                <a href="/admin/tenants" style={{ display: 'block', padding: '12px', background: '#F1F5F9', borderRadius: '8px', textDecoration: 'none', cursor: 'pointer', transition: 'background 0.3s', textAlign: 'right' }} onMouseEnter={(e) => e.target.style.background = '#E2E8F0'} onMouseLeave={(e) => e.target.style.background = '#F1F5F9'}>
-                  <p style={{ fontWeight: 600, color: '#0F172A', margin: '0 0 4px 0', fontSize: '14px' }}>إدارة الشركات</p>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{dashboard?.overview?.totalTenants} شركة مسجلة</p>
-                </a>
-                <a href="/admin/subscriptions" style={{ display: 'block', padding: '12px', background: '#F1F5F9', borderRadius: '8px', textDecoration: 'none', cursor: 'pointer', transition: 'background 0.3s', textAlign: 'right' }} onMouseEnter={(e) => e.target.style.background = '#E2E8F0'} onMouseLeave={(e) => e.target.style.background = '#F1F5F9'}>
-                  <p style={{ fontWeight: 600, color: '#0F172A', margin: '0 0 4px 0', fontSize: '14px' }}>الاشتراكات</p>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{dashboard?.overview?.activeSubscriptions} نشطة</p>
-                </a>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>النشاط الأخير</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {[
+                  { text: 'تقرير جديد من الراجحي', time: 'قبل 5 دقائق' },
+                  { text: 'اشتراك جديد في الباقة الأساسية', time: 'قبل ساعة' },
+                  { text: 'تقرير تمت الموافقة عليه', time: 'قبل ساعتين' },
+                  { text: 'مستخدم جديد سجل', time: 'قبل 3 ساعات' },
+                ].map((activity, idx) => (
+                  <div key={idx} style={{ padding: '12px', borderBottom: idx < 3 ? '1px solid #F1F5F9' : 'none' }}>
+                    <div style={{ fontSize: '13px', color: '#0F172A', fontWeight: 600, marginBottom: '4px' }}>{activity.text}</div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{activity.time}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
 
         {/* Analytics Tab */}
-        {activeTab === 'analytics' && analytics && (
+        {activeTab === 'analytics' && (
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 24px' }}>تحليلات الأداء</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              <div style={{ background: '#F0F4FF', borderRadius: '8px', padding: '16px' }}>
-                <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px' }}>التقارير المرسلة</p>
-                <p style={{ fontSize: '24px', fontWeight: 900, color: '#3B82F6', margin: 0 }}>{analytics?.reportsByStatus?.approved ?? 145}</p>
-              </div>
-              <div style={{ background: '#F0FDF4', borderRadius: '8px', padding: '16px' }}>
-                <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px' }}>التقارير المعتمدة</p>
-                <p style={{ fontSize: '24px', fontWeight: 900, color: '#16A34A', margin: 0 }}>{analytics?.reportsByStatus?.approved ?? 145}</p>
-              </div>
-              <div style={{ background: '#FEF3C7', borderRadius: '8px', padding: '16px' }}>
-                <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px' }}>نسبة الموافقة</p>
-                <p style={{ fontSize: '24px', fontWeight: 900, color: '#F59E0B', margin: 0 }}>{(analytics?.reports?.approval_rate ?? 92).toFixed(1)}%</p>
-              </div>
-              <div style={{ background: '#F3E8FF', borderRadius: '8px', padding: '16px' }}>
-                <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px' }}>الإيراد الإجمالي</p>
-                <p style={{ fontSize: '24px', fontWeight: 900, color: '#7C3AED', margin: 0 }}>﷼{(analytics?.revenue ?? 125400).toLocaleString()}</p>
-              </div>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إحصائيات الأداء</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+              {[
+                { label: 'معدل الموافقة على التقارير', value: '92%', color: '#16A34A' },
+                { label: 'متوسط وقت المراجعة', value: '4 ساعات', color: '#3B82F6' },
+                { label: 'رضا المستخدمين', value: '4.8/5', color: '#F59E0B' },
+                { label: 'معدل الاحتفاظ', value: '87%', color: '#8B5CF6' },
+              ].map((stat, idx) => (
+                <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0' }}>{stat.label}</p>
+                  <p style={{ fontSize: '24px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Alerts Tab */}
-        {activeTab === 'alerts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {dashboard?.overview?.pendingReports > 10 && (
-              <div style={{ display: 'flex', gap: '12px', padding: '16px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '12px' }}>
-                <AlertCircle size={20} color='#F59E0B' style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <p style={{ fontWeight: 600, color: '#92400E', margin: '0 0 4px', fontSize: '14px' }}>تقارير معلقة كثيرة</p>
-                  <p style={{ fontSize: '13px', color: '#A16207', margin: 0 }}>يوجد {dashboard.overview.pendingReports} تقارير بانتظار المراجعة</p>
-                </div>
-              </div>
-            )}
-
-            {!dashboard?.overview?.pendingReports && (
-              <div style={{ display: 'flex', gap: '12px', padding: '16px', background: '#F0FDF4', border: '1px solid #BBFB5E', borderRadius: '12px' }}>
-                <AlertCircle size={20} color='#16A34A' style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <p style={{ fontWeight: 600, color: '#166534', margin: '0 0 4px', fontSize: '14px' }}>كل شيء على ما يرام</p>
-                  <p style={{ fontSize: '13px', color: '#22C55E', margin: 0 }}>لا توجد تنبيهات حالياً. المنصة تعمل بشكل سلس</p>
-                </div>
-              </div>
-            )}
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>الإعدادات</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[
+                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة' },
+                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات' },
+                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات' },
+                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط' },
+              ].map((setting, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => alert('سيتم فتح: ' + setting.label)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'right',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#EEF2FF'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                >
+                  <span style={{ fontSize: '16px' }}>←</span>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{setting.label}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0' }}>{setting.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+    </main>
   )
 }
