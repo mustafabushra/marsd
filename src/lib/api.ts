@@ -366,6 +366,7 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // ===== TENANT CREATION =====
+    // Note: approval_status removed - use companies.status as single source of truth
     const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
       .upsert([{
@@ -376,8 +377,7 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         city: (companyData.city || '').substring(0, 100),
         sector: (companyData.sector || '').substring(0, 100),
         status: 'active',
-        cr_file_url: companyData.crFileUrl || null,
-        approval_status: companyData.status || 'active'
+        cr_file_url: companyData.crFileUrl || null
       }], {
         onConflict: 'email'
       })
