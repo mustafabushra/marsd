@@ -88,11 +88,29 @@ export default function CompanyRegister() {
 
   const validateCompanyData = () => {
     if (!companyData.name.trim()) return 'اسم الشركة مطلوب'
+    if (companyData.name.trim().length < 3) return 'اسم الشركة يجب أن يكون 3 أحرف على الأقل'
+
     if (!companyData.crNumber.trim()) return 'رقم السجل التجاري مطلوب'
+    const crDigits = companyData.crNumber.replace(/\D/g, '')
+    if (crDigits.length < 10) return 'رقم السجل يجب أن يكون 10 أرقام على الأقل'
+
     if (!companyData.sector.trim()) return 'القطاع مطلوب'
     if (!companyData.city.trim()) return 'المدينة مطلوبة'
+
     if (!companyData.email.trim()) return 'البريد الإلكتروني مطلوب'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyData.email)) return 'البريد الإلكتروني غير صحيح'
+
+    if (companyData.phone.trim() && !/^[\d\s\+\-\(\)]{7,}$/.test(companyData.phone))
+      return 'رقم الهاتف غير صحيح'
+
     return ''
+  }
+
+  const setErrorWithTimeout = (msg) => {
+    setError(msg)
+    if (msg) {
+      setTimeout(() => setError(''), 5000)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -103,7 +121,7 @@ export default function CompanyRegister() {
     try {
       const validation = validateCompanyData()
       if (validation) {
-        setError(validation)
+        setErrorWithTimeout(validation)
         setLoading(false)
         return
       }
@@ -131,7 +149,9 @@ export default function CompanyRegister() {
       // Success - redirect to dashboard
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message || 'حدث خطأ غير متوقع')
+      const errorMsg = err.message || 'حدث خطأ غير متوقع'
+      setErrorWithTimeout(errorMsg)
+      console.error('Registration error:', err)
     } finally {
       setLoading(false)
     }
@@ -486,6 +506,21 @@ export default function CompanyRegister() {
                 resize: 'vertical'
               }}
             />
+          </div>
+
+          {/* Privacy Notice */}
+          <div style={{
+            background: '#F0F4FF',
+            border: '1px solid #E0E7FF',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            marginBottom: '16px',
+            fontSize: '12px',
+            color: '#1E40AF',
+            fontWeight: 500,
+            textAlign: 'right'
+          }}>
+            🔒 بياناتك محمية بسياسة الخصوصية. لن نشارك معلوماتك مع جهات خارجية.
           </div>
 
           {/* Submit Button */}
