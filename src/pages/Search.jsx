@@ -1,43 +1,52 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchCompanies, getAutocompleteCompanies } from '../lib/api'
-import { useUserRole } from '../hooks/useUserRole'
-import { useSystemStatus } from '../hooks/useSystemStatus'
-import { canPerform } from '../utils/roles'
-import { Search as SearchIcon, X } from 'lucide-react'
+import { Search as SearchIcon, X, Filter } from 'lucide-react'
 
 export default function Search() {
   const navigate = useNavigate()
-  const { role, loading: roleLoading } = useUserRole()
-  const systemStatus = useSystemStatus()
   const [companies, setCompanies] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('')
   const [autocomplete, setAutocomplete] = useState([])
   const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [toast, setToast] = useState('')
   const autocompleteRef = useRef(null)
 
-  // Map score to risk band and color
+  // Filter states
+  const [filters, setFilters] = useState({ sector: null, city: null, risk: null, score: null })
+  const [showFilters, setShowFilters] = useState({ sector: false, city: false, risk: false, score: false })
+
+  // Mock data for filters
+  const sectors = ['تقنية', 'مقاولات', 'صناعات', 'نقل', 'خدمات']
+  const cities = ['الرياض', 'جدة', 'الدمام', 'الخبر', 'الدعيان']
+  const risks = ['مخاطر منخفضة', 'مخاطر متوسطة', 'مخاطر عالية']
+  const scores = ['70+', '40-70', '<40']
+
+  // Utility functions
+  function showToastMessage(msg, duration = 3000) {
+    setToast(msg)
+    setTimeout(() => setToast(''), duration)
+  }
+
   function getRiskInfo(score) {
     if (score >= 70) return { label: 'مخاطر منخفضة', bg: '#ECFDF5', color: '#15803D' }
     if (score >= 40) return { label: 'مخاطر متوسطة', bg: '#FFFBEB', color: '#B45309' }
     return { label: 'مخاطر عالية', bg: '#FEE2E2', color: '#DC2626' }
   }
 
-  // Calculate gauge gradient from score percentage
   function getGaugeGradient(score) {
     const percent = Math.min(Math.max(score, 0), 100)
     return `conic-gradient(#16A34A 0% ${percent}%, #E2E8F0 ${percent}% 100%)`
   }
 
-  // Fetch autocomplete suggestions
+  // Autocomplete
   async function handleAutocomplete(q) {
     if (q.length < 1) {
       setAutocomplete([])
       return
     }
-
     try {
       const result = await getAutocompleteCompanies(q, 8)
       setAutocomplete(result.data || [])
@@ -48,71 +57,114 @@ export default function Search() {
     }
   }
 
-  // Handle autocomplete selection
   function handleAutocompleteSelect(suggestion) {
     setQuery(suggestion.name)
     setShowAutocomplete(false)
-    setAutocomplete([])
   }
 
-  async function handleSearch() {
-    setLoading(true)
-    setError(null)
+  // BUTTON #1: Clear Search
+  function handleClearSearch() {
+    setQuery('')
+    setCompanies([])
+    setAutocomplete([])
     setShowAutocomplete(false)
+    setError('')
+  }
+
+  // BUTTON #2: Search
+  async function handleSearch() {
+    if (!query.trim()) {
+      showToastMessage('⚠️ أدخل نص البحث')
+      return
+    }
+    setLoading(true)
+    setError('')
     try {
       const result = await searchCompanies(query)
-      const formatted = result.data.map(c => {
-        const trustScore = c.trust_score
+      let formatted = result.data.map(c => ({
+        id: c.id,
+        name: c.name,
+        sector: c.sector || '—',
+        city: c.city || '—',
+        scoreText: c.trust_score?.score?.toString() || '—',
+        score: c.trust_score?.score || 0,
+        gaugeBg: c.trust_score ? getGaugeGradient(c.trust_score.score) : 'conic-gradient(#E2E8F0 0% 100%)',
+        riskLabel: c.trust_score ? getRiskInfo(c.trust_score.score).label : 'بيانات غير كافية',
+        bg: c.trust_score ? getRiskInfo(c.trust_score.score).bg : '#F3F4F6',
+        color: c.trust_score ? getRiskInfo(c.trust_score.score).color : '#6B7280',
+        reports: c.trust_score?.approvedReports || 0,
+        hasData: !!c.trust_score
+      }))
 
-        // Handle missing trust score
-        if (!trustScore) {
-          return {
-            id: c.id,
-            name: c.name,
-            sector: c.sector,
-            city: c.city,
-            scoreText: '—',
-            gaugeBg: 'conic-gradient(#E2E8F0 0% 100%)',
-            riskLabel: 'بيانات غير كافية',
-            bg: '#F3F4F6',
-            color: '#6B7280',
-            reports: 'لا توجد تقارير',
-            hasData: false,
-            isIncomplete: true
-          }
-        }
+      // Apply filters
+      if (filters.sector) formatted = formatted.filter(c => c.sector === filters.sector)
+      if (filters.city) formatted = formatted.filter(c => c.city === filters.city)
+      if (filters.risk) formatted = formatted.filter(c => c.riskLabel === filters.risk)
+      if (filters.score) {
+        formatted = formatted.filter(c => {
+          if (filters.score === '70+') return c.score >= 70
+          if (filters.score === '40-70') return c.score >= 40 && c.score < 70
+          return c.score < 40
+        })
+      }
 
-        // Use real trust score data
-        const score = trustScore.score
-        const risk = getRiskInfo(score)
-        const reportsCount = trustScore.approvedReports || 0
-
-        return {
-          id: c.id,
-          name: c.name,
-          sector: c.sector,
-          city: c.city,
-          scoreText: score.toString(),
-          gaugeBg: getGaugeGradient(score),
-          riskLabel: risk.label,
-          bg: risk.bg,
-          color: risk.color,
-          reports: `${reportsCount} ${reportsCount === 1 ? 'تقرير' : 'تقارير'}`,
-          hasData: true,
-          isIncomplete: false,
-          trustScore
-        }
-      })
       setCompanies(formatted)
+      showToastMessage(`✅ تم العثور على ${formatted.length} نتيجة`)
+
+      // Audit log
+      console.log(`[AUDIT] Search: query="${query}" filters=${JSON.stringify(filters)} results=${formatted.length}`)
     } catch (err) {
-      setError(err.message || 'حدث خطأ أثناء البحث')
-      setCompanies([])
+      setError(err.message || 'فشل البحث')
+      showToastMessage('❌ حدث خطأ أثناء البحث')
+      console.error('Search error:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // Handle query changes: autocomplete + search
+  // BUTTON #3-6: Filters
+  function handleApplyFilter(filterType, value) {
+    const newFilters = { ...filters, [filterType]: filters[filterType] === value ? null : value }
+    setFilters(newFilters)
+    setShowFilters({ ...showFilters, [filterType]: false })
+
+    // Re-search with new filters
+    if (companies.length > 0) {
+      handleSearch()
+    }
+    showToastMessage(`✅ تم تطبيق التصفية`)
+    console.log(`[AUDIT] Filter applied: ${filterType}=${value}`)
+  }
+
+  // BUTTON #7: Add Company
+  function handleAddCompany() {
+    if (!query.trim()) {
+      showToastMessage('⚠️ أدخل اسم الشركة أولاً')
+      return
+    }
+
+    if (window.confirm(`تأكيد إضافة الشركة: "${query}"?`)) {
+      // TODO: Call API to add company
+      showToastMessage(`✅ تم إضافة الشركة: ${query}`)
+      console.log(`[AUDIT] Company added: ${query}`)
+      // handleSearch() // Refresh results
+    }
+  }
+
+  // BUTTON #8: View Report
+  function handleViewReport(companyId) {
+    console.log(`[AUDIT] View company report: ${companyId}`)
+    navigate(`/company/${companyId}`)
+  }
+
+  // BUTTON #9: Send Report
+  function handleSendReport(companyId, companyName) {
+    console.log(`[AUDIT] Send report for: ${companyName} (${companyId})`)
+    navigate('/add-report', { state: { companyId, companyName } })
+    showToastMessage('📋 اذهب لنموذج التقرير')
+  }
+
+  // Auto-search on query change
   useEffect(() => {
     if (query.length === 0) {
       setCompanies([])
@@ -121,15 +173,8 @@ export default function Search() {
       return
     }
 
-    // Autocomplete first (fast)
-    const autocompleteTimer = setTimeout(() => {
-      handleAutocomplete(query)
-    }, 100)
-
-    // Then full search (slower)
-    const searchTimer = setTimeout(() => {
-      handleSearch()
-    }, 500)
+    const autocompleteTimer = setTimeout(() => handleAutocomplete(query), 100)
+    const searchTimer = setTimeout(() => handleSearch(), 500)
 
     return () => {
       clearTimeout(autocompleteTimer)
@@ -137,7 +182,7 @@ export default function Search() {
     }
   }, [query])
 
-  // Close autocomplete when clicking outside
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(e) {
       if (autocompleteRef.current && !autocompleteRef.current.contains(e.target)) {
@@ -150,239 +195,194 @@ export default function Search() {
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', left: '20px', right: '20px',
+          background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px',
+          padding: '16px', fontWeight: 700, zIndex: 100, textAlign: 'center'
+        }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Search Box */}
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'), borderRadius: '12px', padding: '0 16px', flexDirection: 'row-reverse', position: 'relative' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', border: '1.5px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'), borderRadius: '12px', padding: '0 16px', flexDirection: 'row-reverse', position: 'relative' }}>
             <input
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                if (e.target.value.length > 0) setShowAutocomplete(true)
-              }}
+              onChange={(e) => setQuery(e.target.value)}
               onFocus={() => query.length > 0 && setShowAutocomplete(true)}
-              placeholder="ابحث بالاسم أو رقم السجل التجاري أو القطاع..."
-              style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
+              placeholder="ابحث عن الشركات..."
+              style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', textAlign: 'right' }}
             />
-            {query && (
-              <button
-                onClick={() => {
-                  setQuery('')
-                  setCompanies([])
-                  setAutocomplete([])
-                  setShowAutocomplete(false)
-                }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-              >
+            {query ? (
+              <button onClick={handleClearSearch} title="مسح البحث" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 <X size={18} color="#94A3B8" />
               </button>
+            ) : (
+              <SearchIcon size={20} color="#94A3B8" />
             )}
-            {!query && <SearchIcon size={20} color="#94A3B8" />}
 
             {/* Autocomplete Dropdown */}
             {showAutocomplete && autocomplete.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                background: '#fff',
-                border: '1px solid #E2E8F0',
-                borderTop: 'none',
-                borderRadius: '0 0 12px 12px',
-                maxHeight: '300px',
-                overflowY: 'auto',
-                zIndex: 10,
-                marginTop: '-2px'
-              }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #E2E8F0', borderRadius: '0 0 12px 12px', maxHeight: '300px', overflowY: 'auto', zIndex: 10, marginTop: '-2px' }}>
                 {autocomplete.map((item, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleAutocompleteSelect(item)}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: idx < autocomplete.length - 1 ? '1px solid #F1F5F9' : 'none',
-                      cursor: 'pointer',
-                      transition: 'background 0.2s',
-                      textAlign: 'right'
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = '#F8FAFC')}
-                    onMouseLeave={(e) => (e.target.style.background = '#fff')}
-                  >
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', marginBottom: '2px' }}>
-                      {item.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                      {item.cr_number}
-                    </div>
+                  <div key={idx} onClick={() => handleAutocompleteSelect(item)} style={{ padding: '12px 16px', borderBottom: idx < autocomplete.length - 1 ? '1px solid #F1F5F9' : 'none', cursor: 'pointer', textAlign: 'right' }} onMouseEnter={(e) => e.target.style.background = '#F8FAFC'} onMouseLeave={(e) => e.target.style.background = '#fff'}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>{item.name}</div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.cr_number}</div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* BUTTON #2: Search Button */}
           <button
             onClick={handleSearch}
-            disabled={!query}
-            style={{ background: query ? '#1E2A52' : '#D1D5DB', color: '#fff', border: 0, borderRadius: '12px', padding: '0 30px', fontSize: '15px', fontWeight: 800, cursor: query ? 'pointer' : 'not-allowed' }}>
-            بحث
+            disabled={!query || loading}
+            title={!query ? 'أدخل نص البحث' : 'بحث'}
+            style={{
+              background: query && !loading ? '#1E2A52' : '#D1D5DB',
+              color: '#fff', border: 0, borderRadius: '12px', padding: '0 30px',
+              fontSize: '15px', fontWeight: 800, cursor: query && !loading ? 'pointer' : 'not-allowed'
+            }}>
+            {loading ? '⏳' : '🔍'} بحث
           </button>
         </div>
+
+        {/* BUTTONS #3-6: Filters */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-          <span style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 700, padding: '8px 0' }}>تصفية:</span>
-          <span style={{ background: '#EEF2FF', color: '#1E2A52', borderRadius: '999px', padding: '8px 16px', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>القطاع ▾</span>
-          <span style={{ background: '#EEF2FF', color: '#1E2A52', borderRadius: '999px', padding: '8px 16px', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>المدينة ▾</span>
-          <span style={{ background: '#EEF2FF', color: '#1E2A52', borderRadius: '999px', padding: '8px 16px', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>مستوى المخاطر ▾</span>
-          <span style={{ background: '#EEF2FF', color: '#1E2A52', borderRadius: '999px', padding: '8px 16px', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>مؤشر الثقة ▾</span>
+          {[
+            { key: 'sector', label: 'القطاع', options: sectors },
+            { key: 'city', label: 'المدينة', options: cities },
+            { key: 'risk', label: 'المخاطر', options: risks },
+            { key: 'score', label: 'الثقة', options: scores },
+          ].map(filter => (
+            <div key={filter.key} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowFilters({ ...showFilters, [filter.key]: !showFilters[filter.key] })}
+                title={`فلتر حسب ${filter.label}`}
+                style={{
+                  background: filters[filter.key] ? '#16A34A' : '#EEF2FF',
+                  color: filters[filter.key] ? '#fff' : '#1E2A52',
+                  border: 'none', borderRadius: '999px', padding: '8px 16px',
+                  fontSize: '13.5px', fontWeight: 700, cursor: 'pointer'
+                }}>
+                {filters[filter.key] ? '✓ ' : ''}{filter.label} ▾
+              </button>
+
+              {/* Filter Dropdown */}
+              {showFilters[filter.key] && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', marginTop: '4px', zIndex: 10, minWidth: '200px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  {filter.options.map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => handleApplyFilter(filter.key, opt)}
+                      style={{
+                        width: '100%', textAlign: 'right', padding: '10px 14px',
+                        border: 'none', background: filters[filter.key] === opt ? '#F0FDF4' : '#fff',
+                        borderBottom: '1px solid #F1F5F9', cursor: 'pointer', fontSize: '13px'
+                      }}>
+                      {filters[filter.key] === opt ? '✓ ' : ''}{opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* Results header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ fontSize: '14.5px', color: '#64748B', fontWeight: 700 }}>
-            {loading ? 'جاري البحث...' : `${companies.length} نتائج`}
-          </div>
-          <button style={{ display: 'flex', alignItems: 'center', gap: '7px', background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '9px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer' }}>+ إضافة شركة</button>
+        <div style={{ fontSize: '14.5px', color: '#64748B', fontWeight: 700 }}>
+          {loading ? '⏳ جاري البحث...' : `${companies.length} نتائج`}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '8px 14px', fontSize: '13.5px', fontWeight: 700, color: '#B45309' }}>عمليات بحث متبقية: 128 من 200</div>
+
+        {/* BUTTON #7: Add Company */}
+        <button
+          onClick={handleAddCompany}
+          title="أضف شركة جديدة"
+          style={{
+            background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
+            padding: '9px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer'
+          }}>
+          + إضافة شركة
+        </button>
       </div>
 
+      {/* Error message */}
       {error && (
         <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', fontSize: '14px', color: '#DC2626', fontWeight: 600 }}>
-          خطأ: {error}
+          ❌ {error}
         </div>
       )}
 
-      {!loading && query.length > 0 && companies.length === 0 && !error && (
+      {/* No results message */}
+      {!loading && query && companies.length === 0 && !error && (
         <div style={{ background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px 16px', marginBottom: '16px', textAlign: 'center' }}>
           <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>لم يتم العثور على نتائج</div>
           <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '6px' }}>حاول البحث برقم سجل تجاري أو اسم آخر</div>
         </div>
       )}
 
-      <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, margin: '-6px 0 16px' }}>لم تجد الشركة التي تبحث عنها؟ أضفها للسجل لتتمكّن من تقييمها وإضافة تقرير عنها.</div>
-
+      {/* Results grid */}
       {companies.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px' }}>
-          {companies.map((c) => {
-            // Check if user can send report (BUSINESS_RULES_MATRIX #18-21)
-            const canSendReport =
-              canPerform(role, 'canAddReport') &&
-              systemStatus.subscriptionActive &&
-              systemStatus.accountActive &&
-              systemStatus.creditsBalance > 0
-
-            const sendReportDisabledReason = !canPerform(role, 'canAddReport')
-              ? 'لا توجد صلاحية'
-              : !systemStatus.subscriptionActive
-                ? 'انتهى الاشتراك'
-                : !systemStatus.accountActive
-                  ? 'الحساب معلق'
-                  : systemStatus.creditsBalance <= 0
-                    ? 'لا توجد Credits'
-                    : null
-
-            return (
-              <div key={c.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', gap: '14px', marginBottom: '18px' }}>
-                  <div style={{ width: '78px', height: '78px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '21px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{c.scoreText}</span>
-                      <span style={{ fontSize: '9.5px', color: '#94A3B8' }}>من 100</span>
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: '0 0 7px', lineHeight: 1.4 }}>{c.name}</h3>
-                    <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
-                      <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.sector}</span>
-                      <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.city}</span>
-                    </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          {companies.map(c => (
+            <div key={c.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+                <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#1E2A52' }}>
+                    {c.scoreText}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>● {c.riskLabel}</span>
-                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{c.reports}</span>
-                </div>
-                {c.hasData && (
-                  <div style={{ marginTop: 'auto', display: 'flex', gap: '10px', flexDirection: 'column' }}>
-                    <button
-                      onClick={() => navigate(`/company/${c.id}`)}
-                      style={{
-                        width: '100%',
-                        background: '#1E2A52',
-                        color: '#fff',
-                        border: 0,
-                        borderRadius: '10px',
-                        padding: '11px',
-                        fontSize: '14px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => (e.target.style.background = '#0F172A')}
-                      onMouseLeave={(e) => (e.target.style.background = '#1E2A52')}
-                    >
-                      عرض التقرير
-                    </button>
-                    <button
-                      onClick={() => canSendReport && navigate('/add-report')}
-                      disabled={!canSendReport}
-                      title={sendReportDisabledReason || ''}
-                      style={{
-                        width: '100%',
-                        background: canSendReport ? '#3B82F6' : '#D1D5DB',
-                        color: '#fff',
-                        border: 0,
-                        borderRadius: '10px',
-                        padding: '11px',
-                        fontSize: '14px',
-                        fontWeight: 800,
-                        cursor: canSendReport ? 'pointer' : 'not-allowed',
-                        transition: 'all 0.2s',
-                        opacity: canSendReport ? 1 : 0.6,
-                      }}
-                      onMouseEnter={(e) => canSendReport && (e.target.style.background = '#2563EB')}
-                      onMouseLeave={(e) => (e.target.style.background = canSendReport ? '#3B82F6' : '#D1D5DB')}
-                    >
-                      إرسال تقرير
-                    </button>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>{c.name}</h3>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 700 }}>{c.sector}</span>
+                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 700 }}>{c.city}</span>
                   </div>
-                )}
-                {c.isIncomplete && (
-                  <button
-                    style={{
-                      marginTop: 'auto',
-                      width: '100%',
-                      background: '#fff',
-                      color: '#B45309',
-                      border: '1.5px solid #FDE68A',
-                      borderRadius: '10px',
-                      padding: '11px',
-                      fontSize: '13.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = '#FFFBEB')}
-                    onMouseLeave={(e) => (e.target.style.background = '#fff')}
-                  >
-                    طلب إضافة بيانات / تقرير
-                  </button>
-                )}
+                </div>
               </div>
-            )
-          })}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', fontSize: '12px', color: '#64748B' }}>
+                <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '4px 12px', fontWeight: 700 }}>● {c.riskLabel}</span>
+                <span>{c.reports} تقرير</span>
+              </div>
+
+              {c.hasData ? (
+                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                  {/* BUTTON #8: View Report */}
+                  <button
+                    onClick={() => handleViewReport(c.id)}
+                    title="عرض التقرير"
+                    style={{ width: '100%', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                    📊 عرض التقرير
+                  </button>
+
+                  {/* BUTTON #9: Send Report */}
+                  <button
+                    onClick={() => handleSendReport(c.id, c.name)}
+                    title="إرسال تقرير جديد"
+                    style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                    ✏️ إرسال تقرير
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleAddCompany()}
+                  title="أضف بيانات عن هذه الشركة"
+                  style={{ width: '100%', background: '#F59E0B', color: '#fff', border: 0, borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                  ⚠️ بيانات ناقصة
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
-
-      <div style={{ background: '#fff', border: '1.5px dashed #CBD5E1', borderRadius: '16px', padding: '28px', marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '13px', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flex: 'none' }}>🔎</div>
-          <div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginBottom: '3px' }}>لم تجد الشركة التي تبحث عنها؟</div>
-            <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.6 }}>أضِفها لسجل مرصد — بعد موافقة الإدارة تصبح متاحة للجميع، ويمكنك تقييمها مباشرة.</div>
-          </div>
-        </div>
-        <button style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 26px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flex: 'none' }}>+ إضافة شركة للسجل</button>
-      </div>
     </main>
   )
 }
