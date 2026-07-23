@@ -145,17 +145,57 @@ export default function Search() {
   }
 
   // BUTTON #7: Add Company
-  function handleAddCompany() {
+  async function handleAddCompany() {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل اسم الشركة أولاً')
       return
     }
 
     if (window.confirm(`تأكيد إضافة الشركة: "${query}"?`)) {
-      // TODO: Call API to add company
-      showToastMessage(`✅ تم إضافة الشركة: ${query}`)
-      console.log(`[AUDIT] Company added: ${query}`)
-      // handleSearch() // Refresh results
+      try {
+        setLoading(true)
+        const supabase = getSupabase()
+
+        // Check if company already exists
+        const { data: existing } = await supabase
+          .from('companies')
+          .select('id')
+          .or(`name.ilike.%${query}%`)
+          .limit(1)
+
+        if (existing && existing.length > 0) {
+          showToastMessage('⚠️ الشركة موجودة بالفعل')
+          return
+        }
+
+        // Add new company
+        const { data: newCompany, error } = await supabase
+          .from('companies')
+          .insert([{
+            name: query,
+            sector: null,
+            city: null,
+            source: 'manual_addition',
+            approved: false
+          }])
+          .select()
+          .single()
+
+        if (error) {
+          throw new Error('فشل إضافة الشركة: ' + error.message)
+        }
+
+        showToastMessage(`✅ تم إضافة الشركة: ${query}`)
+        console.log(`[AUDIT] Company added: ${query}`)
+
+        // Refresh search results
+        await handleSearch()
+      } catch (err) {
+        showToastMessage('❌ ' + (err.message || 'فشل إضافة الشركة'))
+        console.error('Error adding company:', err)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 

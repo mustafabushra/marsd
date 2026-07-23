@@ -68,6 +68,18 @@ export default function AdminDashboard() {
           ? Math.round(trustScores.reduce((sum, ts) => sum + (ts.score || 0), 0) / trustScores.length)
           : 0
 
+        // Calculate churn rate: cancelled subscriptions in last 30 days / total subscriptions
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        const { count: cancelledCount } = await supabase
+          .from('subscriptions')
+          .select('id', { count: 'exact' })
+          .eq('status', 'cancelled')
+          .gte('updated_at', thirtyDaysAgo.toISOString())
+
+        const totalSubs = (activeSubCount || 0) + (cancelledCount || 0)
+        const churnRate = totalSubs > 0 ? Math.round(((cancelledCount || 0) / totalSubs) * 100) : 0
+
         setStats({
           totalCompanies: companiesCount || 0,
           activeSubscriptions: activeSubCount || 0,
@@ -76,7 +88,7 @@ export default function AdminDashboard() {
           totalUsers: usersCount || 0,
           totalRevenue: totalRevenue,
           averageTrustScore: avgTrust,
-          churnRate: 8, // TODO: Calculate from subscription history
+          churnRate: churnRate,
         })
       } catch (err) {
         console.error('Error loading admin dashboard stats:', err)
@@ -261,14 +273,14 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>الإعدادات</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {[
-                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة' },
-                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات' },
-                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات' },
-                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط' },
+                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة', path: '/admin/settings' },
+                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات', path: '/admin/roles' },
+                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات', path: '/admin/backup' },
+                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط', path: '/admin/logs' },
               ].map((setting, idx) => (
                 <button
                   key={idx}
-                  onClick={() => alert('سيتم فتح: ' + setting.label)}
+                  onClick={() => navigate(setting.path)}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
