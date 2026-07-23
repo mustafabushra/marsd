@@ -15,12 +15,14 @@ export default function AdminCompanies() {
     try {
       setLoading(true)
       setError(null)
-      const response = await api.getAdminCompanies(pagination.page, pagination.limit)
+      // Use Knowledge Base for centralized company registry
+      const response = await api.searchCompaniesKnowledgeBase('', {}, pagination.page, pagination.limit)
       const formatted = response.data?.map(c => ({
         ...c,
-        stBg: c.approved ? '#ECFDF5' : '#FFFBEB',
-        stC: c.approved ? '#15803D' : '#B45309',
-        status: c.approved ? 'مستحق' : 'قيد المراجعة'
+        stBg: c.registration_status === 'approved' ? '#ECFDF5' : '#FFFBEB',
+        stC: c.registration_status === 'approved' ? '#15803D' : '#B45309',
+        status: c.registration_status === 'approved' ? 'مستحق' : 'قيد المراجعة',
+        score: c.trust_score ? Math.round(c.trust_score) : '—'
       })) || []
       setCompanies(formatted)
       setPagination(response.pagination || {})

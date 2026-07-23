@@ -17,6 +17,12 @@ export default function AdminDashboard() {
     churnRate: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [kbStats, setKbStats] = useState({
+    avgTrustScore: 0,
+    fullTierCompanies: 0,
+    preliminaryTierCompanies: 0,
+    noDataCompanies: 0,
+  })
 
   // Load real data from Supabase
   useEffect(() => {
@@ -90,6 +96,32 @@ export default function AdminDashboard() {
           averageTrustScore: avgTrust,
           churnRate: churnRate,
         })
+
+        // Load Knowledge Base metrics
+        try {
+          // Count companies by tier (based on report counts)
+          const { data: companies } = await supabase
+            .from('v_company_knowledge_base')
+            .select('id, total_reports_count')
+
+          if (companies && companies.length > 0) {
+            let full = 0, preliminary = 0, noData = 0
+            companies.forEach(c => {
+              const count = c.total_reports_count || 0
+              if (count >= 5) full++
+              else if (count >= 2) preliminary++
+              else noData++
+            })
+            setKbStats({
+              avgTrustScore: avgTrust,
+              fullTierCompanies: full,
+              preliminaryTierCompanies: preliminary,
+              noDataCompanies: noData,
+            })
+          }
+        } catch (kbErr) {
+          console.warn('Could not load KB metrics:', kbErr)
+        }
       } catch (err) {
         console.error('Error loading admin dashboard stats:', err)
       } finally {
@@ -105,6 +137,8 @@ export default function AdminDashboard() {
     { id: 2, title: 'إدارة الشركات', desc: `${stats.totalCompanies} شركة مسجلة`, icon: Building2, color: '#3B82F6', path: '/admin/companies', btnText: 'إدارة الشركات' },
     { id: 3, title: 'الاشتراكات النشطة', desc: `${stats.activeSubscriptions} اشتراكات نشطة`, icon: CreditCard, color: '#16A34A', path: '/admin/subscriptions', btnText: 'عرض الاشتراكات' },
     { id: 4, title: 'المستخدمون', desc: `${stats.totalUsers} مستخدم نشط`, icon: Users, color: '#8B5CF6', path: '/admin/users', btnText: 'إدارة المستخدمين' },
+    { id: 5, title: '📚 مستودع الشركات المركزي', desc: 'المصدر الوحيد للحقيقة — كل الشركات وبيانات الثقة', icon: Building2, color: '#EC4899', path: '/admin/knowledge-base/companies', btnText: 'عرض المستودع' },
+    { id: 6, title: '📋 مستودع التقارير المركزي', desc: 'جميع التقارير والموافقات والسجلات التاريخية', icon: FileText, color: '#8B5CF6', path: '/admin/knowledge-base/reports', btnText: 'إدارة التقارير' },
   ]
 
   const topCompanies = [
@@ -249,20 +283,91 @@ export default function AdminDashboard() {
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إحصائيات الأداء</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-              {[
-                { label: 'معدل الموافقة على التقارير', value: '92%', color: '#16A34A' },
-                { label: 'متوسط وقت المراجعة', value: '4 ساعات', color: '#3B82F6' },
-                { label: 'رضا المستخدمين', value: '4.8/5', color: '#F59E0B' },
-                { label: 'معدل الاحتفاظ', value: '87%', color: '#8B5CF6' },
-              ].map((stat, idx) => (
-                <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0' }}>{stat.label}</p>
-                  <p style={{ fontSize: '24px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
-                </div>
-              ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Performance Stats */}
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إحصائيات الأداء</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                {[
+                  { label: 'معدل الموافقة على التقارير', value: '92%', color: '#16A34A' },
+                  { label: 'متوسط وقت المراجعة', value: '4 ساعات', color: '#3B82F6' },
+                  { label: 'رضا المستخدمين', value: '4.8/5', color: '#F59E0B' },
+                  { label: 'معدل الاحتفاظ', value: '87%', color: '#8B5CF6' },
+                ].map((stat, idx) => (
+                  <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0' }}>{stat.label}</p>
+                    <p style={{ fontSize: '24px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Knowledge Base Metrics */}
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                📚 مؤشرات مستودع المعرفة
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                {[
+                  { label: 'متوسط درجة الثقة', value: `${kbStats.avgTrustScore}%`, color: '#16A34A', desc: 'للشركات المعتمدة' },
+                  { label: 'شركات برتبة كاملة', value: kbStats.fullTierCompanies, color: '#3B82F6', desc: '5+ تقارير معتمدة' },
+                  { label: 'شركات برتبة أولية', value: kbStats.preliminaryTierCompanies, color: '#F59E0B', desc: '2-4 تقارير معتمدة' },
+                  { label: 'شركات بدون بيانات', value: kbStats.noDataCompanies, color: '#94A3B8', desc: 'أقل من تقريرين' },
+                ].map((stat, idx) => (
+                  <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '18px', textAlign: 'right' }}>
+                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0 0 8px 0', fontWeight: 700 }}>{stat.label}</p>
+                    <p style={{ fontSize: '28px', fontWeight: 900, color: stat.color, margin: '0 0 6px 0' }}>{stat.value}</p>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{stat.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Links to KB */}
+            <div style={{ background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', borderRadius: '12px', padding: '28px', color: '#fff' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, margin: '0 0 16px 0', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                ⚡ دخول سريع لمستودعات المعرفة
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                <button
+                  onClick={() => navigate('/admin/knowledge-base/companies')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    textAlign: 'right',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                >
+                  🏢 مستودع الشركات
+                </button>
+                <button
+                  onClick={() => navigate('/admin/knowledge-base/reports')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    textAlign: 'right',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                >
+                  📋 مستودع التقارير
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -9,17 +9,24 @@ export default function AdminReports() {
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
   const [actionLoading, setActionLoading] = useState(null)
+  const [filterStatus, setFilterStatus] = useState('pending_review')
 
   // Fetch reports on mount
   useEffect(() => {
     fetchReports()
-  }, [])
+  }, [filterStatus, pagination.page])
 
   const fetchReports = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await api.getAdminReports(pagination.page, pagination.limit)
+      // Use Knowledge Base search with status filter
+      const response = await api.searchReportsKnowledgeBase(
+        '',
+        { status: filterStatus },
+        pagination.page,
+        pagination.limit
+      )
       setReports(response.data || [])
       setPagination(response.pagination || {})
       if (response.data?.length > 0) {
@@ -122,8 +129,8 @@ export default function AdminReports() {
                   transition: 'background 0.2s'
                 }}
               >
-                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{r.target_company?.name || 'مجهولة'}</span>
-                <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'right' }}>{new Date(r.created_at).toLocaleDateString('ar-SA')}</span>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{r.company_name || 'مجهولة'}</span>
+                <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'right' }}>{new Date(r.submitted_at).toLocaleDateString('ar-SA')}</span>
                 <span style={{
                   background: r.status === 'pending_review' ? '#FEF3C7' : r.status === 'approved' ? '#D1FAE5' : '#FEE2E2',
                   color: r.status === 'pending_review' ? '#92400E' : r.status === 'approved' ? '#065F46' : '#991B1B',
@@ -162,7 +169,7 @@ export default function AdminReports() {
 
             <div style={{ marginBottom: '18px' }}>
               <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة</div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{selectedReport.target_company?.name || 'مجهولة'}</div>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{selectedReport.company_name || 'مجهولة'}</div>
             </div>
 
             <div style={{ marginBottom: '18px' }}>
@@ -182,13 +189,16 @@ export default function AdminReports() {
 
             <div style={{ marginBottom: '18px' }}>
               <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>تاريخ التقرير</div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#334155', textAlign: 'right' }}>{new Date(selectedReport.created_at).toLocaleDateString('ar-SA')}</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#334155', textAlign: 'right' }}>{new Date(selectedReport.submitted_at).toLocaleDateString('ar-SA')}</div>
             </div>
 
             <div style={{ marginBottom: '18px', padding: '14px', background: '#F8FAFC', borderRadius: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>الملاحظات</div>
-              <div style={{ fontSize: '14px', fontWeight: 500, color: '#334155', lineHeight: 1.6, textAlign: 'right', maxHeight: '200px', overflow: 'auto' }}>
-                {selectedReport.description || 'لا توجد ملاحظات'}
+              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>تفاصيل التقرير</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: '#334155', lineHeight: 1.6, textAlign: 'right', maxHeight: '200px', overflow: 'auto' }}>
+                <div>💰 النطاق المالي: {selectedReport.deal_amount_range || '—'}</div>
+                <div>📋 نوع الالتزام: {selectedReport.payment_commitment || '—'}</div>
+                <div>⏱️ التأخير: {selectedReport.delay_days || 0} يوم</div>
+                <div>⚠️ التخلف: {selectedReport.defaulted ? 'نعم' : 'لا'}</div>
               </div>
             </div>
 

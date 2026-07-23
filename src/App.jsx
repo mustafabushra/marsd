@@ -65,6 +65,8 @@ import AccountSuspended from './pages/AccountSuspended'
 import RegistrationPending from './pages/RegistrationPending'
 import CompanyClaimPending from './pages/CompanyClaimPending'
 import AdminClaimRequests from './pages/AdminClaimRequests'
+import CompanyKnowledgeBase from './pages/CompanyKnowledgeBase'
+import ReportKnowledgeBase from './pages/ReportKnowledgeBase'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -172,6 +174,9 @@ function AppContent() {
           <Route path="/admin/company-approval" element={<AdminRoute><AdminCompanyApproval /></AdminRoute>} />
           <Route path="/admin/claim-requests" element={<AdminRoute><AdminClaimRequests /></AdminRoute>} />
           <Route path="/admin/backup" element={<AdminRoute><AdminBackup /></AdminRoute>} />
+          {/* Knowledge Base Management - Central Repositories */}
+          <Route path="/admin/knowledge-base/companies" element={<AdminRoute><CompanyKnowledgeBase /></AdminRoute>} />
+          <Route path="/admin/knowledge-base/reports" element={<AdminRoute><ReportKnowledgeBase /></AdminRoute>} />
         </Route>
 
         {/* Error Pages */}

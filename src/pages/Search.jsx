@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchKnowledgeGraph, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
+import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
 import { Search as SearchIcon, X, Filter } from 'lucide-react'
 
 export default function Search() {
@@ -71,7 +71,7 @@ export default function Search() {
     setError('')
   }
 
-  // BUTTON #2: Search Knowledge Graph (Reports as Products)
+  // BUTTON #2: Search Knowledge Graph via Knowledge Base
   async function handleSearch() {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل نص البحث')
@@ -80,27 +80,24 @@ export default function Search() {
     setLoading(true)
     setError('')
     try {
-      // Search in Knowledge Graph (reports aggregated by company)
-      const result = await searchKnowledgeGraph(query, filters)
-      let formatted = result.results.map(c => ({
+      // Search in Knowledge Base (centralized company registry)
+      const result = await searchCompaniesKnowledgeBase(query, filters, 1, 50)
+      let formatted = result.data.map(c => ({
         id: c.id,
         name: c.name,
         sector: c.sector || '—',
         city: c.city || '—',
-        scoreText: c.trustScore?.toString() || '—',
-        score: c.trustScore || 0,
-        gaugeBg: c.trustScore ? getGaugeGradient(c.trustScore) : 'conic-gradient(#E2E8F0 0% 100%)',
-        riskLabel: c.trustScore ? getRiskInfo(c.trustScore).label : 'بيانات غير كافية',
-        bg: c.trustScore ? getRiskInfo(c.trustScore).bg : '#F3F4F6',
-        color: c.trustScore ? getRiskInfo(c.trustScore).color : '#6B7280',
-        reports: c.reportCount || 0,  // Number of aggregated reports
-        hasData: c.reportCount > 0,
-        relevance: c.relevance
+        scoreText: c.trust_score?.toString() || '—',
+        score: c.trust_score || 0,
+        gaugeBg: c.trust_score ? getGaugeGradient(c.trust_score) : 'conic-gradient(#E2E8F0 0% 100%)',
+        riskLabel: c.trust_score ? getRiskInfo(c.trust_score).label : 'بيانات غير كافية',
+        bg: c.trust_score ? getRiskInfo(c.trust_score).bg : '#F3F4F6',
+        color: c.trust_score ? getRiskInfo(c.trust_score).color : '#6B7280',
+        reports: c.total_reports_count || 0,  // Total reports from Knowledge Base
+        hasData: c.total_reports_count > 0,
       }))
 
-      // Apply filters if needed
-      if (filters.sector) formatted = formatted.filter(c => c.sector === filters.sector)
-      if (filters.city) formatted = formatted.filter(c => c.city === filters.city)
+      // Apply additional filters if needed (beyond what RPC provides)
       if (filters.risk) formatted = formatted.filter(c => c.riskLabel === filters.risk)
       if (filters.score) {
         formatted = formatted.filter(c => {
@@ -110,17 +107,17 @@ export default function Search() {
         })
       }
 
-      // Sort by relevance and report count
+      // Sort by report count then by score
       formatted.sort((a, b) => {
-        if (a.relevance !== b.relevance) return b.relevance - a.relevance
-        return b.reports - a.reports
+        if (b.reports !== a.reports) return b.reports - a.reports
+        return b.score - a.score
       })
 
       setCompanies(formatted)
-      showToastMessage(`✅ تم العثور على ${formatted.length} شركة بـ ${result.metadata.indexedDocuments} تقرير`)
+      showToastMessage(`✅ تم العثور على ${formatted.length} شركة`)
 
       // Audit log
-      console.log(`[AUDIT] Knowledge Graph Search: query="${query}" filters=${JSON.stringify(filters)} companies=${formatted.length} reports=${result.metadata.indexedDocuments}`)
+      console.log(`[AUDIT] Knowledge Base Search: query="${query}" filters=${JSON.stringify(filters)} companies=${formatted.length}`)
     } catch (err) {
       setError(err.message || 'فشل البحث')
       showToastMessage('❌ حدث خطأ أثناء البحث')

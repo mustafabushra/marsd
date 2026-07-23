@@ -31,15 +31,17 @@ export default function AddReport() {
 
   const fetchCompanies = async () => {
     try {
-      const supabase = getSupabase()
-      const { data, error: fetchError } = await supabase
-        .from('companies')
-        .select('id, name, sector')
-        .eq('approved', true)
-        .order('name', { ascending: true })
+      // Use Knowledge Base for approved companies list
+      const { searchCompaniesKnowledgeBase } = await import('../lib/api')
+      const response = await searchCompaniesKnowledgeBase('', { status: 'approved' }, 1, 1000)
 
-      if (fetchError) throw fetchError
-      setCompanies(data || [])
+      const formatted = response.data?.map(c => ({
+        id: c.id,
+        name: c.name,
+        sector: c.sector
+      })) || []
+
+      setCompanies(formatted)
     } catch (err) {
       console.error('Failed to fetch companies:', err)
     } finally {

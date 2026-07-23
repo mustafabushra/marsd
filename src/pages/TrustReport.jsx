@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCompanyReport, searchCompanies, getCompanyReportsTimeline, getCompanyTrends, getCompanyReportsSummary } from '../lib/api'
+import { getCompanyKnowledgeBase, getCompanyReportsTimeline, getCompanyTrends, getCompanyReportsSummary } from '../lib/api'
 import { DocumentIcon } from '../components/icons'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
@@ -28,14 +28,31 @@ export default function TrustReport() {
           return
         }
 
-        // Load main report data
-        const data = await getCompanyReport(id)
-        setReport(data)
+        // Load complete company profile from Knowledge Base (single source of truth)
+        const kb = await getCompanyKnowledgeBase(id)
+        if (!kb) {
+          setError('الشركة غير موجودة')
+          setLoading(false)
+          return
+        }
 
-        // Get company details
-        const companyResult = await searchCompanies('', 1, 1000)
-        const comp = companyResult.data?.find(c => c.id === id)
-        setCompany(comp || { name: 'شركة', city: '—', sector: '—' })
+        // Set company data from Knowledge Base
+        setCompany({
+          id: kb.id,
+          name: kb.name,
+          city: kb.city || '—',
+          sector: kb.sector || '—',
+          cr_number: kb.cr_number
+        })
+
+        // Build report object from Knowledge Base data
+        const reportObj = {
+          status: kb.total_reports_count >= 5 ? 'full' : kb.total_reports_count >= 2 ? 'preliminary' : 'limited',
+          tier: kb.trust_tier || 'none',
+          score: kb.trust_score || 0,
+          approvedReports: kb.approved_reports_count || 0
+        }
+        setReport(reportObj)
 
         // Load Timeline, Trends, and Summary in parallel
         const [timelineData, trendsData, summaryData] = await Promise.all([

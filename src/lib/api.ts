@@ -2026,3 +2026,163 @@ export async function getUserCompany(clerKUserId: string): Promise<any | null> {
     return null
   }
 }
+
+// ============================================================================
+// KNOWLEDGE BASE API — Single Source of Truth
+// Phase 2: Central Data Repository via RPC Functions
+// ============================================================================
+
+/**
+ * Get complete company profile from Knowledge Base
+ * Single source of truth for all company data including:
+ * - Core information
+ * - Trust scores
+ * - Report counts
+ * - Claim status
+ * - Registration status
+ */
+export async function getCompanyKnowledgeBase(companyId: string) {
+  const supabase = getSupabase()
+
+  try {
+    const { data, error } = await supabase
+      .rpc('get_company_knowledge_base', { p_company_id: companyId })
+
+    if (error) {
+      console.error('Knowledge Base query error:', error)
+      throw new Error('فشل جلب بيانات الشركة: ' + error.message)
+    }
+
+    if (!data || data.length === 0) {
+      return null
+    }
+
+    return data[0]
+  } catch (err) {
+    console.error('Get company KB error:', err)
+    throw err
+  }
+}
+
+/**
+ * Search companies through Knowledge Base
+ * Full-text search with optional filters
+ */
+export async function searchCompaniesKnowledgeBase(
+  query: string = '',
+  filters?: { source?: string; status?: string },
+  page: number = 1,
+  limit: number = 20
+) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
+
+  try {
+    const { data, error } = await supabase
+      .rpc('search_company_knowledge_base', {
+        p_query: query || null,
+        p_source: filters?.source || null,
+        p_status: filters?.status || null,
+        p_limit: limit,
+        p_offset: offset
+      })
+
+    if (error) {
+      console.error('Company KB search error:', error)
+      throw new Error('فشل البحث: ' + error.message)
+    }
+
+    // Get total count (approximate — could improve with separate count RPC)
+    const total = data?.length || 0
+
+    return {
+      data: data || [],
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    }
+  } catch (err) {
+    console.error('Search companies KB error:', err)
+    throw err
+  }
+}
+
+/**
+ * Get complete report profile from Knowledge Base
+ * Single source of truth for all report data including:
+ * - Core report information
+ * - Company details
+ * - Approval/rejection history
+ * - Credits awarded
+ */
+export async function getReportKnowledgeBase(reportId: string) {
+  const supabase = getSupabase()
+
+  try {
+    const { data, error } = await supabase
+      .rpc('get_report_knowledge_base', { p_report_id: reportId })
+
+    if (error) {
+      console.error('Knowledge Base query error:', error)
+      throw new Error('فشل جلب بيانات التقرير: ' + error.message)
+    }
+
+    if (!data || data.length === 0) {
+      return null
+    }
+
+    return data[0]
+  } catch (err) {
+    console.error('Get report KB error:', err)
+    throw err
+  }
+}
+
+/**
+ * Search reports through Knowledge Base
+ * Full-text search with optional filters
+ */
+export async function searchReportsKnowledgeBase(
+  query: string = '',
+  filters?: { status?: string; companyId?: string },
+  page: number = 1,
+  limit: number = 20
+) {
+  const supabase = getSupabase()
+  const offset = (page - 1) * limit
+
+  try {
+    const { data, error } = await supabase
+      .rpc('search_report_knowledge_base', {
+        p_query: query || null,
+        p_status: filters?.status || null,
+        p_company_id: filters?.companyId || null,
+        p_limit: limit,
+        p_offset: offset
+      })
+
+    if (error) {
+      console.error('Report KB search error:', error)
+      throw new Error('فشل البحث: ' + error.message)
+    }
+
+    // Get total count (approximate)
+    const total = data?.length || 0
+
+    return {
+      data: data || [],
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    }
+  } catch (err) {
+    console.error('Search reports KB error:', err)
+    throw err
+  }
+}
