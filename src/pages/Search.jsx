@@ -250,6 +250,16 @@ export default function Search() {
         </div>
       )}
 
+      {/* Header */}
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>
+          🔍 البحث عن الشركات
+        </h1>
+        <p style={{ fontSize: '13px', color: '#64748B', margin: '0', textAlign: 'right' }}>
+          ابحث عن شركة لعرض درجة الثقة وإرسال تقرير
+        </p>
+      </div>
+
       {/* Search Box */}
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
@@ -258,7 +268,7 @@ export default function Search() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => query.length > 0 && setShowAutocomplete(true)}
-              placeholder="ابحث عن الشركات..."
+              placeholder="ابحث باسم الشركة أو رقم السجل..."
               style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', textAlign: 'right' }}
             />
             {query ? (
@@ -364,11 +374,59 @@ export default function Search() {
         </div>
       )}
 
-      {/* No results message */}
+      {/* No results message - IMPROVED UI */}
       {!loading && query && companies.length === 0 && !error && (
-        <div style={{ background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px 16px', marginBottom: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>لم يتم العثور على نتائج</div>
-          <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '6px' }}>حاول البحث برقم سجل تجاري أو اسم آخر</div>
+        <div style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FEE2E2 100%)', border: '1px solid #FECACA', borderRadius: '16px', padding: '32px 24px', marginBottom: '16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>😕</div>
+          <div style={{ fontSize: '16px', color: '#92400E', fontWeight: 800, marginBottom: '8px' }}>
+            لم نجد "{query}"
+          </div>
+          <div style={{ fontSize: '13px', color: '#A16207', marginBottom: '20px' }}>
+            قد تكون الشركة مسجلة باسم مختلف أو لم تسجل بعد
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '20px' }}>
+            {/* Action 1: Add New Company */}
+            <button
+              onClick={handleAddCompany}
+              title="أضف الشركة للمنصة"
+              style={{
+                background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
+                padding: '12px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.background = '#15803D'}
+              onMouseLeave={(e) => e.target.style.background = '#16A34A'}
+            >
+              ➕ تسجيل شركة جديدة
+            </button>
+
+            {/* Action 2: Search Tips */}
+            <button
+              onClick={() => setQuery('')}
+              title="امسح البحث وحاول مرة أخرى"
+              style={{
+                background: '#3B82F6', color: '#fff', border: 0, borderRadius: '10px',
+                padding: '12px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.background = '#2563EB'}
+              onMouseLeave={(e) => e.target.style.background = '#3B82F6'}
+            >
+              🔄 بحث جديد
+            </button>
+          </div>
+
+          {/* Helpful tips */}
+          <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(255,255,255,0.6)', borderRadius: '8px', fontSize: '12px', color: '#92400E', lineHeight: '1.6' }}>
+            <strong>💡 نصائح البحث:</strong><br/>
+            • ابحث برقم السجل التجاري (مثل: 1010012345)<br/>
+            • جرّب اسم مختلف أو أقصر (مثل: "الراجحي" بدل "شركة الراجحي للمقاولات")<br/>
+            • إذا كنت متأكد الشركة غير موجودة، أضفها للمنصة
+          </div>
         </div>
       )}
 
