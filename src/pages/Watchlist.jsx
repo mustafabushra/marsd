@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { AlertIcon } from '../components/icons'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
 
 export default function Watchlist() {
+  const navigate = useNavigate()
   const { user } = useUser()
+  const { role, loading: roleLoading } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState([])
   const [alerts, setAlerts] = useState([])
@@ -108,6 +114,24 @@ export default function Watchlist() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexDirection: 'row-reverse' }}>
             <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>الشركات المُتابَعة ({companies.length})</h3>
+            <button
+              onClick={() => navigate('/search')}
+              disabled={!systemStatus.accountActive}
+              title={!systemStatus.accountActive ? 'الحساب معلق' : ''}
+              style={{
+                background: systemStatus.accountActive ? '#16A34A' : '#D1D5DB',
+                color: '#fff',
+                border: 0,
+                borderRadius: '10px',
+                padding: '8px 16px',
+                fontSize: '13.5px',
+                fontWeight: 800,
+                cursor: systemStatus.accountActive ? 'pointer' : 'not-allowed',
+                opacity: systemStatus.accountActive ? 1 : 0.6,
+              }}
+            >
+              + إضافة
+            </button>
           </div>
           {companies.length === 0 ? (
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '32px', textAlign: 'center' }}>
@@ -130,6 +154,32 @@ export default function Watchlist() {
                     <polyline points={w.pts} fill="none" stroke={w.lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline>
                   </svg>
                   <span style={{ background: w.tBg, color: w.tColor, borderRadius: '8px', padding: '6px 13px', fontSize: '13.5px', fontWeight: 800, flex: 'none' }}>{w.trend}</span>
+                  <button
+                    onClick={() => {
+                      // Remove from watchlist
+                      setCompanies(companies.filter(c => c.id !== w.id))
+                    }}
+                    style={{
+                      background: '#FEE2E2',
+                      color: '#DC2626',
+                      border: 0,
+                      borderRadius: '8px',
+                      width: '32px',
+                      height: '32px',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 'none',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.target.style.background = '#FECACA')}
+                    onMouseLeave={(e) => (e.target.style.background = '#FEE2E2')}
+                    title="حذف من القائمة"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>

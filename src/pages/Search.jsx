@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { searchCompanies } from '../lib/api'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
+import { canPerform } from '../utils/roles'
 
 export default function Search() {
+  const navigate = useNavigate()
+  const { role, loading: roleLoading } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [companies, setCompanies] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -139,31 +146,114 @@ export default function Search() {
 
       {companies.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px' }}>
-          {companies.map((c) => (
-            <div key={c.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', gap: '14px', marginBottom: '18px' }}>
-                <div style={{ width: '78px', height: '78px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '21px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{c.scoreText}</span>
-                    <span style={{ fontSize: '9.5px', color: '#94A3B8' }}>من 100</span>
+          {companies.map((c) => {
+            // Check if user can send report (BUSINESS_RULES_MATRIX #18-21)
+            const canSendReport =
+              canPerform(role, 'canAddReport') &&
+              systemStatus.subscriptionActive &&
+              systemStatus.accountActive &&
+              systemStatus.creditsBalance > 0
+
+            const sendReportDisabledReason = !canPerform(role, 'canAddReport')
+              ? 'لا توجد صلاحية'
+              : !systemStatus.subscriptionActive
+                ? 'انتهى الاشتراك'
+                : !systemStatus.accountActive
+                  ? 'الحساب معلق'
+                  : systemStatus.creditsBalance <= 0
+                    ? 'لا توجد Credits'
+                    : null
+
+            return (
+              <div key={c.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '14px', marginBottom: '18px' }}>
+                  <div style={{ width: '78px', height: '78px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '21px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{c.scoreText}</span>
+                      <span style={{ fontSize: '9.5px', color: '#94A3B8' }}>من 100</span>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: '0 0 7px', lineHeight: 1.4 }}>{c.name}</h3>
+                    <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+                      <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.sector}</span>
+                      <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.city}</span>
+                    </div>
                   </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: '0 0 7px', lineHeight: 1.4 }}>{c.name}</h3>
-                  <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
-                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.sector}</span>
-                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '3px 9px', fontSize: '12px', fontWeight: 700 }}>{c.city}</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>● {c.riskLabel}</span>
+                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{c.reports}</span>
                 </div>
+                {c.hasData && (
+                  <div style={{ marginTop: 'auto', display: 'flex', gap: '10px', flexDirection: 'column' }}>
+                    <button
+                      onClick={() => navigate(`/company/${c.id}`)}
+                      style={{
+                        width: '100%',
+                        background: '#1E2A52',
+                        color: '#fff',
+                        border: 0,
+                        borderRadius: '10px',
+                        padding: '11px',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => (e.target.style.background = '#0F172A')}
+                      onMouseLeave={(e) => (e.target.style.background = '#1E2A52')}
+                    >
+                      عرض التقرير
+                    </button>
+                    <button
+                      onClick={() => canSendReport && navigate('/add-report')}
+                      disabled={!canSendReport}
+                      title={sendReportDisabledReason || ''}
+                      style={{
+                        width: '100%',
+                        background: canSendReport ? '#3B82F6' : '#D1D5DB',
+                        color: '#fff',
+                        border: 0,
+                        borderRadius: '10px',
+                        padding: '11px',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        cursor: canSendReport ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.2s',
+                        opacity: canSendReport ? 1 : 0.6,
+                      }}
+                      onMouseEnter={(e) => canSendReport && (e.target.style.background = '#2563EB')}
+                      onMouseLeave={(e) => (e.target.style.background = canSendReport ? '#3B82F6' : '#D1D5DB')}
+                    >
+                      إرسال تقرير
+                    </button>
+                  </div>
+                )}
+                {c.isIncomplete && (
+                  <button
+                    style={{
+                      marginTop: 'auto',
+                      width: '100%',
+                      background: '#fff',
+                      color: '#B45309',
+                      border: '1.5px solid #FDE68A',
+                      borderRadius: '10px',
+                      padding: '11px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.target.style.background = '#FFFBEB')}
+                    onMouseLeave={(e) => (e.target.style.background = '#fff')}
+                  >
+                    طلب إضافة بيانات / تقرير
+                  </button>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>● {c.riskLabel}</span>
-                <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{c.reports}</span>
-              </div>
-              {c.hasData && <button style={{ marginTop: 'auto', width: '100%', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '10px', padding: '11px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>عرض التقرير</button>}
-              {c.isIncomplete && <button style={{ marginTop: 'auto', width: '100%', background: '#fff', color: '#B45309', border: '1.5px solid #FDE68A', borderRadius: '10px', padding: '11px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer' }}>طلب إضافة بيانات / تقرير</button>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

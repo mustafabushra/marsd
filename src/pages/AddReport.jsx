@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { submitReport, searchCompanies } from '../lib/api'
 import { CheckIcon, FileIcon, UploadIcon } from '../components/icons'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
+import { canPerform } from '../utils/roles'
 
 export default function AddReport() {
   const navigate = useNavigate()
+  const { role, loading: roleLoading } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -12,6 +17,13 @@ export default function AddReport() {
   const [companies, setCompanies] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCompany, setSelectedCompany] = useState(null)
+
+  // Check access (BUSINESS_RULES_MATRIX #23-26)
+  const canSubmitReport =
+    canPerform(role, 'canAddReport') &&
+    systemStatus.subscriptionActive &&
+    systemStatus.accountActive &&
+    systemStatus.creditsBalance > 0
 
   const [formData, setFormData] = useState({
     targetCompanyId: '',
@@ -97,6 +109,23 @@ export default function AddReport() {
     setLoading(true)
 
     try {
+      // Check access requirements (BUSINESS_RULES_MATRIX #23-26)
+      if (!canPerform(role, 'canAddReport')) {
+        throw new Error('لا توجد صلاحية لإرسال التقارير')
+      }
+
+      if (!systemStatus.subscriptionActive) {
+        throw new Error('انتهى اشتراكك — جدّد الاشتراك لمتابعة المساهمة')
+      }
+
+      if (!systemStatus.accountActive) {
+        throw new Error('حسابك معلق — تواصل مع الدعم')
+      }
+
+      if (systemStatus.creditsBalance <= 0) {
+        throw new Error('لا توجد Credits متاحة — كل تقرير يستهلك نقطة واحدة')
+      }
+
       if (!selectedCompany) {
         throw new Error('لم يتم اختيار شركة')
       }
@@ -412,19 +441,44 @@ export default function AddReport() {
             </button>
             <button
               onClick={step === 4 ? handleSubmit : handleNext}
-              disabled={loading}
+              disabled={loading || (step === 4 && !canSubmitReport)}
+              title={
+                step === 4 && !canSubmitReport
+                  ? !canPerform(role, 'canAddReport')
+                    ? 'لا توجد صلاحية'
+                    : !systemStatus.subscriptionActive
+                      ? 'انتهى الاشتراك'
+                      : !systemStatus.accountActive
+                        ? 'الحساب معلق'
+                        : 'لا توجد Credits'
+                  : ''
+              }
               style={{
-                background: loading ? '#CCCCCC' : '#16A34A',
+                background:
+                  loading || (step === 4 && !canSubmitReport)
+                    ? '#D1D5DB'
+                    : '#16A34A',
                 color: '#fff',
                 border: 0,
                 borderRadius: '10px',
                 padding: '12px 32px',
                 fontSize: '14.5px',
                 fontWeight: 800,
-                cursor: loading ? 'not-allowed' : 'pointer'
+                cursor:
+                  loading || (step === 4 && !canSubmitReport)
+                    ? 'not-allowed'
+                    : 'pointer',
+                opacity:
+                  loading || (step === 4 && !canSubmitReport)
+                    ? 0.6
+                    : 1,
               }}
             >
-              {loading ? 'جاري الإرسال...' : step === 4 ? 'إرسال التقرير' : 'التالي'}
+              {loading
+                ? 'جاري الإرسال...'
+                : step === 4
+                  ? 'إرسال التقرير'
+                  : 'التالي'}
             </button>
           </div>
         </div>

@@ -2,10 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
+import { canPerform } from '../utils/roles'
 
 export default function CompanyDashboard() {
   const navigate = useNavigate()
   const { user } = useUser()
+  const { role, loading: roleLoading } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [loading, setLoading] = useState(true)
   const [companyName, setCompanyName] = useState('الشركة')
   const [kpis, setKpis] = useState([
@@ -107,13 +112,33 @@ export default function CompanyDashboard() {
     }
   }, [user?.id])
 
-  if (loading) {
+  if (loading || roleLoading || systemStatus.isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
         جاري التحميل...
       </div>
     )
   }
+
+  // Check if user can add reports (BUSINESS_RULES_MATRIX #5, #23-26)
+  const canAddReport =
+    canPerform(role, 'canAddReport') &&
+    systemStatus.subscriptionActive &&
+    systemStatus.accountActive &&
+    systemStatus.tenantActive &&
+    systemStatus.creditsBalance > 0
+
+  const addReportDisabledReason = !canPerform(role, 'canAddReport')
+    ? 'لا توجد صلاحية'
+    : !systemStatus.subscriptionActive
+      ? 'انتهى الاشتراك'
+      : !systemStatus.accountActive
+        ? 'الحساب معلق'
+        : !systemStatus.tenantActive
+          ? 'الشركة معطلة'
+          : systemStatus.creditsBalance <= 0
+            ? 'لا توجد Credits'
+            : null
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px' }}>
@@ -210,7 +235,30 @@ export default function CompanyDashboard() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
                 بحث جديد
               </button>
-              <button onClick={() => navigate('/add-report')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#16A34A', border: 0, borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#fff', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#15A34A'} onMouseLeave={(e) => e.target.style.background = '#16A34A'}>
+              <button
+                onClick={() => canAddReport && navigate('/add-report')}
+                disabled={!canAddReport}
+                title={addReportDisabledReason || ''}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  background: canAddReport ? '#16A34A' : '#D1D5DB',
+                  border: 0,
+                  borderRadius: '11px',
+                  padding: '14px 16px',
+                  fontSize: '14.5px',
+                  fontWeight: 800,
+                  color: '#fff',
+                  cursor: canAddReport ? 'pointer' : 'not-allowed',
+                  textAlign: 'right',
+                  transition: 'all 0.2s',
+                  opacity: canAddReport ? 1 : 0.6,
+                }}
+                onMouseEnter={(e) => canAddReport && (e.target.style.background = '#15A34A')}
+                onMouseLeave={(e) => (e.target.style.background = canAddReport ? '#16A34A' : '#D1D5DB')}
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 إضافة تقرير
               </button>

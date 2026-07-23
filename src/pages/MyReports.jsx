@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { CloseIcon, FileIcon } from '../components/icons'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
+import { canPerform } from '../utils/roles'
 
 export default function MyReports() {
   const { user } = useUser()
+  const { role, loading: roleLoading } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState(null)
@@ -177,6 +182,18 @@ export default function MyReports() {
                 </div>
                 <span style={{ background: selectedReport.st.bg, color: selectedReport.st.c, borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>{selectedReport.st.label}</span>
               </div>
+
+              {selectedReport.status === 'pending_review' && (
+                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13.5px', color: '#92400E', fontWeight: 700 }}>
+                  التقرير قيد المراجعة — لا يمكن تعديله حالياً
+                </div>
+              )}
+
+              {selectedReport.status === 'rejected' && (
+                <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13.5px', color: '#991B1B', fontWeight: 700 }}>
+                  التقرير مرفوض — يمكنك إرسال نسخة مُحدّثة
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
                 <div style={{ background: '#F8FAFC', borderRadius: '11px', padding: '15px' }}>
                   <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '5px' }}>قيمة التعامل</div>
@@ -203,7 +220,7 @@ export default function MyReports() {
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedReport.period}</div>
                 </div>
               </div>
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '22px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>المستندات المرفقة</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '9px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', color: '#64748B' }}>
                   <div style={{ flex: 'none', display: 'flex', alignItems: 'center' }}>
@@ -212,6 +229,31 @@ export default function MyReports() {
                   <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>عقد_التعامل.pdf</span>
                 </div>
               </div>
+
+              {selectedReport.status === 'rejected' && (
+                <button
+                  onClick={() => {
+                    handleCloseDrawer()
+                    // Navigate to add-report with pre-filled data
+                  }}
+                  style={{
+                    width: '100%',
+                    background: '#16A34A',
+                    color: '#fff',
+                    border: 0,
+                    borderRadius: '10px',
+                    padding: '12px',
+                    fontSize: '14.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.target.style.background = '#15A34A')}
+                  onMouseLeave={(e) => (e.target.style.background = '#16A34A')}
+                >
+                  إعادة الإرسال
+                </button>
+              )}
             </div>
           </div>
         </>
