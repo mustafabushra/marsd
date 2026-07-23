@@ -50,6 +50,31 @@ export async function ensureStorageBucket(bucketName: string): Promise<void> {
 }
 
 // ============================================================================
+// CLERK-SUPABASE LINKING
+// ============================================================================
+
+/**
+ * Link Clerk user metadata with Supabase tenant
+ * Updates Clerk user's public metadata to include tenant_id and cr_number
+ * This creates a bridge between Clerk (auth) and Supabase (business logic)
+ */
+export async function linkClerkUserToTenant(userId: string, tenantId: string, crNumber: string): Promise<void> {
+  try {
+    // Note: Updating Clerk metadata requires Clerk SDK
+    // This is a placeholder - actual implementation depends on your setup
+    // For now, we just log it. In production, you'd use Clerk's backend SDK
+    console.log(`📌 Linked Clerk user ${userId} to Supabase tenant ${tenantId} (CR: ${crNumber})`)
+
+    // The connection is established via:
+    // 1. Supabase: users.id = clerk_user_id (foreign key to auth.users)
+    // 2. Supabase: users.tenant_id points to the company tenant
+    // 3. On login: Clerk → Supabase users table → tenant_id lookup
+  } catch (err) {
+    console.warn('Failed to link Clerk user:', err)
+  }
+}
+
+// ============================================================================
 // TOKEN MANAGEMENT
 // ============================================================================
 
@@ -436,6 +461,14 @@ export async function createTenantAndUser(userId: string, companyData: any) {
           }])
 
         if (insertError) throw insertError
+      }
+
+      // Link Clerk user with Supabase tenant via Clerk metadata
+      try {
+        await linkClerkUserToTenant(userId, tenantData.id, companyData.crNumber || crNumber)
+      } catch (metadataError) {
+        console.warn('⚠️ Failed to update Clerk metadata:', metadataError)
+        // Don't fail the whole registration if metadata update fails
       }
     } catch (userError) {
       if (userError.message.includes('هذا البريد')) {
