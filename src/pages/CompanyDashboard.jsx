@@ -39,27 +39,17 @@ export default function CompanyDashboard() {
           return
         }
 
-        // Get tenant (company) name and approval status
+        // Get tenant (company) name
+        // Note: ApprovalStatusGuard already checked approval_status in routing,
+        // so we only get here if status='approved'
         const { data: tenantData } = await supabase
           .from('tenants')
-          .select('name, approval_status')
+          .select('name')
           .eq('id', userData.tenant_id)
           .single()
 
         if (tenantData) {
           setCompanyName(tenantData.name)
-
-          // If account is pending approval, redirect to pending page
-          if (tenantData.approval_status === 'pending_approval') {
-            navigate('/account-pending', { replace: true })
-            return
-          }
-
-          // If account was rejected
-          if (tenantData.approval_status === 'rejected') {
-            navigate('/account-rejected', { replace: true })
-            return
-          }
         }
 
         // Get submitted reports count

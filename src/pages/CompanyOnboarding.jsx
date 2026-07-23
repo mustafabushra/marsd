@@ -194,7 +194,8 @@ export default function CompanyOnboarding() {
       // ===== SUCCESS =====
       setError('')
       alert('✅ تم رفع بيانات شركتك بنجاح!\n\n⏳ سيتم مراجعة السجل التجاري من قبل فريق مرصد\n📧 ستتلقى إشعار عند اكتمال المراجعة')
-      navigate('/dashboard')
+      // Redirect to pending approval screen (not dashboard)
+      navigate('/account-pending', { replace: true })
     } catch (err) {
       setError(err.message || '❌ حدث خطأ غير متوقع')
       console.error('Registration error:', err)
