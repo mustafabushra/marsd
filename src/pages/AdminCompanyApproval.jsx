@@ -19,7 +19,7 @@ export default function AdminCompanyApproval() {
       const supabase = getSupabase()
       const { data, error: fetchError } = await supabase
         .from('tenants')
-        .select('*')
+        .select('id, cr_number, name, email, phone, city, sector, cr_file_url, approval_status, created_at')
         .eq('approval_status', 'pending_approval')
         .order('created_at', { ascending: false })
 
@@ -32,7 +32,7 @@ export default function AdminCompanyApproval() {
     }
   }
 
-  const handleApprove = async (companyId) => {
+  const handleApprove = async (companyId, crNumber) => {
     if (processingId) return
     setProcessingId(companyId)
     setError('')
@@ -49,7 +49,7 @@ export default function AdminCompanyApproval() {
 
       if (updateError) throw updateError
 
-      // Log the action
+      // Log the action (use both ID and CR Number for reference)
       const { data: user } = await supabase.auth.getUser()
       await supabase
         .from('audit_logs')
@@ -58,7 +58,10 @@ export default function AdminCompanyApproval() {
           action: 'company_approved',
           entity: 'company',
           entity_id: companyId,
-          meta: JSON.stringify({ approval_status: 'approved' }),
+          meta: JSON.stringify({
+            approval_status: 'approved',
+            cr_number: crNumber
+          }),
           created_at: new Date().toISOString()
         }])
         .catch(err => console.warn('Audit log warning:', err))
@@ -71,7 +74,8 @@ export default function AdminCompanyApproval() {
           tenant_id: companyId,
           type: 'company_approved',
           payload: JSON.stringify({
-            message: 'تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.'
+            message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
+            cr_number: crNumber
           }),
           created_at: new Date().toISOString()
         }])
@@ -80,7 +84,7 @@ export default function AdminCompanyApproval() {
       // Remove from list and show success
       setCompanies(companies.filter(c => c.id !== companyId))
       setSelectedCompany(null)
-      alert(`✅ تمت الموافقة على: ${company?.name}`)
+      alert(`✅ تمت الموافقة على: ${company?.name}\n(السجل: ${crNumber})`)
     } catch (err) {
       setError(err.message || 'فشل الموافقة على الشركة')
     } finally {
@@ -88,7 +92,7 @@ export default function AdminCompanyApproval() {
     }
   }
 
-  const handleReject = async (companyId) => {
+  const handleReject = async (companyId, crNumber) => {
     if (!rejectionReason.trim()) {
       setError('يجب إدخال سبب الرفض')
       return
@@ -119,7 +123,10 @@ export default function AdminCompanyApproval() {
           action: 'company_rejected',
           entity: 'company',
           entity_id: companyId,
-          meta: JSON.stringify({ reason: rejectionReason }),
+          meta: JSON.stringify({
+            reason: rejectionReason,
+            cr_number: crNumber
+          }),
           created_at: new Date().toISOString()
         }])
         .catch(err => console.warn('Audit log warning:', err))
@@ -132,7 +139,8 @@ export default function AdminCompanyApproval() {
           tenant_id: companyId,
           type: 'company_rejected',
           payload: JSON.stringify({
-            message: `تم رفض تسجيل شركتك. السبب: ${rejectionReason}`
+            message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
+            cr_number: crNumber
           }),
           created_at: new Date().toISOString()
         }])
@@ -142,7 +150,7 @@ export default function AdminCompanyApproval() {
       setCompanies(companies.filter(c => c.id !== companyId))
       setSelectedCompany(null)
       setRejectionReason('')
-      alert(`❌ تم رفض: ${company?.name}`)
+      alert(`❌ تم رفض: ${company?.name}\n(السجل: ${crNumber})`)
     } catch (err) {
       setError(err.message || 'فشل رفض الشركة')
     } finally {
@@ -210,14 +218,29 @@ export default function AdminCompanyApproval() {
                     textAlign: 'right'
                   }}
                 >
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
-                    {company.name}
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
-                    {company.email}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
-                    رقم السجل: {company.cr_number}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
+                        {company.name}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+                        {company.email}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: '#EEF2FF',
+                        color: '#3730A3',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="رقم السجل التجاري - المرجع الأساسي"
+                    >
+                      {company.cr_number}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -353,7 +376,7 @@ export default function AdminCompanyApproval() {
               {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
-                  onClick={() => handleApprove(selectedCompany.id)}
+                  onClick={() => handleApprove(selectedCompany.id, selectedCompany.cr_number)}
                   disabled={processingId === selectedCompany.id}
                   style={{
                     flex: 1,
@@ -367,12 +390,13 @@ export default function AdminCompanyApproval() {
                     cursor: processingId === selectedCompany.id ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s'
                   }}
+                  title={`الموافقة على السجل: ${selectedCompany.cr_number}`}
                 >
                   {processingId === selectedCompany.id ? '⏳' : '✅'} الموافقة
                 </button>
 
                 <button
-                  onClick={() => handleReject(selectedCompany.id)}
+                  onClick={() => handleReject(selectedCompany.id, selectedCompany.cr_number)}
                   disabled={processingId === selectedCompany.id}
                   style={{
                     flex: 1,
@@ -386,6 +410,7 @@ export default function AdminCompanyApproval() {
                     cursor: processingId === selectedCompany.id ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s'
                   }}
+                  title={`رفض السجل: ${selectedCompany.cr_number}`}
                 >
                   {processingId === selectedCompany.id ? '⏳' : '❌'} الرفض
                 </button>
