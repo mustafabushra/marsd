@@ -58,6 +58,7 @@ import AdminTenantAnalytics from './pages/AdminTenantAnalytics'
 import AdminCompanyVerification from './pages/AdminCompanyVerification'
 import AdminBackup from './pages/AdminBackup'
 import AdminCompanyApproval from './pages/AdminCompanyApproval'
+import AccountPendingApproval from './pages/AccountPendingApproval'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -111,6 +112,7 @@ function AppContent() {
         {/* Auth Routes - No layout */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/account-pending" element={<AccountPendingApproval />} />
         <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected */}
