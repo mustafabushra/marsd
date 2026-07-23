@@ -150,29 +150,58 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <main style={{ background: '#fff', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <main style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC', fontFamily: 'Tajawal, system-ui, sans-serif', dir: 'rtl', color: '#0F172A' }}>
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
       `}</style>
 
-      {/* HEADER */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '20px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1E2A52', margin: 0, textAlign: 'right' }}>لوحة التحكم</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ background: '#16A34A', color: '#fff', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700' }}>✓</div>
-          <span style={{ fontSize: '18px', fontWeight: '700', color: '#1E2A52' }}>مرصد</span>
+      {/* SIDEBAR */}
+      <aside style={{ width: '268px', background: '#1E2A52', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '0 8px 22px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.1)', marginBottom: '16px' }}>
+          <span style={{ display: 'inline-flex', background: '#fff', borderRadius: '9px', padding: '5px', flex: 'none', fontSize: '20px', color: '#1E2A52' }}>📊</span>
+          <div><div style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>مرصد</div><div style={{ fontSize: '11px', color: '#94A3B8' }}>Admin</div></div>
         </div>
-      </div>
 
-      <div style={{ flex: 1, padding: '32px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          {[
+            { label: 'نظرة عامة', icon: '📊' },
+            { label: 'التقارير', icon: '📋' },
+            { label: 'الشركات', icon: '🏢' },
+            { label: 'الاشتراكات', icon: '💳' },
+            { label: 'المستخدمون', icon: '👥' },
+            { label: 'الإعدادات', icon: '⚙️' },
+          ].map((item, idx) => (
+            <button key={idx} style={{ background: 'transparent', border: '0', color: '#fff', padding: '12px 12px', textAlign: 'right', cursor: 'pointer', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '10px' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+              <span>{item.icon}</span> {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: 'auto' }}>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>Admin Access</div>
+          <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>Full Platform Control</div>
+          <button style={{ width: '100%', background: '#16A34A', color: '#fff', border: '0', borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>Settings</button>
+        </div>
+      </aside>
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* HEADER */}
+        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 30 }}>
+          <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>Admin Dashboard</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <button style={{ display: 'flex', alignItems: 'center', gap: '9px', background: '#F1F5F9', border: '0', borderRadius: '10px', padding: '9px 16px', fontSize: '14px', color: '#64748B', cursor: 'pointer', fontWeight: 600, minWidth: '240px' }}>🔍 Search...</button>
+            <div style={{ fontSize: '22px' }}>🔔</div>
+          </div>
+        </header>
+
+        {/* MAIN */}
+        <main style={{ padding: '28px 32px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
@@ -563,6 +592,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+          </div>
+        </main>
       </div>
     </main>
   )
