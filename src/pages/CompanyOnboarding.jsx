@@ -183,7 +183,7 @@ export default function CompanyOnboarding() {
           foundedYear: companyData.foundedYear,
           crStatus: companyData.crStatus || 'active',
           crFileUrl: crFileUrl,
-          status: 'pending_approval',
+          status: 'pending',
           firstName: user.firstName || '',
           lastName: user.lastName || ''
         })
