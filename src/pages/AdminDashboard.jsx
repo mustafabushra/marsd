@@ -150,12 +150,22 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '32px' }}>
+    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px' }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>لوحة التحكم الإدارية</h1>
-          <p style={{ color: '#64748B', fontSize: '14px', margin: '0 0 0 0', textAlign: 'right' }}>مرحباً بك في نظام إدارة مرصد</p>
+          <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>📊 لوحة التحكم الإدارية</h1>
+          <p style={{ color: '#64748B', fontSize: '14px', margin: '0 0 0 0', textAlign: 'right' }}>مرحباً بك في نظام إدارة مرصد — نظرة عامة شاملة على أداء المنصة</p>
         </div>
 
         {/* KPI Cards */}
@@ -166,46 +176,86 @@ export default function AdminDashboard() {
             { label: 'التقارير المعلقة', value: stats.pendingReports, color: '#F59E0B', icon: '📋' },
             { label: 'التقارير المعتمدة', value: stats.approvedReports, color: '#8B5CF6', icon: '✅' },
           ].map((kpi, idx) => (
-            <div key={idx} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <div style={{ fontSize: '28px' }}>{kpi.icon}</div>
+            <div
+              key={idx}
+              style={{
+                background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.06)', transition: 'all 0.3s ease',
+                animation: `fadeIn 0.6s ease-out ${idx * 0.1}s both`
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
+                e.currentTarget.style.transform = 'translateY(-4px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div style={{ fontSize: '32px' }}>{kpi.icon}</div>
                 <p style={{ color: '#64748B', fontSize: '12px', fontWeight: 700, margin: 0 }}>{kpi.label}</p>
               </div>
-              <p style={{ fontSize: '32px', fontWeight: 900, color: kpi.color, margin: 0 }}>{kpi.value}</p>
+              <p style={{ fontSize: '36px', fontWeight: 900, color: kpi.color, margin: 0 }}>{kpi.value}</p>
             </div>
           ))}
         </div>
 
         {/* Quick Actions */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-          {quickActions.map((action) => (
-            <div key={action.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: action.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {quickActions.map((action, idx) => (
+            <div
+              key={action.id}
+              style={{
+                background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+                display: 'flex', flexDirection: 'column',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'all 0.3s ease',
+                animation: `slideUp 0.6s ease-out ${0.6 + idx * 0.08}s both`
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)'
+                e.currentTarget.style.transform = 'translateY(-6px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '12px',
+                  background: `linear-gradient(135deg, ${action.color}30 0%, ${action.color}10 100%)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: `2px solid ${action.color}20`
+                }}>
                   <action.icon size={24} color={action.color} />
                 </div>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0 }}>{action.title}</h3>
-                  <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0 0' }}>{action.desc}</p>
+                  <p style={{ fontSize: '12px', color: '#94A3B8', margin: '4px 0 0 0' }}>{action.desc}</p>
                 </div>
               </div>
               <button
                 onClick={() => navigate(action.path)}
                 style={{
                   marginTop: 'auto',
-                  background: action.color,
+                  background: `linear-gradient(135deg, ${action.color} 0%, ${action.color}dd 100%)`,
                   color: '#fff',
-                  border: 0,
-                  borderRadius: '8px',
-                  padding: '10px 16px',
+                  border: '0',
+                  borderRadius: '12px',
+                  padding: '12px 18px',
                   fontSize: '13px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'opacity 0.2s',
+                  transition: 'all 0.3s ease',
+                  boxShadow: `0 4px 12px ${action.color}30`
                 }}
-                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-                onMouseLeave={(e) => e.target.style.opacity = '1'}
-              >
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)'
+                  e.target.style.boxShadow = `0 6px 16px ${action.color}40`
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)'
+                  e.target.style.boxShadow = `0 4px 12px ${action.color}30`
+                }}>
                 {action.btnText} →
               </button>
             </div>
@@ -213,23 +263,26 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs */}
-        <div style={{ borderBottom: '1px solid #E2E8F0', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', gap: '24px' }}>
+        <div style={{
+          borderBottom: '2px solid #E2E8F0', marginBottom: '28px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end'
+        }}>
+          <div style={{ display: 'flex', gap: '28px' }}>
             {['overview', 'analytics', 'settings'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  padding: '12px 0',
-                  borderBottom: activeTab === tab ? '2px solid #16A34A' : 'none',
+                  padding: '14px 0',
+                  borderBottom: activeTab === tab ? '3px solid #16A34A' : 'none',
                   background: 'none',
                   border: 'none',
                   color: activeTab === tab ? '#16A34A' : '#64748B',
-                  fontWeight: activeTab === tab ? 600 : 500,
+                  fontWeight: activeTab === tab ? 700 : 500,
                   cursor: 'pointer',
                   fontSize: '14px',
-                  transition: 'all 0.3s',
-                  textAlign: 'right'
+                  transition: 'all 0.3s ease',
+                  textAlign: 'center'
                 }}
               >
                 {tab === 'overview' && '📊 نظرة عامة'}
@@ -242,18 +295,41 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', animation: 'fadeIn 0.4s ease-out' }}>
             {/* Top Companies */}
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>أكثر الشركات تقارير</h3>
+            <div style={{
+              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>🏆 أكثر الشركات تقارير</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {topCompanies.map((company, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#F8FAFC', borderRadius: '8px' }}>
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '14px', background: '#F8FAFC', borderRadius: '12px',
+                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#EEF2FF'
+                      e.currentTarget.style.transform = 'translateX(-4px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#F8FAFC'
+                      e.currentTarget.style.transform = 'translateX(0)'
+                    }}>
                     <div style={{ textAlign: 'right', flex: 1 }}>
                       <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{company.name}</div>
                       <div style={{ fontSize: '12px', color: '#94A3B8' }}>{company.reports} تقرير • {company.score}%</div>
                     </div>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% ${company.score}%, #E2E8F0 ${company.score}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#16A34A' }}>
+                    <div style={{
+                      width: '44px', height: '44px', borderRadius: '50%',
+                      background: `conic-gradient(#16A34A 0% ${company.score}%, #E2E8F0 ${company.score}% 100%)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 700, color: '#16A34A',
+                      boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
+                    }}>
                       {company.score}%
                     </div>
                   </div>
@@ -262,8 +338,11 @@ export default function AdminDashboard() {
             </div>
 
             {/* Recent Activity */}
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>النشاط الأخير</h3>
+            <div style={{
+              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>⏱️ النشاط الأخير</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {[
                   { text: 'تقرير جديد من الراجحي', time: 'قبل 5 دقائق' },
@@ -283,10 +362,13 @@ export default function AdminDashboard() {
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.4s ease-out' }}>
             {/* Performance Stats */}
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إحصائيات الأداء</h3>
+            <div style={{
+              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>📊 إحصائيات الأداء</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                 {[
                   { label: 'معدل الموافقة على التقارير', value: '92%', color: '#16A34A' },
@@ -294,17 +376,37 @@ export default function AdminDashboard() {
                   { label: 'رضا المستخدمين', value: '4.8/5', color: '#F59E0B' },
                   { label: 'معدل الاحتفاظ', value: '87%', color: '#8B5CF6' },
                 ].map((stat, idx) => (
-                  <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0' }}>{stat.label}</p>
-                    <p style={{ fontSize: '24px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+                      borderRadius: '12px', padding: '18px', textAlign: 'center',
+                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 10px 0', fontWeight: 600 }}>{stat.label}</p>
+                    <p style={{ fontSize: '28px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Knowledge Base Metrics */}
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+            <div style={{
+              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{
+                fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0',
+                textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px'
+              }}>
                 📚 مؤشرات مستودع المعرفة
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -314,7 +416,21 @@ export default function AdminDashboard() {
                   { label: 'شركات برتبة أولية', value: kbStats.preliminaryTierCompanies, color: '#F59E0B', desc: '2-4 تقارير معتمدة' },
                   { label: 'شركات بدون بيانات', value: kbStats.noDataCompanies, color: '#94A3B8', desc: 'أقل من تقريرين' },
                 ].map((stat, idx) => (
-                  <div key={idx} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '18px', textAlign: 'right' }}>
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+                      borderRadius: '12px', padding: '18px', textAlign: 'right',
+                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}>
                     <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0 0 8px 0', fontWeight: 700 }}>{stat.label}</p>
                     <p style={{ fontSize: '28px', fontWeight: 900, color: stat.color, margin: '0 0 6px 0' }}>{stat.value}</p>
                     <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{stat.desc}</p>
@@ -324,8 +440,15 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick Links to KB */}
-            <div style={{ background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', borderRadius: '12px', padding: '28px', color: '#fff' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, margin: '0 0 16px 0', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+              borderRadius: '16px', padding: '28px', color: '#fff',
+              boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+            }}>
+              <h3 style={{
+                fontSize: '16px', fontWeight: 900, margin: '0 0 20px 0', textAlign: 'right',
+                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px'
+              }}>
                 ⚡ دخول سريع لمستودعات المعرفة
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
@@ -333,38 +456,48 @@ export default function AdminDashboard() {
                   onClick={() => navigate('/admin/knowledge-base/companies')}
                   style={{
                     background: 'rgba(255, 255, 255, 0.2)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
                     padding: '16px',
                     color: '#fff',
                     cursor: 'pointer',
                     textAlign: 'right',
                     fontSize: '13px',
                     fontWeight: 700,
-                    transition: 'all 0.2s'
+                    transition: 'all 0.3s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-                >
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}>
                   🏢 مستودع الشركات
                 </button>
                 <button
                   onClick={() => navigate('/admin/knowledge-base/reports')}
                   style={{
                     background: 'rgba(255, 255, 255, 0.2)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
                     padding: '16px',
                     color: '#fff',
                     cursor: 'pointer',
                     textAlign: 'right',
                     fontSize: '13px',
                     fontWeight: 700,
-                    transition: 'all 0.2s'
+                    transition: 'all 0.3s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-                >
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}>
                   📋 مستودع التقارير
                 </button>
               </div>
@@ -374,14 +507,17 @@ export default function AdminDashboard() {
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>الإعدادات</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{
+            background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.4s ease-out'
+          }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>⚙️ الإعدادات</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
-                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة', path: '/admin/settings' },
-                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات', path: '/admin/roles' },
-                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات', path: '/admin/backup' },
-                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط', path: '/admin/logs' },
+                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة', path: '/admin/settings', icon: '⚙️' },
+                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات', path: '/admin/roles', icon: '🔐' },
+                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات', path: '/admin/backup', icon: '💾' },
+                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط', path: '/admin/logs', icon: '📋' },
               ].map((setting, idx) => (
                 <button
                   key={idx}
@@ -392,18 +528,28 @@ export default function AdminDashboard() {
                     alignItems: 'center',
                     padding: '16px',
                     background: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
+                    border: '2px solid #E2E8F0',
+                    borderRadius: '12px',
                     cursor: 'pointer',
                     textAlign: 'right',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.3s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#EEF2FF'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#F8FAFC'}
-                >
-                  <span style={{ fontSize: '16px' }}>←</span>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{setting.label}</div>
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#EEF2FF'
+                    e.currentTarget.style.borderColor = '#E0E7FF'
+                    e.currentTarget.style.transform = 'translateX(-4px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#F8FAFC'
+                    e.currentTarget.style.borderColor = '#E2E8F0'
+                    e.currentTarget.style.transform = 'translateX(0)'
+                  }}>
+                  <span style={{ fontSize: '18px' }}>←</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{setting.icon}</span>
+                      {setting.label}
+                    </div>
                     <div style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0' }}>{setting.desc}</div>
                   </div>
                 </button>
