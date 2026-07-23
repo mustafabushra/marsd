@@ -33,7 +33,7 @@ export default function MyReports() {
           return
         }
 
-        // Get user's reports with company data
+        // Get user's reports with company data + credits earned + rejection reason
         const { data: reportsData } = await supabase
           .from('reports')
           .select(`
@@ -41,9 +41,13 @@ export default function MyReports() {
             target_company_id,
             status,
             submitted_at,
+            approved_at,
+            rejection_reason,
             title,
             description,
-            companies (id, name, cr_number)
+            type,
+            companies (id, name, cr_number),
+            credits_ledger(amount)
           `)
           .eq('reporter_tenant_id', userData.tenant_id)
           .order('submitted_at', { ascending: false })
@@ -51,9 +55,14 @@ export default function MyReports() {
         const formatted = (reportsData || []).map(r => {
           const statusObj = {
             pending_review: { bg: '#FFFBEB', c: '#B45309', label: 'قيد المراجعة' },
-            approved: { bg: '#ECFDF5', c: '#15803D', label: 'معتمد' },
-            rejected: { bg: '#FEE2E2', c: '#B91C1C', label: 'مرفوض' }
+            approved: { bg: '#ECFDF5', c: '#15803D', label: '✅ معتمد' },
+            rejected: { bg: '#FEE2E2', c: '#B91C1C', label: '❌ مرفوض' }
           }[r.status] || { bg: '#F1F5F9', c: '#64748B', label: 'جديد' }
+
+          // Calculate credits earned for approved reports
+          const creditsEarned = r.status === 'approved'
+            ? (r.credits_ledger?.find(c => c.amount > 0)?.amount || 10)
+            : 0
 
           return {
             id: r.id,
@@ -62,12 +71,16 @@ export default function MyReports() {
             date: new Date(r.submitted_at).toLocaleDateString('ar-SA'),
             value: r.description || 'تقرير',
             status: r.status,
+            type: r.type,
             st: statusObj,
             description: r.description,
+            rejectionReason: r.rejection_reason,
+            creditsEarned: creditsEarned,
             paid: '—',
             delay: '—',
             due: '—',
-            period: new Date(r.submitted_at).toLocaleDateString('ar-SA')
+            period: new Date(r.submitted_at).toLocaleDateString('ar-SA'),
+            approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleDateString('ar-SA') : null
           }
         })
 
@@ -185,13 +198,24 @@ export default function MyReports() {
 
               {selectedReport.status === 'pending_review' && (
                 <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13.5px', color: '#92400E', fontWeight: 700 }}>
-                  التقرير قيد المراجعة — لا يمكن تعديله حالياً
+                  ⏳ التقرير قيد المراجعة — الرجاء الانتظار
+                </div>
+              )}
+
+              {selectedReport.status === 'approved' && (
+                <div style={{ background: '#ECFDF5', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13.5px', color: '#15803D', fontWeight: 700 }}>
+                  ✅ تم اعتماد تقريرك! كسبت {selectedReport.creditsEarned} نقطة ائتمان
                 </div>
               )}
 
               {selectedReport.status === 'rejected' && (
                 <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13.5px', color: '#991B1B', fontWeight: 700 }}>
-                  التقرير مرفوض — يمكنك إرسال نسخة مُحدّثة
+                  ❌ التقرير مرفوض
+                  {selectedReport.rejectionReason && (
+                    <div style={{ marginTop: '8px', fontSize: '12.5px', fontWeight: 600 }}>
+                      السبب: {selectedReport.rejectionReason}
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
