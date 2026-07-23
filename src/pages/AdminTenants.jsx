@@ -1,76 +1,97 @@
 import { useState, useEffect } from 'react'
+import { getSupabase } from '../lib/api'
+import { AlertCircle } from 'lucide-react'
 
 export default function AdminTenants() {
-  const [tenants, setTenants] = useState([
-    {
-      id: 1,
-      name: 'شركة الراجحي التجارية',
-      crNumber: '1010012345',
-      status: 'active',
-      users: 5,
-      subscriptionPlan: 'pro',
-      joinDate: '2026-06-15',
-      reports: 8,
-    },
-    {
-      id: 2,
-      name: 'مجموعة النور للاستثمار',
-      crNumber: '1010098765',
-      status: 'active',
-      users: 12,
-      subscriptionPlan: 'enterprise',
-      joinDate: '2026-05-20',
-      reports: 24,
-    },
-    {
-      id: 3,
-      name: 'الشركة العربية للتوريد',
-      crNumber: '1010054321',
-      status: 'suspended',
-      users: 3,
-      subscriptionPlan: 'basic',
-      joinDate: '2026-04-10',
-      reports: 2,
-    },
-  ])
-
+  const [tenants, setTenants] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [updateLoading, setUpdateLoading] = useState(null)
 
   useEffect(() => {
     fetchTenants()
   }, [])
 
   const fetchTenants = async () => {
-    setIsLoading(true)
     try {
-      const response = await fetch('/api/tenants')
-      if (response.ok) {
-        const data = await response.json()
-        setTenants(data)
-      }
+      setIsLoading(true)
+      setError(null)
+      const supabase = getSupabase()
+
+      // Fetch tenants with subscriptions and report counts
+      const { data: tenantsData, error: tenantsError } = await supabase
+        .from('tenants')
+        .select(`
+          *,
+          subscriptions (*),
+          users (id),
+          reports (id)
+        `)
+
+      if (tenantsError) throw new Error(tenantsError.message)
+
+      // Format the data
+      const formatted = (tenantsData || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        crNumber: t.cr_number || '—',
+        status: t.status || 'active',
+        users: t.users?.length || 0,
+        subscriptionPlan: t.subscriptions?.[0]?.plan_name || 'basic',
+        joinDate: new Date(t.created_at).toLocaleDateString('ar-SA'),
+        reports: t.reports?.length || 0,
+      }))
+
+      setTenants(formatted)
     } catch (err) {
-      console.log('Using mock data:', err.message)
+      setError(err.message || 'حدث خطأ في تحميل المشتركين')
+      console.error('Error fetching tenants:', err)
     } finally {
       setIsLoading(false)
     }
   }
 
   const filtered = tenants.filter(t =>
-    t.name.includes(searchTerm) || t.crNumber.includes(searchTerm)
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.crNumber.includes(searchTerm)
   )
 
-  const handleSuspend = async (id) => {
+  const handleSuspend = async (tenantId) => {
     try {
-      const response = await fetch(`/api/tenants/${id}/toggle-status`, { method: 'POST' })
-      if (response.ok) {
-        setTenants(tenants.map(t =>
-          t.id === id ? { ...t, status: t.status === 'suspended' ? 'active' : 'suspended' } : t
-        ))
-      }
+      setUpdateLoading(tenantId)
+      const supabase = getSupabase()
+      const tenant = tenants.find(t => t.id === tenantId)
+      const newStatus = tenant.status === 'active' ? 'suspended' : 'active'
+
+      const { error } = await supabase
+        .from('tenants')
+        .update({ status: newStatus })
+        .eq('id', tenantId)
+
+      if (error) throw new Error(error.message)
+
+      setTenants(tenants.map(t =>
+        t.id === tenantId ? { ...t, status: newStatus } : t
+      ))
+      setError(null)
     } catch (err) {
-      console.error('Failed to update tenant status:', err)
+      setError(err.message || 'فشل تحديث حالة المشترك')
+      console.error('Error updating tenant:', err)
+    } finally {
+      setUpdateLoading(null)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
+          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل المشتركين...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -81,9 +102,20 @@ export default function AdminTenants() {
           إدارة المشتركين
         </h1>
         <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          إدارة حسابات الشركات المشتركة
+          إدارة حسابات الشركات المشتركة ({filtered.length})
         </p>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <AlertCircle size={20} color='#991B1B' style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <p style={{ fontWeight: 600, color: '#991B1B', margin: '0 0 4px', fontSize: '14px' }}>خطأ</p>
+            <p style={{ fontSize: '13px', color: '#7F1D1D', margin: 0 }}>{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div style={{ marginBottom: '24px' }}>
@@ -162,18 +194,32 @@ export default function AdminTenants() {
                 <td style={{ padding: '16px', fontSize: '13px' }}>
                   <button
                     onClick={() => handleSuspend(tenant.id)}
+                    disabled={updateLoading === tenant.id}
                     style={{
                       padding: '6px 12px',
-                      background: tenant.status === 'active' ? '#FEE2E2' : '#E0F2FE',
-                      color: tenant.status === 'active' ? '#DC2626' : '#0369A1',
+                      background: updateLoading === tenant.id
+                        ? '#E2E8F0'
+                        : tenant.status === 'active'
+                        ? '#FEE2E2'
+                        : '#E0F2FE',
+                      color: updateLoading === tenant.id
+                        ? '#94A3B8'
+                        : tenant.status === 'active'
+                        ? '#DC2626'
+                        : '#0369A1',
                       border: 'none',
                       borderRadius: '6px',
                       fontSize: '12px',
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: updateLoading === tenant.id ? 'not-allowed' : 'pointer',
+                      opacity: updateLoading === tenant.id ? 0.7 : 1,
                     }}
                   >
-                    {tenant.status === 'active' ? 'علق' : 'فعّل'}
+                    {updateLoading === tenant.id
+                      ? 'جاري...'
+                      : tenant.status === 'active'
+                      ? 'علق'
+                      : 'فعّل'}
                   </button>
                 </td>
               </tr>
@@ -195,6 +241,12 @@ export default function AdminTenants() {
           <p style={{ fontSize: '16px', margin: 0 }}>لا توجد نتائج</p>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

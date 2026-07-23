@@ -1,56 +1,51 @@
 import { useState, useEffect } from 'react'
+import { getSupabase } from '../lib/api'
+import { AlertCircle } from 'lucide-react'
 
 export default function AdminSubscriptions() {
-  const [subscriptions, setSubscriptions] = useState([
-    {
-      id: 1,
-      tenant: 'شركة الراجحي التجارية',
-      plan: 'pro',
-      status: 'active',
-      startDate: '2026-06-15',
-      endDate: '2026-09-15',
-      amount: 799,
-      users: 5,
-    },
-    {
-      id: 2,
-      tenant: 'مجموعة النور للاستثمار',
-      plan: 'enterprise',
-      status: 'active',
-      startDate: '2026-05-20',
-      endDate: '2027-05-20',
-      amount: 5000,
-      users: 12,
-    },
-    {
-      id: 3,
-      tenant: 'الشركة العربية للتوريد',
-      plan: 'basic',
-      status: 'expired',
-      startDate: '2026-04-10',
-      endDate: '2026-07-10',
-      amount: 299,
-      users: 3,
-    },
-  ])
-
-  const [isLoading, setIsLoading] = useState(false)
+  const [subscriptions, setSubscriptions] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [updateLoading, setUpdateLoading] = useState(null)
 
   useEffect(() => {
     fetchSubscriptions()
   }, [])
 
   const fetchSubscriptions = async () => {
-    setIsLoading(true)
     try {
-      const response = await fetch('/api/subscriptions')
-      if (response.ok) {
-        const data = await response.json()
-        setSubscriptions(data)
-      }
+      setIsLoading(true)
+      setError(null)
+      const supabase = getSupabase()
+
+      // Fetch subscriptions with tenant and plan info
+      const { data: subsData, error: subsError } = await supabase
+        .from('subscriptions')
+        .select(`
+          *,
+          tenant:tenants(id, name),
+          plan:plans(name, price),
+          users:tenants(users(id))
+        `)
+
+      if (subsError) throw new Error(subsError.message)
+
+      // Format the data
+      const formatted = (subsData || []).map(s => ({
+        id: s.id,
+        tenant: s.tenant?.name || 'مجهولة',
+        plan: s.plan_name || 'basic',
+        status: s.status || 'active',
+        startDate: new Date(s.start_date).toLocaleDateString('ar-SA'),
+        endDate: new Date(s.end_date).toLocaleDateString('ar-SA'),
+        amount: s.price || 0,
+        users: s.users?.length || 0,
+      }))
+
+      setSubscriptions(formatted)
     } catch (err) {
-      console.log('Using mock data:', err.message)
+      setError(err.message || 'حدث خطأ في تحميل الاشتراكات')
+      console.error('Error fetching subscriptions:', err)
     } finally {
       setIsLoading(false)
     }
@@ -58,15 +53,49 @@ export default function AdminSubscriptions() {
 
   const handleRenew = async (id) => {
     try {
-      const response = await fetch(`/api/subscriptions/${id}/renew`, { method: 'POST' })
-      if (response.ok) {
-        setSubscriptions(subscriptions.map(s =>
-          s.id === id ? { ...s, status: 'active', startDate: new Date().toISOString().split('T')[0], endDate: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0] } : s
-        ))
-      }
+      setUpdateLoading(id)
+      const supabase = getSupabase()
+      const newEndDate = new Date()
+      newEndDate.setDate(newEndDate.getDate() + 90)
+
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          status: 'active',
+          end_date: newEndDate.toISOString(),
+        })
+        .eq('id', id)
+
+      if (error) throw new Error(error.message)
+
+      setSubscriptions(subscriptions.map(s =>
+        s.id === id
+          ? {
+              ...s,
+              status: 'active',
+              startDate: new Date().toLocaleDateString('ar-SA'),
+              endDate: newEndDate.toLocaleDateString('ar-SA'),
+            }
+          : s
+      ))
+      setError(null)
     } catch (err) {
-      setError('فشل تجديد الاشتراك')
+      setError(err.message || 'فشل تجديد الاشتراك')
+      console.error('Error renewing subscription:', err)
+    } finally {
+      setUpdateLoading(null)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
+          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل الاشتراكات...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -77,9 +106,20 @@ export default function AdminSubscriptions() {
           إدارة الاشتراكات
         </h1>
         <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          إدارة اشتراكات الشركات والباقات
+          إدارة اشتراكات الشركات والباقات ({subscriptions.length})
         </p>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <AlertCircle size={20} color='#991B1B' style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <p style={{ fontWeight: 600, color: '#991B1B', margin: '0 0 4px', fontSize: '14px' }}>خطأ</p>
+            <p style={{ fontSize: '13px', color: '#7F1D1D', margin: 0 }}>{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -161,21 +201,23 @@ export default function AdminSubscriptions() {
                   </span>
                 </td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
-                  {sub.status === 'expired' && (
+                  {sub.status !== 'active' && (
                     <button
                       onClick={() => handleRenew(sub.id)}
+                      disabled={updateLoading === sub.id}
                       style={{
                         padding: '6px 12px',
-                        background: '#16A34A',
-                        color: '#fff',
+                        background: updateLoading === sub.id ? '#E2E8F0' : '#16A34A',
+                        color: updateLoading === sub.id ? '#94A3B8' : '#fff',
                         border: 'none',
                         borderRadius: '6px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        cursor: 'pointer',
+                        cursor: updateLoading === sub.id ? 'not-allowed' : 'pointer',
+                        opacity: updateLoading === sub.id ? 0.7 : 1,
                       }}
                     >
-                      تجديد
+                      {updateLoading === sub.id ? 'جاري...' : 'تجديد'}
                     </button>
                   )}
                 </td>
@@ -184,6 +226,12 @@ export default function AdminSubscriptions() {
           </tbody>
         </table>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }
