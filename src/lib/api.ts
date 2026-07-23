@@ -378,6 +378,50 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         }])
     }
 
+    // 5. Initialize Credits Ledger (0 initial balance, companies earn credits by submitting approved reports)
+    await supabase
+      .from('credits_ledger')
+      .insert([{
+        tenant_id: tenantData.id,
+        amount: 0,
+        reason: 'initial',
+        created_at: new Date().toISOString()
+      }])
+      .catch(err => console.warn('Credits initialization warning:', err))
+
+    // 6. Send Welcome Notification
+    await supabase
+      .from('notifications')
+      .insert([{
+        tenant_id: tenantData.id,
+        type: 'welcome',
+        title: 'أهلاً وسهلاً في مرصد',
+        message: `مرحباً بـ ${companyData.name}! تم تفعيل حسابك بنجاح. ابدأ بإرسال التقارير والبحث عن الشركات.`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }])
+      .catch(err => console.warn('Welcome notification warning:', err))
+
+    // 7. Log registration in audit logs
+    await supabase
+      .from('audit_logs')
+      .insert([{
+        tenant_id: tenantData.id,
+        actor_id: userId,
+        action: 'company_registered',
+        resource_type: 'company',
+        resource_id: tenantData.id,
+        details: JSON.stringify({
+          company_name: companyData.name,
+          cr_number: crNumber,
+          sector: companyData.sector,
+          city: companyData.city,
+          auto_created: !companyData.crNumber ? 'cr_number_generated' : 'cr_provided'
+        }),
+        created_at: new Date().toISOString()
+      }])
+      .catch(err => console.warn('Audit log warning:', err))
+
     return { success: true, tenantId: tenantData.id }
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : 'خطأ في إنشاء الحساب')
@@ -387,6 +431,103 @@ export async function createTenantAndUser(userId: string, companyData: any) {
 // ============================================================================
 // COMPANIES API
 // ============================================================================
+
+// Get Company Dashboard Data for current logged-in company
+export async function getCompanyDashboard() {
+  const supabase = getSupabase()
+  const user = await supabase.auth.getUser()
+
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id, email, first_name, last_name, role')
+    .eq('id', user.data.user.id)
+    .single()
+
+  if (!userData) {
+    throw new Error('User not found')
+  }
+
+  // Get tenant/company info
+  const { data: tenantData } = await supabase
+    .from('tenants')
+    .select('id, name, sector, city, cr_number, status')
+    .eq('id', userData.tenant_id)
+    .single()
+
+  // Get company detailed info
+  const { data: companyData } = await supabase
+    .from('companies')
+    .select(`
+      id, name, sector, city, cr_number, logo_url,
+      trust_scores(score, tier, calculated_at),
+      reports(count)
+    `)
+    .eq('cr_number', tenantData?.cr_number)
+    .single()
+
+  // Get subscription info
+  const { data: subscriptionData } = await supabase
+    .from('subscriptions')
+    .select(`
+      id, status, current_period_start, current_period_end,
+      plans(name, features, price)
+    `)
+    .eq('tenant_id', userData.tenant_id)
+    .eq('status', 'active')
+    .single()
+
+  // Get credits balance
+  const { data: creditBalance } = await supabase
+    .rpc('get_credit_balance', { p_tenant_id: userData.tenant_id })
+
+  // Get recent activity (approved reports, credits earned, users invited)
+  const { data: recentReports } = await supabase
+    .from('reports')
+    .select('id, status, created_at, type')
+    .eq('reporter_tenant_id', userData.tenant_id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: watchlistCount } = await supabase
+    .from('watchlist_items')
+    .select('id', { count: 'exact' })
+    .eq('tenant_id', userData.tenant_id)
+
+  return {
+    company: {
+      name: tenantData?.name || companyData?.name,
+      sector: tenantData?.sector || companyData?.sector,
+      city: tenantData?.city || companyData?.city,
+      crNumber: tenantData?.cr_number,
+      logoUrl: companyData?.logo_url,
+      status: tenantData?.status
+    },
+    stats: {
+      trustScore: companyData?.trust_scores?.[0]?.score || null,
+      trustTier: companyData?.trust_scores?.[0]?.tier || 'none',
+      approvedReportsCount: recentReports?.filter(r => r.status === 'approved').length || 0,
+      watchedByCount: watchlistCount?.length || 0,
+      creditsBalance: creditBalance || 0,
+      subscriptionTier: subscriptionData?.plans?.name || 'free',
+      subscriptionExpiry: subscriptionData?.current_period_end
+    },
+    recentActivity: recentReports?.map(r => ({
+      type: r.status === 'approved' ? 'report_approved' : 'report_pending',
+      title: `تقرير ${r.type}`,
+      date: r.created_at,
+      status: r.status
+    })) || [],
+    user: {
+      email: userData.email,
+      name: `${userData.first_name} ${userData.last_name}`,
+      role: userData.role
+    }
+  }
+}
 
 // Autocomplete function for company names, CR numbers, etc.
 export async function getAutocompleteCompanies(q: string, limit = 10) {
@@ -626,9 +767,14 @@ export async function submitReport(reportData: any) {
   // Get user's tenant
   const { data: userData } = await supabase
     .from('users')
-    .select('tenant_id')
+    .select('tenant_id, role')
     .eq('id', user.data.user.id)
     .single()
+
+  // BR-06: Check if user role can submit reports (not viewer)
+  if (userData?.role === 'viewer') {
+    throw new Error('لا يمكنك رفع التقارير. اتصل بمدير الشركة.')
+  }
 
   // Check BR-05: Prevent duplicate reports within 90 days
   const ninetyDaysAgo = new Date()
@@ -636,32 +782,96 @@ export async function submitReport(reportData: any) {
 
   const { data: existingReport } = await supabase
     .from('reports')
-    .select('id')
+    .select('id, created_at')
     .eq('reporter_tenant_id', userData?.tenant_id)
     .eq('target_company_id', reportData.targetCompanyId)
+    .eq('status', 'approved')
     .gte('created_at', ninetyDaysAgo.toISOString())
     .limit(1)
 
   if (existingReport && existingReport.length > 0) {
-    throw new Error('لا يمكن رفع تقريرين عن نفس الشركة خلال 90 يوماً (BR-05)')
+    const daysSinceLast = Math.floor((Date.now() - new Date(existingReport[0].created_at).getTime()) / (1000 * 60 * 60 * 24))
+    throw new Error(`لقد أرسلت تقريراً عن هذه الشركة قبل ${daysSinceLast} أيام. يرجى الانتظار لمدة 90 يوماً من آخر تقرير معتمد.`)
   }
 
-  // Check credits balance
-  const { data: creditBalance } = await supabase
-    .rpc('get_credit_balance', { p_tenant_id: userData?.tenant_id })
+  // Check subscription status
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('status, plans(name)')
+    .eq('tenant_id', userData?.tenant_id)
+    .eq('status', 'active')
+    .single()
 
-  if ((creditBalance || 0) < 1) {
-    throw new Error('رصيد كافي غير متوفر')
+  if (!subscription) {
+    throw new Error('الاشتراك غير نشط. يرجى تجديد الاشتراك أولاً.')
   }
 
-  // Insert report
+  // Check BR-04: Subscription free plan limit
+  if (subscription.plans?.name === 'مجاني') {
+    const { data: monthReports, count } = await supabase
+      .from('reports')
+      .select('id', { count: 'exact' })
+      .eq('reporter_tenant_id', userData?.tenant_id)
+      .gte('created_at', new Date(Date.now() - 30*24*60*60*1000).toISOString())
+
+    if ((count || 0) >= 5) {
+      throw new Error('لقد وصلت لحد التقارير الشهري (5 تقارير). يرجى الترقية للخطة المدفوعة.')
+    }
+  }
+
+  // BR-07: Content validation
+  if (!reportData.description || reportData.description.trim().length < 20) {
+    throw new Error('وصف التقرير يجب أن يكون 20 حرفاً على الأقل.')
+  }
+
+  // Check/create company if not exists
+  let targetCompanyId = reportData.targetCompanyId
+  if (!targetCompanyId && reportData.companyName) {
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('id')
+      .or(`name.ilike.%${reportData.companyName}%,cr_number.eq.${reportData.companyCrNumber}`)
+      .limit(1)
+
+    if (existingCompany && existingCompany.length > 0) {
+      targetCompanyId = existingCompany[0].id
+    } else {
+      // Create company
+      const { data: newCompany, error: companyError } = await supabase
+        .from('companies')
+        .insert([{
+          name: reportData.companyName,
+          cr_number: reportData.companyCrNumber || null,
+          sector: reportData.companySector || null,
+          city: reportData.companyCity || null,
+          source: 'from_report',
+          approved: false
+        }])
+        .select()
+        .single()
+
+      if (companyError) {
+        throw new Error('فشل إنشاء الشركة: ' + companyError.message)
+      }
+      targetCompanyId = newCompany.id
+    }
+  }
+
+  if (!targetCompanyId) {
+    throw new Error('شركة الهدف مطلوبة')
+  }
+
+  // BR-08: Insert report with audit logging
   const { data: report, error } = await supabase
     .from('reports')
     .insert([
       {
         reporter_tenant_id: userData?.tenant_id,
-        target_company_id: reportData.targetCompanyId,
+        target_company_id: targetCompanyId,
         status: 'pending_review',
+        type: reportData.type,
+        title: reportData.title || reportData.type,
+        description: reportData.description,
         deal_amount_range: reportData.dealAmountRange,
         payment_commitment: reportData.paymentCommitment,
         delay_days: reportData.delayDays || 0,
@@ -677,7 +887,7 @@ export async function submitReport(reportData: any) {
     throw new Error('Failed to submit report: ' + error.message)
   }
 
-  // Deduct credits immediately
+  // Deduct credits immediately (1 credit per report submission)
   await supabase
     .from('credits_ledger')
     .insert([
@@ -685,9 +895,41 @@ export async function submitReport(reportData: any) {
         tenant_id: userData?.tenant_id,
         report_id: report.id,
         amount: -1,
-        reason: 'report_approved',
+        reason: 'report_submitted',
+        created_at: new Date().toISOString()
       },
     ])
+    .catch(err => console.warn('Credit deduction warning:', err))
+
+  // BR-09: Log in audit logs
+  await supabase
+    .from('audit_logs')
+    .insert([{
+      tenant_id: userData?.tenant_id,
+      actor_id: user.data.user.id,
+      action: 'report_submitted',
+      resource_type: 'report',
+      resource_id: report.id,
+      details: JSON.stringify({
+        target_company_id: targetCompanyId,
+        type: reportData.type,
+        status: 'pending_review'
+      }),
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Audit log warning:', err))
+
+  // BR-09: Send notification to admins
+  await supabase
+    .from('notifications')
+    .insert([{
+      type: 'new_report_pending',
+      title: 'تقرير جديد ينتظر المراجعة',
+      message: `تقرير جديد من شركة ينتظر المراجعة`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Notification warning:', err))
 
   return report
 }
@@ -1104,6 +1346,22 @@ export async function approveReport(reportId: string) {
   const supabase = getSupabase()
   const user = await supabase.auth.getUser()
 
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
+  }
+
+  // Get report info
+  const { data: report } = await supabase
+    .from('reports')
+    .select('id, target_company_id, reporter_tenant_id')
+    .eq('id', reportId)
+    .single()
+
+  if (!report) {
+    throw new Error('Report not found')
+  }
+
+  // Update report status to approved
   const { error } = await supabase
     .from('reports')
     .update({ status: 'approved', approved_at: new Date().toISOString() })
@@ -1113,15 +1371,64 @@ export async function approveReport(reportId: string) {
     throw new Error('Failed to approve: ' + error.message)
   }
 
+  // Award 10 credits to reporter
+  await supabase
+    .from('credits_ledger')
+    .insert([{
+      tenant_id: report.reporter_tenant_id,
+      report_id: reportId,
+      amount: 10,
+      reason: 'report_approved',
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Credit award warning:', err))
+
+  // Trigger: Recalculate trust score for the company
+  // This would be a trigger in the database, but we can call an RPC
+  await supabase
+    .rpc('compute_trust_score', { p_company_id: report.target_company_id })
+    .catch(err => console.warn('Trust score calculation warning:', err))
+
+  // Send notification to reporter
+  await supabase
+    .from('notifications')
+    .insert([{
+      tenant_id: report.reporter_tenant_id,
+      type: 'report_approved',
+      title: '✅ تم اعتماد تقريرك!',
+      message: 'تقريرك تمت الموافقة عليه بنجاح وحصلت على 10 نقاط ائتمان.',
+      is_read: false,
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Notification warning:', err))
+
+  // Log review action
   await supabase
     .from('review_actions')
-    .insert([
-      {
-        report_id: reportId,
-        reviewer_id: user.data.user?.id,
-        action: 'approved',
-      },
-    ])
+    .insert([{
+      report_id: reportId,
+      reviewer_id: user.data.user.id,
+      action: 'approved',
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Review action warning:', err))
+
+  // Audit log
+  await supabase
+    .from('audit_logs')
+    .insert([{
+      actor_id: user.data.user.id,
+      action: 'report_approved',
+      resource_type: 'report',
+      resource_id: reportId,
+      details: JSON.stringify({
+        reporter_tenant_id: report.reporter_tenant_id,
+        target_company_id: report.target_company_id,
+        credits_awarded: 10
+      }),
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Audit log warning:', err))
 
   return { success: true }
 }
@@ -1130,25 +1437,88 @@ export async function rejectReport(reportId: string, reason: string) {
   const supabase = getSupabase()
   const user = await supabase.auth.getUser()
 
+  if (!user.data.user) {
+    throw new Error('Unauthorized')
+  }
+
+  // Get report info
+  const { data: report } = await supabase
+    .from('reports')
+    .select('id, reporter_tenant_id')
+    .eq('id', reportId)
+    .single()
+
+  if (!report) {
+    throw new Error('Report not found')
+  }
+
+  // Update report status to rejected with reason
   const { error } = await supabase
     .from('reports')
-    .update({ status: 'rejected', rejected_at: new Date().toISOString() })
+    .update({
+      status: 'rejected',
+      rejected_at: new Date().toISOString(),
+      rejection_reason: reason
+    })
     .eq('id', reportId)
 
   if (error) {
     throw new Error('Failed to reject: ' + error.message)
   }
 
+  // Refund the 1 credit deducted during submission
+  await supabase
+    .from('credits_ledger')
+    .insert([{
+      tenant_id: report.reporter_tenant_id,
+      report_id: reportId,
+      amount: 1,
+      reason: 'report_rejected_refund',
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Credit refund warning:', err))
+
+  // Send notification to reporter
+  await supabase
+    .from('notifications')
+    .insert([{
+      tenant_id: report.reporter_tenant_id,
+      type: 'report_rejected',
+      title: '❌ تم رفض تقريرك',
+      message: `تقريرك لم يتم قبوله. السبب: ${reason}`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Notification warning:', err))
+
+  // Log review action
   await supabase
     .from('review_actions')
-    .insert([
-      {
-        report_id: reportId,
-        reviewer_id: user.data.user?.id,
-        action: 'rejected',
-        reason,
-      },
-    ])
+    .insert([{
+      report_id: reportId,
+      reviewer_id: user.data.user.id,
+      action: 'rejected',
+      reason,
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Review action warning:', err))
+
+  // Audit log
+  await supabase
+    .from('audit_logs')
+    .insert([{
+      actor_id: user.data.user.id,
+      action: 'report_rejected',
+      resource_type: 'report',
+      resource_id: reportId,
+      details: JSON.stringify({
+        reporter_tenant_id: report.reporter_tenant_id,
+        rejection_reason: reason,
+        credit_refunded: 1
+      }),
+      created_at: new Date().toISOString()
+    }])
+    .catch(err => console.warn('Audit log warning:', err))
 
   return { success: true }
 }
