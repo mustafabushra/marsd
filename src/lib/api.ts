@@ -68,6 +68,128 @@ export function getUser(): Record<string, any> | null {
 }
 
 // ============================================================================
+// SEARCH API — Knowledge Graph (Reports as Products)
+// ============================================================================
+
+/**
+ * Search in Knowledge Graph:
+ * Reports are "products" (منتجات) aggregated by mرصد
+ * Search looks in: report descriptions, report types, company names
+ * Results show companies with their aggregated reports (without revealing reporter identity)
+ */
+
+export async function searchKnowledgeGraph(q: string, filters?: { sector?: string; city?: string; riskLevel?: string; trustScoreMin?: number }) {
+  const supabase = getSupabase()
+
+  if (!q.trim()) {
+    return { results: [], totalResults: 0, metadata: { searchTime: 0 } }
+  }
+
+  // FTS search query for reports aggregated by company
+  const { data, error } = await supabase
+    .from('companies')
+    .select(`
+      id,
+      name,
+      commercial_name,
+      tax_id,
+      sector,
+      city,
+      trust_score,
+      approved_reports_count,
+      reports(id, description, type, created_at)
+    `)
+    .or(`name.ilike.%${q}%,commercial_name.ilike.%${q}%,tax_id.ilike.%${q}%`)
+    .limit(20)
+
+  if (error) {
+    console.error('Search error:', error)
+    return { results: [], totalResults: 0, metadata: { searchTime: 0 } }
+  }
+
+  // Also search in report descriptions/types to find related companies
+  const { data: reportMatches, error: reportError } = await supabase
+    .from('reports')
+    .select('target_company_id, description, type')
+    .or(`description.ilike.%${q}%,type.ilike.%${q}%`)
+    .eq('status', 'approved')
+    .limit(100)
+
+  if (reportError) {
+    console.error('Report search error:', reportError)
+  }
+
+  // Collect unique company IDs from report matches
+  const companyIdsFromReports = new Set(
+    reportMatches?.map(r => r.target_company_id) || []
+  )
+
+  // Fetch companies from report matches
+  if (companyIdsFromReports.size > 0) {
+    const { data: reportRelatedCompanies, error: e2 } = await supabase
+      .from('companies')
+      .select(`
+        id,
+        name,
+        commercial_name,
+        sector,
+        city,
+        trust_score,
+        approved_reports_count,
+        reports(id, description, type, created_at)
+      `)
+      .in('id', Array.from(companyIdsFromReports))
+      .limit(20)
+
+    if (!e2 && reportRelatedCompanies) {
+      // Merge results, remove duplicates
+      const merged = [...(data || [])].concat(reportRelatedCompanies || [])
+      const unique = Array.from(
+        new Map(merged.map(c => [c.id, c])).values()
+      )
+
+      return {
+        results: unique.map(c => ({
+          type: 'company',
+          id: c.id,
+          name: c.name || c.commercial_name,
+          sector: c.sector,
+          city: c.city,
+          trustScore: c.trust_score,
+          reportCount: c.approved_reports_count || 0,
+          aggregatedReports: c.reports || [],
+          relevance: 0.85
+        })),
+        totalResults: unique.length,
+        metadata: {
+          searchTime: 0,
+          indexedDocuments: (data?.length || 0) + (reportMatches?.length || 0)
+        }
+      }
+    }
+  }
+
+  return {
+    results: (data || []).map(c => ({
+      type: 'company',
+      id: c.id,
+      name: c.name || c.commercial_name,
+      sector: c.sector,
+      city: c.city,
+      trustScore: c.trust_score,
+      reportCount: c.approved_reports_count || 0,
+      aggregatedReports: c.reports || [],
+      relevance: 0.90
+    })),
+    totalResults: data?.length || 0,
+    metadata: {
+      searchTime: 0,
+      indexedDocuments: data?.length || 0
+    }
+  }
+}
+
+// ============================================================================
 // AUTH API
 // ============================================================================
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchCompanies, getAutocompleteCompanies } from '../lib/api'
+import { searchKnowledgeGraph, getAutocompleteCompanies } from '../lib/api'
 import { Search as SearchIcon, X, Filter } from 'lucide-react'
 
 export default function Search() {
@@ -71,7 +71,7 @@ export default function Search() {
     setError('')
   }
 
-  // BUTTON #2: Search
+  // BUTTON #2: Search Knowledge Graph (Reports as Products)
   async function handleSearch() {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل نص البحث')
@@ -80,23 +80,25 @@ export default function Search() {
     setLoading(true)
     setError('')
     try {
-      const result = await searchCompanies(query)
-      let formatted = result.data.map(c => ({
+      // Search in Knowledge Graph (reports aggregated by company)
+      const result = await searchKnowledgeGraph(query, filters)
+      let formatted = result.results.map(c => ({
         id: c.id,
         name: c.name,
         sector: c.sector || '—',
         city: c.city || '—',
-        scoreText: c.trust_score?.score?.toString() || '—',
-        score: c.trust_score?.score || 0,
-        gaugeBg: c.trust_score ? getGaugeGradient(c.trust_score.score) : 'conic-gradient(#E2E8F0 0% 100%)',
-        riskLabel: c.trust_score ? getRiskInfo(c.trust_score.score).label : 'بيانات غير كافية',
-        bg: c.trust_score ? getRiskInfo(c.trust_score.score).bg : '#F3F4F6',
-        color: c.trust_score ? getRiskInfo(c.trust_score.score).color : '#6B7280',
-        reports: c.trust_score?.approvedReports || 0,
-        hasData: !!c.trust_score
+        scoreText: c.trustScore?.toString() || '—',
+        score: c.trustScore || 0,
+        gaugeBg: c.trustScore ? getGaugeGradient(c.trustScore) : 'conic-gradient(#E2E8F0 0% 100%)',
+        riskLabel: c.trustScore ? getRiskInfo(c.trustScore).label : 'بيانات غير كافية',
+        bg: c.trustScore ? getRiskInfo(c.trustScore).bg : '#F3F4F6',
+        color: c.trustScore ? getRiskInfo(c.trustScore).color : '#6B7280',
+        reports: c.reportCount || 0,  // Number of aggregated reports
+        hasData: c.reportCount > 0,
+        relevance: c.relevance
       }))
 
-      // Apply filters
+      // Apply filters if needed
       if (filters.sector) formatted = formatted.filter(c => c.sector === filters.sector)
       if (filters.city) formatted = formatted.filter(c => c.city === filters.city)
       if (filters.risk) formatted = formatted.filter(c => c.riskLabel === filters.risk)
@@ -108,11 +110,17 @@ export default function Search() {
         })
       }
 
+      // Sort by relevance and report count
+      formatted.sort((a, b) => {
+        if (a.relevance !== b.relevance) return b.relevance - a.relevance
+        return b.reports - a.reports
+      })
+
       setCompanies(formatted)
-      showToastMessage(`✅ تم العثور على ${formatted.length} نتيجة`)
+      showToastMessage(`✅ تم العثور على ${formatted.length} شركة بـ ${result.metadata.indexedDocuments} تقرير`)
 
       // Audit log
-      console.log(`[AUDIT] Search: query="${query}" filters=${JSON.stringify(filters)} results=${formatted.length}`)
+      console.log(`[AUDIT] Knowledge Graph Search: query="${query}" filters=${JSON.stringify(filters)} companies=${formatted.length} reports=${result.metadata.indexedDocuments}`)
     } catch (err) {
       setError(err.message || 'فشل البحث')
       showToastMessage('❌ حدث خطأ أثناء البحث')
