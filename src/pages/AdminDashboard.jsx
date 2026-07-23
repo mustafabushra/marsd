@@ -1,20 +1,92 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, CreditCard, FileText, Users, BarChart3, Settings } from 'lucide-react'
+import { getSupabase } from '../lib/api'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
+  const [stats, setStats] = useState({
+    totalCompanies: 0,
+    activeSubscriptions: 0,
+    pendingReports: 0,
+    approvedReports: 0,
+    totalUsers: 0,
+    totalRevenue: 0,
+    averageTrustScore: 0,
+    churnRate: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - في الإنتاج ستأتي من Supabase
-  const stats = {
-    totalCompanies: 15,
-    activeSubscriptions: 3,
-    pendingReports: 5,
-    approvedReports: 28,
-    totalUsers: 12,
-    totalRevenue: 45000,
-  }
+  // Load real data from Supabase
+  useEffect(() => {
+    const loadDashboardStats = async () => {
+      try {
+        const supabase = getSupabase()
+
+        // Get total companies count
+        const { count: companiesCount } = await supabase
+          .from('companies')
+          .select('id', { count: 'exact' })
+
+        // Get active subscriptions count
+        const { count: activeSubCount } = await supabase
+          .from('subscriptions')
+          .select('id', { count: 'exact' })
+          .eq('status', 'active')
+
+        // Get pending reports count
+        const { count: pendingCount } = await supabase
+          .from('reports')
+          .select('id', { count: 'exact' })
+          .eq('status', 'pending_review')
+
+        // Get approved reports count
+        const { count: approvedCount } = await supabase
+          .from('reports')
+          .select('id', { count: 'exact' })
+          .eq('status', 'approved')
+
+        // Get total users count (excluding admins)
+        const { count: usersCount } = await supabase
+          .from('users')
+          .select('id', { count: 'exact' })
+          .eq('role', 'company_admin')
+
+        // Get total revenue (sum of invoices)
+        const { data: revenueData } = await supabase
+          .from('invoices')
+          .select('amount')
+          .eq('status', 'paid')
+        const totalRevenue = revenueData?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
+
+        // Get average trust score
+        const { data: trustScores } = await supabase
+          .from('trust_scores')
+          .select('score')
+        const avgTrust = trustScores?.length > 0
+          ? Math.round(trustScores.reduce((sum, ts) => sum + (ts.score || 0), 0) / trustScores.length)
+          : 0
+
+        setStats({
+          totalCompanies: companiesCount || 0,
+          activeSubscriptions: activeSubCount || 0,
+          pendingReports: pendingCount || 0,
+          approvedReports: approvedCount || 0,
+          totalUsers: usersCount || 0,
+          totalRevenue: totalRevenue,
+          averageTrustScore: avgTrust,
+          churnRate: 8, // TODO: Calculate from subscription history
+        })
+      } catch (err) {
+        console.error('Error loading admin dashboard stats:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardStats()
+  }, [])
 
   const quickActions = [
     { id: 1, title: 'مراجعة التقارير المعلقة', desc: `${stats.pendingReports} تقارير بانتظار`, icon: FileText, color: '#F59E0B', path: '/admin/reports', btnText: 'عرض التقارير' },
