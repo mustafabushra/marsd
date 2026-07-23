@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCompanyReport, searchCompanies } from '../lib/api'
+import { getCompanyReport, searchCompanies, getCompanyReportsTimeline, getCompanyTrends, getCompanyReportsSummary } from '../lib/api'
 import { DocumentIcon } from '../components/icons'
+import { useUserRole } from '../hooks/useUserRole'
+import { useSystemStatus } from '../hooks/useSystemStatus'
+import { canPerform } from '../utils/roles'
 
 export default function TrustReport() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { role } = useUserRole()
+  const systemStatus = useSystemStatus()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [company, setCompany] = useState(null)
   const [report, setReport] = useState(null)
+  const [timeline, setTimeline] = useState([])
+  const [trends, setTrends] = useState([])
+  const [summary, setSummary] = useState([])
 
   useEffect(() => {
     const loadReport = async () => {
@@ -20,6 +28,7 @@ export default function TrustReport() {
           return
         }
 
+        // Load main report data
         const data = await getCompanyReport(id)
         setReport(data)
 
@@ -27,6 +36,17 @@ export default function TrustReport() {
         const companyResult = await searchCompanies('', 1, 1000)
         const comp = companyResult.data?.find(c => c.id === id)
         setCompany(comp || { name: 'شركة', city: '—', sector: '—' })
+
+        // Load Timeline, Trends, and Summary in parallel
+        const [timelineData, trendsData, summaryData] = await Promise.all([
+          getCompanyReportsTimeline(id, 8),
+          getCompanyTrends(id),
+          getCompanyReportsSummary(id),
+        ])
+
+        setTimeline(timelineData.data || [])
+        setTrends(trendsData.data || [])
+        setSummary(summaryData.data || [])
       } catch (err) {
         setError(err.message || 'خطأ في تحميل البيانات')
       } finally {
@@ -124,19 +144,36 @@ export default function TrustReport() {
           <div style={{ flex: 1, minWidth: '240px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#334155' }}>مستوى موثوقية التقرير</span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#16A34A' }}>عالٍ — 34 تقرير معتمد</span>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#16A34A' }}>{report?.approvedReports || 0} تقرير معتمد</span>
             </div>
             <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '6px', overflow: 'hidden' }}>
-              <div style={{ width: '88%', height: '100%', background: 'linear-gradient(90deg,#16A34A,#4ADE80)', borderRadius: '6px' }}></div>
+              <div style={{ width: Math.min(((report?.approvedReports || 0) / 50) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg,#16A34A,#4ADE80)', borderRadius: '6px' }}></div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>⬇ تحميل PDF</button>
-            <button style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>+ قائمة المراقبة</button>
-            <button style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              إضافة تقرير
-              <DocumentIcon />
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                const canAdd = canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0
+                if (canAdd) {
+                  navigate('/add-report', { state: { companyId: id, companyName: company?.name } })
+                }
+              }}
+              disabled={!canPerform(role, 'canAddReport') || !systemStatus.subscriptionActive || !systemStatus.accountActive || systemStatus.creditsBalance <= 0}
+              style={{
+                background: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? '#3B82F6' : '#D1D5DB',
+                color: '#fff',
+                border: 0,
+                borderRadius: '10px',
+                padding: '11px 18px',
+                fontSize: '14px',
+                fontWeight: 800,
+                cursor: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive ? 'pointer' : 'not-allowed',
+                opacity: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive ? 1 : 0.6
+              }}>
+              + إضافة تقرير
             </button>
+            <button style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>⭐ قائمة المراقبة</button>
+            <button style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>⬇ تحميل PDF</button>
           </div>
         </div>
       </div>
@@ -181,6 +218,86 @@ export default function TrustReport() {
               </div>
             </div>
           </div>
+
+          {/* Reports Summary */}
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>ملخص التقارير</h3>
+            {summary.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                {summary.map((item, idx) => (
+                  <div key={idx} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', marginBottom: '6px' }}>{item.icon}</div>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: item.color, marginBottom: '4px' }}>{item.count}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{item.category}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8' }}>لا توجد تقارير بعد</div>
+            )}
+          </div>
+
+          {/* Trends */}
+          {trends.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>اتجاهات الأداء</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {trends.slice(0, 6).map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#F8FAFC', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '16px' }}>
+                        {item.trend_direction === 'improving' ? '📈' : item.trend_direction === 'declining' ? '📉' : '➡️'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{item.period_month}</div>
+                        <div style={{ fontSize: '12px', color: '#64748B' }}>{item.avg_score}% • {item.approved_reports} تقرير</div>
+                      </div>
+                    </div>
+                    <div style={{
+                      background: item.trend_direction === 'improving' ? '#ECFDF5' : item.trend_direction === 'declining' ? '#FEE2E2' : '#F1F5F9',
+                      color: item.trend_direction === 'improving' ? '#15803D' : item.trend_direction === 'declining' ? '#DC2626' : '#64748B',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      fontWeight: 700
+                    }}>
+                      {item.trend_direction === 'improving' ? 'تحسّن' : item.trend_direction === 'declining' ? 'تراجع' : 'مستقر'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Timeline */}
+          {timeline.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>آخر التقارير</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {timeline.map((report, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '14px', paddingBottom: '14px', borderBottom: idx < timeline.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', fontSize: '18px' }}>
+                      {report.severity === 'دفع متأخر' ? '💳' : report.severity === 'عدم التزام' ? '⚠️' : report.severity === 'ممتاز' ? '⭐' : report.severity === 'قضايا' ? '⚔️' : '📋'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
+                          {new Date(report.created_at).toLocaleDateString('ar-SA')}
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{report.title}</div>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.5, marginBottom: '6px' }}>
+                        {report.summary}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
+                        من {report.reporter_company_name}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </main>

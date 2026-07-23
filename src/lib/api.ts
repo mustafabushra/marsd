@@ -437,6 +437,58 @@ export async function getCompanyReport(companyId: string) {
   }
 }
 
+// Get company reports timeline
+export async function getCompanyReportsTimeline(companyId: string, limit = 10) {
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .rpc('get_company_reports_timeline', {
+      company_id: companyId,
+      limit_val: limit
+    })
+
+  if (error) {
+    console.warn('Timeline RPC error:', error)
+    return { data: [] }
+  }
+
+  return { data: data || [] }
+}
+
+// Get company trends over time
+export async function getCompanyTrends(companyId: string) {
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .rpc('get_company_trends', {
+      company_id: companyId
+    })
+
+  if (error) {
+    console.warn('Trends RPC error:', error)
+    return { data: [] }
+  }
+
+  return { data: data || [] }
+}
+
+// Get reports summary by category
+export async function getCompanyReportsSummary(companyId: string) {
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .rpc('get_company_reports_summary', {
+      company_id: companyId
+    })
+
+  if (error) {
+    console.warn('Summary RPC error:', error)
+    return { data: [] }
+  }
+
+  return { data: data || [] }
+}
+
 // ============================================================================
 // REPORTS API
 // ============================================================================
