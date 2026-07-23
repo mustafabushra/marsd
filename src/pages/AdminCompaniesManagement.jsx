@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Search, Trash2, Edit2, Plus, AlertCircle, CheckCircle } from 'lucide-react'
+import * as api from '../lib/api'
 
 export default function AdminCompaniesManagement() {
   const [companies, setCompanies] = useState([])
@@ -7,6 +8,8 @@ export default function AdminCompaniesManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [error, setError] = useState(null)
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
   const [formData, setFormData] = useState({
     name: '',
     crNumber: '',
@@ -21,77 +24,37 @@ export default function AdminCompaniesManagement() {
     loadCompanies()
   }, [])
 
-  const loadCompanies = () => {
-    const mockCompanies = [
-      {
-        id: '1',
-        name: 'شركة نجد للمقاولات',
-        crNumber: '1010123456',
-        sector: 'مقاولات',
-        city: 'الرياض',
-        email: 'contact@najd.sa',
-        phone: '+966501234567',
+  const loadCompanies = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await api.getAdminCompanies(pagination.page, pagination.limit)
+      const formattedCompanies = (response.data || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        crNumber: c.cr_number,
+        sector: c.sector || '—',
+        city: c.city || '—',
         status: 'active',
-        trustScore: 94,
-        reportsCount: 15,
-        createdAt: '2024-01-15'
-      },
-      {
-        id: '2',
-        name: 'الرياض للتجارة',
-        crNumber: '1010789456',
-        sector: 'تجارة',
-        city: 'الرياض',
-        email: 'contact@riyadh.sa',
-        phone: '+966501234568',
-        status: 'active',
-        trustScore: 88,
-        reportsCount: 12,
-        createdAt: '2024-02-10'
-      },
-      {
-        id: '3',
-        name: 'التقنية المتقدمة',
-        crNumber: '1010456789',
-        sector: 'تقنية',
-        city: 'جدة',
-        email: 'contact@tech.sa',
-        phone: '+966501234569',
-        status: 'active',
-        trustScore: 92,
-        reportsCount: 10,
-        createdAt: '2024-03-05'
-      },
-      {
-        id: '4',
-        name: 'الشرق للتوريد',
-        crNumber: '1010111222',
-        sector: 'توريد',
-        city: 'الدمام',
-        email: 'contact@sharq.sa',
-        phone: '+966501234570',
-        status: 'inactive',
-        trustScore: 71,
-        reportsCount: 5,
-        createdAt: '2024-01-20'
-      }
-    ]
-    setCompanies(mockCompanies)
-    setLoading(false)
+        trustScore: c.trust_score?.score || 0,
+        riskBand: c.trust_score?.risk_band || 'none',
+        reportsCount: c.trust_score?.approved_reports || 0,
+        createdAt: new Date(c.created_at).toLocaleDateString('ar-SA')
+      }))
+      setCompanies(formattedCompanies)
+      setPagination(response.pagination || {})
+    } catch (err) {
+      setError(err.message || 'حدث خطأ في تحميل الشركات')
+      console.error('Error loading companies:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleAddCompany = (e) => {
     e.preventDefault()
-    const newCompany = {
-      id: Date.now().toString(),
-      ...formData,
-      trustScore: 85,
-      reportsCount: 0,
-      createdAt: new Date().toISOString().split('T')[0]
-    }
-    setCompanies([newCompany, ...companies])
-    setFormData({ name: '', crNumber: '', sector: '', city: '', email: '', phone: '', status: 'active' })
     setShowAddForm(false)
+    setFormData({ name: '', crNumber: '', sector: '', city: '', email: '', phone: '', status: 'active' })
   }
 
   const handleDeleteCompany = (id) => {
@@ -124,6 +87,13 @@ export default function AdminCompaniesManagement() {
         <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>إدارة الشركات</h1>
         <p style={{ color: '#64748B', fontSize: '14px', textAlign: 'right' }}>إدارة الشركات المسجلة والعملاء</p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', fontSize: '14px', color: '#991B1B', fontWeight: 600 }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       {/* Top Controls */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', justifyContent: 'space-between', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
