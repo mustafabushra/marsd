@@ -1797,3 +1797,141 @@ export async function getCreditsBalance() {
 
   return { balance: balance || 0 }
 }
+
+// ============================================================================
+// SMART COMPANY DETECTION — CASE A (New) vs CASE B (Existing) vs CASE C (Owner)
+// ============================================================================
+
+/**
+ * Smart Company Detection for Onboarding
+ * Search order:
+ * 1. Commercial Registration (CR) Number
+ * 2. Unified Number
+ * 3. License Number
+ * 4. Official Email
+ * 5. Company Name (Fuzzy)
+ *
+ * Returns:
+ * - null: No company found (CASE A — Create new)
+ * - company: Found existing company (CASE B — Create claim request)
+ */
+export async function smartCompanyDetection(searchData: {
+  crNumber?: string
+  unifiedNumber?: string
+  licenseNumber?: string
+  officialEmail?: string
+  companyName?: string
+}): Promise<{ company: any; searchMethod: string } | null> {
+  const supabase = getSupabase()
+
+  try {
+    // 1. Search by CR Number (Primary)
+    if (searchData.crNumber?.trim()) {
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('cr_number', searchData.crNumber.trim())
+        .limit(1)
+        .single()
+
+      if (data) {
+        return { company: data, searchMethod: 'cr_number' }
+      }
+    }
+
+    // 2. Search by Unified Number
+    if (searchData.unifiedNumber?.trim()) {
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('unified_number', searchData.unifiedNumber.trim())
+        .limit(1)
+        .single()
+
+      if (data) {
+        return { company: data, searchMethod: 'unified_number' }
+      }
+    }
+
+    // 3. Search by License Number
+    if (searchData.licenseNumber?.trim()) {
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('license_number', searchData.licenseNumber.trim())
+        .limit(1)
+        .single()
+
+      if (data) {
+        return { company: data, searchMethod: 'license_number' }
+      }
+    }
+
+    // 4. Search by Official Email
+    if (searchData.officialEmail?.trim()) {
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('official_email', searchData.officialEmail.toLowerCase().trim())
+        .limit(1)
+        .single()
+
+      if (data) {
+        return { company: data, searchMethod: 'official_email' }
+      }
+    }
+
+    // 5. Fuzzy Search by Company Name (Optional — use with caution)
+    // Disabled by default to prevent false positives
+    // if (searchData.companyName?.trim()) {
+    //   const { data } = await supabase
+    //     .from('companies')
+    //     .select('*')
+    //     .ilike('name', `%${searchData.companyName.trim()}%`)
+    //     .limit(1)
+    //     .single()
+    //
+    //   if (data) {
+    //     return { company: data, searchMethod: 'company_name_fuzzy' }
+    //   }
+    // }
+
+    return null
+  } catch (err) {
+    console.error('Smart company detection error:', err)
+    return null
+  }
+}
+
+/**
+ * Check if current user already owns a company
+ * Returns: company data if user is owner, null otherwise
+ */
+export async function getUserCompany(clerKUserId: string): Promise<any | null> {
+  const supabase = getSupabase()
+
+  try {
+    // Get user record
+    const { data: userData } = await supabase
+      .from('users')
+      .select('company_id, tenant_id')
+      .eq('id', clerKUserId)
+      .single()
+
+    if (!userData?.company_id) {
+      return null
+    }
+
+    // Get company
+    const { data: company } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', userData.company_id)
+      .single()
+
+    return company || null
+  } catch (err) {
+    console.error('Get user company error:', err)
+    return null
+  }
+}

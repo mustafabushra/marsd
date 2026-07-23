@@ -62,6 +62,8 @@ import AdminCompanyApproval from './pages/AdminCompanyApproval'
 import AccountPendingApproval from './pages/AccountPendingApproval'
 import AccountRejected from './pages/AccountRejected'
 import AccountSuspended from './pages/AccountSuspended'
+import RegistrationPending from './pages/RegistrationPending'
+import CompanyClaimPending from './pages/CompanyClaimPending'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -118,6 +120,8 @@ function AppContent() {
         <Route path="/account-pending" element={<AccountPendingApproval />} />
         <Route path="/account-rejected" element={<AccountRejected />} />
         <Route path="/account-suspended" element={<AccountSuspended />} />
+        <Route path="/registration-pending" element={<RegistrationPending />} />
+        <Route path="/company-claim-pending" element={<CompanyClaimPending />} />
         <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected & Company Status Checked */}
