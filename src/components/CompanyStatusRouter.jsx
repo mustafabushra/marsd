@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCompanyStatus } from '../hooks/useCompanyStatus'
+import { COMPANY_STATUS } from '../lib/constants'
 
 /**
  * CompanyStatusRouter: Route based on company.status (database source of truth)
@@ -23,17 +24,17 @@ export default function CompanyStatusRouter({ children }) {
     if (status === null) {
       // No company exists → User is new
       navigate('/company-onboarding', { replace: true })
-    } else if (status === 'pending') {
+    } else if (status === COMPANY_STATUS.PENDING) {
       // Company pending admin approval
       navigate('/account-pending', { replace: true })
-    } else if (status === 'rejected') {
+    } else if (status === COMPANY_STATUS.REJECTED) {
       // Company was rejected by admin
       navigate('/account-rejected', { replace: true })
-    } else if (status === 'suspended') {
+    } else if (status === COMPANY_STATUS.SUSPENDED) {
       // Company account was suspended
       navigate('/account-suspended', { replace: true })
-    } else if (status === 'approved') {
-      // Company is approved → Allow access
+    } else if (status === COMPANY_STATUS.APPROVED || status === COMPANY_STATUS.ACTIVE) {
+      // Company is approved or active → Allow access
       return // Render children (dashboard access)
     } else {
       // Unknown status → Safety redirect

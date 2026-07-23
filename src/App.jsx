@@ -60,6 +60,8 @@ import AdminCompanyVerification from './pages/AdminCompanyVerification'
 import AdminBackup from './pages/AdminBackup'
 import AdminCompanyApproval from './pages/AdminCompanyApproval'
 import AccountPendingApproval from './pages/AccountPendingApproval'
+import AccountRejected from './pages/AccountRejected'
+import AccountSuspended from './pages/AccountSuspended'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -114,6 +116,8 @@ function AppContent() {
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/account-pending" element={<AccountPendingApproval />} />
+        <Route path="/account-rejected" element={<AccountRejected />} />
+        <Route path="/account-suspended" element={<AccountSuspended />} />
         <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected & Company Status Checked */}

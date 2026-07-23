@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
+import { COMPANY_STATUS } from '../lib/constants'
 
 export default function AdminCompanyApproval() {
   const [companies, setCompanies] = useState([])
@@ -21,7 +22,7 @@ export default function AdminCompanyApproval() {
       const { data, error: fetchError } = await supabase
         .from('companies')
         .select('id, cr_number, name, cr_file_url, status, created_at, sector, city')
-        .eq('status', 'pending')
+        .eq('status', COMPANY_STATUS.PENDING)
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -64,7 +65,7 @@ export default function AdminCompanyApproval() {
       const { error: updateError } = await supabase
         .from('companies')
         .update({
-          status: 'approved',
+          status: COMPANY_STATUS.APPROVED,
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)
@@ -131,7 +132,7 @@ export default function AdminCompanyApproval() {
       const { error: updateError } = await supabase
         .from('companies')
         .update({
-          status: 'rejected',
+          status: COMPANY_STATUS.REJECTED,
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)

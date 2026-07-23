@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { createTenantAndUser, getSupabase, ensureStorageBucket } from '../lib/api'
+import { COMPANY_STATUS } from '../lib/constants'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -183,7 +184,7 @@ export default function CompanyOnboarding() {
           foundedYear: companyData.foundedYear,
           crStatus: companyData.crStatus || 'active',
           crFileUrl: crFileUrl,
-          status: 'pending',
+          status: COMPANY_STATUS.PENDING,
           firstName: user.firstName || '',
           lastName: user.lastName || ''
         })

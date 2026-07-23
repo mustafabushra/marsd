@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { COMPANY_STATUS } from '../lib/constants'
 
 export default function AccountPendingApproval() {
   const navigate = useNavigate()
@@ -39,11 +40,11 @@ export default function AccountPendingApproval() {
           .single()
 
         // If approved, redirect to dashboard
-        if (companyData?.status === 'approved') {
+        if (companyData?.status === COMPANY_STATUS.APPROVED || companyData?.status === COMPANY_STATUS.ACTIVE) {
           navigate('/dashboard', { replace: true })
-        } else if (companyData?.status === 'rejected') {
+        } else if (companyData?.status === COMPANY_STATUS.REJECTED) {
           navigate('/account-rejected', { replace: true })
-        } else if (companyData?.status === 'suspended') {
+        } else if (companyData?.status === COMPANY_STATUS.SUSPENDED) {
           navigate('/account-suspended', { replace: true })
         }
       } catch (err) {
