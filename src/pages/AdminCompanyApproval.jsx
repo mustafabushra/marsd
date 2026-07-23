@@ -29,18 +29,37 @@ export default function AdminCompanyApproval() {
 
       // Enrich with tenant info (email, phone)
       const companiesWithTenant = await Promise.all((data || []).map(async (company) => {
-        const { data: tenantData } = await supabase
-          .from('tenants')
-          .select('id, email, phone')
-          .eq('company_id', company.id)
-          .single()
-          .catch(() => ({ data: null }))
+        try {
+          const { data: tenantData, error: tenantError } = await supabase
+            .from('tenants')
+            .select('id, email, phone')
+            .eq('company_id', company.id)
+            .single()
 
-        return {
-          ...company,
-          tenant_id: tenantData?.id || null,
-          email: tenantData?.email || '',
-          phone: tenantData?.phone || ''
+          if (tenantError) {
+            console.warn(`⚠️ Tenant not found for company ${company.id}:`, tenantError.message)
+            return {
+              ...company,
+              tenant_id: null,
+              email: '',
+              phone: ''
+            }
+          }
+
+          return {
+            ...company,
+            tenant_id: tenantData?.id || null,
+            email: tenantData?.email || '',
+            phone: tenantData?.phone || ''
+          }
+        } catch (err) {
+          console.warn(`⚠️ Error fetching tenant for company ${company.id}:`, err.message)
+          return {
+            ...company,
+            tenant_id: null,
+            email: '',
+            phone: ''
+          }
         }
       }))
 
@@ -72,35 +91,49 @@ export default function AdminCompanyApproval() {
 
       if (updateError) throw updateError
 
-      // Log the action
-      const { data: authUser } = await supabase.auth.getUser()
-      await supabase
-        .from('audit_logs')
-        .insert([{
-          actor_id: authUser.user?.id,
-          action: 'company_approved',
-          entity: 'company',
-          entity_id: companyId,
-          meta: JSON.stringify({
-            status: 'approved',
-            cr_number: crNumber
-          })
-        }])
-        .catch(err => console.warn('Audit log warning:', err))
-
-      // Create notification for tenant
-      if (company?.tenant_id) {
-        await supabase
-          .from('notifications')
+      // Log the action (non-blocking)
+      try {
+        const { data: authUser } = await supabase.auth.getUser()
+        const { error: auditError } = await supabase
+          .from('audit_logs')
           .insert([{
-            tenant_id: company.tenant_id,
-            type: 'company_approved',
-            payload: JSON.stringify({
-              message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
+            actor_id: authUser.user?.id,
+            action: 'company_approved',
+            entity: 'company',
+            entity_id: companyId,
+            meta: JSON.stringify({
+              status: 'approved',
               cr_number: crNumber
             })
           }])
-          .catch(err => console.warn('Notification warning:', err))
+
+        if (auditError) {
+          console.warn('⚠️ Audit log warning (non-blocking):', auditError.message)
+        }
+      } catch (auditErr) {
+        console.warn('⚠️ Audit log error (non-blocking):', auditErr.message)
+      }
+
+      // Create notification for tenant (non-blocking)
+      if (company?.tenant_id) {
+        try {
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert([{
+              tenant_id: company.tenant_id,
+              type: 'company_approved',
+              payload: JSON.stringify({
+                message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
+                cr_number: crNumber
+              })
+            }])
+
+          if (notifError) {
+            console.warn('⚠️ Notification warning (non-blocking):', notifError.message)
+          }
+        } catch (notifErr) {
+          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
+        }
       }
 
       // Remove from list and show success
@@ -139,35 +172,49 @@ export default function AdminCompanyApproval() {
 
       if (updateError) throw updateError
 
-      // Log the action
-      const { data: authUser } = await supabase.auth.getUser()
-      await supabase
-        .from('audit_logs')
-        .insert([{
-          actor_id: authUser.user?.id,
-          action: 'company_rejected',
-          entity: 'company',
-          entity_id: companyId,
-          meta: JSON.stringify({
-            reason: rejectionReason,
-            cr_number: crNumber
-          })
-        }])
-        .catch(err => console.warn('Audit log warning:', err))
-
-      // Create notification for tenant
-      if (company?.tenant_id) {
-        await supabase
-          .from('notifications')
+      // Log the action (non-blocking)
+      try {
+        const { data: authUser } = await supabase.auth.getUser()
+        const { error: auditError } = await supabase
+          .from('audit_logs')
           .insert([{
-            tenant_id: company.tenant_id,
-            type: 'company_rejected',
-            payload: JSON.stringify({
-              message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
+            actor_id: authUser.user?.id,
+            action: 'company_rejected',
+            entity: 'company',
+            entity_id: companyId,
+            meta: JSON.stringify({
+              reason: rejectionReason,
               cr_number: crNumber
             })
           }])
-          .catch(err => console.warn('Notification warning:', err))
+
+        if (auditError) {
+          console.warn('⚠️ Audit log warning (non-blocking):', auditError.message)
+        }
+      } catch (auditErr) {
+        console.warn('⚠️ Audit log error (non-blocking):', auditErr.message)
+      }
+
+      // Create notification for tenant (non-blocking)
+      if (company?.tenant_id) {
+        try {
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert([{
+              tenant_id: company.tenant_id,
+              type: 'company_rejected',
+              payload: JSON.stringify({
+                message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
+                cr_number: crNumber
+              })
+            }])
+
+          if (notifError) {
+            console.warn('⚠️ Notification warning (non-blocking):', notifError.message)
+          }
+        } catch (notifErr) {
+          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
+        }
       }
 
       // Remove from list and show success
