@@ -1,6 +1,8 @@
-{
-    "outputDirectory": "dist",
-    "buildCommand": "bash build.sh",
-    "devCommand": "npm run dev",
-    "framework": "vite"
+﻿{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
