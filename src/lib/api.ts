@@ -478,7 +478,7 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // 3. Create Company Record (for searchability)
-    await supabase
+    const { data: companyInsertData, error: companyError } = await supabase
       .from('companies')
       .insert([{
         name: companyData.name,
@@ -488,8 +488,26 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         founded_year: companyData.foundedYear,
         cr_status: companyData.crStatus || 'active',
         source: 'self_registered',
+        status: companyData.status || 'pending',
+        cr_file_url: companyData.crFileUrl || null,
         approved: true
       }])
+      .select('id')
+      .single()
+
+    if (companyError || !companyInsertData) {
+      throw new Error('فشل إنشاء شركة: ' + (companyError?.message || 'Unknown error'))
+    }
+
+    // Link company to tenant
+    const { error: updateError } = await supabase
+      .from('tenants')
+      .update({ company_id: companyInsertData.id })
+      .eq('id', tenantData.id)
+
+    if (updateError) {
+      throw new Error('فشل ربط الشركة بـ الحساب: ' + updateError.message)
+    }
 
     // 4. Create default subscription (Free plan)
     const { data: plansData } = await supabase

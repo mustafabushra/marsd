@@ -8,27 +8,43 @@ export default function AccountPendingApproval() {
   const { user } = useUser()
 
   useEffect(() => {
-    // Check if account is actually pending
+    // Check if account is actually pending (follow exact sequence)
     const checkApprovalStatus = async () => {
       try {
         const supabase = getSupabase()
+
+        // Step 1: Get user → tenant_id
         const { data: userData } = await supabase
           .from('users')
           .select('tenant_id')
           .eq('id', user?.id)
           .single()
 
-        if (userData?.tenant_id) {
-          const { data: tenantData } = await supabase
-            .from('tenants')
-            .select('approval_status')
-            .eq('id', userData.tenant_id)
-            .single()
+        if (!userData?.tenant_id) return
 
-          // If approved, redirect to dashboard
-          if (tenantData?.approval_status === 'approved') {
-            navigate('/dashboard', { replace: true })
-          }
+        // Step 2: Get tenant → company_id
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('company_id')
+          .eq('id', userData.tenant_id)
+          .single()
+
+        if (!tenantData?.company_id) return
+
+        // Step 3: Get company → status (SOURCE OF TRUTH)
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('status')
+          .eq('id', tenantData.company_id)
+          .single()
+
+        // If approved, redirect to dashboard
+        if (companyData?.status === 'approved') {
+          navigate('/dashboard', { replace: true })
+        } else if (companyData?.status === 'rejected') {
+          navigate('/account-rejected', { replace: true })
+        } else if (companyData?.status === 'suspended') {
+          navigate('/account-suspended', { replace: true })
         }
       } catch (err) {
         console.error('Error checking approval status:', err)

@@ -4,7 +4,7 @@ import { useUser, useAuth as useClerkAuth } from '@clerk/react'
 import VisitorShell from './components/VisitorShell'
 import CompanyShell from './components/CompanyShell'
 import AdminShell from './components/AdminShell'
-import ApprovalStatusGuard from './components/ApprovalStatusGuard'
+import CompanyStatusRouter from './components/CompanyStatusRouter'
 import { AdminRoute, CompanyRoute } from './components/ProtectedRoute'
 import NotFound from './pages/NotFound'
 import Unauthorized from './pages/Unauthorized'
@@ -116,8 +116,8 @@ function AppContent() {
         <Route path="/account-pending" element={<AccountPendingApproval />} />
         <Route path="/test-supabase" element={<TestSupabase />} />
 
-        {/* Company Routes - Protected & Approval Status Checked */}
-        <Route element={<ApprovalStatusGuard><CompanyShell user={user} /></ApprovalStatusGuard>}>
+        {/* Company Routes - Protected & Company Status Checked */}
+        <Route element={<CompanyStatusRouter><CompanyShell user={user} /></CompanyStatusRouter>}>
           <Route path="/dashboard" element={<CompanyRoute><CompanyDashboard /></CompanyRoute>} />
           <Route path="/search" element={<CompanyRoute><Search /></CompanyRoute>} />
           <Route path="/add-company" element={<CompanyRoute><AddCompany /></CompanyRoute>} />

@@ -17,14 +17,33 @@ export default function AdminCompanyApproval() {
     setLoading(true)
     try {
       const supabase = getSupabase()
+      // Query companies with status='pending' (SOURCE OF TRUTH)
       const { data, error: fetchError } = await supabase
-        .from('tenants')
-        .select('id, cr_number, name, email, phone, city, sector, cr_file_url, approval_status, created_at')
-        .eq('approval_status', 'pending_approval')
+        .from('companies')
+        .select('id, cr_number, name, cr_file_url, status, created_at, sector, city')
+        .eq('status', 'pending')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
-      setCompanies(data || [])
+
+      // Enrich with tenant info (email, phone)
+      const companiesWithTenant = await Promise.all((data || []).map(async (company) => {
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('id, email, phone')
+          .eq('company_id', company.id)
+          .single()
+          .catch(() => ({ data: null }))
+
+        return {
+          ...company,
+          tenant_id: tenantData?.id || null,
+          email: tenantData?.email || '',
+          phone: tenantData?.phone || ''
+        }
+      }))
+
+      setCompanies(companiesWithTenant)
     } catch (err) {
       setError(err.message || 'فشل تحميل قائمة الشركات')
     } finally {
@@ -39,47 +58,49 @@ export default function AdminCompanyApproval() {
 
     try {
       const supabase = getSupabase()
+      const company = companies.find(c => c.id === companyId)
+
+      // Update company status in companies table (SOURCE OF TRUTH)
       const { error: updateError } = await supabase
-        .from('tenants')
+        .from('companies')
         .update({
-          approval_status: 'approved',
+          status: 'approved',
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)
 
       if (updateError) throw updateError
 
-      // Log the action (use both ID and CR Number for reference)
-      const { data: user } = await supabase.auth.getUser()
+      // Log the action
+      const { data: authUser } = await supabase.auth.getUser()
       await supabase
         .from('audit_logs')
         .insert([{
-          actor_id: user.user?.id,
+          actor_id: authUser.user?.id,
           action: 'company_approved',
           entity: 'company',
           entity_id: companyId,
           meta: JSON.stringify({
-            approval_status: 'approved',
+            status: 'approved',
             cr_number: crNumber
-          }),
-          created_at: new Date().toISOString()
+          })
         }])
         .catch(err => console.warn('Audit log warning:', err))
 
-      // Create notification for company
-      const company = companies.find(c => c.id === companyId)
-      await supabase
-        .from('notifications')
-        .insert([{
-          tenant_id: companyId,
-          type: 'company_approved',
-          payload: JSON.stringify({
-            message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
-            cr_number: crNumber
-          }),
-          created_at: new Date().toISOString()
-        }])
-        .catch(err => console.warn('Notification warning:', err))
+      // Create notification for tenant
+      if (company?.tenant_id) {
+        await supabase
+          .from('notifications')
+          .insert([{
+            tenant_id: company.tenant_id,
+            type: 'company_approved',
+            payload: JSON.stringify({
+              message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
+              cr_number: crNumber
+            })
+          }])
+          .catch(err => console.warn('Notification warning:', err))
+      }
 
       // Remove from list and show success
       setCompanies(companies.filter(c => c.id !== companyId))
@@ -104,10 +125,13 @@ export default function AdminCompanyApproval() {
 
     try {
       const supabase = getSupabase()
+      const company = companies.find(c => c.id === companyId)
+
+      // Update company status in companies table (SOURCE OF TRUTH)
       const { error: updateError } = await supabase
-        .from('tenants')
+        .from('companies')
         .update({
-          approval_status: 'rejected',
+          status: 'rejected',
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)
@@ -115,36 +139,35 @@ export default function AdminCompanyApproval() {
       if (updateError) throw updateError
 
       // Log the action
-      const { data: user } = await supabase.auth.getUser()
+      const { data: authUser } = await supabase.auth.getUser()
       await supabase
         .from('audit_logs')
         .insert([{
-          actor_id: user.user?.id,
+          actor_id: authUser.user?.id,
           action: 'company_rejected',
           entity: 'company',
           entity_id: companyId,
           meta: JSON.stringify({
             reason: rejectionReason,
             cr_number: crNumber
-          }),
-          created_at: new Date().toISOString()
+          })
         }])
         .catch(err => console.warn('Audit log warning:', err))
 
-      // Create notification for company
-      const company = companies.find(c => c.id === companyId)
-      await supabase
-        .from('notifications')
-        .insert([{
-          tenant_id: companyId,
-          type: 'company_rejected',
-          payload: JSON.stringify({
-            message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
-            cr_number: crNumber
-          }),
-          created_at: new Date().toISOString()
-        }])
-        .catch(err => console.warn('Notification warning:', err))
+      // Create notification for tenant
+      if (company?.tenant_id) {
+        await supabase
+          .from('notifications')
+          .insert([{
+            tenant_id: company.tenant_id,
+            type: 'company_rejected',
+            payload: JSON.stringify({
+              message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
+              cr_number: crNumber
+            })
+          }])
+          .catch(err => console.warn('Notification warning:', err))
+      }
 
       // Remove from list and show success
       setCompanies(companies.filter(c => c.id !== companyId))
