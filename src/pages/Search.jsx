@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchCompanies } from '../lib/api'
+import { searchCompanies, getAutocompleteCompanies } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
+import { Search as SearchIcon, X } from 'lucide-react'
 
 export default function Search() {
   const navigate = useNavigate()
@@ -13,6 +14,9 @@ export default function Search() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [autocomplete, setAutocomplete] = useState([])
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const autocompleteRef = useRef(null)
 
   // Map score to risk band and color
   function getRiskInfo(score) {
@@ -27,9 +31,34 @@ export default function Search() {
     return `conic-gradient(#16A34A 0% ${percent}%, #E2E8F0 ${percent}% 100%)`
   }
 
+  // Fetch autocomplete suggestions
+  async function handleAutocomplete(q) {
+    if (q.length < 1) {
+      setAutocomplete([])
+      return
+    }
+
+    try {
+      const result = await getAutocompleteCompanies(q, 8)
+      setAutocomplete(result.data || [])
+      setShowAutocomplete(true)
+    } catch (err) {
+      console.error('Autocomplete error:', err)
+      setAutocomplete([])
+    }
+  }
+
+  // Handle autocomplete selection
+  function handleAutocompleteSelect(suggestion) {
+    setQuery(suggestion.name)
+    setShowAutocomplete(false)
+    setAutocomplete([])
+  }
+
   async function handleSearch() {
     setLoading(true)
     setError(null)
+    setShowAutocomplete(false)
     try {
       const result = await searchCompanies(query)
       const formatted = result.data.map(c => {
@@ -83,32 +112,119 @@ export default function Search() {
     }
   }
 
+  // Handle query changes: autocomplete + search
   useEffect(() => {
-    if (query.length > 0) {
-      const timer = setTimeout(handleSearch, 500)
-      return () => clearTimeout(timer)
-    } else {
+    if (query.length === 0) {
       setCompanies([])
+      setAutocomplete([])
+      setShowAutocomplete(false)
+      return
+    }
+
+    // Autocomplete first (fast)
+    const autocompleteTimer = setTimeout(() => {
+      handleAutocomplete(query)
+    }, 100)
+
+    // Then full search (slower)
+    const searchTimer = setTimeout(() => {
+      handleSearch()
+    }, 500)
+
+    return () => {
+      clearTimeout(autocompleteTimer)
+      clearTimeout(searchTimer)
     }
   }, [query])
+
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (autocompleteRef.current && !autocompleteRef.current.contains(e.target)) {
+        setShowAutocomplete(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexDirection: 'row-reverse' }}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px', flexDirection: 'row-reverse' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexDirection: 'row-reverse', position: 'relative' }} ref={autocompleteRef}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid ' + (showAutocomplete ? '#16A34A' : '#E2E8F0'), borderRadius: '12px', padding: '0 16px', flexDirection: 'row-reverse', position: 'relative' }}>
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ابحث بالاسم أو رقم السجل التجاري"
+              onChange={(e) => {
+                setQuery(e.target.value)
+                if (e.target.value.length > 0) setShowAutocomplete(true)
+              }}
+              onFocus={() => query.length > 0 && setShowAutocomplete(true)}
+              placeholder="ابحث بالاسم أو رقم السجل التجاري أو القطاع..."
               style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
             />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
-              <circle cx="11" cy="11" r="7"></circle>
-              <path d="m21 21-4.3-4.3"></path>
-            </svg>
+            {query && (
+              <button
+                onClick={() => {
+                  setQuery('')
+                  setCompanies([])
+                  setAutocomplete([])
+                  setShowAutocomplete(false)
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+              >
+                <X size={18} color="#94A3B8" />
+              </button>
+            )}
+            {!query && <SearchIcon size={20} color="#94A3B8" />}
+
+            {/* Autocomplete Dropdown */}
+            {showAutocomplete && autocomplete.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#fff',
+                border: '1px solid #E2E8F0',
+                borderTop: 'none',
+                borderRadius: '0 0 12px 12px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                zIndex: 10,
+                marginTop: '-2px'
+              }}>
+                {autocomplete.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleAutocompleteSelect(item)}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: idx < autocomplete.length - 1 ? '1px solid #F1F5F9' : 'none',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      textAlign: 'right'
+                    }}
+                    onMouseEnter={(e) => (e.target.style.background = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.target.style.background = '#fff')}
+                  >
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', marginBottom: '2px' }}>
+                      {item.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>
+                      {item.cr_number}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <button style={{ background: '#1E2A52', color: '#fff', border: 0, borderRadius: '12px', padding: '0 30px', fontSize: '15px', fontWeight: 800, cursor: 'pointer' }}>بحث</button>
+          <button
+            onClick={handleSearch}
+            disabled={!query}
+            style={{ background: query ? '#1E2A52' : '#D1D5DB', color: '#fff', border: 0, borderRadius: '12px', padding: '0 30px', fontSize: '15px', fontWeight: 800, cursor: query ? 'pointer' : 'not-allowed' }}>
+            بحث
+          </button>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
           <span style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 700, padding: '8px 0' }}>تصفية:</span>

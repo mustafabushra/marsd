@@ -266,37 +266,113 @@ export async function createTenantAndUser(userId: string, companyData: any) {
 // COMPANIES API
 // ============================================================================
 
-export async function searchCompanies(q: string, page = 1, limit = 20) {
+// Autocomplete function for company names, CR numbers, etc.
+export async function getAutocompleteCompanies(q: string, limit = 10) {
   const supabase = getSupabase()
 
+  if (!q || q.trim().length < 1) {
+    return { data: [] }
+  }
+
+  const { data, error } = await supabase
+    .rpc('autocomplete_companies', {
+      search_query: q.trim(),
+      limit_val: limit
+    })
+
+  if (error) {
+    console.warn('Autocomplete RPC failed, returning empty:', error)
+    return { data: [] }
+  }
+
+  return { data: data || [] }
+}
+
+export async function searchCompanies(q: string, page = 1, limit = 20) {
+  const supabase = getSupabase()
   const offset = (page - 1) * limit
 
-  // Search companies with trust scores
+  if (!q || q.trim().length === 0) {
+    // Return top companies if no search query
+    const { data: companies, count, error } = await supabase
+      .from('companies')
+      .select(`
+        *,
+        trust_scores(*)
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (error) throw new Error('Failed to fetch companies: ' + error.message)
+
+    return {
+      data: companies?.map(c => ({
+        ...c,
+        trust_score: c.trust_scores?.[0] || null,
+      })) || [],
+      pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+    }
+  }
+
+  // Use Full Text Search for better search quality
   const { data: companies, count, error } = await supabase
+    .rpc('search_companies_fts', {
+      search_query: q.trim(),
+      limit_val: limit,
+      offset_val: offset
+    })
+
+  if (error) {
+    // Fallback to ILIKE if RPC not available
+    console.warn('FTS not available, falling back to ILIKE:', error)
+
+    const { data: companies, count, error: fallbackError } = await supabase
+      .from('companies')
+      .select(`
+        *,
+        trust_scores(*)
+      `, { count: 'exact' })
+      .ilike('name', `%${q}%`)
+      .range(offset, offset + limit - 1)
+
+    if (fallbackError) throw new Error('Search failed: ' + fallbackError.message)
+
+    return {
+      data: companies?.map(c => ({
+        ...c,
+        trust_score: c.trust_scores?.[0] || null,
+      })) || [],
+      pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+    }
+  }
+
+  // Format FTS results
+  const companyIds = companies?.map((c: any) => c.id) || []
+
+  if (companyIds.length === 0) {
+    return {
+      data: [],
+      pagination: { page, limit, total: 0, pages: 0 },
+    }
+  }
+
+  // Fetch full company data with trust scores
+  const { data: fullCompanies, error: fetchError } = await supabase
     .from('companies')
     .select(`
       *,
       trust_scores(*)
-    `, { count: 'exact' })
-    .ilike('name', `%${q}%`)
-    .or(`cr_number.ilike.%${q}%,sector.ilike.%${q}%`)
-    .range(offset, offset + limit - 1)
+    `)
+    .in('id', companyIds)
 
-  if (error) {
-    throw new Error('Search failed: ' + error.message)
-  }
+  if (fetchError) throw new Error('Failed to fetch company details: ' + fetchError.message)
 
   return {
-    data: companies?.map(c => ({
+    data: fullCompanies?.map(c => ({
       ...c,
       trust_score: c.trust_scores?.[0] || null,
     })) || [],
-    pagination: {
-      page,
-      limit,
-      total: count || 0,
-      pages: Math.ceil((count || 0) / limit),
-    },
+    pagination: { page, limit, total: companyIds.length, pages: Math.ceil((companyIds.length) / limit) },
   }
 }
 
