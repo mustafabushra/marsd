@@ -227,7 +227,7 @@ export default function CompanyOnboarding() {
             founded_year: formData.foundedYear,
             status: COMPANY_STATUS.PENDING,
             cr_file_url: crFileUrl,
-            source: 'self_registered'
+            source: 'community'
           }])
           .select('id')
           .single()
