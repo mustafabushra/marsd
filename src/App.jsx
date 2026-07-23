@@ -64,6 +64,7 @@ import AccountRejected from './pages/AccountRejected'
 import AccountSuspended from './pages/AccountSuspended'
 import RegistrationPending from './pages/RegistrationPending'
 import CompanyClaimPending from './pages/CompanyClaimPending'
+import AdminClaimRequests from './pages/AdminClaimRequests'
 import ModalDemo from './pages/ModalDemo'
 import SupabaseTest from './pages/SupabaseTest'
 import TestSupabase from './pages/TestSupabase'
@@ -167,6 +168,7 @@ function AppContent() {
           <Route path="/admin/tenant-analytics" element={<AdminRoute><AdminTenantAnalytics /></AdminRoute>} />
           <Route path="/admin/company-verification" element={<AdminRoute><AdminCompanyVerification /></AdminRoute>} />
           <Route path="/admin/company-approval" element={<AdminRoute><AdminCompanyApproval /></AdminRoute>} />
+          <Route path="/admin/claim-requests" element={<AdminRoute><AdminClaimRequests /></AdminRoute>} />
           <Route path="/admin/backup" element={<AdminRoute><AdminBackup /></AdminRoute>} />
         </Route>
 
