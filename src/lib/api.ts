@@ -368,20 +368,80 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     }
 
     // 2. Create/Update User record with tenant_id
-    const { error: userError } = await supabase
-      .from('users')
-      .upsert([{
-        id: userId,
-        tenant_id: tenantData.id,
-        email: companyData.email,
-        first_name: companyData.firstName || '',
-        last_name: companyData.lastName || '',
-        role: 'company_admin',
-        status: 'active'
-      }])
+    try {
+      // First check if user already exists by ID
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id, email, tenant_id')
+        .eq('id', userId)
+        .single()
 
-    if (userError) {
-      throw new Error('فشل تحديث ملف المستخدم: ' + userError.message)
+      if (checkError && checkError.code !== 'PGRST116') {
+        // PGRST116 = not found, which is expected for new users
+        throw new Error('فشل البحث عن المستخدم: ' + checkError.message)
+      }
+
+      if (existingUser) {
+        // User exists - check if email changed
+        if (existingUser.email !== companyData.email) {
+          // Email changed - check if new email is unique
+          const { data: emailExists } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', companyData.email)
+            .limit(1)
+
+          if (emailExists && emailExists.length > 0) {
+            throw new Error('❌ هذا البريد الإلكتروني مسجل بالفعل')
+          }
+        }
+
+        // Update existing user
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            tenant_id: tenantData.id,
+            email: companyData.email,
+            first_name: companyData.firstName || '',
+            last_name: companyData.lastName || '',
+            role: 'company_admin',
+            status: 'active'
+          })
+          .eq('id', userId)
+
+        if (updateError) throw updateError
+      } else {
+        // New user - check if email is unique first
+        const { data: emailExists } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', companyData.email)
+          .limit(1)
+
+        if (emailExists && emailExists.length > 0) {
+          throw new Error('❌ هذا البريد الإلكتروني مسجل بالفعل')
+        }
+
+        // Insert new user
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: userId,
+            tenant_id: tenantData.id,
+            email: companyData.email,
+            first_name: companyData.firstName || '',
+            last_name: companyData.lastName || '',
+            role: 'company_admin',
+            status: 'active'
+          }])
+
+        if (insertError) throw insertError
+      }
+    } catch (userError) {
+      if (userError.message.includes('هذا البريد')) {
+        throw userError
+      }
+      throw new Error('❌ فشل تحديث ملف المستخدم: ' + userError.message)
     }
 
     // 3. Create Company Record (for searchability)
