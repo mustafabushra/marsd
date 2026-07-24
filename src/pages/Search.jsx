@@ -145,7 +145,8 @@ export default function Search() {
     } 0% ${percent}%, #E2E8F0 ${percent}% 100%)`
   }
 
-  async function handleAutocomplete(q) {
+  async function handleAutocomplete(raw) {
+    const q = (raw || '').trim().replace(/\s+/g, ' ')
     if (q.length < 1) {
       setAutocomplete([])
       return
@@ -180,7 +181,9 @@ export default function Search() {
     setLoading(true)
     setError('')
     try {
-      const result = await searchCompaniesKnowledgeBase(query, activeFilters, 1, 50)
+      // Normalize the term: trim edges and collapse internal whitespace
+      const q = query.trim().replace(/\s+/g, ' ')
+      const result = await searchCompaniesKnowledgeBase(q, activeFilters, 1, 50)
       let formatted = result.data.map(c => ({
         id: c.id,
         name: c.name,
