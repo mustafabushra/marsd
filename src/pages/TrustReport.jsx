@@ -36,13 +36,29 @@ export default function TrustReport() {
           return
         }
 
-        // Set company data from Knowledge Base
+        // Supplement with identity fields directly from companies
+        // (the knowledge-base RPC doesn't return the extended Layer-1 columns).
+        let identity = {}
+        try {
+          const { getSupabase } = await import('../lib/api')
+          const { data: c } = await getSupabase()
+            .from('companies')
+            .select('name_en, entity_type, cr_status, cr_expiry_date, founding_date, founded_year, main_activity, sub_activities, region, national_address, website, official_email, phone, unified_number, verified')
+            .eq('id', id)
+            .single()
+          identity = c || {}
+        } catch (e) {
+          console.warn('Identity fetch warning:', e)
+        }
+
+        // Set company data from Knowledge Base + identity supplement
         setCompany({
           id: kb.id,
           name: kb.name,
           city: kb.city || '—',
           sector: kb.sector || '—',
-          cr_number: kb.cr_number
+          cr_number: kb.cr_number,
+          ...identity,
         })
 
         // Build report object from Knowledge Base data
@@ -125,12 +141,30 @@ export default function TrustReport() {
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
               <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>{company?.name}</h1>
+              {company?.verified && (
+                <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>✔ موثّقة</span>
+              )}
               <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>● سجل نشط</span>
             </div>
+            {company?.name_en && (
+              <div style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 600, marginBottom: '8px', textAlign: 'right' }}>{company.name_en}</div>
+            )}
             <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap', fontSize: '14px', color: '#64748B', fontWeight: 600 }}>
-              <span>القطاع: {company?.sector || '—'}</span>
-              <span>المدينة: {company?.city || '—'}</span>
-              <span>السجل: {company?.cr_number || '—'}</span>
+              {[
+                ['القطاع', company?.sector],
+                ['النشاط الرئيسي', company?.main_activity],
+                ['نوع الكيان', company?.entity_type],
+                ['المدينة', company?.city],
+                ['المنطقة', company?.region],
+                ['السجل', company?.cr_number],
+                ['الرقم الموحّد', company?.unified_number],
+                ['تاريخ الانتهاء', company?.cr_expiry_date],
+              ].filter(([, v]) => v && v !== '—').map(([label, v]) => (
+                <span key={label}>{label}: {v}</span>
+              ))}
+              {company?.website && (
+                <span>الموقع: <a href={company.website} target="_blank" rel="noreferrer" style={{ color: '#1D4ED8', fontWeight: 700 }}>{company.website}</a></span>
+              )}
             </div>
           </div>
 

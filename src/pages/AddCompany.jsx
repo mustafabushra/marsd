@@ -13,10 +13,22 @@ export default function AddCompany() {
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     companyName: location.state?.companyName || '',
+    nameEn: '',
     registryNumber: location.state?.registryNumber || '',
     unifiedNumber: '',
+    entityType: '',
+    crStatus: '',
+    crExpiryDate: '',
+    foundingDate: '',
     sector: '',
-    city: ''
+    mainActivity: '',
+    subActivities: '',
+    city: '',
+    region: '',
+    nationalAddress: '',
+    website: '',
+    officialEmail: '',
+    phone: ''
   })
 
   const handleChange = (e) => {
@@ -50,10 +62,22 @@ export default function AddCompany() {
 
       const insert = buildCompanyInsert({
         name: formData.companyName,
+        nameEn: formData.nameEn,
         crNumber,
         unifiedNumber: formData.unifiedNumber,
+        entityType: formData.entityType,
+        crStatus: formData.crStatus || undefined,
+        crExpiryDate: formData.crExpiryDate || null,
+        foundingDate: formData.foundingDate || null,
         sector: formData.sector || null,
+        mainActivity: formData.mainActivity,
+        subActivities: formData.subActivities,
         city: formData.city || null,
+        region: formData.region,
+        nationalAddress: formData.nationalAddress,
+        website: formData.website,
+        officialEmail: formData.officialEmail,
+        phone: formData.phone,
         approved: false,      // pending admin review
         source: 'community',
       })
@@ -111,56 +135,68 @@ export default function AddCompany() {
               <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 24px 0', textAlign: 'right' }}>كل ما كانت البيانات أدق، أسرعت الموافقة</p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
-                <div style={{ gridColumn: '1/3' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>اسم الشركة</label>
-                  <input
-                    placeholder="مثال: شركة الرياض للتجارة المحدودة"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleChange}
-                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>رقم السجل التجاري</label>
-                  <input
-                    placeholder="1010XXXXXX"
-                    name="registryNumber"
-                    value={formData.registryNumber}
-                    onChange={handleChange}
-                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>الرقم الموحّد (700)</label>
-                  <input
-                    placeholder="7001234567"
-                    name="unifiedNumber"
-                    value={formData.unifiedNumber}
-                    onChange={handleChange}
-                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>القطاع</label>
-                  <input
-                    placeholder="تجارة"
-                    name="sector"
-                    value={formData.sector}
-                    onChange={handleChange}
-                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>المدينة</label>
-                  <input
-                    placeholder="الرياض"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
+                {[
+                  { name: 'companyName', label: 'اسم الشركة (عربي)', ph: 'مثال: شركة الرياض للتجارة المحدودة', full: true },
+                  { name: 'nameEn', label: 'اسم الشركة (إنجليزي)', ph: 'Riyadh Trading Co.' },
+                  { name: 'registryNumber', label: 'رقم السجل التجاري', ph: '1010XXXXXX' },
+                  { name: 'unifiedNumber', label: 'الرقم الموحّد (700)', ph: '7001234567' },
+                  { name: 'entityType', label: 'نوع الكيان', type: 'select', options: [
+                    { v: '', t: '— اختر —' },
+                    { v: 'مؤسسة', t: 'مؤسسة' },
+                    { v: 'ذات مسؤولية محدودة', t: 'شركة ذات مسؤولية محدودة' },
+                    { v: 'مساهمة', t: 'شركة مساهمة' },
+                    { v: 'تضامن', t: 'شركة تضامن' },
+                    { v: 'أخرى', t: 'أخرى' },
+                  ] },
+                  { name: 'crStatus', label: 'حالة السجل', type: 'select', options: [
+                    { v: '', t: '— اختر —' },
+                    { v: 'active', t: 'نشط' },
+                    { v: 'suspended', t: 'موقوف' },
+                    { v: 'terminated', t: 'منتهٍ / مشطوب' },
+                    { v: 'pending', t: 'قيد المعالجة' },
+                  ] },
+                  { name: 'foundingDate', label: 'تاريخ التأسيس', type: 'date' },
+                  { name: 'crExpiryDate', label: 'تاريخ انتهاء السجل', type: 'date' },
+                  { name: 'sector', label: 'القطاع', ph: 'تجارة' },
+                  { name: 'mainActivity', label: 'النشاط الرئيسي', ph: 'تجارة الجملة' },
+                  { name: 'subActivities', label: 'الأنشطة الفرعية', ph: 'افصل بينها بفواصل', type: 'textarea', full: true },
+                  { name: 'city', label: 'المدينة', ph: 'الرياض' },
+                  { name: 'region', label: 'المنطقة', ph: 'منطقة الرياض' },
+                  { name: 'nationalAddress', label: 'العنوان الوطني', ph: 'الرمز البريدي + رقم المبنى', full: true },
+                  { name: 'website', label: 'الموقع الإلكتروني', ph: 'https://' },
+                  { name: 'officialEmail', label: 'البريد الإلكتروني', ph: 'info@company.sa' },
+                  { name: 'phone', label: 'رقم الهاتف', ph: '0112345678' },
+                ].map(f => (
+                  <div key={f.name} style={f.full ? { gridColumn: '1/3' } : undefined}>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
+                    {f.type === 'select' ? (
+                      <select
+                        name={f.name}
+                        value={formData[f.name]}
+                        onChange={handleChange}
+                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
+                        {f.options.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                      </select>
+                    ) : f.type === 'textarea' ? (
+                      <textarea
+                        placeholder={f.ph}
+                        name={f.name}
+                        value={formData[f.name]}
+                        onChange={handleChange}
+                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '70px', resize: 'vertical' }}
+                      />
+                    ) : (
+                      <input
+                        type={f.type === 'date' ? 'date' : 'text'}
+                        placeholder={f.ph}
+                        name={f.name}
+                        value={formData[f.name]}
+                        onChange={handleChange}
+                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: f.type === 'date' ? 'right' : undefined }}
+                      />
+                    )}
+                  </div>
+                ))}
                 <div style={{ gridColumn: '1/3' }}>
                   <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>مستند داعم (السجل التجاري) — اختياري</label>
                   <div style={{ border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>

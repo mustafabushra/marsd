@@ -49,6 +49,17 @@ export interface CompanyInsertInput {
   city?: string | null
   foundedYear?: number | null
   crFileUrl?: string | null
+  // ===== Identity fields (Layer 1) — all optional, unverified until confirmed =====
+  nameEn?: string | null
+  entityType?: string | null
+  crExpiryDate?: string | null
+  foundingDate?: string | null
+  mainActivity?: string | null
+  subActivities?: string | null
+  region?: string | null
+  nationalAddress?: string | null
+  website?: string | null
+  phone?: string | null
   /** الحالة — تُتحقق مقابل COMPANY_STATUS_VALUES. الافتراضي: pending */
   status?: CompanyStatus
   /** حالة السجل التجاري — تُتحقق مقابل COMPANY_CR_STATUS_VALUES. الافتراضي: active */
@@ -78,6 +89,17 @@ export function buildCompanyInsert(input: CompanyInsertInput): Record<string, an
     city: input.city ?? null,
     founded_year: input.foundedYear ?? null,
     cr_file_url: input.crFileUrl ?? null,
+    // ===== Identity fields (Layer 1) =====
+    name_en: input.nameEn?.trim() || null,
+    entity_type: input.entityType?.trim() || null,
+    cr_expiry_date: input.crExpiryDate || null,
+    founding_date: input.foundingDate || null,
+    main_activity: input.mainActivity?.trim() || null,
+    sub_activities: input.subActivities?.trim() || null,
+    region: input.region?.trim() || null,
+    national_address: input.nationalAddress?.trim() || null,
+    website: input.website?.trim() || null,
+    phone: input.phone?.trim() || null,
     // الحقول المقيّدة — تحقق قبل الإدراج
     status: assertEnum(
       input.status ?? COMPANY_STATUS.PENDING,
