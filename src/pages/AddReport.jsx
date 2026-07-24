@@ -144,9 +144,16 @@ export default function AddReport() {
 
   const selectedCompany = companies.find(c => c.id === form.companyId)
   const selectableCompanies = companies.filter(c => c.id !== ownCompanyId)
-  const filteredCompanies = companySearch.trim()
-    ? selectableCompanies.filter(c => (c.name || '').includes(companySearch.trim()) || (c.cr || '').includes(companySearch.trim()))
+  const nq = companySearch.trim().replace(/\s+/g, ' ')
+  const filteredCompanies = nq
+    ? selectableCompanies.filter(c => (c.name || '').replace(/\s+/g, ' ').includes(nq) || (c.cr || '').includes(nq))
     : selectableCompanies
+
+  const goAddCompany = () => {
+    const q = companySearch.trim()
+    const isReg = /^[0-9]{6,}$/.test(q)
+    navigate('/add-company', { state: isReg ? { registryNumber: q } : { companyName: q } })
+  }
 
   // ===== Impact / reliability computation (client-side, Phase A) =====
   const impact = (() => {
@@ -344,7 +351,16 @@ export default function AddReport() {
               {companiesLoading ? (
                 <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>جاري تحميل الشركات...</div>
               ) : filteredCompanies.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
+                companySearch.trim() ? (
+                  <div style={{ textAlign: 'center', padding: '30px 16px', border: '1.5px dashed #CBD5E1', borderRadius: '14px', background: '#F8FAFC' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔍</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>لم يتم العثور على نتائج</div>
+                    <div style={{ fontSize: '13.5px', color: '#94A3B8', marginBottom: '16px' }}>جرّب اسم شركة أخرى أو رقم سجل مختلف</div>
+                    <button type="button" onClick={goAddCompany} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '12px 24px', fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>+ طلب إضافة شركة</button>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>ابدأ بكتابة اسم الشركة أو رقم سجلها للبحث</div>
+                )
               ) : filteredCompanies.slice(0, 40).map(c => {
                 const chosen = form.companyId === c.id
                 return (
