@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useUser } from '@clerk/react'
 import { Search as SearchIcon, Send } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 
@@ -15,6 +16,7 @@ const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي'
 export default function AddReport() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useUser()
   const prefill = location.state || {}
 
   const [step, setStep] = useState(1)
@@ -93,17 +95,16 @@ export default function AddReport() {
     setLoading(true)
     try {
       const supabase = getSupabase()
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) throw new Error('Unauthorized')
+      if (!user?.id) throw new Error('يجب تسجيل الدخول')
 
-      // Get user's tenant
+      // Get user's tenant (users.id === Clerk user id)
       const { data: userData } = await supabase
         .from('users')
         .select('tenant_id')
-        .eq('id', user.user.id)
+        .eq('id', user.id)
         .single()
 
-      if (!userData?.tenant_id) throw new Error('Tenant not found')
+      if (!userData?.tenant_id) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
       // BR-05: Check for duplicate reports in last 90 days
       const ninetyDaysAgo = new Date()
@@ -158,7 +159,7 @@ export default function AddReport() {
         .from('audit_logs')
         .insert([{
           tenant_id: userData.tenant_id,
-          actor_id: user.user.id,
+          actor_id: user.id,
           action: 'report_submitted',
           entity: 'report',
           entity_id: reportData.id,

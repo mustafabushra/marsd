@@ -111,12 +111,11 @@ export default function Watchlist() {
 
       setCompanies(companies.filter(c => c.id !== itemId))
 
-      // Audit log
-      const { data: user } = await supabase.auth.getUser()
+      // Audit log (users.id === Clerk user id)
       await supabase
         .from('audit_logs')
         .insert([{
-          actor_id: user.user?.id,
+          actor_id: user?.id,
           action: 'removed_from_watchlist',
           entity: 'watchlist',
           entity_id: itemId,

@@ -16,6 +16,7 @@ export default function Search() {
 
   const [filters, setFilters] = useState({ sector: null, city: null, risk: null, score: null })
   const [showFilters, setShowFilters] = useState({ sector: false, city: false, risk: false, score: false })
+  const [reqModalCompany, setReqModalCompany] = useState(null)
 
   const sectors = ['تقنية', 'مقاولات', 'صناعات', 'نقل', 'خدمات']
   const cities = ['الرياض', 'جدة', 'الدمام', 'الخبر', 'الدعيان']
@@ -365,7 +366,7 @@ export default function Search() {
                 </button>
               ) : (
                 <button
-                  onClick={() => handleViewReport(c.id)}
+                  onClick={() => setReqModalCompany(c)}
                   style={{ marginTop: 'auto', width: '100%', background: '#fff', color: '#B45309', border: '1.5px solid #FDE68A', borderRadius: '10px', padding: '11px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                   طلب إضافة بيانات / تقرير
                 </button>
@@ -386,6 +387,64 @@ export default function Search() {
         </div>
         <button onClick={handleAddCompany} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 26px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flex: 'none', fontFamily: 'inherit' }}>+ إضافة شركة للسجل</button>
       </div>
+
+      {/* REQUEST (DATA / REPORT) MODAL */}
+      {reqModalCompany && (
+        <div
+          onClick={() => setReqModalCompany(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+          dir="rtl">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(15,23,42,.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '22px 26px', borderBottom: '1px solid #E2E8F0' }}>
+              <div>
+                <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>بيانات هذه الشركة غير مكتملة</h2>
+                <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '4px', lineHeight: 1.6 }}>{reqModalCompany.name} · {reqModalCompany.reports} تقارير فقط (لا يوجد تقييم موثوق بعد)</div>
+              </div>
+              <button
+                onClick={() => setReqModalCompany(null)}
+                style={{ background: '#F1F5F9', border: 0, borderRadius: '9px', width: '34px', height: '34px', fontSize: '18px', cursor: 'pointer', color: '#64748B', flex: 'none' }}>✕</button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.7, margin: '0 0 18px' }}>ساهم في إكمال ملف هذه الشركة. اختر نوع الطلب:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  onClick={() => { const c = reqModalCompany; setReqModalCompany(null); navigate('/add-report', { state: { companyId: c.id, companyName: c.name } }) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                  <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>⭐</span>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>إضافة تقرير (تقييم)</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>قيّم الشركة من واقع تعاملك معها</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setReqModalCompany(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                  <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>＋</span>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>إضافة بيانات ناقصة</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>القطاع، المدينة، الرقم الموحّد، وغيرها</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setReqModalCompany(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                  <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#FEF3C7', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>✎</span>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>طلب تعديل بيانات خاطئة</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>أبلِغ الإدارة عن بيانات غير دقيقة للمراجعة</div>
+                  </div>
+                </button>
+              </div>
+              <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginTop: '18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '17px' }}>ℹ</span>
+                <span style={{ fontSize: '13px', color: '#3730A3', fontWeight: 700, lineHeight: 1.6 }}>تُراجَع كل الطلبات من إدارة مرصد قبل اعتمادها وتحديث ملف الشركة.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

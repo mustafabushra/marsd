@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
 import { UserPlus, Trash2, Edit2 } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 
 export default function CompanyUsers() {
+  const { user } = useUser()
   const [users, setUsers] = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,23 +15,22 @@ export default function CompanyUsers() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    if (user?.id) loadUsers()
+  }, [user?.id])
 
   const loadUsers = async () => {
     try {
       const supabase = getSupabase()
-      const { data: authUser } = await supabase.auth.getUser()
-      if (!authUser.user) throw new Error('Unauthorized')
+      if (!user?.id) throw new Error('يجب تسجيل الدخول')
 
-      // Get user's tenant
+      // Get user's tenant (users.id === Clerk user id)
       const { data: userData } = await supabase
         .from('users')
         .select('tenant_id')
-        .eq('id', authUser.user.id)
+        .eq('id', user.id)
         .single()
 
-      if (!userData?.tenant_id) throw new Error('Tenant not found')
+      if (!userData?.tenant_id) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
       // Get company users
       const { data: companyUsers } = await supabase
@@ -75,15 +76,16 @@ export default function CompanyUsers() {
 
     try {
       const supabase = getSupabase()
-      const { data: authUser } = await supabase.auth.getUser()
-      if (!authUser.user) throw new Error('Unauthorized')
+      if (!user?.id) throw new Error('يجب تسجيل الدخول')
 
-      // Get tenant
+      // Get tenant (users.id === Clerk user id)
       const { data: userData } = await supabase
         .from('users')
         .select('tenant_id')
-        .eq('id', authUser.user.id)
+        .eq('id', user.id)
         .single()
+
+      if (!userData?.tenant_id) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
       // Create pending invite
       const { error: inviteError } = await supabase
@@ -92,7 +94,7 @@ export default function CompanyUsers() {
           tenant_id: userData.tenant_id,
           email: inviteEmail,
           role: inviteRole,
-          invited_by: authUser.user.id,
+          invited_by: user.id,
           status: 'pending',
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         }])
@@ -104,7 +106,7 @@ export default function CompanyUsers() {
         .from('audit_logs')
         .insert([{
           tenant_id: userData.tenant_id,
-          actor_id: authUser.user.id,
+          actor_id: user.id,
           action: 'user_invited',
           entity: 'user',
           meta: JSON.stringify({ email: inviteEmail, role: inviteRole }),
