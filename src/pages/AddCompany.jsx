@@ -31,8 +31,25 @@ export default function AddCompany() {
     phone: ''
   })
 
+  const [crFile, setCrFile] = useState(null) // { name, url(base64) }
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  const handleCrFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setError('حجم الملف كبير جداً (الحد الأقصى 10MB)')
+      e.target.value = ''
+      return
+    }
+    setError('')
+    const reader = new FileReader()
+    reader.onload = () => setCrFile({ name: file.name, url: reader.result })
+    reader.onerror = () => setError('تعذّر قراءة الملف')
+    reader.readAsDataURL(file)
   }
 
   const handleSubmit = async () => {
@@ -78,6 +95,7 @@ export default function AddCompany() {
         website: formData.website,
         officialEmail: formData.officialEmail,
         phone: formData.phone,
+        crFileUrl: crFile?.url || null,
         approved: false,      // pending admin review
         source: 'community',
       })
@@ -199,10 +217,21 @@ export default function AddCompany() {
                 ))}
                 <div style={{ gridColumn: '1/3' }}>
                   <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>مستند داعم (السجل التجاري) — اختياري</label>
-                  <div style={{ border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <UploadIcon />
-                    اسحب صورة السجل التجاري أو اضغط للرفع
-                  </div>
+                  {crFile ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1.5px solid #BBF7D0', background: '#F0FDF4', borderRadius: '12px', padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <span style={{ fontSize: '20px' }}>📄</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#15803D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{crFile.name}</span>
+                      </div>
+                      <button type="button" onClick={() => setCrFile(null)} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', color: '#B91C1C', fontSize: '13px', fontWeight: 800, padding: '7px 12px', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إزالة</button>
+                    </div>
+                  ) : (
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+                      <UploadIcon />
+                      اضغط لاختيار صورة أو PDF للسجل التجاري (حتى 10MB)
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*" onChange={handleCrFile} style={{ display: 'none' }} />
+                    </label>
+                  )}
                 </div>
               </div>
 
