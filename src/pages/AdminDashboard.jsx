@@ -1,600 +1,213 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, CreditCard, FileText, Users, BarChart3, Settings } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalCompanies: 0,
     activeSubscriptions: 0,
     pendingReports: 0,
-    approvedReports: 0,
-    totalUsers: 0,
-    totalRevenue: 0,
-    averageTrustScore: 0,
-    churnRate: 0,
+    approvedToday: 0,
+    companyRequests: 0,
   })
-  const [loading, setLoading] = useState(true)
-  const [kbStats, setKbStats] = useState({
-    avgTrustScore: 0,
-    fullTierCompanies: 0,
-    preliminaryTierCompanies: 0,
-    noDataCompanies: 0,
-  })
+  const [risk, setRisk] = useState({ low: 0, med: 0, high: 0 })
+  const [sectors, setSectors] = useState([])
 
-  // Load real data from Supabase
   useEffect(() => {
-    const loadDashboardStats = async () => {
+    const load = async () => {
       try {
         const supabase = getSupabase()
 
-        // Get total companies count
-        const { count: companiesCount } = await supabase
-          .from('companies')
-          .select('id', { count: 'exact' })
+        const [{ count: companiesCount }, { count: activeSubCount }, { count: pendingCount }] = await Promise.all([
+          supabase.from('companies').select('id', { count: 'exact', head: true }),
+          supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
+        ])
 
-        // Get active subscriptions count
-        const { count: activeSubCount } = await supabase
-          .from('subscriptions')
-          .select('id', { count: 'exact' })
-          .eq('status', 'active')
+        // Approved today
+        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+        const { count: approvedTodayCount } = await supabase
+          .from('reports').select('id', { count: 'exact', head: true })
+          .eq('status', 'approved').gte('approved_at', startOfToday.toISOString())
 
-        // Get pending reports count
-        const { count: pendingCount } = await supabase
-          .from('reports')
-          .select('id', { count: 'exact' })
-          .eq('status', 'pending_review')
-
-        // Get approved reports count
-        const { count: approvedCount } = await supabase
-          .from('reports')
-          .select('id', { count: 'exact' })
-          .eq('status', 'approved')
-
-        // Get total users count (excluding admins)
-        const { count: usersCount } = await supabase
-          .from('users')
-          .select('id', { count: 'exact' })
-          .eq('role', 'company_admin')
-
-        // Get total revenue (sum of invoices)
-        const { data: revenueData } = await supabase
-          .from('invoices')
-          .select('amount')
-          .eq('status', 'paid')
-        const totalRevenue = revenueData?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
-
-        // Get average trust score
-        const { data: trustScores } = await supabase
-          .from('trust_scores')
-          .select('score')
-        const avgTrust = trustScores?.length > 0
-          ? Math.round(trustScores.reduce((sum, ts) => sum + (ts.score || 0), 0) / trustScores.length)
-          : 0
-
-        // Calculate churn rate: cancelled subscriptions in last 30 days / total subscriptions
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        const { count: cancelledCount } = await supabase
-          .from('subscriptions')
-          .select('id', { count: 'exact' })
-          .eq('status', 'cancelled')
-          .gte('updated_at', thirtyDaysAgo.toISOString())
-
-        const totalSubs = (activeSubCount || 0) + (cancelledCount || 0)
-        const churnRate = totalSubs > 0 ? Math.round(((cancelledCount || 0) / totalSubs) * 100) : 0
+        // Pending company data requests
+        let companyReqCount = 0
+        try {
+          const { count } = await supabase
+            .from('company_data_requests').select('id', { count: 'exact', head: true })
+            .eq('status', 'pending')
+          companyReqCount = count || 0
+        } catch (e) { /* table may not exist in older envs */ }
 
         setStats({
           totalCompanies: companiesCount || 0,
           activeSubscriptions: activeSubCount || 0,
           pendingReports: pendingCount || 0,
-          approvedReports: approvedCount || 0,
-          totalUsers: usersCount || 0,
-          totalRevenue: totalRevenue,
-          averageTrustScore: avgTrust,
-          churnRate: churnRate,
+          approvedToday: approvedTodayCount || 0,
+          companyRequests: companyReqCount,
         })
 
-        // Load Knowledge Base metrics
-        try {
-          // Count companies by tier (based on report counts)
-          const { data: companies } = await supabase
-            .from('v_company_knowledge_base')
-            .select('id, total_reports_count')
+        // Risk distribution from trust scores
+        const { data: scores } = await supabase.from('trust_scores').select('score')
+        const r = { low: 0, med: 0, high: 0 }
+        ;(scores || []).forEach((s) => {
+          const v = s.score || 0
+          if (v >= 70) r.low++
+          else if (v >= 40) r.med++
+          else r.high++
+        })
+        setRisk(r)
 
-          if (companies && companies.length > 0) {
-            let full = 0, preliminary = 0, noData = 0
-            companies.forEach(c => {
-              const count = c.total_reports_count || 0
-              if (count >= 5) full++
-              else if (count >= 2) preliminary++
-              else noData++
-            })
-            setKbStats({
-              avgTrustScore: avgTrust,
-              fullTierCompanies: full,
-              preliminaryTierCompanies: preliminary,
-              noDataCompanies: noData,
-            })
-          }
-        } catch (kbErr) {
-          console.warn('Could not load KB metrics:', kbErr)
-        }
+        // Top sectors (group companies by sector)
+        const { data: companyRows } = await supabase.from('companies').select('sector')
+        const counts = {}
+        ;(companyRows || []).forEach((c) => {
+          const key = (c.sector || '').trim()
+          if (!key) return
+          counts[key] = (counts[key] || 0) + 1
+        })
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+        const max = top.length ? top[0][1] : 1
+        setSectors(top.map(([name, val]) => ({ name, val, pct: Math.round((val / max) * 100) })))
       } catch (err) {
-        console.error('Error loading admin dashboard stats:', err)
+        console.error('Error loading admin dashboard:', err)
       } finally {
         setLoading(false)
       }
     }
-
-    loadDashboardStats()
+    load()
   }, [])
 
-  const quickActions = [
-    { id: 1, title: 'مراجعة التقارير المعلقة', desc: `${stats.pendingReports} تقارير بانتظار`, icon: FileText, color: '#F59E0B', path: '/admin/reports', btnText: 'عرض التقارير' },
-    { id: 2, title: 'إدارة الشركات', desc: `${stats.totalCompanies} شركة مسجلة`, icon: Building2, color: '#3B82F6', path: '/admin/companies', btnText: 'إدارة الشركات' },
-    { id: 3, title: 'الاشتراكات النشطة', desc: `${stats.activeSubscriptions} اشتراكات نشطة`, icon: CreditCard, color: '#16A34A', path: '/admin/subscriptions', btnText: 'عرض الاشتراكات' },
-    { id: 4, title: 'المستخدمون', desc: `${stats.totalUsers} مستخدم نشط`, icon: Users, color: '#8B5CF6', path: '/admin/users', btnText: 'إدارة المستخدمين' },
-    { id: 5, title: '📚 مستودع الشركات المركزي', desc: 'المصدر الوحيد للحقيقة — كل الشركات وبيانات الثقة', icon: Building2, color: '#EC4899', path: '/admin/knowledge-base/companies', btnText: 'عرض المستودع' },
-    { id: 6, title: '📋 مستودع التقارير المركزي', desc: 'جميع التقارير والموافقات والسجلات التاريخية', icon: FileText, color: '#8B5CF6', path: '/admin/knowledge-base/reports', btnText: 'إدارة التقارير' },
+  const riskTotal = risk.low + risk.med + risk.high || 1
+  const lowPct = (risk.low / riskTotal) * 100
+  const medPct = (risk.med / riskTotal) * 100
+  const donut = `conic-gradient(#16A34A 0% ${lowPct}%, #F59E0B ${lowPct}% ${lowPct + medPct}%, #DC2626 ${lowPct + medPct}% 100%)`
+  const pctOf = (n) => Math.round((n / riskTotal) * 100)
+
+  const kpis = [
+    { label: 'إجمالي الشركات', value: stats.totalCompanies.toLocaleString('ar-SA'), sub: 'في سجلات مرصد', color: '#1E2A52' },
+    { label: 'تقارير قيد المراجعة', value: stats.pendingReports, sub: 'بحاجة لإجراء', color: '#F59E0B' },
+    { label: 'التقارير المعتمدة اليوم', value: stats.approvedToday, sub: 'خلال اليوم', color: '#16A34A' },
+    { label: 'الاشتراكات النشطة', value: stats.activeSubscriptions.toLocaleString('ar-SA'), sub: 'حسابات مدفوعة', color: '#7C3AED' },
   ]
 
-  const topCompanies = [
-    { name: 'الراجحي للمقاولات', reports: 12, score: 84 },
-    { name: 'البناء الحديث', reports: 8, score: 72 },
-    { name: 'الصناعات المتقدمة', reports: 6, score: 91 },
-    { name: 'النقل السريع', reports: 5, score: 68 },
-    { name: 'الخدمات اللوجستية', reports: 4, score: 75 },
-  ]
+  const opsPending = stats.pendingReports + stats.companyRequests
 
   return (
-    <main style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC', fontFamily: 'Tajawal, system-ui, sans-serif', dir: 'rtl', color: '#0F172A' }}>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
-      `}</style>
-
-      {/* SIDEBAR */}
-      <aside style={{ width: '268px', background: '#1E2A52', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '0 8px 22px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.1)', marginBottom: '16px' }}>
-          <span style={{ display: 'inline-flex', background: '#fff', borderRadius: '9px', padding: '5px', flex: 'none', fontSize: '20px', color: '#1E2A52' }}>📊</span>
-          <div><div style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>مرصد</div><div style={{ fontSize: '11px', color: '#94A3B8' }}>Admin</div></div>
-        </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-          {[
-            { label: 'نظرة عامة', icon: '📊' },
-            { label: 'التقارير', icon: '📋' },
-            { label: 'الشركات', icon: '🏢' },
-            { label: 'الاشتراكات', icon: '💳' },
-            { label: 'المستخدمون', icon: '👥' },
-            { label: 'الإعدادات', icon: '⚙️' },
-          ].map((item, idx) => (
-            <button key={idx} style={{ background: 'transparent', border: '0', color: '#fff', padding: '12px 12px', textAlign: 'right', cursor: 'pointer', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '10px' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-              <span>{item.icon}</span> {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: 'auto' }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>Admin Access</div>
-          <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>Full Platform Control</div>
-          <button style={{ width: '100%', background: '#16A34A', color: '#fff', border: '0', borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>Settings</button>
-        </div>
-      </aside>
-
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* HEADER */}
-        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 30 }}>
-          <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>Admin Dashboard</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: '9px', background: '#F1F5F9', border: '0', borderRadius: '10px', padding: '9px 16px', fontSize: '14px', color: '#64748B', cursor: 'pointer', fontWeight: 600, minWidth: '240px' }}>🔍 Search...</button>
-            <div style={{ fontSize: '22px' }}>🔔</div>
+    <div>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '18px', marginBottom: '18px' }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
+            <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '12px' }}>{k.label}</div>
+            <div style={{ fontSize: '32px', fontWeight: 900, color: k.color, lineHeight: 1 }}>{loading ? '…' : k.value}</div>
+            <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '6px' }}>{k.sub}</div>
           </div>
-        </header>
+        ))}
+      </div>
 
-        {/* MAIN */}
-        <main style={{ padding: '28px 32px', flex: 1, overflowY: 'auto' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-
-        {/* KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-          {[
-            { label: 'الشركات المسجلة', value: stats.totalCompanies, color: '#3B82F6', icon: '🏢' },
-            { label: 'الاشتراكات النشطة', value: stats.activeSubscriptions, color: '#16A34A', icon: '💳' },
-            { label: 'التقارير المعلقة', value: stats.pendingReports, color: '#F59E0B', icon: '📋' },
-            { label: 'التقارير المعتمدة', value: stats.approvedReports, color: '#8B5CF6', icon: '✅' },
-          ].map((kpi, idx) => (
-            <div
-              key={idx}
-              style={{
-                background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.06)', transition: 'all 0.3s ease',
-                animation: `fadeIn 0.6s ease-out ${idx * 0.1}s both`
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
-                e.currentTarget.style.transform = 'translateY(-4px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div style={{ fontSize: '32px' }}>{kpi.icon}</div>
-                <p style={{ color: '#64748B', fontSize: '12px', fontWeight: 700, margin: 0 }}>{kpi.label}</p>
-              </div>
-              <p style={{ fontSize: '36px', fontWeight: 900, color: kpi.color, margin: 0 }}>{kpi.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-          {quickActions.map((action, idx) => (
-            <div
-              key={action.id}
-              style={{
-                background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-                display: 'flex', flexDirection: 'column',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'all 0.3s ease',
-                animation: `slideUp 0.6s ease-out ${0.6 + idx * 0.08}s both`
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)'
-                e.currentTarget.style.transform = 'translateY(-6px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{
-                  width: '48px', height: '48px', borderRadius: '12px',
-                  background: `linear-gradient(135deg, ${action.color}30 0%, ${action.color}10 100%)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: `2px solid ${action.color}20`
-                }}>
-                  <action.icon size={24} color={action.color} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0 }}>{action.title}</h3>
-                  <p style={{ fontSize: '12px', color: '#94A3B8', margin: '4px 0 0 0' }}>{action.desc}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigate(action.path)}
-                style={{
-                  marginTop: 'auto',
-                  background: `linear-gradient(135deg, ${action.color} 0%, ${action.color}dd 100%)`,
-                  color: '#fff',
-                  border: '0',
-                  borderRadius: '12px',
-                  padding: '12px 18px',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: `0 4px 12px ${action.color}30`
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)'
-                  e.target.style.boxShadow = `0 6px 16px ${action.color}40`
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)'
-                  e.target.style.boxShadow = `0 4px 12px ${action.color}30`
-                }}>
-                {action.btnText} →
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <div style={{
-          borderBottom: '2px solid #E2E8F0', marginBottom: '28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end'
-        }}>
-          <div style={{ display: 'flex', gap: '28px' }}>
-            {['overview', 'analytics', 'settings'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '14px 0',
-                  borderBottom: activeTab === tab ? '3px solid #16A34A' : 'none',
-                  background: 'none',
-                  border: 'none',
-                  color: activeTab === tab ? '#16A34A' : '#64748B',
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  transition: 'all 0.3s ease',
-                  textAlign: 'center'
-                }}
-              >
-                {tab === 'overview' && '📊 نظرة عامة'}
-                {tab === 'analytics' && '📈 التحليلات'}
-                {tab === 'settings' && '⚙️ الإعدادات'}
-              </button>
-            ))}
+      {/* Growth + Risk distribution */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '18px', marginBottom: '18px' }}>
+        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>نمو عدد الشركات</h3>
+          <svg viewBox="0 0 460 160" style={{ width: '100%', height: '170px' }}>
+            <defs>
+              <linearGradient id="gb" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stopColor="#1E2A52" stopOpacity=".2" />
+                <stop offset="1" stopColor="#1E2A52" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="40" x2="460" y2="40" stroke="#F1F5F9" />
+            <line x1="0" y1="80" x2="460" y2="80" stroke="#F1F5F9" />
+            <line x1="0" y1="120" x2="460" y2="120" stroke="#F1F5F9" />
+            <path d="M0,130 L77,118 L154,122 L231,90 L308,78 L385,52 L460,34 L460,160 L0,160 Z" fill="url(#gb)" />
+            <polyline points="0,130 77,118 154,122 231,90 308,78 385,52 460,34" fill="none" stroke="#1E2A52" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
+            <span>يناير</span><span>فبراير</span><span>مارس</span><span>أبريل</span><span>مايو</span><span>يونيو</span>
           </div>
         </div>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', animation: 'fadeIn 0.4s ease-out' }}>
-            {/* Top Companies */}
-            <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>🏆 أكثر الشركات تقارير</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {topCompanies.map((company, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '14px', background: '#F8FAFC', borderRadius: '12px',
-                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#EEF2FF'
-                      e.currentTarget.style.transform = 'translateX(-4px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#F8FAFC'
-                      e.currentTarget.style.transform = 'translateX(0)'
-                    }}>
-                    <div style={{ textAlign: 'right', flex: 1 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{company.name}</div>
-                      <div style={{ fontSize: '12px', color: '#94A3B8' }}>{company.reports} تقرير • {company.score}%</div>
-                    </div>
-                    <div style={{
-                      width: '44px', height: '44px', borderRadius: '50%',
-                      background: `conic-gradient(#16A34A 0% ${company.score}%, #E2E8F0 ${company.score}% 100%)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '11px', fontWeight: 700, color: '#16A34A',
-                      boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
-                    }}>
-                      {company.score}%
-                    </div>
-                  </div>
-                ))}
+        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>توزيع مستويات المخاطر</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ width: '130px', height: '130px', borderRadius: '50%', background: donut, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#1E2A52' }}>{riskTotal === 1 && !risk.low && !risk.med && !risk.high ? 0 : riskTotal}</span>
+                <span style={{ fontSize: '11px', color: '#94A3B8' }}>شركة مُقيّمة</span>
               </div>
             </div>
-
-            {/* Recent Activity */}
-            <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>⏱️ النشاط الأخير</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { text: 'تقرير جديد من الراجحي', time: 'قبل 5 دقائق' },
-                  { text: 'اشتراك جديد في الباقة الأساسية', time: 'قبل ساعة' },
-                  { text: 'تقرير تمت الموافقة عليه', time: 'قبل ساعتين' },
-                  { text: 'مستخدم جديد سجل', time: 'قبل 3 ساعات' },
-                ].map((activity, idx) => (
-                  <div key={idx} style={{ padding: '12px', borderBottom: idx < 3 ? '1px solid #F1F5F9' : 'none' }}>
-                    <div style={{ fontSize: '13px', color: '#0F172A', fontWeight: 600, marginBottom: '4px' }}>{activity.text}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{activity.time}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.4s ease-out' }}>
-            {/* Performance Stats */}
-            <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>📊 إحصائيات الأداء</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                {[
-                  { label: 'معدل الموافقة على التقارير', value: '92%', color: '#16A34A' },
-                  { label: 'متوسط وقت المراجعة', value: '4 ساعات', color: '#3B82F6' },
-                  { label: 'رضا المستخدمين', value: '4.8/5', color: '#F59E0B' },
-                  { label: 'معدل الاحتفاظ', value: '87%', color: '#8B5CF6' },
-                ].map((stat, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
-                      borderRadius: '12px', padding: '18px', textAlign: 'center',
-                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 10px 0', fontWeight: 600 }}>{stat.label}</p>
-                    <p style={{ fontSize: '28px', fontWeight: 900, color: stat.color, margin: 0 }}>{stat.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Knowledge Base Metrics */}
-            <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-            }}>
-              <h3 style={{
-                fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0',
-                textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px'
-              }}>
-                📚 مؤشرات مستودع المعرفة
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                {[
-                  { label: 'متوسط درجة الثقة', value: `${kbStats.avgTrustScore}%`, color: '#16A34A', desc: 'للشركات المعتمدة' },
-                  { label: 'شركات برتبة كاملة', value: kbStats.fullTierCompanies, color: '#3B82F6', desc: '5+ تقارير معتمدة' },
-                  { label: 'شركات برتبة أولية', value: kbStats.preliminaryTierCompanies, color: '#F59E0B', desc: '2-4 تقارير معتمدة' },
-                  { label: 'شركات بدون بيانات', value: kbStats.noDataCompanies, color: '#94A3B8', desc: 'أقل من تقريرين' },
-                ].map((stat, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
-                      borderRadius: '12px', padding: '18px', textAlign: 'right',
-                      border: '1px solid #E2E8F0', transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}>
-                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0 0 8px 0', fontWeight: 700 }}>{stat.label}</p>
-                    <p style={{ fontSize: '28px', fontWeight: 900, color: stat.color, margin: '0 0 6px 0' }}>{stat.value}</p>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{stat.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Links to KB */}
-            <div style={{
-              background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
-              borderRadius: '16px', padding: '28px', color: '#fff',
-              boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
-            }}>
-              <h3 style={{
-                fontSize: '16px', fontWeight: 900, margin: '0 0 20px 0', textAlign: 'right',
-                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px'
-              }}>
-                ⚡ دخول سريع لمستودعات المعرفة
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                <button
-                  onClick={() => navigate('/admin/knowledge-base/companies')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'right',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}>
-                  🏢 مستودع الشركات
-                </button>
-                <button
-                  onClick={() => navigate('/admin/knowledge-base/reports')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'right',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}>
-                  📋 مستودع التقارير
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <div style={{
-            background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.4s ease-out'
-          }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>⚙️ الإعدادات</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
-                { label: 'إعدادات النظام', desc: 'اضبط إعدادات المنصة العامة', path: '/admin/settings', icon: '⚙️' },
-                { label: 'إدارة الأدوار والصلاحيات', desc: 'تحكم في الأدوار والصلاحيات', path: '/admin/roles', icon: '🔐' },
-                { label: 'نسخ احتياطية', desc: 'أدر النسخ الاحتياطية للبيانات', path: '/admin/backup', icon: '💾' },
-                { label: 'السجلات والتدقيق', desc: 'عرض سجلات النشاط', path: '/admin/logs', icon: '📋' },
-              ].map((setting, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => navigate(setting.path)}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '16px',
-                    background: '#F8FAFC',
-                    border: '2px solid #E2E8F0',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    textAlign: 'right',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#EEF2FF'
-                    e.currentTarget.style.borderColor = '#E0E7FF'
-                    e.currentTarget.style.transform = 'translateX(-4px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#F8FAFC'
-                    e.currentTarget.style.borderColor = '#E2E8F0'
-                    e.currentTarget.style.transform = 'translateX(0)'
-                  }}>
-                  <span style={{ fontSize: '18px' }}>←</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>{setting.icon}</span>
-                      {setting.label}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0' }}>{setting.desc}</div>
-                  </div>
-                </button>
+                { c: '#16A34A', label: 'منخفض', pct: pctOf(risk.low) },
+                { c: '#F59E0B', label: 'متوسط', pct: pctOf(risk.med) },
+                { c: '#DC2626', label: 'مرتفع', pct: pctOf(risk.high) },
+              ].map((row) => (
+                <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '4px', background: row.c }}></span>
+                  <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700 }}>{row.label} — {row.pct}%</span>
+                </div>
               ))}
             </div>
           </div>
-        )}
-          </div>
-        </main>
+        </div>
       </div>
-    </main>
+
+      {/* Top sectors + Operations center */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '18px' }}>
+        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>أكثر القطاعات نشاطاً</h3>
+          {sectors.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>لا توجد بيانات قطاعات بعد</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {sectors.map((s) => (
+                <div key={s.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    <span>{s.name}</span><span style={{ color: '#94A3B8' }}>{s.val.toLocaleString('ar-SA')}</span>
+                  </div>
+                  <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${s.pct}%`, height: '100%', background: '#1E2A52', borderRadius: '6px' }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>مركز العمليات</h3>
+            <span style={{ background: '#FEF2F2', color: '#B91C1C', borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 900 }}>{opsPending} معلّق</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button onClick={() => navigate('/admin/reports')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '13px 15px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+              <span style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#F59E0B', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', flex: 'none' }}>{stats.pendingReports}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>تقارير بانتظار المراجعة</div>
+                <div style={{ fontSize: '12px', color: '#B45309', marginTop: '1px' }}>اعتماد أو رفض تقارير الأعضاء</div>
+              </div>
+              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+            </button>
+            <button onClick={() => navigate('/admin/requests')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '13px 15px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+              <span style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', flex: 'none' }}>{stats.companyRequests}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>طلبات إضافة/تعديل شركات</div>
+                <div style={{ fontSize: '12px', color: '#15803D', marginTop: '1px' }}>التحقق من السجل قبل النشر</div>
+              </div>
+              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+            </button>
+            <button onClick={() => navigate('/admin/bulk-import')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '12px', padding: '13px 15px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+              <span style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#7C3AED', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flex: 'none' }}>⬆</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>رفع دفعة شركات</div>
+                <div style={{ fontSize: '12px', color: '#6D28D9', marginTop: '1px' }}>استيراد جماعي من Excel</div>
+              </div>
+              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
