@@ -92,12 +92,28 @@ export default function AddReport() {
   const [companiesLoading, setCompaniesLoading] = useState(true)
   const [companySearch, setCompanySearch] = useState(prefill.companyName || '')
   const [companyInfo, setCompanyInfo] = useState(null)
+  const [ownCompanyId, setOwnCompanyId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   useEffect(() => { fetchCompanies() }, [])
   useEffect(() => { if (form.companyId) loadCompanyInfo(form.companyId) }, [form.companyId])
+
+  // A company cannot report on itself — resolve the reporter's own company
+  useEffect(() => {
+    const loadOwn = async () => {
+      if (!user?.id) return
+      try {
+        const supabase = getSupabase()
+        const { data: u } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+        if (!u?.tenant_id) return
+        const { data: t } = await supabase.from('tenants').select('company_id').eq('id', u.tenant_id).single()
+        if (t?.company_id) setOwnCompanyId(t.company_id)
+      } catch (e) { /* non-blocking */ }
+    }
+    loadOwn()
+  }, [user?.id])
 
   const fetchCompanies = async () => {
     try {
@@ -127,9 +143,10 @@ export default function AddReport() {
   const setRating = (k, v) => setForm(prev => ({ ...prev, ratings: { ...prev.ratings, [k]: v } }))
 
   const selectedCompany = companies.find(c => c.id === form.companyId)
+  const selectableCompanies = companies.filter(c => c.id !== ownCompanyId)
   const filteredCompanies = companySearch.trim()
-    ? companies.filter(c => (c.name || '').includes(companySearch.trim()) || (c.cr || '').includes(companySearch.trim()))
-    : companies
+    ? selectableCompanies.filter(c => (c.name || '').includes(companySearch.trim()) || (c.cr || '').includes(companySearch.trim()))
+    : selectableCompanies
 
   // ===== Impact / reliability computation (client-side, Phase A) =====
   const impact = (() => {
@@ -150,6 +167,7 @@ export default function AddReport() {
 
   const validateStep = (s) => {
     if (s === 1 && !form.companyId) return 'اختر الشركة المُبلَّغ عنها'
+    if (s === 1 && ownCompanyId && form.companyId === ownCompanyId) return 'لا يمكن تقديم تقرير عن شركتك نفسها'
     if (s === 2) {
       if (!form.category) return 'اختر تصنيف التقرير'
       if (!form.title.trim()) return 'أدخل عنوان التقرير'
