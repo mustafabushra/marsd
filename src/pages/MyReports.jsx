@@ -54,6 +54,7 @@ export default function MyReports() {
             defaulted,
             notes,
             description,
+            rejection_reason,
             companies (id, name, cr_number),
             credits_ledger(amount),
             review_actions(action, reason, created_at)
@@ -97,7 +98,7 @@ export default function MyReports() {
             status: r.status,
             st: statusObj,
             notes: r.description || r.notes,
-            rejectionReason: rejectAction?.reason || '',
+            rejectionReason: r.rejection_reason || rejectAction?.reason || '',
             creditsEarned: creditsEarned,
             paid: r.payment_commitment ? (paymentLabels[r.payment_commitment] || r.payment_commitment) : '—',
             delay: (r.delay_days ?? 0) + ' يوم',

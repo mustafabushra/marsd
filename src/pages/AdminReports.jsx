@@ -1,266 +1,209 @@
 import { useState, useEffect } from 'react'
-import { Check, X, AlertCircle } from 'lucide-react'
-import * as api from '../lib/api'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
+
+const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
+const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
 
 export default function AdminReports() {
-  const [selectedReport, setSelectedReport] = useState(null)
+  const { user } = useUser()
   const [reports, setReports] = useState([])
+  const [sel, setSel] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
   const [actionLoading, setActionLoading] = useState(null)
-  const [filterStatus, setFilterStatus] = useState('pending_review')
+  const [toast, setToast] = useState('')
 
-  // Fetch reports on mount
-  useEffect(() => {
-    fetchReports()
-  }, [filterStatus, pagination.page])
+  useEffect(() => { fetchReports() }, [])
+
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
 
   const fetchReports = async () => {
     try {
       setLoading(true)
-      setError(null)
-      // Use Knowledge Base search with status filter
-      const response = await api.searchReportsKnowledgeBase(
-        '',
-        { status: filterStatus },
-        pagination.page,
-        pagination.limit
-      )
-      setReports(response.data || [])
-      setPagination(response.pagination || {})
-      if (response.data?.length > 0) {
-        setSelectedReport(response.data[0])
-      }
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from('reports')
+        .select(`id, target_company_id, reporter_tenant_id, status, submitted_at, dealt_at, deal_end_date,
+                 deal_value, currency, deal_amount_range, payment_commitment, delay_days, defaulted,
+                 title, category, description, notes, would_recommend,
+                 companies:target_company_id ( name, cr_number )`)
+        .eq('status', 'pending_review')
+        .order('submitted_at', { ascending: false })
+      setReports(data || [])
+      setSel(0)
     } catch (err) {
-      setError(err.message || 'حدث خطأ في تحميل التقارير')
       console.error('Error fetching reports:', err)
     } finally {
       setLoading(false)
     }
   }
 
+  const current = reports[sel] || null
+
+  const removeCurrent = () => {
+    const next = reports.filter((_, i) => i !== sel)
+    setReports(next)
+    setSel(0)
+  }
+
   const handleApprove = async () => {
-    if (!selectedReport) return
+    if (!current) return
     try {
       setActionLoading('approve')
-      await api.approveReport(selectedReport.id)
-      setError(null)
-      // Remove from list and select next
-      const updatedReports = reports.filter(r => r.id !== selectedReport.id)
-      setReports(updatedReports)
-      setSelectedReport(updatedReports[0] || null)
+      const supabase = getSupabase()
+      const { error } = await supabase.from('reports')
+        .update({ status: 'approved', approved_at: new Date().toISOString() })
+        .eq('id', current.id)
+      if (error) throw error
+      // Award credits to the reporter
+      await supabase.from('credits_ledger').insert([{
+        tenant_id: current.reporter_tenant_id, report_id: current.id, amount: 10,
+        reason: 'report_approved', created_at: new Date().toISOString(),
+      }]).catch(() => {})
+      // Recompute trust score (best effort)
+      await supabase.rpc('compute_trust_score', { p_company_id: current.target_company_id }).catch(() => {})
+      // Audit + notify
+      await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_approved', entity: 'report', entity_id: current.id, created_at: new Date().toISOString() }]).catch(() => {})
+      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_approved', title: 'تم اعتماد تقريرك', message: 'تم اعتماد تقريرك وإضافته لمؤشر الثقة.', is_read: false, created_at: new Date().toISOString() }]).catch(() => {})
+      showToast('✅ تم اعتماد التقرير')
+      removeCurrent()
     } catch (err) {
-      setError(err.message || 'فشل الموافقة على التقرير')
-      console.error('Error approving report:', err)
-    } finally {
-      setActionLoading(null)
-    }
+      showToast('❌ فشل الاعتماد')
+      console.error(err)
+    } finally { setActionLoading(null) }
   }
 
   const handleReject = async () => {
-    if (!selectedReport) return
+    if (!current) return
+    const reason = window.prompt('سبب الرفض (سيظهر للمُبلِّغ):', '')
+    if (reason === null) return
     try {
       setActionLoading('reject')
-      await api.rejectReport(selectedReport.id, 'تم الرفض من قبل الإدارة')
-      setError(null)
-      // Remove from list and select next
-      const updatedReports = reports.filter(r => r.id !== selectedReport.id)
-      setReports(updatedReports)
-      setSelectedReport(updatedReports[0] || null)
+      const supabase = getSupabase()
+      const { error } = await supabase.from('reports')
+        .update({ status: 'rejected', rejected_at: new Date().toISOString(), rejection_reason: reason || 'تم الرفض من قبل الإدارة' })
+        .eq('id', current.id)
+      if (error) throw error
+      // Refund the credit deducted at submission
+      await supabase.from('credits_ledger').insert([{
+        tenant_id: current.reporter_tenant_id, report_id: current.id, amount: 1,
+        reason: 'report_rejected_refund', created_at: new Date().toISOString(),
+      }]).catch(() => {})
+      await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_rejected', entity: 'report', entity_id: current.id, meta: JSON.stringify({ reason }), created_at: new Date().toISOString() }]).catch(() => {})
+      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_rejected', title: 'تم رفض تقريرك', message: reason || 'راجع ملاحظات الإدارة.', is_read: false, created_at: new Date().toISOString() }]).catch(() => {})
+      showToast('تم رفض التقرير')
+      removeCurrent()
     } catch (err) {
-      setError(err.message || 'فشل رفض التقرير')
-      console.error('Error rejecting report:', err)
-    } finally {
-      setActionLoading(null)
-    }
+      showToast('❌ فشل الرفض')
+      console.error(err)
+    } finally { setActionLoading(null) }
+  }
+
+  const handleRequestInfo = async () => {
+    if (!current) return
+    try {
+      setActionLoading('info')
+      const supabase = getSupabase()
+      await supabase.from('reports').update({ status: 'request_info' }).eq('id', current.id)
+      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_request_info', title: 'مطلوب توضيح على تقريرك', message: 'يرجى إضافة تفاصيل/مستندات إضافية.', is_read: false, created_at: new Date().toISOString() }]).catch(() => {})
+      showToast('تم طلب توضيح')
+      removeCurrent()
+    } catch (err) {
+      showToast('❌ تعذّر الإجراء')
+    } finally { setActionLoading(null) }
+  }
+
+  const dealValue = (r) => r?.deal_value != null ? `${Number(r.deal_value).toLocaleString('ar-SA')} ${r.currency || ''}`.trim() : (r?.deal_amount_range || '—')
+  const period = (r) => {
+    const f = r?.dealt_at ? new Date(r.dealt_at).toLocaleDateString('ar-SA') : null
+    const t = r?.deal_end_date ? new Date(r.deal_end_date).toLocaleDateString('ar-SA') : null
+    return f ? (t ? `${f} — ${t}` : f) : '—'
   }
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
-          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل التقارير...</p>
-        </div>
-      </div>
-    )
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل التقارير...</div>
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px 32px' }}>
-      {/* Error Alert */}
-      {error && (
-        <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <AlertCircle size={20} color='#991B1B' style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
-            <p style={{ fontWeight: 600, color: '#991B1B', margin: '0 0 4px', fontSize: '14px' }}>خطأ</p>
-            <p style={{ fontSize: '13px', color: '#7F1D1D', margin: 0 }}>{error}</p>
-          </div>
-        </div>
+    <div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)' }}>{toast}</div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '18px' }}>
-        {/* Left: Reports Table */}
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
-          <div style={{ padding: '15px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
-            <span>الشركة</span>
-            <span>التاريخ</span>
-            <span>الحالة</span>
-            <span>الإجراء</span>
-          </div>
-          {reports.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-              <p>لا توجد تقارير معلقة</p>
+      {reports.length === 0 ? (
+        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '48px', textAlign: 'center' }}>
+          <div style={{ fontSize: '44px', marginBottom: '12px' }}>✅</div>
+          <div style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>لا توجد تقارير قيد المراجعة</div>
+          <div style={{ fontSize: '14px', color: '#94A3B8', marginTop: '6px' }}>كل التقارير تمت مراجعتها.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '18px', alignItems: 'start' }}>
+          {/* List */}
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: 0 }}>تقارير قيد المراجعة</h3>
+              <span style={{ background: '#FFFBEB', color: '#B45309', borderRadius: '999px', padding: '3px 11px', fontSize: '12.5px', fontWeight: 800 }}>{reports.length}</span>
             </div>
-          ) : (
-            reports.map(r => (
-              <div
-                key={r.id}
-                onClick={() => setSelectedReport(r)}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  padding: '15px 22px',
-                  borderBottom: '1px solid #F1F5F9',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  background: selectedReport?.id === r.id ? '#F0F4FF' : 'transparent',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{r.company_name || 'مجهولة'}</span>
-                <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'right' }}>{new Date(r.submitted_at).toLocaleDateString('ar-SA')}</span>
-                <span style={{
-                  background: r.status === 'pending_review' ? '#FEF3C7' : r.status === 'approved' ? '#D1FAE5' : '#FEE2E2',
-                  color: r.status === 'pending_review' ? '#92400E' : r.status === 'approved' ? '#065F46' : '#991B1B',
-                  borderRadius: '6px',
-                  padding: '4px 10px',
-                  fontSize: '12.5px',
-                  fontWeight: 800,
-                  textAlign: 'center'
-                }}>
-                  {r.status === 'pending_review' ? 'قيد الانتظار' : r.status === 'approved' ? 'معتمد' : 'مرفوض'}
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedReport(r); }}
-                  style={{
-                    background: '#fff',
-                    color: '#1E2A52',
-                    border: '1.5px solid #E2E8F0',
-                    borderRadius: '8px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  عرض
-                </button>
+            {reports.map((r, i) => (
+              <div key={r.id} onClick={() => setSel(i)} style={{ padding: '16px 18px', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', background: sel === i ? '#F0FDF4' : '#fff', borderRight: sel === i ? '3px solid #16A34A' : '3px solid transparent' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '5px', lineHeight: 1.4 }}>{r.companies?.name || 'شركة'}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar-SA') : '—'}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#334155' }}>{dealValue(r)}</span>
+                </div>
               </div>
-            ))
+            ))}
+          </div>
+
+          {/* Detail */}
+          {current && (
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '26px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '18px', borderBottom: '1px solid #F1F5F9' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلَّغ عنها</div>
+                  <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{current.companies?.name || 'شركة'}</h2>
+                  {current.title && <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '5px' }}>{current.title}{current.category ? ` · ${CATEGORY_LABELS[current.category] || current.category}` : ''}</div>}
+                </div>
+                <span style={{ background: '#FFFBEB', color: '#B45309', borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>قيد المراجعة</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '20px' }}>
+                {[
+                  ['قيمة التعامل', dealValue(current)],
+                  ['حالة السداد', PAYMENT_LABELS[current.payment_commitment] || '—'],
+                  ['متوسط التأخير', `${current.delay_days ?? 0} يوم`],
+                  ['مبالغ مستحقة', current.defaulted ? 'نعم' : 'لا'],
+                  ['التوصية', current.would_recommend === 'yes' ? 'ينصح به' : current.would_recommend === 'maybe' ? 'ربما' : current.would_recommend === 'no' ? 'لا ينصح' : '—'],
+                  ['فترة التعامل', period(current)],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '15px' }}>
+                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '5px' }}>{l}</div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(current.description || current.notes) && (
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>ملاحظات المُبلِّغ</div>
+                  <p style={{ fontSize: '14.5px', color: '#475569', lineHeight: 1.7, margin: 0, background: '#F8FAFC', borderRadius: '11px', padding: '16px' }}>{current.description || current.notes}</p>
+                </div>
+              )}
+
+              <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '17px' }}>ℹ</span>
+                <span style={{ fontSize: '13px', color: '#3730A3', fontWeight: 700, lineHeight: 1.6 }}>اعتماد التقرير سيؤثر تدريجياً على مؤشر ثقة الشركة حين يبدأ الإجماع، لا بشكل فوري.</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '11px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                <button onClick={handleApprove} disabled={!!actionLoading} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '13px 28px', fontSize: '14.5px', fontWeight: 800, cursor: actionLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>{actionLoading === 'approve' ? '...' : '✓ اعتماد التقرير'}</button>
+                <button onClick={handleReject} disabled={!!actionLoading} style={{ background: '#fff', color: '#B91C1C', border: '1.5px solid #FECACA', borderRadius: '10px', padding: '13px 28px', fontSize: '14.5px', fontWeight: 800, cursor: actionLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>✕ رفض</button>
+                <button onClick={handleRequestInfo} disabled={!!actionLoading} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '13px 28px', fontSize: '14.5px', fontWeight: 800, cursor: actionLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>طلب توضيح</button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Right: Details Panel */}
-        {selectedReport && (
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', height: 'fit-content', position: 'sticky', top: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>تفاصيل التقرير</h3>
-
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة</div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{selectedReport.company_name || 'مجهولة'}</div>
-            </div>
-
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الحالة</div>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 700,
-                padding: '6px 10px',
-                borderRadius: '6px',
-                display: 'inline-block',
-                background: selectedReport.status === 'pending_review' ? '#FEF3C7' : selectedReport.status === 'approved' ? '#D1FAE5' : '#FEE2E2',
-                color: selectedReport.status === 'pending_review' ? '#92400E' : selectedReport.status === 'approved' ? '#065F46' : '#991B1B'
-              }}>
-                {selectedReport.status === 'pending_review' ? 'قيد الانتظار' : selectedReport.status === 'approved' ? 'معتمد' : 'مرفوض'}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>تاريخ التقرير</div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#334155', textAlign: 'right' }}>{new Date(selectedReport.submitted_at).toLocaleDateString('ar-SA')}</div>
-            </div>
-
-            <div style={{ marginBottom: '18px', padding: '14px', background: '#F8FAFC', borderRadius: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>تفاصيل التقرير</div>
-              <div style={{ fontSize: '13px', fontWeight: 500, color: '#334155', lineHeight: 1.6, textAlign: 'right', maxHeight: '200px', overflow: 'auto' }}>
-                <div>💰 النطاق المالي: {selectedReport.deal_amount_range || '—'}</div>
-                <div>📋 نوع الالتزام: {selectedReport.payment_commitment || '—'}</div>
-                <div>⏱️ التأخير: {selectedReport.delay_days || 0} يوم</div>
-                <div>⚠️ التخلف: {selectedReport.defaulted ? 'نعم' : 'لا'}</div>
-              </div>
-            </div>
-
-            {selectedReport.status === 'pending_review' && (
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                <button
-                  onClick={handleApprove}
-                  disabled={actionLoading === 'approve'}
-                  style={{
-                    flex: 1,
-                    background: actionLoading === 'approve' ? '#DBEAFE' : '#16A34A',
-                    color: '#fff',
-                    border: 0,
-                    borderRadius: '10px',
-                    padding: '11px',
-                    fontSize: '14px',
-                    fontWeight: 800,
-                    cursor: actionLoading === 'approve' ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    opacity: actionLoading === 'approve' ? 0.7 : 1
-                  }}
-                >
-                  <Check size={18} />
-                  {actionLoading === 'approve' ? 'جاري...' : 'موافقة'}
-                </button>
-                <button
-                  onClick={handleReject}
-                  disabled={actionLoading === 'reject'}
-                  style={{
-                    flex: 1,
-                    background: actionLoading === 'reject' ? '#DBEAFE' : '#FEE2E2',
-                    color: actionLoading === 'reject' ? '#3B82F6' : '#DC2626',
-                    border: 0,
-                    borderRadius: '10px',
-                    padding: '11px',
-                    fontSize: '14px',
-                    fontWeight: 800,
-                    cursor: actionLoading === 'reject' ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    opacity: actionLoading === 'reject' ? 0.7 : 1
-                  }}
-                >
-                  <X size={18} />
-                  {actionLoading === 'reject' ? 'جاري...' : 'رفض'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </main>
+      )}
+    </div>
   )
 }
