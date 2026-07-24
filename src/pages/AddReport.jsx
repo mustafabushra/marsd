@@ -346,13 +346,12 @@ export default function AddReport() {
         {step === 1 && (
           <>
             <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>اختيار الشركة المُبلَّغ عنها</h2>
-            <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 18px', textAlign: 'right' }}>ابحث بالاسم أو رقم السجل التجاري، أو أضِف شركة جديدة إن لم تكن موجودة</p>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px' }}>
+            <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 18px', textAlign: 'right' }}>ابحث بالاسم أو رقم السجل التجاري لاختيار الشركة التي تعاملت معها</p>
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px' }}>
                 <SearchIcon size={20} color="#94A3B8" />
                 <input placeholder="اسم الشركة أو رقم السجل التجاري" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
               </div>
-              <button type="button" onClick={() => navigate('/add-company', { state: { companyName: companySearch.trim() } })} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '12px', padding: '0 20px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', flex: 'none', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>+ شركة جديدة</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
               {companiesLoading ? (
