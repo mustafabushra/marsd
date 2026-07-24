@@ -231,7 +231,7 @@ export default function AdminClaimRequests() {
                   {req.users.email}
                 </div>
                 <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                  {new Date(req.submitted_at).toLocaleDateString('ar-SA')}
+                  {new Date(req.submitted_at).toLocaleDateString('en-GB')}
                 </div>
               </div>
             ))}

@@ -1,5 +1,7 @@
+// Unified formatting for the whole app: Western (Latin) digits + Gregorian
+// calendar. Long dates keep Arabic month names but with Latin digits.
 export const formatCurrency = (amount, currency = 'SAR') => {
-  return new Intl.NumberFormat('ar-SA', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency
   }).format(amount)
@@ -7,21 +9,22 @@ export const formatCurrency = (amount, currency = 'SAR') => {
 
 export const formatDate = (date, format = 'short') => {
   const d = new Date(date)
+  if (isNaN(d.getTime())) return '—'
   if (format === 'short') {
-    return d.toLocaleDateString('ar-SA')
+    return d.toLocaleDateString('en-GB')
   }
   if (format === 'long') {
-    return d.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    return d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' })
   }
   return d.toISOString()
 }
 
 export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+  return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 export const formatNumber = (num) => {
-  return new Intl.NumberFormat('ar-SA').format(num)
+  return new Intl.NumberFormat('en-US').format(num)
 }
 
 export const formatPercentage = (num, decimals = 1) => {

@@ -56,7 +56,7 @@ export default function AdminBackup() {
     setTimeout(() => {
       const newBackup = {
         id: backups.length + 1,
-        timestamp: new Date().toLocaleString('ar-SA'),
+        timestamp: new Date().toLocaleString('en-US'),
         size: '2.5 GB',
         status: 'completed',
         type: 'full',

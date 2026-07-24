@@ -46,7 +46,7 @@ export default function CompanyUsers() {
         status: u.status === 'active' ? 'نشط' : 'معطل',
         stBg: u.status === 'active' ? '#ECFDF5' : '#FEE2E2',
         stC: u.status === 'active' ? '#15803D' : '#DC2626',
-        lastLogin: u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('ar-SA') : 'لم يسجل دخول'
+        lastLogin: u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-GB') : 'لم يسجل دخول'
       }))
 
       setUsers(formatted)

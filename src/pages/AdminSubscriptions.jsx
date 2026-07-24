@@ -36,8 +36,8 @@ export default function AdminSubscriptions() {
         tenant: s.tenant?.name || 'مجهولة',
         plan: s.plan_name || 'basic',
         status: s.status || 'active',
-        startDate: new Date(s.start_date).toLocaleDateString('ar-SA'),
-        endDate: new Date(s.end_date).toLocaleDateString('ar-SA'),
+        startDate: new Date(s.start_date).toLocaleDateString('en-GB'),
+        endDate: new Date(s.end_date).toLocaleDateString('en-GB'),
         amount: s.price || 0,
         users: s.users?.length || 0,
       }))
@@ -73,8 +73,8 @@ export default function AdminSubscriptions() {
           ? {
               ...s,
               status: 'active',
-              startDate: new Date().toLocaleDateString('ar-SA'),
-              endDate: newEndDate.toLocaleDateString('ar-SA'),
+              startDate: new Date().toLocaleDateString('en-GB'),
+              endDate: newEndDate.toLocaleDateString('en-GB'),
             }
           : s
       ))
@@ -133,7 +133,7 @@ export default function AdminSubscriptions() {
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
           <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>إجمالي الإيرادات الشهرية</p>
           <p style={{ fontSize: '28px', fontWeight: 900, color: '#0369A1', margin: 0, textAlign: 'right' }}>
-            {subscriptions.filter(s => s.status === 'active').reduce((sum, s) => sum + s.amount, 0).toLocaleString()} ر.س
+            {subscriptions.filter(s => s.status === 'active').reduce((sum, s) => sum + s.amount, 0).toLocaleString('en-US')} ر.س
           </p>
         </div>
 
@@ -179,7 +179,7 @@ export default function AdminSubscriptions() {
                   </span>
                 </td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {sub.amount.toLocaleString()} ر.س
+                  {sub.amount.toLocaleString('en-US')} ر.س
                 </td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', borderLeft: '1px solid #E2E8F0' }}>
                   {sub.users}

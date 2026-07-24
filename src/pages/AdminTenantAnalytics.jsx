@@ -135,7 +135,7 @@ export default function AdminTenantAnalytics() {
                   {tenant.users}
                 </td>
                 <td style={{ padding: '16px', fontSize: '13px', color: '#0F172A', fontWeight: 600 }}>
-                  {tenant.revenue.toLocaleString()} ر.س
+                  {tenant.revenue.toLocaleString('en-US')} ر.س
                 </td>
               </tr>
             ))}

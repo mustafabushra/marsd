@@ -75,7 +75,7 @@ const AdminDashboard: React.FC = () => {
     },
     {
       label: 'الإيراد الإجمالي',
-      value: `﷼${(dashboard.overview.totalRevenue || 0).toLocaleString()}`,
+      value: `﷼${(dashboard.overview.totalRevenue || 0).toLocaleString('en-US')}`,
       color: '#7C3AED',
       icon: '💰',
     },
@@ -188,7 +188,7 @@ const AdminDashboard: React.FC = () => {
                       <p style={activityUserStyles}>{log.userEmail}</p>
                     </div>
                     <p style={activityTimeStyles}>
-                      {new Date(log.timestamp).toLocaleDateString('ar-SA')}
+                      {new Date(log.timestamp).toLocaleDateString('en-GB')}
                     </p>
                   </div>
                 ))}
@@ -230,7 +230,7 @@ const AdminDashboard: React.FC = () => {
               <div style={analyticsTileStyles}>
                 <p style={analyticsTileLabelStyles}>الإيراد الشهري</p>
                 <p style={{ ...analyticsTileValueStyles, color: '#7C3AED' }}>
-                  ﷼{(dashboard.overview.totalRevenue || 0).toLocaleString()}
+                  ﷼{(dashboard.overview.totalRevenue || 0).toLocaleString('en-US')}
                 </p>
               </div>
             </div>

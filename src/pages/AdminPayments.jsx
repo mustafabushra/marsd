@@ -174,7 +174,7 @@ export default function AdminPayments() {
                     {payment.company}
                   </td>
                   <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                    {payment.amount.toLocaleString()} ر.س
+                    {payment.amount.toLocaleString('en-US')} ر.س
                   </td>
                   <td style={{ padding: '16px', borderLeft: '1px solid #E2E8F0' }}>
                     <span style={{

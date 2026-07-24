@@ -84,7 +84,7 @@ export default function MyReports() {
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
 
           const dealValue = r.deal_value != null
-            ? `${Number(r.deal_value).toLocaleString('ar-SA')} ${r.currency || ''}`.trim()
+            ? `${Number(r.deal_value).toLocaleString('en-US')} ${r.currency || ''}`.trim()
             : (r.deal_amount_range ? r.deal_amount_range.replace(/^SAR\s*/, '') + ' ر.س' : '—')
 
           return {
@@ -93,7 +93,7 @@ export default function MyReports() {
             companyId: r.target_company_id,
             title: r.title || '—',
             category: r.category ? (categoryLabels[r.category] || r.category) : '—',
-            date: r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar-SA') : '—',
+            date: r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—',
             value: dealValue,
             status: r.status,
             st: statusObj,
@@ -103,8 +103,8 @@ export default function MyReports() {
             paid: r.payment_commitment ? (paymentLabels[r.payment_commitment] || r.payment_commitment) : '—',
             delay: (r.delay_days ?? 0) + ' يوم',
             due: r.defaulted ? 'نعم' : 'لا',
-            period: r.dealt_at ? new Date(r.dealt_at).toLocaleDateString('ar-SA') : '—',
-            approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleDateString('ar-SA') : null
+            period: r.dealt_at ? new Date(r.dealt_at).toLocaleDateString('en-GB') : '—',
+            approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-GB') : null
           }
         })
 

@@ -97,7 +97,7 @@ export default function AdminCompaniesManagement() {
         {statChips.map((s) => (
           <div key={s.key} onClick={() => setFilter(s.key)} style={{ background: '#fff', border: `1px solid ${filter === s.key ? s.color : '#E2E8F0'}`, borderRadius: '14px', padding: '18px 20px', cursor: 'pointer' }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{s.label}</div>
-            <div style={{ fontSize: '26px', fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value.toLocaleString('ar-SA')}</div>
+            <div style={{ fontSize: '26px', fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value.toLocaleString('en-US')}</div>
           </div>
         ))}
       </div>

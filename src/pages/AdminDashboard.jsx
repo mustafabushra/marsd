@@ -87,10 +87,10 @@ export default function AdminDashboard() {
   const pctOf = (n) => Math.round((n / riskTotal) * 100)
 
   const kpis = [
-    { label: 'إجمالي الشركات', value: stats.totalCompanies.toLocaleString('ar-SA'), sub: 'في سجلات مرصد', color: '#1E2A52' },
+    { label: 'إجمالي الشركات', value: stats.totalCompanies.toLocaleString('en-US'), sub: 'في سجلات مرصد', color: '#1E2A52' },
     { label: 'تقارير قيد المراجعة', value: stats.pendingReports, sub: 'بحاجة لإجراء', color: '#F59E0B' },
     { label: 'التقارير المعتمدة اليوم', value: stats.approvedToday, sub: 'خلال اليوم', color: '#16A34A' },
-    { label: 'الاشتراكات النشطة', value: stats.activeSubscriptions.toLocaleString('ar-SA'), sub: 'حسابات مدفوعة', color: '#7C3AED' },
+    { label: 'الاشتراكات النشطة', value: stats.activeSubscriptions.toLocaleString('en-US'), sub: 'حسابات مدفوعة', color: '#7C3AED' },
   ]
 
   const opsPending = stats.pendingReports + stats.companyRequests
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
               {sectors.map((s) => (
                 <div key={s.name}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    <span>{s.name}</span><span style={{ color: '#94A3B8' }}>{s.val.toLocaleString('ar-SA')}</span>
+                    <span>{s.name}</span><span style={{ color: '#94A3B8' }}>{s.val.toLocaleString('en-US')}</span>
                   </div>
                   <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '6px', overflow: 'hidden' }}>
                     <div style={{ width: `${s.pct}%`, height: '100%', background: '#1E2A52', borderRadius: '6px' }}></div>

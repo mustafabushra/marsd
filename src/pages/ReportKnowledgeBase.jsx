@@ -36,8 +36,8 @@ export default function ReportKnowledgeBase() {
   })
 
   const kpis = [
-    { label: 'إجمالي التقارير المعتمدة', value: reports.length.toLocaleString('ar-SA'), color: '#1E2A52' },
-    { label: 'معتمدة هذا الشهر', value: thisMonth.toLocaleString('ar-SA'), color: '#16A34A' },
+    { label: 'إجمالي التقارير المعتمدة', value: reports.length.toLocaleString('en-US'), color: '#1E2A52' },
+    { label: 'معتمدة هذا الشهر', value: thisMonth.toLocaleString('en-US'), color: '#16A34A' },
     { label: 'حالة الأرشيف', value: 'محدّث', color: '#7C3AED' },
   ]
 
@@ -78,7 +78,7 @@ export default function ReportKnowledgeBase() {
             <span style={{ fontSize: '13px', fontWeight: 700, color: '#1E2A52', fontFamily: 'monospace' }}>RPT-{String(r.id).slice(0, 8)}</span>
             <span style={{ fontSize: '14px', color: '#0F172A', fontWeight: 700 }}>{r.companies?.name || '—'}</span>
             <span style={{ fontSize: '13.5px', color: '#334155' }}>{r.companies?.sector || '—'}</span>
-            <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>{r.approved_at ? new Date(r.approved_at).toLocaleDateString('ar-SA') : '—'}</span>
+            <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>{r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-GB') : '—'}</span>
           </div>
         ))}
       </div>

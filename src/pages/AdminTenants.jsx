@@ -39,7 +39,7 @@ export default function AdminTenants() {
         status: t.status || 'active',
         users: t.users?.length || 0,
         subscriptionPlan: t.subscriptions?.[0]?.plan_name || 'basic',
-        joinDate: new Date(t.created_at).toLocaleDateString('ar-SA'),
+        joinDate: new Date(t.created_at).toLocaleDateString('en-GB'),
         reports: t.reports?.length || 0,
       }))
 

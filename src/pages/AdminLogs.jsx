@@ -21,7 +21,7 @@ export default function AdminLogs() {
         stBg: '#ECFDF5',
         stC: '#15803D',
         status: 'نجاح',
-        timestamp: new Date(log.created_at).toLocaleString('ar-SA'),
+        timestamp: new Date(log.created_at).toLocaleString('en-US'),
         user: log.actor?.email || 'نظام'
       })) || []
       setLogs(formatted)

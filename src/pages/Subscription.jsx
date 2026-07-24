@@ -53,8 +53,8 @@ export default function Subscription() {
           setInvoices(invoicesData.map((inv, idx) => ({
             id: inv.id,
             no: `INV-${new Date().getFullYear()}-${String(idx + 1).padStart(3, '0')}`,
-            date: new Date(inv.created_at).toLocaleDateString('ar-SA'),
-            amount: `${inv.amount?.toLocaleString('ar-SA')} ر.س`,
+            date: new Date(inv.created_at).toLocaleDateString('en-GB'),
+            amount: `${inv.amount?.toLocaleString('en-US')} ر.س`,
             status: inv.status === 'paid' ? 'مدفوعة' : 'معلقة'
           })))
         }
@@ -101,7 +101,7 @@ export default function Subscription() {
             </span>
           </div>
           <div style={{ fontSize: '13.5px', color: '#CBD5E1', margin: '14px 0 22px' }}>
-            تتجدد تلقائياً في {subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('ar-SA') : '—'} · {subscription?.plans?.price?.toLocaleString('ar-SA')} ر.س / شهرياً
+            تتجدد تلقائياً في {subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('en-GB') : '—'} · {subscription?.plans?.price?.toLocaleString('en-US')} ر.س / شهرياً
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button

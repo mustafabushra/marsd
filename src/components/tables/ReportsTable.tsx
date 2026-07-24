@@ -59,7 +59,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({
 
   const formatDate = (date: Date | string) => {
     const d = new Date(date)
-    return d.toLocaleDateString('ar-SA', {
+    return d.toLocaleDateString('en-GB', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',

@@ -99,7 +99,7 @@ export default function CompanyDashboard() {
         }
         const formattedActivity = (notificationsData || []).map(n => ({
           title: n.message || 'تحديث',
-          time: new Date(n.created_at).toLocaleDateString('ar-SA'),
+          time: new Date(n.created_at).toLocaleDateString('en-GB'),
           dot: dotColor(n.type)
         }))
         setActivity(formattedActivity)

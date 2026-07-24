@@ -249,7 +249,7 @@ export default function AdminBulkImport() {
         {step === 4 && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', margin: '0 auto 18px' }}>✓</div>
-            <h2 style={{ fontSize: '23px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>تم استيراد {importedCount.toLocaleString('ar-SA')} شركة بنجاح</h2>
+            <h2 style={{ fontSize: '23px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>تم استيراد {importedCount.toLocaleString('en-US')} شركة بنجاح</h2>
             <p style={{ fontSize: '15px', color: '#64748B', lineHeight: 1.75, margin: '0 auto 22px', maxWidth: '520px' }}>أُضيفت الشركات لسجلات مرصد وأصبحت متاحة للبحث والتقييم. استُبعدت {validation.invalid.length} صفوف (مكررة أو ناقصة).</p>
             <button onClick={reset} style={{ background: P, color: '#fff', border: 0, borderRadius: '11px', padding: '12px 30px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>رفع دفعة أخرى</button>
           </div>

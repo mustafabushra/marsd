@@ -70,7 +70,7 @@ export default function CompanyKnowledgeBase() {
             <span style={{ fontSize: '13px', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{c.cr_number || '—'}</span>
             <span style={{ fontSize: '13px', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{c.unified_number || '—'}</span>
             <span style={{ fontSize: '13px', color: '#334155', fontWeight: 600 }}>{sourceLabel(c)}</span>
-            <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>{c.verified_at ? new Date(c.verified_at).toLocaleDateString('ar-SA') : '—'}</span>
+            <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>{c.verified_at ? new Date(c.verified_at).toLocaleDateString('en-GB') : '—'}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ flex: 1, height: '7px', background: '#F1F5F9', borderRadius: '5px', overflow: 'hidden', minWidth: '50px' }}>
                 <div style={{ height: '100%', borderRadius: '5px', background: compColor(c.completeness), width: `${c.completeness}%` }}></div>

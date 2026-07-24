@@ -113,10 +113,10 @@ export default function AdminReports() {
     } finally { setActionLoading(null) }
   }
 
-  const dealValue = (r) => r?.deal_value != null ? `${Number(r.deal_value).toLocaleString('ar-SA')} ${r.currency || ''}`.trim() : (r?.deal_amount_range || '—')
+  const dealValue = (r) => r?.deal_value != null ? `${Number(r.deal_value).toLocaleString('en-US')} ${r.currency || ''}`.trim() : (r?.deal_amount_range || '—')
   const period = (r) => {
-    const f = r?.dealt_at ? new Date(r.dealt_at).toLocaleDateString('ar-SA') : null
-    const t = r?.deal_end_date ? new Date(r.deal_end_date).toLocaleDateString('ar-SA') : null
+    const f = r?.dealt_at ? new Date(r.dealt_at).toLocaleDateString('en-GB') : null
+    const t = r?.deal_end_date ? new Date(r.deal_end_date).toLocaleDateString('en-GB') : null
     return f ? (t ? `${f} — ${t}` : f) : '—'
   }
 
@@ -148,7 +148,7 @@ export default function AdminReports() {
               <div key={r.id} onClick={() => setSel(i)} style={{ padding: '16px 18px', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', background: sel === i ? '#F0FDF4' : '#fff', borderRight: sel === i ? '3px solid #16A34A' : '3px solid transparent' }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '5px', lineHeight: 1.4 }}>{r.companies?.name || 'شركة'}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar-SA') : '—'}</span>
+                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}</span>
                   <span style={{ fontSize: '13px', fontWeight: 800, color: '#334155' }}>{dealValue(r)}</span>
                 </div>
               </div>

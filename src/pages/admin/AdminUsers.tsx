@@ -305,7 +305,7 @@ const AdminUsers: React.FC = () => {
                     </td>
                     <td style={tdStyles}>
                       {user.lastLogin
-                        ? new Date(user.lastLogin).toLocaleDateString('ar-SA')
+                        ? new Date(user.lastLogin).toLocaleDateString('en-GB')
                         : 'لم يسجل دخول'}
                     </td>
                     <td style={tdStyles}>

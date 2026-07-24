@@ -390,7 +390,7 @@ export default function TrustReport() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                         <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
-                          {new Date(report.created_at).toLocaleDateString('ar-SA')}
+                          {new Date(report.created_at).toLocaleDateString('en-GB')}
                         </div>
                         <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{report.title}</div>
                       </div>

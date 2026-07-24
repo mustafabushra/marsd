@@ -46,7 +46,7 @@ export default function BusinessRequests() {
             type: 'sent',
             subject: r.subject || 'طلب',
             message: r.description || '',
-            date: new Date(r.created_at).toLocaleDateString('ar-SA'),
+            date: new Date(r.created_at).toLocaleDateString('en-GB'),
             status: r.status || 'pending'
           })),
           ...(receivedRequests || []).map(r => ({
@@ -55,7 +55,7 @@ export default function BusinessRequests() {
             type: 'received',
             subject: r.subject || 'طلب',
             message: r.description || '',
-            date: new Date(r.created_at).toLocaleDateString('ar-SA'),
+            date: new Date(r.created_at).toLocaleDateString('en-GB'),
             status: r.status || 'pending'
           }))
         ]

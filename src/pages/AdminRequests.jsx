@@ -165,7 +165,7 @@ export default function AdminRequests() {
                     <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>مقدّم من: {r.by}</div>
                   </div>
                   <span><span style={{ background: m.bg, color: m.c, borderRadius: '7px', padding: '4px 10px', fontSize: '11.5px', fontWeight: 800 }}>{m.label}</span></span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{r.date ? new Date(r.date).toLocaleDateString('ar-SA') : ''}</span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{r.date ? new Date(r.date).toLocaleDateString('en-GB') : ''}</span>
                 </div>
               )
             })}

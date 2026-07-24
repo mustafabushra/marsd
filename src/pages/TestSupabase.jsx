@@ -7,7 +7,7 @@ export default function TestSupabase() {
 
   const addLog = (message) => {
     console.log(message)
-    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`])
+    setLogs(prev => [...prev, `${new Date().toLocaleTimeString('en-GB')}: ${message}`])
   }
 
   const testConnection = async () => {

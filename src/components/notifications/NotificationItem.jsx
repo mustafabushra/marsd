@@ -59,7 +59,7 @@ export default function NotificationItem({ notification, onClose }) {
     const diffDays = Math.floor(diffHours / 24)
     if (diffDays < 7) return `قبل ${diffDays} يوم`
 
-    return notificationDate.toLocaleDateString('ar-SA')
+    return notificationDate.toLocaleDateString('en-GB')
   }
 
   return (
