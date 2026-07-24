@@ -386,23 +386,10 @@ export default function Search() {
         </div>
       </div>
 
-      {/* RESULTS INFO & ADD BUTTON */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ fontSize: '14.5px', color: '#64748B', fontWeight: 700 }}>{companies.length} نتائج</div>
-          <button
-            onClick={handleAddCompany}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '7px', background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
-              padding: '9px 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
-            }}>
-            + إضافة شركة
-          </button>
-        </div>
-      </div>
-      <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, margin: '-6px 0 16px' }}>
-        لم تجد الشركة التي تبحث عنها؟ أضفها للسجل لتتمكّن من تقييمها وإضافة تقرير عنها.
-      </div>
+      {/* RESULTS COUNT */}
+      {companies.length > 0 && (
+        <div style={{ fontSize: '14.5px', color: '#64748B', fontWeight: 700, marginBottom: '16px' }}>{companies.length} نتائج</div>
+      )}
 
       {/* ERROR */}
       {error && (
