@@ -74,7 +74,7 @@ export default function AdminCompaniesManagement() {
       setDrawer((d) => (d && d.id === company.id ? { ...d, status } : d))
       showToast(status === 'suspended' ? 'تم تعليق الشركة' : 'تم إعادة تفعيل الشركة')
     } catch (err) {
-      showToast('❌ تعذّر تغيير الحالة')
+      showToast('❌ تعذّر تغيير الحالة: ' + (err?.message || 'خطأ غير معروف'))
     } finally { setBusy(false) }
   }
 

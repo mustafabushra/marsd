@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/react'
+import { getSupabase } from '../lib/api'
 import {
   DashboardIcon,
   DocumentIcon,
@@ -14,8 +15,8 @@ import {
 
 const TOP_ITEMS = [
   { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
-  { label: 'طلبات الشركات', icon: DocumentIcon, path: '/admin/requests', badge: '4', badgeBg: '#DC2626' },
-  { label: 'مراجعة التقارير', icon: ListIcon, path: '/admin/reports', badge: '47', badgeBg: '#F59E0B' },
+  { label: 'طلبات الشركات', icon: DocumentIcon, path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
+  { label: 'مراجعة التقارير', icon: ListIcon, path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
   { label: 'رفع دفعة', icon: UploadIcon, path: '/admin/bulk-import' },
   { label: 'الشركات', icon: BuildingIcon, path: '/admin/companies' },
   { label: 'المستخدمون', icon: UsersIcon, path: '/admin/users' },
@@ -95,6 +96,26 @@ export default function AdminShell({ user }) {
   const [openGroups, setOpenGroups] = useState({})
   const toggleGroup = (key) => setOpenGroups((s) => ({ ...s, [key]: !s[key] }))
 
+  // Live badge counts (real pending work)
+  const [counts, setCounts] = useState({ requests: 0, reviews: 0 })
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const supabase = getSupabase()
+        const [pendingCompanies, pendingData, pendingReports] = await Promise.all([
+          supabase.from('companies').select('id', { count: 'exact', head: true }).eq('approved', false),
+          supabase.from('company_data_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').then((r) => r, () => ({ count: 0 })),
+          supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
+        ])
+        setCounts({
+          requests: (pendingCompanies.count || 0) + (pendingData.count || 0),
+          reviews: pendingReports.count || 0,
+        })
+      } catch (e) { /* non-blocking */ }
+    }
+    load()
+  }, [path])
+
   return (
     <div dir="rtl" style={{ fontFamily: 'Tajawal, system-ui, sans-serif', background: '#F8FAFC', minHeight: '100vh', display: 'flex', color: '#0F172A' }}>
       {/* Sidebar */}
@@ -140,8 +161,8 @@ export default function AdminShell({ user }) {
               >
                 <span style={{ display: 'flex', alignItems: 'center', flex: 'none', color: 'inherit' }}><Icon /></span>
                 <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && (
-                  <span style={{ background: item.badgeBg, color: '#fff', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 800 }}>{item.badge}</span>
+                {item.badgeKey && counts[item.badgeKey] > 0 && (
+                  <span style={{ background: item.badgeBg, color: '#fff', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 800 }}>{counts[item.badgeKey]}</span>
                 )}
               </button>
             )

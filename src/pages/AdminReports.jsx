@@ -68,7 +68,7 @@ export default function AdminReports() {
       showToast('✅ تم اعتماد التقرير')
       removeCurrent()
     } catch (err) {
-      showToast('❌ فشل الاعتماد')
+      showToast('❌ فشل الاعتماد: ' + (err?.message || 'خطأ غير معروف'))
       console.error(err)
     } finally { setActionLoading(null) }
   }
@@ -94,7 +94,7 @@ export default function AdminReports() {
       showToast('تم رفض التقرير')
       removeCurrent()
     } catch (err) {
-      showToast('❌ فشل الرفض')
+      showToast('❌ فشل الرفض: ' + (err?.message || 'خطأ غير معروف'))
       console.error(err)
     } finally { setActionLoading(null) }
   }

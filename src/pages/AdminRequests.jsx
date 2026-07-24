@@ -89,7 +89,7 @@ export default function AdminRequests() {
       showToast('✅ تمت الموافقة')
       removeCurrent()
     } catch (err) {
-      console.error(err); showToast('❌ فشلت الموافقة')
+      console.error(err); showToast('❌ فشلت الموافقة: ' + (err?.message || 'خطأ غير معروف'))
     } finally { setActionLoading(false) }
   }
 
@@ -109,7 +109,7 @@ export default function AdminRequests() {
       showToast('تم رفض الطلب')
       removeCurrent()
     } catch (err) {
-      console.error(err); showToast('❌ فشل الرفض')
+      console.error(err); showToast('❌ فشل الرفض: ' + (err?.message || 'خطأ غير معروف'))
     } finally { setActionLoading(false) }
   }
 
