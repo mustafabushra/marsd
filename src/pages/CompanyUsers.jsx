@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/react'
+import { useUser, useAuth } from '@clerk/react'
 import { UserPlus, Trash2, RotateCcw } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 
@@ -7,6 +7,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function CompanyUsers() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const [users, setUsers] = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
   const [tenantId, setTenantId] = useState(null)
@@ -77,31 +78,66 @@ export default function CompanyUsers() {
 
     setSubmitting(true)
     try {
-      const supabase = getSupabase()
       if (!tenantId) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
-      const { error: invErr } = await supabase.from('pending_invites').insert([{
-        tenant_id: tenantId,
-        email,
-        role: inviteRole,
-        invited_by: user.id,
-        status: 'pending',
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }])
-      if (invErr) throw invErr
-      await supabase.from('audit_logs').insert([{
-        tenant_id: tenantId, actor_id: user.id, action: 'user_invited', entity: 'user',
-        meta: { email, role: inviteRole }, created_at: new Date().toISOString(),
-      }])
+
+      // Prefer the server endpoint, which sends a real Clerk invitation email.
+      const server = await tryServerInvite(email, inviteRole)
+      if (server.error) { setError(server.error); return }
+
+      if (!server.emailSent) {
+        // Endpoint not deployed yet: fall back to recording the invite only,
+        // so the feature degrades gracefully (no email until the server is up).
+        const supabase = getSupabase()
+        const { error: invErr } = await supabase.from('pending_invites').insert([{
+          tenant_id: tenantId,
+          email,
+          role: inviteRole,
+          invited_by: user.id,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }])
+        if (invErr) throw invErr
+        await supabase.from('audit_logs').insert([{
+          tenant_id: tenantId, actor_id: user.id, action: 'user_invited', entity: 'user',
+          meta: { email, role: inviteRole, delivery: 'record_only' }, created_at: new Date().toISOString(),
+        }])
+      }
+
       setInviteEmail('')
       setInviteRole('company_member')
       setShowInviteForm(false)
       await loadUsers()
-      showToast(`✅ تم إنشاء الدعوة لـ ${email}`)
+      showToast(server.emailSent
+        ? `✅ تم إرسال الدعوة بالبريد إلى ${email}`
+        : `✅ تم إنشاء الدعوة لـ ${email} (سيبدأ الإرسال بالبريد بعد نشر الخادم)`)
     } catch (err) {
       setError(err.message || 'تعذّر إنشاء الدعوة')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Calls /api/invite-user. Distinguishes a real business error (JSON 4xx from
+  // our function) from the endpoint simply not being deployed (network error or
+  // the SPA fallback serving index.html), so we only fall back in the latter.
+  const tryServerInvite = async (email, role) => {
+    let token
+    try { token = await getToken() } catch { token = null }
+    if (!token) return { emailSent: false }
+    let resp
+    try {
+      resp = await fetch('/api/invite-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email, role }),
+      })
+    } catch { return { emailSent: false } }
+    const ct = resp.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) return { emailSent: false }
+    const data = await resp.json().catch(() => null)
+    if (!data) return { emailSent: false }
+    if (resp.ok && data.emailSent) return { emailSent: true }
+    return { error: data.error || 'تعذّر إرسال الدعوة' }
   }
 
   const cancelInvite = async (invite) => {

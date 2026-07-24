@@ -52,22 +52,37 @@ export default function AuthCallback() {
       }
 
       // 2. Query users table
-      const { data: userData, error: userError } = await supabase
+      let { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, email, tenant_id, role, status')
         .eq('id', userId)
         .single()
 
       if (userError && userError.code === 'PGRST116') {
-        // User doesn't exist yet - create it
+        // User doesn't exist yet - create it.
+        const email = clerkUser.email.toLowerCase().trim()
+
+        // Honor a pending invitation for this email, if any: attach the new
+        // user to the inviting tenant with the invited role instead of sending
+        // them to onboarding. Works regardless of how the invite was delivered.
+        const { data: invite } = await supabase
+          .from('pending_invites')
+          .select('id, tenant_id, role')
+          .eq('email', email)
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert([{
             id: userId,
-            email: clerkUser.email.toLowerCase().trim(),
-            role: 'company_member',
-            status: 'active'
-            // tenant_id NULL until onboarding
+            email,
+            role: invite?.role || 'company_member',
+            status: 'active',
+            tenant_id: invite?.tenant_id || null,
           }])
           .select('id, email, tenant_id')
           .single()
@@ -76,12 +91,17 @@ export default function AuthCallback() {
           throw new Error('فشل إنشاء ملف المستخدم')
         }
 
-        // New user - no tenant yet
-        navigate('/company-onboarding')
-        return
-      }
-
-      if (userError || !userData) {
+        if (invite) {
+          // Mark the invite accepted, then continue into the normal tenant /
+          // company-status routing below using the freshly created record.
+          await supabase.from('pending_invites').update({ status: 'accepted' }).eq('id', invite.id)
+          userData = newUser
+        } else {
+          // Brand-new user with no invite - collect company details first.
+          navigate('/company-onboarding')
+          return
+        }
+      } else if (userError || !userData) {
         throw new Error('فشل البحث عن المستخدم')
       }
 
