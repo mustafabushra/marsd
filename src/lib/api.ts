@@ -60,6 +60,7 @@ export interface CompanyInsertInput {
   nationalAddress?: string | null
   website?: string | null
   phone?: string | null
+  enterpriseSize?: string | null
   /** الحالة — تُتحقق مقابل COMPANY_STATUS_VALUES. الافتراضي: pending */
   status?: CompanyStatus
   /** حالة السجل التجاري — تُتحقق مقابل COMPANY_CR_STATUS_VALUES. الافتراضي: active */
@@ -100,6 +101,7 @@ export function buildCompanyInsert(input: CompanyInsertInput): Record<string, an
     national_address: input.nationalAddress?.trim() || null,
     website: input.website?.trim() || null,
     phone: input.phone?.trim() || null,
+    enterprise_size: input.enterpriseSize?.trim() || null,
     // الحقول المقيّدة — تحقق قبل الإدراج
     status: assertEnum(
       input.status ?? COMPANY_STATUS.PENDING,

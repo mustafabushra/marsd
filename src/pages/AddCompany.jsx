@@ -4,6 +4,14 @@ import { useUser } from '@clerk/react'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 
+const ENTITY_TYPES = ['مؤسسة', 'شركة ذات مسؤولية محدودة', 'شركة مساهمة', 'شركة تضامن', 'شركة توصية بسيطة']
+const ENTERPRISE_SIZES = ['متناهية الصغر', 'صغيرة', 'متوسطة', 'كبيرة']
+const SAUDI_REGIONS = ['منطقة الرياض', 'منطقة مكة المكرمة', 'المنطقة الشرقية', 'منطقة المدينة المنورة', 'منطقة القصيم', 'منطقة عسير', 'منطقة تبوك', 'منطقة حائل', 'منطقة الحدود الشمالية', 'منطقة جازان', 'منطقة نجران', 'منطقة الباحة', 'منطقة الجوف']
+const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الظهران', 'الطائف', 'بريدة', 'عنيزة', 'تبوك', 'حائل', 'أبها', 'خميس مشيط', 'نجران', 'جازان', 'الجبيل', 'ينبع', 'الأحساء', 'القطيف', 'عرعر', 'سكاكا', 'الباحة']
+const SECTORS = ['تقنية المعلومات', 'المقاولات والإنشاءات', 'التجارة', 'الصناعة', 'النقل واللوجستيات', 'الخدمات', 'الرعاية الصحية', 'التعليم', 'العقارات', 'المالية والتأمين', 'الطاقة', 'الأغذية والمشروبات', 'السياحة والضيافة', 'الإعلام والتسويق', 'الزراعة']
+const ACTIVITIES = ['تجارة الجملة', 'تجارة التجزئة', 'المقاولات العامة', 'مقاولات متخصصة', 'الاستيراد والتصدير', 'تطوير البرمجيات', 'الاستشارات', 'النقل والشحن', 'التصنيع', 'الصيانة والتشغيل', 'الخدمات اللوجستية', 'التسويق والإعلان', 'المطاعم والضيافة', 'العقارات والتطوير']
+const CR_STATUSES = [{ v: 'active', t: 'نشط' }, { v: 'suspended', t: 'موقوف' }, { v: 'terminated', t: 'منتهٍ / مشطوب' }, { v: 'pending', t: 'قيد المعالجة' }]
+
 export default function AddCompany() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -18,6 +26,7 @@ export default function AddCompany() {
     unifiedNumber: '',
     entityType: '',
     crStatus: '',
+    enterpriseSize: '',
     crExpiryDate: '',
     foundingDate: '',
     sector: '',
@@ -32,9 +41,28 @@ export default function AddCompany() {
   })
 
   const [crFile, setCrFile] = useState(null) // { name, url(base64) }
+  const [otherMode, setOtherMode] = useState({}) // { field: true } → show custom text input
+  const [otherActivity, setOtherActivity] = useState('')
+
+  const setOther = (name, on) => setOtherMode(prev => ({ ...prev, [name]: on }))
+  const setFieldValue = (name, value) => setFormData(prev => ({ ...prev, [name]: value }))
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  // Multi-select (sub-activities) stored as a comma-joined string
+  const subActs = (formData.subActivities || '').split('،').map(s => s.trim()).filter(Boolean)
+  const toggleSubAct = (val) => {
+    const set = new Set(subActs)
+    set.has(val) ? set.delete(val) : set.add(val)
+    setFieldValue('subActivities', Array.from(set).join('، '))
+  }
+  const addOtherActivity = () => {
+    const v = otherActivity.trim()
+    if (!v) return
+    if (!subActs.includes(v)) setFieldValue('subActivities', [...subActs, v].join('، '))
+    setOtherActivity('')
   }
 
   const handleCrFile = (e) => {
@@ -84,6 +112,7 @@ export default function AddCompany() {
         unifiedNumber: formData.unifiedNumber,
         entityType: formData.entityType,
         crStatus: formData.crStatus || undefined,
+        enterpriseSize: formData.enterpriseSize,
         crExpiryDate: formData.crExpiryDate || null,
         foundingDate: formData.foundingDate || null,
         sector: formData.sector || null,
@@ -158,63 +187,81 @@ export default function AddCompany() {
                   { name: 'nameEn', label: 'اسم الشركة (إنجليزي)', ph: 'Riyadh Trading Co.' },
                   { name: 'registryNumber', label: 'رقم السجل التجاري', ph: '1010XXXXXX' },
                   { name: 'unifiedNumber', label: 'الرقم الموحّد (700)', ph: '7001234567' },
-                  { name: 'entityType', label: 'نوع الكيان', type: 'select', options: [
-                    { v: '', t: '— اختر —' },
-                    { v: 'مؤسسة', t: 'مؤسسة' },
-                    { v: 'ذات مسؤولية محدودة', t: 'شركة ذات مسؤولية محدودة' },
-                    { v: 'مساهمة', t: 'شركة مساهمة' },
-                    { v: 'تضامن', t: 'شركة تضامن' },
-                    { v: 'أخرى', t: 'أخرى' },
-                  ] },
-                  { name: 'crStatus', label: 'حالة السجل', type: 'select', options: [
-                    { v: '', t: '— اختر —' },
-                    { v: 'active', t: 'نشط' },
-                    { v: 'suspended', t: 'موقوف' },
-                    { v: 'terminated', t: 'منتهٍ / مشطوب' },
-                    { v: 'pending', t: 'قيد المعالجة' },
-                  ] },
+                  { name: 'entityType', label: 'نوع الكيان', type: 'selectOther', options: ENTITY_TYPES },
+                  { name: 'crStatus', label: 'حالة السجل', type: 'select', options: CR_STATUSES },
+                  { name: 'enterpriseSize', label: 'حجم المنشأة', type: 'select', options: ENTERPRISE_SIZES },
                   { name: 'foundingDate', label: 'تاريخ التأسيس', type: 'date' },
                   { name: 'crExpiryDate', label: 'تاريخ انتهاء السجل', type: 'date' },
-                  { name: 'sector', label: 'القطاع', ph: 'تجارة' },
-                  { name: 'mainActivity', label: 'النشاط الرئيسي', ph: 'تجارة الجملة' },
-                  { name: 'subActivities', label: 'الأنشطة الفرعية', ph: 'افصل بينها بفواصل', type: 'textarea', full: true },
-                  { name: 'city', label: 'المدينة', ph: 'الرياض' },
-                  { name: 'region', label: 'المنطقة', ph: 'منطقة الرياض' },
+                  { name: 'sector', label: 'القطاع', type: 'selectOther', options: SECTORS },
+                  { name: 'mainActivity', label: 'النشاط الرئيسي', type: 'selectOther', options: ACTIVITIES },
+                  { name: 'subActivities', label: 'الأنشطة الفرعية', type: 'multi', options: ACTIVITIES, full: true },
+                  { name: 'city', label: 'المدينة', type: 'selectOther', options: SAUDI_CITIES },
+                  { name: 'region', label: 'المنطقة', type: 'selectOther', options: SAUDI_REGIONS },
                   { name: 'nationalAddress', label: 'العنوان الوطني', ph: 'الرمز البريدي + رقم المبنى', full: true },
                   { name: 'website', label: 'الموقع الإلكتروني', ph: 'https://' },
                   { name: 'officialEmail', label: 'البريد الإلكتروني', ph: 'info@company.sa' },
                   { name: 'phone', label: 'رقم الهاتف', ph: '0112345678' },
-                ].map(f => (
-                  <div key={f.name} style={f.full ? { gridColumn: '1/3' } : undefined}>
-                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
-                    {f.type === 'select' ? (
-                      <select
-                        name={f.name}
-                        value={formData[f.name]}
-                        onChange={handleChange}
-                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
-                        {f.options.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
-                      </select>
-                    ) : f.type === 'textarea' ? (
-                      <textarea
-                        placeholder={f.ph}
-                        name={f.name}
-                        value={formData[f.name]}
-                        onChange={handleChange}
-                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '70px', resize: 'vertical' }}
-                      />
-                    ) : (
-                      <input
-                        type={f.type === 'date' ? 'date' : 'text'}
-                        placeholder={f.ph}
-                        name={f.name}
-                        value={formData[f.name]}
-                        onChange={handleChange}
-                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: f.type === 'date' ? 'right' : undefined }}
-                      />
-                    )}
-                  </div>
-                ))}
+                ].map(f => {
+                  const opts = (f.options || []).map(o => (typeof o === 'string' ? { v: o, t: o } : o))
+                  const isOther = !!otherMode[f.name]
+                  const baseInput = { width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }
+                  return (
+                    <div key={f.name} style={f.full ? { gridColumn: '1/3' } : undefined}>
+                      <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
+
+                      {f.type === 'select' ? (
+                        <select name={f.name} value={formData[f.name]} onChange={handleChange} style={{ ...baseInput, background: '#fff' }}>
+                          <option value="">— اختر —</option>
+                          {opts.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                        </select>
+
+                      ) : f.type === 'selectOther' ? (
+                        <>
+                          <select
+                            value={isOther ? '__other__' : (formData[f.name] || '')}
+                            onChange={(e) => {
+                              if (e.target.value === '__other__') { setOther(f.name, true); setFieldValue(f.name, '') }
+                              else { setOther(f.name, false); setFieldValue(f.name, e.target.value) }
+                            }}
+                            style={{ ...baseInput, background: '#fff' }}>
+                            <option value="">— اختر —</option>
+                            {opts.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                            <option value="__other__">أخرى…</option>
+                          </select>
+                          {isOther && (
+                            <input autoFocus placeholder="اكتب القيمة" value={formData[f.name]} onChange={(e) => setFieldValue(f.name, e.target.value)} style={{ ...baseInput, marginTop: '8px' }} />
+                          )}
+                        </>
+
+                      ) : f.type === 'multi' ? (
+                        <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#fff' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {opts.map(o => {
+                              const on = subActs.includes(o.v)
+                              return (
+                                <span key={o.v} onClick={() => toggleSubAct(o.v)} style={{ background: on ? '#16A34A' : '#F1F5F9', color: on ? '#fff' : '#475569', borderRadius: '999px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{on ? '✓ ' : ''}{o.t}</span>
+                              )
+                            })}
+                          </div>
+                          {subActs.filter(s => !opts.some(o => o.v === s)).length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                              {subActs.filter(s => !opts.some(o => o.v === s)).map(s => (
+                                <span key={s} onClick={() => toggleSubAct(s)} style={{ background: '#1E2A52', color: '#fff', borderRadius: '999px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>✕ {s}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                            <input value={otherActivity} onChange={(e) => setOtherActivity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOtherActivity() } }} placeholder="إضافة نشاط آخر…" style={{ ...baseInput, padding: '9px 12px', fontSize: '14px' }} />
+                            <button type="button" onClick={addOtherActivity} style={{ background: '#EEF2FF', color: '#1E2A52', border: 0, borderRadius: '9px', padding: '0 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إضافة</button>
+                          </div>
+                        </div>
+
+                      ) : (
+                        <input type={f.type === 'date' ? 'date' : 'text'} placeholder={f.ph} name={f.name} value={formData[f.name]} onChange={handleChange} style={{ ...baseInput, textAlign: f.type === 'date' ? 'right' : undefined }} />
+                      )}
+                    </div>
+                  )
+                })}
                 <div style={{ gridColumn: '1/3' }}>
                   <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>مستند داعم (السجل التجاري) — اختياري</label>
                   {crFile ? (
