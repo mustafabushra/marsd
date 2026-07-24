@@ -197,7 +197,11 @@ export default function Search() {
         bg: c.trust_score ? getRiskInfo(c.trust_score).bg : '#F1F5F9',
         hasData: c.trust_score != null && c.trust_score > 0,
         reports: c.total_reports_count || 0,
+        status: c.registration_status,
       }))
+
+      // Show only published companies — hide suspended / pending / rejected (unapproved)
+      formatted = formatted.filter(c => c.status === 'active' || c.status === 'approved')
 
       // Client-side filters (the KB RPC only handles source/status).
       const looseMatch = (val, f) => {
