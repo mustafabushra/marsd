@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react'
 import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
 import { Search as SearchIcon, X } from 'lucide-react'
 
-const EMPTY_REQ_FORM = { sector: '', city: '', unified: '', cr: '', field: 'sector', correctValue: '', note: '' }
+const EMPTY_REQ_FORM = { field: 'sector', correctValue: '', note: '' }
 
 export default function Search() {
   const navigate = useNavigate()
@@ -30,28 +30,51 @@ export default function Search() {
     setReqSubModal(type)
   }
 
-  async function submitCompanyDataRequest() {
-    if (!reqModalCompany || !reqSubModal) return
-    const type = reqSubModal
-    let payload = {}
-    if (type === 'add_data') {
-      if (!reqForm.sector && !reqForm.city && !reqForm.unified && !reqForm.cr) {
-        showToastMessage('⚠️ أدخل بياناً واحداً على الأقل')
+  async function addToWatchlist(company) {
+    if (!company) return
+    if (!user?.id) { showToastMessage('⚠️ يجب تسجيل الدخول'); return }
+    try {
+      setReqSubmitting(true)
+      const supabase = getSupabase()
+      const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+      if (!userData?.tenant_id) { showToastMessage('❌ لا توجد شركة مرتبطة بحسابك'); return }
+
+      // Avoid duplicates
+      const { data: existing } = await supabase
+        .from('watchlist_items')
+        .select('id')
+        .eq('tenant_id', userData.tenant_id)
+        .eq('company_id', company.id)
+        .limit(1)
+      if (existing?.length) {
+        showToastMessage('ℹ️ الشركة موجودة في قائمة المراقبة')
+        setReqModalCompany(null)
         return
       }
-      payload = {
-        sector: reqForm.sector || null,
-        city: reqForm.city || null,
-        unified_number: reqForm.unified || null,
-        cr_number: reqForm.cr || null,
-      }
-    } else {
-      if (!reqForm.correctValue.trim()) {
-        showToastMessage('⚠️ أدخل القيمة الصحيحة')
-        return
-      }
-      payload = { field: reqForm.field, correct_value: reqForm.correctValue.trim() }
+
+      const { error } = await supabase.from('watchlist_items').insert([{
+        tenant_id: userData.tenant_id,
+        company_id: company.id,
+        list_name: 'المراقبة',
+      }])
+      if (error) throw error
+      showToastMessage('✅ تمت إضافة الشركة لقائمة المراقبة')
+      setReqModalCompany(null)
+    } catch (err) {
+      console.error('Add to watchlist failed:', err)
+      showToastMessage('❌ فشلت الإضافة لقائمة المراقبة')
+    } finally {
+      setReqSubmitting(false)
     }
+  }
+
+  async function submitCompanyDataRequest() {
+    if (!reqModalCompany || reqSubModal !== 'edit_data') return
+    if (!reqForm.correctValue.trim()) {
+      showToastMessage('⚠️ أدخل القيمة الصحيحة')
+      return
+    }
+    const payload = { field: reqForm.field, correct_value: reqForm.correctValue.trim() }
 
     try {
       setReqSubmitting(true)
@@ -65,7 +88,7 @@ export default function Search() {
         company_id: reqModalCompany.id,
         requested_by_tenant_id: tenantId,
         requested_by_user_id: user?.id || null,
-        request_type: type,
+        request_type: 'edit_data',
         payload,
         note: reqForm.note || null,
         status: 'pending',
@@ -483,12 +506,13 @@ export default function Search() {
                   </div>
                 </button>
                 <button
-                  onClick={() => openReqSubModal('add_data')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
-                  <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>＋</span>
+                  onClick={() => addToWatchlist(reqModalCompany)}
+                  disabled={reqSubmitting}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: reqSubmitting ? 'not-allowed' : 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                  <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>👁</span>
                   <div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>إضافة بيانات ناقصة</div>
-                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>القطاع، المدينة، الرقم الموحّد، وغيرها</div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>إضافة لقائمة المراقبة</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>تابِع الشركة ويصلك تنبيه عند توفّر تقييم موثوق</div>
                   </div>
                 </button>
                 <button
@@ -521,9 +545,7 @@ export default function Search() {
             style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(15,23,42,.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '22px 26px', borderBottom: '1px solid #E2E8F0' }}>
               <div>
-                <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>
-                  {reqSubModal === 'add_data' ? 'إضافة بيانات ناقصة' : 'طلب تعديل بيانات خاطئة'}
-                </h2>
+                <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>طلب تعديل بيانات خاطئة</h2>
                 <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '4px' }}>{reqModalCompany.name}</div>
               </div>
               <button
@@ -531,69 +553,39 @@ export default function Search() {
                 style={{ background: '#F1F5F9', border: 0, borderRadius: '9px', width: '34px', height: '34px', fontSize: '18px', cursor: 'pointer', color: '#64748B', flex: 'none' }}>✕</button>
             </div>
             <div style={{ padding: '24px' }}>
-              {reqSubModal === 'add_data' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  {[
-                    { key: 'sector', label: 'القطاع', ph: 'مثال: صناعات غذائية' },
-                    { key: 'city', label: 'المدينة', ph: 'مثال: القصيم' },
-                    { key: 'unified', label: 'الرقم الموحّد (700)', ph: '7001234567' },
-                    { key: 'cr', label: 'رقم السجل التجاري', ph: '1010XXXXXX' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
-                      <input
-                        placeholder={f.ph}
-                        value={reqForm[f.key]}
-                        onChange={(e) => setReqForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
-                      />
-                    </div>
-                  ))}
-                  <div style={{ gridColumn: '1/3' }}>
-                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>ملاحظة (اختياري)</label>
-                    <textarea
-                      placeholder="أي تفاصيل إضافية تساعد الإدارة..."
-                      value={reqForm.note}
-                      onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
-                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical' }}
-                    />
-                  </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>الحقل المراد تعديله</label>
+                  <select
+                    value={reqForm.field}
+                    onChange={(e) => setReqForm(prev => ({ ...prev, field: e.target.value }))}
+                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
+                    <option value="name">اسم الشركة</option>
+                    <option value="sector">القطاع</option>
+                    <option value="city">المدينة</option>
+                    <option value="cr_number">رقم السجل التجاري</option>
+                    <option value="unified_number">الرقم الموحّد (700)</option>
+                  </select>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>الحقل المراد تعديله</label>
-                    <select
-                      value={reqForm.field}
-                      onChange={(e) => setReqForm(prev => ({ ...prev, field: e.target.value }))}
-                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
-                      <option value="name">اسم الشركة</option>
-                      <option value="sector">القطاع</option>
-                      <option value="city">المدينة</option>
-                      <option value="cr_number">رقم السجل التجاري</option>
-                      <option value="unified_number">الرقم الموحّد (700)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>القيمة الصحيحة</label>
-                    <input
-                      placeholder="اكتب القيمة الصحيحة"
-                      value={reqForm.correctValue}
-                      onChange={(e) => setReqForm(prev => ({ ...prev, correctValue: e.target.value }))}
-                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>سبب التعديل (اختياري)</label>
-                    <textarea
-                      placeholder="لماذا البيان الحالي غير دقيق؟"
-                      value={reqForm.note}
-                      onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
-                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical' }}
-                    />
-                  </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>القيمة الصحيحة</label>
+                  <input
+                    placeholder="اكتب القيمة الصحيحة"
+                    value={reqForm.correctValue}
+                    onChange={(e) => setReqForm(prev => ({ ...prev, correctValue: e.target.value }))}
+                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
+                  />
                 </div>
-              )}
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>سبب التعديل (اختياري)</label>
+                  <textarea
+                    placeholder="لماذا البيان الحالي غير دقيق؟"
+                    value={reqForm.note}
+                    onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
+                    style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical' }}
+                  />
+                </div>
+              </div>
 
               <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginTop: '18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <span style={{ fontSize: '17px' }}>ℹ</span>
