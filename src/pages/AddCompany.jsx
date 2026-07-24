@@ -13,7 +13,7 @@ export default function AddCompany() {
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     companyName: location.state?.companyName || '',
-    registryNumber: '',
+    registryNumber: location.state?.registryNumber || '',
     unifiedNumber: '',
     sector: '',
     city: ''

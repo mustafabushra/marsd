@@ -211,8 +211,11 @@ export default function Search() {
   }
 
   function handleAddCompany() {
-    // Carry the searched name into the "Add company" request page (prefilled)
-    navigate('/add-company', { state: { companyName: query.trim() } })
+    // Carry the search term into the "Add company" request page (prefilled).
+    // Digits-only → registry (CR) number field; otherwise → company name field.
+    const q = query.trim()
+    const isRegistryNumber = /^[0-9]{6,}$/.test(q)
+    navigate('/add-company', { state: isRegistryNumber ? { registryNumber: q } : { companyName: q } })
   }
 
   function handleViewReport(companyId) {
