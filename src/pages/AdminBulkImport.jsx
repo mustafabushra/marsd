@@ -70,11 +70,12 @@ export default function AdminBulkImport() {
       const { data: existing } = await supabase.from('companies').select('name, cr_number').limit(5000)
       const existNames = new Set((existing || []).map((c) => norm(c.name)))
       const existCrs = new Set((existing || []).map((c) => norm(c.cr_number)).filter(Boolean))
-      const seenNames = new Set()
-      const seenCrs = new Set()
+      const seenNames = new Map() // norm(name) -> first row number
+      const seenCrs = new Map()   // norm(cr)   -> first row number
       const valid = []
       const invalid = []
       rows.forEach((r, i) => {
+        const rowNo = i + 2 // +1 header, +1 to 1-index
         const name = String(r[mapping.name] ?? '').trim()
         const cr = mapping.crNumber ? String(r[mapping.crNumber] ?? '').trim() : ''
         const rec = {
@@ -86,10 +87,11 @@ export default function AdminBulkImport() {
         }
         let reason = ''
         if (!name) reason = 'اسم الشركة مفقود'
-        else if (existNames.has(norm(name)) || (cr && existCrs.has(norm(cr)))) reason = 'مكررة — موجودة في السجل'
-        else if (seenNames.has(norm(name)) || (cr && seenCrs.has(norm(cr)))) reason = 'مكررة داخل الملف'
-        if (reason) { invalid.push({ row: i + 2, name: name || '—', reason }) }
-        else { seenNames.add(norm(name)); if (cr) seenCrs.add(norm(cr)); valid.push(rec) }
+        else if (existNames.has(norm(name)) || (cr && existCrs.has(norm(cr)))) reason = 'موجودة مسبقاً في سجلات مرصد'
+        else if (seenNames.has(norm(name))) reason = `مكرّرة داخل ملفك (وردت في الصف ${seenNames.get(norm(name))})`
+        else if (cr && seenCrs.has(norm(cr))) reason = `رقم السجل مكرّر داخل ملفك (الصف ${seenCrs.get(norm(cr))})`
+        if (reason) { invalid.push({ row: rowNo, name: name || '—', reason }) }
+        else { seenNames.set(norm(name), rowNo); if (cr) seenCrs.set(norm(cr), rowNo); valid.push(rec) }
       })
       setValidation({ valid, invalid })
       setStep(3)
