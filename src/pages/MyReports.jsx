@@ -43,11 +43,17 @@ export default function MyReports() {
             submitted_at,
             approved_at,
             dealt_at,
+            title,
+            category,
+            report_type,
             deal_amount_range,
+            deal_value,
+            currency,
             payment_commitment,
             delay_days,
             defaulted,
             notes,
+            description,
             companies (id, name, cr_number),
             credits_ledger(amount),
             review_actions(action, reason, created_at)
@@ -55,10 +61,12 @@ export default function MyReports() {
           .eq('reporter_tenant_id', userData.tenant_id)
           .order('submitted_at', { ascending: false })
 
-        const paymentLabels = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد' }
+        const paymentLabels = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
+        const categoryLabels = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 
         const formatted = (reportsData || []).map(r => {
           const statusObj = {
+            draft: { bg: '#EEF2FF', c: '#3730A3', label: 'مسودّة' },
             pending_review: { bg: '#FFFBEB', c: '#B45309', label: 'قيد المراجعة' },
             approved: { bg: '#ECFDF5', c: '#15803D', label: '✅ معتمد' },
             rejected: { bg: '#FEE2E2', c: '#B91C1C', label: '❌ مرفوض' }
@@ -74,17 +82,21 @@ export default function MyReports() {
             .filter(a => a.action === 'reject')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
 
-          const dealValue = r.deal_amount_range ? r.deal_amount_range.replace(/^SAR\s*/, '') + ' ر.س' : '—'
+          const dealValue = r.deal_value != null
+            ? `${Number(r.deal_value).toLocaleString('ar-SA')} ${r.currency || ''}`.trim()
+            : (r.deal_amount_range ? r.deal_amount_range.replace(/^SAR\s*/, '') + ' ر.س' : '—')
 
           return {
             id: r.id,
             company: r.companies?.name || 'شركة مجهولة',
             companyId: r.target_company_id,
+            title: r.title || '—',
+            category: r.category ? (categoryLabels[r.category] || r.category) : '—',
             date: r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar-SA') : '—',
             value: dealValue,
             status: r.status,
             st: statusObj,
-            notes: r.notes,
+            notes: r.description || r.notes,
             rejectionReason: rejectAction?.reason || '',
             creditsEarned: creditsEarned,
             paid: r.payment_commitment ? (paymentLabels[r.payment_commitment] || r.payment_commitment) : '—',
