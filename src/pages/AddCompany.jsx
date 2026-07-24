@@ -20,8 +20,7 @@ export default function AddCompany() {
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
-      <div style={{ maxWidth: '820px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '820px', margin: '0 auto' }}>
         {!submitted ? (
           <>
             <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '14px', padding: '16px 20px', marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -127,7 +126,6 @@ export default function AddCompany() {
             </div>
           </div>
         )}
-      </div>
-    </main>
+    </div>
   )
 }

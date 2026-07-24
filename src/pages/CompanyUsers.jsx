@@ -152,7 +152,7 @@ export default function CompanyUsers() {
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
+    <div>
       {error && (
         <div style={{
           background: '#FEE2E2',
@@ -166,9 +166,9 @@ export default function CompanyUsers() {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexDirection: 'row-reverse' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexDirection: 'row-reverse' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>المستخدمون ({users.length})</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>المستخدمون ({users.length})</h3>
           {pendingInvites.length > 0 && (
             <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>
               {pendingInvites.length} دعوة معلقة
@@ -288,6 +288,6 @@ export default function CompanyUsers() {
           ))}
         </div>
       )}
-    </main>
+    </div>
   )
 }

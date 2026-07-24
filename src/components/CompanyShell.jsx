@@ -32,19 +32,23 @@ export default function CompanyShell({ user }) {
   }
 
   const screenLabels = {
-    '/dashboard': 'لوحة تحكم الشركة',
-    '/search': 'البحث',
-    '/add-company': 'إضافة شركة',
+    '/dashboard': 'لوحة التحكم',
+    '/search': 'البحث عن الشركات',
+    '/add-company': 'إضافة شركة للسجل',
     '/add-report': 'إضافة تقرير',
     '/my-reports': 'تقاريري المرسلة',
-    '/watchlist': 'قوائس المراقبة',
+    '/trust-report': 'تقرير الشركة الكامل',
+    '/watchlist': 'قوائم المراقبة',
     '/compare': 'مقارنة الشركات',
     '/users': 'إدارة المستخدمين',
     '/subscription': 'إدارة الاشتراك',
     '/profile': 'الملف الشخصي',
   }
 
-  const currentScreenLabel = screenLabels[location.pathname] || 'لوحة التحكم'
+  const matchedLabelKey = Object.keys(screenLabels).find(
+    (key) => location.pathname === key || location.pathname.startsWith(key + '/')
+  )
+  const currentScreenLabel = screenLabels[matchedLabelKey] || 'لوحة التحكم'
 
   return (
     <div dir="rtl" style={{ fontFamily: 'Tajawal, system-ui, sans-serif', background: '#F8FAFC', display: 'flex', minHeight: '100vh', color: '#0F172A' }}>
@@ -84,51 +88,55 @@ export default function CompanyShell({ user }) {
         {/* Nav Items */}
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           {[
-            { label: 'لوحة التحكم', icon: DashboardIcon, path: '/dashboard', screenLabel: 'لوحة تحكم الشركة' },
-            { label: 'البحث عن الشركات', icon: SearchIcon, path: '/search', screenLabel: 'البحث' },
-            { label: 'إضافة شركة للسجل', icon: BuildingIcon, path: '/add-company', screenLabel: 'إضافة شركة' },
-            { label: 'إضافة تقرير', icon: DocumentIcon, path: '/add-report', screenLabel: 'إضافة تقرير' },
-            { label: 'تقاريري المرسلة', icon: ListIcon, path: '/my-reports', screenLabel: 'تقاريري المرسلة' },
-            { label: 'قوائس المراقبة', icon: EyeIcon, path: '/watchlist', screenLabel: 'قوائس المراقبة' },
-            { label: 'مقارنة الشركات', icon: CompareIcon, path: '/compare', screenLabel: 'مقارنة الشركات' },
-            { label: 'إدارة المستخدمين', icon: UsersIcon, path: '/users', screenLabel: 'إدارة المستخدمين' },
-            { label: 'إدارة الاشتراك', icon: CreditCardIcon, path: '/subscription', screenLabel: 'إدارة الاشتراك' },
-            { label: 'الملف الشخصي', icon: SettingsIcon, path: '/profile', screenLabel: 'الملف الشخصي' },
+            { label: 'لوحة التحكم', icon: DashboardIcon, path: '/dashboard' },
+            { label: 'البحث عن الشركات', icon: SearchIcon, path: '/search' },
+            { label: 'إضافة شركة للسجل', icon: BuildingIcon, path: '/add-company' },
+            { label: 'إضافة تقرير', icon: DocumentIcon, path: '/add-report' },
+            { label: 'تقاريري المرسلة', icon: ListIcon, path: '/my-reports' },
+            { label: 'قوائم المراقبة', icon: EyeIcon, path: '/watchlist' },
+            { label: 'مقارنة الشركات', icon: CompareIcon, path: '/compare' },
+            { label: 'إدارة المستخدمين', icon: UsersIcon, path: '/users' },
+            { label: 'إدارة الاشتراك', icon: CreditCardIcon, path: '/subscription' },
+            { label: 'الملف الشخصي', icon: SettingsIcon, path: '/profile' },
           ].map(item => {
             const IconComponent = item.icon
+            const isActive =
+              location.pathname === item.path || location.pathname.startsWith(item.path + '/')
             return (
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  background: 'transparent',
+                  background: isActive ? '#16A34A' : 'transparent',
                   border: 0,
-                  color: '#E2E8F0',
-                  padding: '12px 14px',
-                  fontSize: '14px',
-                  fontWeight: 600,
+                  color: isActive ? '#fff' : '#CBD5E1',
+                  padding: '12px 15px',
+                  fontSize: '14.5px',
+                  fontWeight: isActive ? 800 : 600,
                   textAlign: 'right',
                   cursor: 'pointer',
-                  borderRadius: '8px',
+                  borderRadius: '11px',
                   transition: 'all .2s',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '11px',
-                  justifyContent: 'flex-end'
+                  gap: '12px',
+                  fontFamily: 'inherit'
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,.1)'
+                  if (isActive) return
+                  e.currentTarget.style.background = 'rgba(255,255,255,.08)'
                   e.currentTarget.style.color = '#fff'
                 }}
                 onMouseLeave={e => {
+                  if (isActive) return
                   e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = '#E2E8F0'
+                  e.currentTarget.style.color = '#CBD5E1'
                 }}
               >
-                {item.label}
                 <span style={{ display: 'flex', alignItems: 'center', flex: 'none', color: 'inherit' }}>
                   <IconComponent />
                 </span>
+                {item.label}
               </button>
             )
           })}
@@ -143,19 +151,6 @@ export default function CompanyShell({ user }) {
             دور: {userRole || 'عضو'}
           </div>
           <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>إدارة الباقة</button>
-        </div>
-
-        {/* Clerk UserButton */}
-        <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: 'w-10 h-10',
-                userButtonBox: 'flex-row-reverse',
-              }
-            }}
-          />
         </div>
       </aside>
 

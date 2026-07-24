@@ -1,29 +1,39 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Send } from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Search as SearchIcon, Send } from 'lucide-react'
 import { getSupabase } from '../lib/api'
+
+const STEPS = [
+  { n: 1, label: 'اختيار الشركة' },
+  { n: 2, label: 'تفاصيل التعامل' },
+  { n: 3, label: 'المستندات الداعمة' },
+  { n: 4, label: 'مراجعة وإرسال' },
+]
+
+const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', default: 'لم يُسدَّد' }
 
 export default function AddReport() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const prefill = location.state || {}
+
+  const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
-    companyId: '',
-    type: 'delayed-payment',
-    description: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
+    companyId: prefill.companyId || '',
+    dealValue: '',
+    delayDays: '',
+    fromDate: '',
+    toDate: '',
+    paymentCommitment: 'full',
+    duesOutstanding: false,
+    notes: '',
   })
   const [companies, setCompanies] = useState([])
+  const [companiesLoading, setCompaniesLoading] = useState(true)
+  const [companySearch, setCompanySearch] = useState(prefill.companyName || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [companiesLoading, setCompaniesLoading] = useState(true)
-
-  const reportTypes = [
-    { value: 'delayed-payment', label: '💳 دفع متأخر' },
-    { value: 'non-compliance', label: '⚠️ عدم التزام' },
-    { value: 'excellent', label: '⭐ ممتاز' },
-    { value: 'issues', label: '⚔️ قضايا' },
-  ]
 
   useEffect(() => {
     fetchCompanies()
@@ -31,16 +41,15 @@ export default function AddReport() {
 
   const fetchCompanies = async () => {
     try {
-      // Use Knowledge Base for approved companies list
       const { searchCompaniesKnowledgeBase } = await import('../lib/api')
       const response = await searchCompaniesKnowledgeBase('', { status: 'approved' }, 1, 1000)
-
       const formatted = response.data?.map(c => ({
         id: c.id,
         name: c.name,
-        sector: c.sector
+        sector: c.sector,
+        city: c.city,
+        cr: c.cr_number,
       })) || []
-
       setCompanies(formatted)
     } catch (err) {
       console.error('Failed to fetch companies:', err)
@@ -49,33 +58,39 @@ export default function AddReport() {
     }
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+  const setField = (name, value) => setFormData(prev => ({ ...prev, [name]: value }))
+
+  const selectedCompany = companies.find(c => c.id === formData.companyId)
+
+  const filteredCompanies = companySearch.trim()
+    ? companies.filter(c =>
+        (c.name || '').includes(companySearch.trim()) ||
+        (c.cr || '').includes(companySearch.trim()))
+    : companies
+
+  const validateStep = (current) => {
+    if (current === 1 && !formData.companyId) return 'اختر الشركة المُبلَّغ عنها'
+    if (current === 2 && !formData.fromDate) return 'حدّد تاريخ بداية التعامل'
+    return ''
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const stepNext = () => {
+    const msg = validateStep(step)
+    if (msg) { setError(msg); return }
     setError('')
+    setStep(s => Math.min(4, s + 1))
+  }
+  const stepPrev = () => { setError(''); setStep(s => Math.max(1, s - 1)) }
+
+  const handleSubmit = async () => {
+    setError('')
+    // Final validation
+    const s1 = validateStep(1)
+    if (s1) { setError(s1); setStep(1); return }
+    const s2 = validateStep(2)
+    if (s2) { setError(s2); setStep(2); return }
+
     setLoading(true)
-
-    // Validation
-    if (!formData.companyId.trim()) {
-      setError('اختر شركة')
-      setLoading(false)
-      return
-    }
-    if (formData.description.length < 20) {
-      setError('وصف التقرير يجب أن يكون 20 حرف على الأقل (BR-07)')
-      setLoading(false)
-      return
-    }
-    if (!formData.date) {
-      setError('حدد التاريخ')
-      setLoading(false)
-      return
-    }
-
     try {
       const supabase = getSupabase()
       const { data: user } = await supabase.auth.getUser()
@@ -106,18 +121,20 @@ export default function AddReport() {
         throw new Error('❌ لا يمكن إرسال تقرير لنفس الشركة مرتين خلال 90 يوم (BR-05)')
       }
 
-      // Submit report
+      // Submit report (real schema columns)
       const { data: reportData, error: submitError } = await supabase
         .from('reports')
         .insert([{
           reporter_tenant_id: userData.tenant_id,
           target_company_id: formData.companyId,
-          type: formData.type,
-          description: formData.description,
-          deal_amount_range: formData.amount ? `SAR ${formData.amount}` : null,
-          dealt_at: new Date(formData.date).toISOString(),
+          deal_amount_range: formData.dealValue ? `SAR ${formData.dealValue}` : null,
+          payment_commitment: formData.paymentCommitment,
+          delay_days: parseInt(formData.delayDays, 10) || 0,
+          defaulted: formData.duesOutstanding,
+          dealt_at: new Date(formData.fromDate).toISOString(),
+          notes: formData.notes || null,
           status: 'pending_review',
-          submitted_at: new Date().toISOString()
+          submitted_at: new Date().toISOString(),
         }])
         .select()
         .single()
@@ -132,7 +149,7 @@ export default function AddReport() {
           report_id: reportData.id,
           amount: -1,
           reason: 'report_submitted',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         }])
         .catch(err => console.warn('Credit deduction warning:', err))
 
@@ -145,8 +162,8 @@ export default function AddReport() {
           action: 'report_submitted',
           entity: 'report',
           entity_id: reportData.id,
-          meta: JSON.stringify({ company_id: formData.companyId, type: formData.type }),
-          created_at: new Date().toISOString()
+          meta: JSON.stringify({ company_id: formData.companyId, payment_commitment: formData.paymentCommitment }),
+          created_at: new Date().toISOString(),
         }])
         .catch(err => console.warn('Audit log warning:', err))
 
@@ -161,267 +178,227 @@ export default function AddReport() {
 
   if (success) {
     return (
-      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', padding: '20px' }}>
-        <style>{`
-          @keyframes successBounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-          }
-        `}</style>
-        <div style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '48px', textAlign: 'center', maxWidth: '420px', boxShadow: '0 12px 32px rgba(0,0,0,0.12)' }}>
-          <div style={{ fontSize: '64px', marginBottom: '20px', animation: 'successBounce 0.6s ease-out' }}>✅</div>
-          <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', marginBottom: '12px' }}>تم إرسال التقرير!</h2>
-          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px', lineHeight: '1.6' }}>شكراً لمساهمتك في بناء مجتمع آمن. سيتم مراجعة تقريرك من قبل فريقنا قريباً.</p>
-          <button
-            onClick={() => navigate('/my-reports')}
-            style={{
-              background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
-              color: '#fff',
-              border: '0',
-              borderRadius: '12px',
-              padding: '14px 24px',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              width: '100%',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px)'
-              e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
-            }}>
-            📋 عرض تقاريري
-          </button>
-        </div>
-      </main>
+      <div style={{ maxWidth: '520px', margin: '40px auto', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '40px', textAlign: 'center' }}>
+        <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', margin: '0 auto 18px', color: '#16A34A' }}>✓</div>
+        <h2 style={{ fontSize: '23px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>تم إرسال التقرير</h2>
+        <p style={{ fontSize: '15px', color: '#64748B', margin: '0 auto 24px', lineHeight: 1.75, maxWidth: '420px' }}>سيتم إرسال التقرير لإدارة المنصة للمراجعة قبل اعتماده. لن يظهر التقرير علناً، وستظهر مؤشراته بشكل مجمّع وسرّي.</p>
+        <button
+          onClick={() => navigate('/my-reports')}
+          style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 32px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+          عرض تقاريري
+        </button>
+      </div>
     )
   }
 
-  return (
-    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px 28px' }}>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
-      <div style={{ maxWidth: '700px', margin: '0 auto', animation: 'fadeIn 0.5s ease-out' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px 0', textAlign: 'right', letterSpacing: '-0.5px' }}>
-          📋 إرسال تقرير جديد
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 28px 0', textAlign: 'right', lineHeight: '1.6' }}>
-          شارك معنا تجربتك مع الشركات لمساعدة المجتمع على اتخاذ قرارات أفضل
-        </p>
+  const fieldStyle = {
+    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px',
+    fontSize: '15px', outline: 'none', background: '#fff', fontFamily: 'inherit',
+  }
+  const labelStyle = { fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }
 
-        {error && (
-          <div style={{ background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: 'none', borderRadius: '12px', padding: '16px 18px', marginBottom: '24px', fontSize: '14px', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 2px 8px rgba(220, 38, 38, 0.1)' }}>
-            <AlertCircle size={18} />
-            {error}
-          </div>
+  const chip = (active, onClick, text, activeBg = '#16A34A') => (
+    <span
+      onClick={onClick}
+      style={{
+        flex: 1, textAlign: 'center', background: active ? activeBg : '#F1F5F9', color: active ? '#fff' : '#64748B',
+        borderRadius: '9px', padding: '11px', fontSize: '14px', fontWeight: active ? 800 : 700, cursor: 'pointer',
+      }}>
+      {text}
+    </span>
+  )
+
+  return (
+    <div style={{ maxWidth: '820px', margin: '0 auto' }}>
+      {/* Stepper */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '28px' }}>
+        {STEPS.map((w, idx) => {
+          const done = w.n < step
+          const active = w.n === step
+          return (
+            <div key={w.n} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '15px', flex: 'none',
+                  background: active || done ? '#16A34A' : '#E2E8F0', color: active || done ? '#fff' : '#94A3B8',
+                }}>{done ? '✓' : String(w.n)}</div>
+                <span style={{ fontSize: '14px', fontWeight: active ? 800 : 600, color: active || done ? '#1E2A52' : '#94A3B8', whiteSpace: 'nowrap' }}>{w.label}</span>
+              </div>
+              {idx < STEPS.length - 1 && (
+                <div style={{ flex: 1, height: '2px', background: '#E2E8F0', margin: '0 10px', minWidth: '16px' }}></div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', fontSize: '14px', color: '#B91C1C', fontWeight: 700 }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '32px' }}>
+        {/* STEP 1: Company selection */}
+        {step === 1 && (
+          <>
+            <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>اختيار الشركة المُبلَّغ عنها</h2>
+            <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 22px', textAlign: 'right' }}>ابحث عن الشركة التي تعاملت معها</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px', marginBottom: '16px' }}>
+              <SearchIcon size={20} color="#94A3B8" />
+              <input
+                placeholder="اسم الشركة أو رقم السجل التجاري"
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
+              {companiesLoading ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>جاري تحميل الشركات...</div>
+              ) : filteredCompanies.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
+              ) : (
+                filteredCompanies.slice(0, 40).map(c => {
+                  const chosen = formData.companyId === c.id
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => setField('companyId', c.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        border: chosen ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0',
+                        background: chosen ? '#F0FDF4' : '#fff', borderRadius: '12px', padding: '16px', cursor: 'pointer',
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flex: 'none' }}>{(c.name || '؟').charAt(0)}</div>
+                        <div>
+                          <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{c.name}</div>
+                          <div style={{ fontSize: '13px', color: '#64748B', textAlign: 'right' }}>السجل: {c.cr || '—'} · {c.city || '—'}</div>
+                        </div>
+                      </div>
+                      {chosen && <span style={{ color: '#16A34A', fontWeight: 900, fontSize: '18px' }}>✓</span>}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </>
         )}
 
-        <form onSubmit={handleSubmit} style={{ background: '#fff', border: 'none', borderRadius: '20px', padding: '32px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
-          {/* Company Selection */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>🏢 اختر الشركة</label>
-            <select
-              name="companyId"
-              value={formData.companyId}
-              onChange={handleChange}
-              disabled={companiesLoading}
-              style={{
-                width: '100%',
-                border: '2px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '13px 16px',
-                fontSize: '14px',
-                textAlign: 'right',
-                outline: 'none',
-                background: '#F8FAFC',
-                transition: 'all 0.3s ease',
-                cursor: companiesLoading ? 'not-allowed' : 'pointer',
-                fontWeight: '500'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
-              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-            >
-              <option value="">{companiesLoading ? 'جاري التحميل...' : '-- اختر شركة --'}</option>
-              {companies.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Report Type */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '12px', textAlign: 'right' }}>📊 نوع التقرير</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              {reportTypes.map(rt => (
-                <label key={rt.value} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 12px',
-                  border: formData.type === rt.value ? '2px solid #16A34A' : '2px solid #E2E8F0',
-                  borderRadius: '12px', cursor: 'pointer',
-                  background: formData.type === rt.value ? 'linear-gradient(135deg, #F0FDF4 0%, #E8F9EE 100%)' : '#F8FAFC',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <input
-                    type="radio"
-                    name="type"
-                    value={rt.value}
-                    checked={formData.type === rt.value}
-                    onChange={handleChange}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  {rt.label}
-                </label>
-              ))}
+        {/* STEP 2: Deal details */}
+        {step === 2 && (
+          <>
+            <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 22px', textAlign: 'right' }}>تفاصيل التعامل</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+              <div>
+                <label style={labelStyle}>قيمة التعامل (ر.س)</label>
+                <input type="number" placeholder="120,000" value={formData.dealValue} onChange={(e) => setField('dealValue', e.target.value)} style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>متوسط التأخير (أيام)</label>
+                <input type="number" placeholder="4" value={formData.delayDays} onChange={(e) => setField('delayDays', e.target.value)} style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>من تاريخ</label>
+                <input type="date" value={formData.fromDate} onChange={(e) => setField('fromDate', e.target.value)} style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>إلى تاريخ</label>
+                <input type="date" value={formData.toDate} onChange={(e) => setField('toDate', e.target.value)} style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>هل تم السداد؟</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {chip(formData.paymentCommitment === 'full', () => setField('paymentCommitment', 'full'), 'نعم')}
+                  {chip(formData.paymentCommitment === 'partial', () => setField('paymentCommitment', 'partial'), 'جزئي', '#1E2A52')}
+                  {chip(formData.paymentCommitment === 'default', () => setField('paymentCommitment', 'default'), 'لا', '#DC2626')}
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>مبالغ مستحقة؟</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {chip(formData.duesOutstanding === true, () => setField('duesOutstanding', true), 'نعم', '#DC2626')}
+                  {chip(formData.duesOutstanding === false, () => setField('duesOutstanding', false), 'لا', '#1E2A52')}
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/3' }}>
+                <label style={labelStyle}>ملاحظات إضافية</label>
+                <textarea placeholder="تفاصيل عن التعامل..." value={formData.notes} onChange={(e) => setField('notes', e.target.value)} style={{ ...fieldStyle, minHeight: '90px', resize: 'vertical', textAlign: 'right' }} />
+              </div>
             </div>
-          </div>
+          </>
+        )}
 
-          {/* Date */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>📅 التاريخ</label>
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-              style={{
-                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
-                fontSize: '14px', outline: 'none', background: '#F8FAFC', transition: 'all 0.3s ease', fontWeight: '500'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
-              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-            />
-          </div>
-
-          {/* Amount (optional) */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>💰 المبلغ (اختياري)</label>
-            <input
-              type="number"
-              name="amount"
-              placeholder="0.00 ريال"
-              value={formData.amount}
-              onChange={handleChange}
-              style={{
-                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
-                fontSize: '14px', textAlign: 'right', outline: 'none', background: '#F8FAFC',
-                transition: 'all 0.3s ease', fontWeight: '500'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
-              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-            />
-          </div>
-
-          {/* Description */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '10px', textAlign: 'right' }}>📝 تفاصيل التقرير</label>
-            <textarea
-              name="description"
-              placeholder="اكتب التفاصيل والملاحظات هنا... (20 حرف بالحد الأدنى)"
-              value={formData.description}
-              onChange={handleChange}
-              rows="5"
-              style={{
-                width: '100%', border: '2px solid #E2E8F0', borderRadius: '12px', padding: '13px 16px',
-                fontSize: '14px', textAlign: 'right', outline: 'none', fontFamily: 'inherit',
-                resize: 'none', background: '#F8FAFC', transition: 'all 0.3s ease', fontWeight: '500'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#16A34A'}
-              onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-            />
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px', textAlign: 'right' }}>
-              {formData.description.length}/500 حرف
+        {/* STEP 3: Documents (optional, UI placeholder) */}
+        {step === 3 && (
+          <>
+            <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>المستندات الداعمة</h2>
+            <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 22px', textAlign: 'right' }}>ارفق الفواتير أو العقود لتسريع المراجعة (اختياري)</p>
+            <div style={{ border: '2px dashed #CBD5E1', borderRadius: '16px', padding: '46px', textAlign: 'center', background: '#F8FAFC' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📎</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>اسحب الملفات هنا أو اضغط للرفع</div>
+              <div style={{ fontSize: '13px', color: '#94A3B8' }}>PDF، JPG، PNG حتى 10MB</div>
             </div>
-          </div>
+          </>
+        )}
 
-          {/* Submit Button */}
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
+        {/* STEP 4: Review */}
+        {step === 4 && (
+          <>
+            <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 22px', textAlign: 'right' }}>مراجعة وإرسال</h2>
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '22px', marginBottom: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700, marginBottom: '3px' }}>الشركة</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedCompany?.name || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700, marginBottom: '3px' }}>قيمة التعامل</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{formData.dealValue ? `${formData.dealValue} ر.س` : '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700, marginBottom: '3px' }}>حالة السداد</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: formData.paymentCommitment === 'full' ? '#16A34A' : formData.paymentCommitment === 'partial' ? '#B45309' : '#DC2626' }}>{PAYMENT_LABELS[formData.paymentCommitment]}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700, marginBottom: '3px' }}>متوسط التأخير</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{formData.delayDays || 0} أيام</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '15px 18px', display: 'flex', gap: '11px', alignItems: 'center' }}>
+              <span style={{ fontSize: '18px' }}>ℹ</span>
+              <span style={{ fontSize: '14px', color: '#92400E', fontWeight: 700, lineHeight: 1.6 }}>سيتم إرسال التقرير لإدارة المنصة للمراجعة قبل اعتماده. لن يظهر التقرير علناً، وستظهر مؤشراته بشكل مجمّع وسرّي.</span>
+            </div>
+          </>
+        )}
+
+        {/* Footer nav */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '28px', paddingTop: '22px', borderTop: '1px solid #F1F5F9' }}>
+          <button
+            onClick={step === 1 ? () => navigate('/search') : stepPrev}
+            style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 26px', fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {step === 1 ? 'إلغاء' : 'السابق'}
+          </button>
+          {step < 4 ? (
             <button
-              type="submit"
+              onClick={stepNext}
+              style={{ background: '#1E2A52', color: '#fff', border: 0, borderRadius: '10px', padding: '12px 34px', fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+              التالي
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
               disabled={loading}
-              style={{
-                background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
-                color: '#fff',
-                border: '0',
-                borderRadius: '12px',
-                padding: '14px 28px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.3s ease',
-                boxShadow: loading ? 'none' : '0 4px 12px rgba(22, 163, 74, 0.25)'
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  e.target.style.transform = 'translateY(-2px)'
-                  e.target.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.35)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!loading) {
-                  e.target.style.transform = 'translateY(0)'
-                  e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.25)'
-                }
-              }}>
+              style={{ background: loading ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '12px 34px', fontSize: '14.5px', fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'inherit' }}>
               <Send size={16} />
-              {loading ? '⏳ جاري الإرسال...' : '✉️ إرسال التقرير'}
+              {loading ? 'جاري الإرسال...' : 'إرسال التقرير'}
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/search')}
-              style={{
-                background: '#EEF2FF',
-                color: '#1E2A52',
-                border: '0',
-                borderRadius: '12px',
-                padding: '14px 28px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = '#E0E7FF'
-                e.target.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#EEF2FF'
-                e.target.style.transform = 'translateY(0)'
-              }}>
-              ← إلغاء
-            </button>
-          </div>
-
-          {/* Info */}
-          <div style={{
-            background: 'linear-gradient(135deg, #F0F4FF 0%, #EEF2FF 100%)',
-            border: '2px solid #E0E7FF',
-            borderRadius: '12px',
-            padding: '16px 18px',
-            marginTop: '28px',
-            fontSize: '13px',
-            color: '#1E40AF',
-            fontWeight: '600',
-            lineHeight: '1.6',
-            display: 'flex',
-            gap: '10px',
-            alignItems: 'flex-start'
-          }}>
-            <span>ℹ️</span>
-            <span>تقريرك سيساعد المجتمع على اتخاذ قرارات آمنة وموثوقة. شكراً لمساهمتك في بناء مجتمع آمن!</span>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   )
 }

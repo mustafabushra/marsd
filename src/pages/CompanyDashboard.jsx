@@ -145,41 +145,10 @@ export default function CompanyDashboard() {
             : null
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px' }}>
+    <div>
       <div style={{ marginBottom: '22px' }}>
-        <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', letterSpacing: '-0.5px', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
-        <p style={{ fontSize: '15px', color: '#64748B', margin: 0, fontWeight: 600, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
-      </div>
-
-      {/* Search Box */}
-      <div style={{ marginBottom: '22px' }}>
-        <button
-          onClick={() => navigate('/search')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '11px',
-            background: '#F8FAFC',
-            border: '1.5px solid #E2E8F0',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            fontSize: '15px',
-            color: '#94A3B8',
-            cursor: 'pointer',
-            fontWeight: 700,
-            width: '100%',
-            maxWidth: '340px',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.target.style.background = '#F1F5F9'}
-          onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m21 21-4.3-4.3"></path>
-          </svg>
-          ابحث عن شركة...
-        </button>
+        <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
+        <p style={{ fontSize: '15px', color: '#64748B', margin: 0, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
       </div>
 
       {/* KPIs Grid */}
@@ -273,6 +242,6 @@ export default function CompanyDashboard() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -76,7 +76,7 @@ export default function TrustReport() {
 
   if (loading) {
     return (
-      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
         <style>{`
           @keyframes spin {
             from { transform: rotate(0deg); }
@@ -84,41 +84,28 @@ export default function TrustReport() {
           }
         `}</style>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>⏳</div>
-          <div style={{ fontSize: '16px', fontWeight: '600', color: '#64748B' }}>جاري تحميل بيانات الشركة...</div>
+          <div style={{ fontSize: '44px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>⏳</div>
+          <div style={{ fontSize: '16px', fontWeight: 600, color: '#64748B' }}>جاري تحميل بيانات الشركة...</div>
         </div>
-      </main>
+      </div>
     )
   }
 
   if (error || !report) {
     return (
-      <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '32px 28px' }}>
-        <div style={{ maxWidth: '500px', margin: '0 auto', background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '2px solid #FECACA', borderRadius: '16px', padding: '32px', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#991B1B', marginBottom: '12px' }}>{error || 'لم يتم العثور على البيانات'}</div>
-          <p style={{ fontSize: '14px', color: '#DC2626', marginBottom: '24px', lineHeight: '1.6' }}>قد تكون الشركة لم تعد متوفرة أو قد يكون هناك خطأ في الوصول إليها.</p>
-          <button
-            onClick={() => navigate('/search')}
-            style={{
-              background: 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)',
-              color: '#fff', border: 0, borderRadius: '12px', padding: '14px 28px',
-              fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 12px rgba(156, 27, 27, 0.25)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px)'
-              e.target.style.boxShadow = '0 6px 16px rgba(156, 27, 27, 0.35)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = '0 4px 12px rgba(156, 27, 27, 0.25)'
-            }}>
-            ← العودة للبحث
-          </button>
-        </div>
-      </main>
+      <div style={{ maxWidth: '520px', margin: '40px auto', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '16px', padding: '32px', textAlign: 'center' }}>
+        <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', margin: '0 auto 14px' }}>⚠</div>
+        <div style={{ fontSize: '18px', fontWeight: 900, color: '#991B1B', marginBottom: '12px' }}>{error || 'لم يتم العثور على البيانات'}</div>
+        <p style={{ fontSize: '14px', color: '#B91C1C', marginBottom: '24px', lineHeight: 1.7 }}>قد تكون الشركة لم تعد متوفرة أو قد يكون هناك خطأ في الوصول إليها.</p>
+        <button
+          onClick={() => navigate('/search')}
+          style={{
+            background: '#1E2A52', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 28px',
+            fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
+          }}>
+          ← العودة للبحث
+        </button>
+      </div>
     )
   }
 
@@ -126,21 +113,10 @@ export default function TrustReport() {
   const score = report.score || 0
 
   return (
-    <main style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', minHeight: '100vh', padding: '28px 28px' }}>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(20px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
+    <div>
       <div style={{
-        background: '#fff', border: '2px solid #E2E8F0', borderRadius: '20px', padding: '32px',
-        marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-        animation: 'fadeIn 0.6s ease-out'
+        background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '30px',
+        marginBottom: '18px'
       }}>
         <div style={{ display: 'flex', gap: '28px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: '66px', height: '66px', borderRadius: '16px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 900, flex: 'none' }}>
@@ -211,6 +187,20 @@ export default function TrustReport() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button style={{
+              background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 18px',
+              fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
+            }}>
+              ⬇ تحميل PDF
+            </button>
+            <button
+              onClick={() => navigate('/watchlist')}
+              style={{
+                background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px',
+                fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
+              }}>
+              + قائمة المراقبة
+            </button>
             <button
               onClick={() => {
                 const canAdd = canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0
@@ -220,59 +210,18 @@ export default function TrustReport() {
               }}
               disabled={!canPerform(role, 'canAddReport') || !systemStatus.subscriptionActive || !systemStatus.accountActive || systemStatus.creditsBalance <= 0}
               style={{
-                background: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' : '#D1D5DB',
-                color: '#fff',
-                border: '0',
-                borderRadius: '12px',
-                padding: '13px 22px',
+                background: '#fff',
+                color: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? '#1E2A52' : '#94A3B8',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '10px',
+                padding: '11px 18px',
                 fontSize: '14px',
                 fontWeight: 800,
-                cursor: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive ? 'pointer' : 'not-allowed',
-                opacity: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive ? 1 : 0.6,
-                transition: 'all 0.3s ease',
-                boxShadow: (canPerform(role, 'canAddReport') && systemStatus.subscriptionActive) ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (canPerform(role, 'canAddReport') && systemStatus.subscriptionActive) {
-                  e.target.style.transform = 'translateY(-2px)'
-                  e.target.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.35)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (canPerform(role, 'canAddReport') && systemStatus.subscriptionActive) {
-                  e.target.style.transform = 'translateY(0)'
-                  e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.25)'
-                }
+                cursor: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 'pointer' : 'not-allowed',
+                opacity: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 1 : 0.6,
+                fontFamily: 'inherit'
               }}>
-              + إضافة تقرير
-            </button>
-            <button style={{
-              background: '#EEF2FF', color: '#3730A3', border: '2px solid #E0E7FF', borderRadius: '12px', padding: '13px 22px',
-              fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.3s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#E0E7FF'
-              e.target.style.transform = 'translateY(-2px)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = '#EEF2FF'
-              e.target.style.transform = 'translateY(0)'
-            }}>
-              ⭐ قائمة المراقبة
-            </button>
-            <button style={{
-              background: '#F0FAFF', color: '#0369A1', border: '2px solid #CFF0FF', borderRadius: '12px', padding: '13px 22px',
-              fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.3s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#E0F2FE'
-              e.target.style.transform = 'translateY(-2px)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = '#F0FAFF'
-              e.target.style.transform = 'translateY(0)'
-            }}>
-              ⬇ تحميل PDF
+              ⭐ إضافة تقرير
             </button>
           </div>
         </div>
@@ -280,60 +229,52 @@ export default function TrustReport() {
 
       {tier === 'none' && (
         <div style={{
-          background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-          border: '2px solid #FDE68A', borderRadius: '16px', padding: '28px', textAlign: 'center',
-          boxShadow: '0 4px 16px rgba(180, 83, 9, 0.1)',
-          animation: 'fadeIn 0.6s ease-out'
+          background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '16px', padding: '26px', textAlign: 'center'
         }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
-          <div style={{ fontSize: '18px', fontWeight: 900, color: '#B45309', marginBottom: '12px' }}>بيانات غير كافية</div>
-          <p style={{ fontSize: '14px', color: '#92400E', margin: '0 0 0 0', lineHeight: 1.7, textAlign: 'right' }}>عدد التقارير المعتمدة الحالية (3) أقل من الحد الأدنى المطلوب (5 تقارير). ساهم بتقريرك لمساعدة المجتمع على بناء تقييم دقيق.</p>
+          <div style={{ fontSize: '17px', fontWeight: 900, color: '#B45309', marginBottom: '8px' }}>⚠ بيانات غير كافية لإصدار تقييم موثوق</div>
+          <p style={{ fontSize: '14.5px', color: '#92400E', margin: 0, lineHeight: 1.7 }}>عدد التقارير المعتمدة الحالية ({report?.approvedReports || 0}) أقل من الحد الأدنى المطلوب (5 تقارير). ساهم بتقريرك لمساعدة المجتمع على بناء تقييم دقيق.</p>
         </div>
       )}
 
       {tier === 'full' && (
         <>
           <div style={{
-            background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '20px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.6s ease-out 0.1s both'
+            background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>📊 تركيبة مؤشر الثقة</h3>
-              <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, background: '#F1F5F9', padding: '6px 12px', borderRadius: '6px' }}>كيف تم احتساب الدرجة</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>تركيبة مؤشر الثقة</h3>
+              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>كيف تم احتساب الدرجة</span>
             </div>
-            <div style={{ display: 'flex', borderRadius: '12px', overflow: 'hidden', height: '52px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-              <div style={{ width: '30%', background: 'linear-gradient(135deg, #1E2A52 0%, #293E5B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '13px', textAlign: 'center', padding: '0 8px' }}>البيانات الرسمية 30%</div>
-              <div style={{ width: '50%', background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '13px', textAlign: 'center', padding: '0 8px' }}>بيانات المجتمع 50%</div>
-              <div style={{ width: '20%', background: 'linear-gradient(135deg, #64748B 0%, #475569 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '13px', textAlign: 'center', padding: '0 8px' }}>المنصة 20%</div>
+            <div style={{ display: 'flex', borderRadius: '12px', overflow: 'hidden', height: '52px' }}>
+              <div style={{ width: '30%', background: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>البيانات الرسمية 30%</div>
+              <div style={{ width: '50%', background: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>بيانات المجتمع 50%</div>
+              <div style={{ width: '20%', background: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>المنصة 20%</div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
-            {[
-              { icon: '🏢', label: 'الشركات التي قدّمت تقارير', value: '18' },
-              { icon: '✅', label: 'عدد التقارير المعتمدة', value: '34' },
-              { icon: '📈', label: 'نسبة الالتزام بالسداد', value: '94%', highlight: true }
-            ].map((stat, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: '#fff', border: '2px solid #E2E8F0', borderRadius: '14px', padding: '20px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  transition: 'all 0.3s ease',
-                  animation: `fadeIn 0.6s ease-out ${0.2 + idx * 0.1}s both`
-                }}
-              >
-                <div style={{ fontSize: '24px', marginBottom: '8px' }}>{stat.icon}</div>
-                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{stat.label}</div>
-                <div style={{ fontSize: '28px', fontWeight: 900, color: '#1E2A52' }}>{stat.value}</div>
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '18px' }}>
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
+              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>عدد التقارير المعتمدة</div>
+              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{report?.approvedReports || 0}</div>
+            </div>
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
+              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>مؤشر الثقة الحالي</div>
+              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{Math.round(score)}<span style={{ fontSize: '16px', color: '#94A3B8' }}> / 100</span></div>
+            </div>
+            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
+              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>حالة التقييم</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#15803D', marginTop: '6px' }}>موثوق</div>
+            </div>
+          </div>
+
+          <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', display: 'flex', gap: '11px', alignItems: 'center' }}>
+            <span style={{ fontSize: '18px' }}>🛡</span>
+            <span style={{ fontSize: '13.5px', color: '#3730A3', fontWeight: 700 }}>لا تُعرض أسماء الشركات المبلّغة — تُعرض المؤشرات المجمّعة فقط حفاظاً على الخصوصية.</span>
           </div>
 
           {/* Reports Summary */}
           <div style={{
-            background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '20px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.6s ease-out 0.3s both'
+            background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
           }}>
             <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>ملخص التقارير</h3>
             {summary.length > 0 ? (
@@ -354,10 +295,9 @@ export default function TrustReport() {
           {/* Trends */}
           {trends.length > 0 && (
             <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '20px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.6s ease-out 0.4s both'
+              background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
             }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>📈 اتجاهات الأداء</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>سجل تغيّرات التقييم</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {trends.slice(0, 6).map((item, idx) => (
                   <div
@@ -404,10 +344,9 @@ export default function TrustReport() {
           {/* Timeline */}
           {timeline.length > 0 && (
             <div style={{
-              background: '#fff', border: '2px solid #E2E8F0', borderRadius: '16px', padding: '24px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)', animation: 'fadeIn 0.6s ease-out 0.5s both'
+              background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px'
             }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>آخر التقارير</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>أحدث التقارير المعتمدة</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {timeline.map((report, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '14px', paddingBottom: '14px', borderBottom: idx < timeline.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
@@ -435,6 +374,6 @@ export default function TrustReport() {
           )}
         </>
       )}
-    </main>
+    </div>
   )
 }

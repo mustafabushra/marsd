@@ -17,10 +17,10 @@ export default function Compare() {
   ])
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px 32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexDirection: 'row-reverse' }}>
-        <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>مقارنة الشركات</h3>
-        <div style={{ display: 'flex', gap: '10px', flexDirection: 'row-reverse' }}>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+        <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>مقارنة الشركات</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button style={{ background: '#fff', color: '#15803D', border: '1.5px solid #BBF7D0', borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer' }}>⬇ تصدير Excel</button>
           <button style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer' }}>⬇ تصدير PDF</button>
         </div>
@@ -61,6 +61,6 @@ export default function Compare() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   )
 }

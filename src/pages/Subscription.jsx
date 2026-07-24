@@ -82,7 +82,7 @@ export default function Subscription() {
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '22px 28px' }}>
+    <div>
       {error && (
         <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', color: '#991B1B', fontSize: '14px' }}>
           {error}
@@ -121,7 +121,7 @@ export default function Subscription() {
           <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>استهلاك الباقة</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px', flexDirection: 'row-reverse' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 <span>عمليات البحث</span>
                 <span>72 / 200</span>
               </div>
@@ -130,7 +130,7 @@ export default function Subscription() {
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px', flexDirection: 'row-reverse' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 <span>المستخدمون</span>
                 <span>4 / 8</span>
               </div>
@@ -139,7 +139,7 @@ export default function Subscription() {
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px', flexDirection: 'row-reverse' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 <span>قوائم المراقبة</span>
                 <span>9 / 25</span>
               </div>
@@ -184,6 +184,6 @@ export default function Subscription() {
           ))
         )}
       </div>
-    </main>
+    </div>
   )
 }

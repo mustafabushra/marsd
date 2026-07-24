@@ -26,8 +26,7 @@ export default function Profile() {
   }
 
   return (
-    <main style={{ background: '#F8FAFC', minHeight: '100vh', padding: '28px 32px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '18px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '18px' }}>
         {/* Left: Company Data */}
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '26px' }}>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>بيانات الشركة</h3>
@@ -89,7 +88,6 @@ export default function Profile() {
             ))}
           </div>
         </div>
-      </div>
-    </main>
+    </div>
   )
 }
