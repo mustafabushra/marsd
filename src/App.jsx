@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary'
 import { ClerkProvider } from './context/ClerkProvider'
 import { useUser, useAuth as useClerkAuth } from '@clerk/react'
 import VisitorShell from './components/VisitorShell'
@@ -197,8 +198,10 @@ function AppContent() {
  */
 export default function App() {
   return (
-    <ClerkProvider>
-      <AppContent />
-    </ClerkProvider>
+    <ErrorBoundary>
+      <ClerkProvider>
+        <AppContent />
+      </ClerkProvider>
+    </ErrorBoundary>
   )
 }

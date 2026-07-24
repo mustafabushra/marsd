@@ -61,6 +61,6 @@ export default function CompanyStatusRouter({ children }) {
     )
   }
 
-  // Only render children if company is approved
-  return status === 'approved' ? children : null
+  // Render children if company is approved OR active (matches the effect logic above)
+  return (status === COMPANY_STATUS.APPROVED || status === COMPANY_STATUS.ACTIVE) ? children : null
 }
