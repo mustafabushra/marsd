@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/react'
 import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
 import { Search as SearchIcon, X } from 'lucide-react'
 
+const EMPTY_REQ_FORM = { sector: '', city: '', unified: '', cr: '', field: 'sector', correctValue: '', note: '' }
+
 export default function Search() {
   const navigate = useNavigate()
+  const { user } = useUser()
   const [companies, setCompanies] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,6 +21,66 @@ export default function Search() {
   const [filters, setFilters] = useState({ sector: null, city: null, risk: null, score: null })
   const [showFilters, setShowFilters] = useState({ sector: false, city: false, risk: false, score: false })
   const [reqModalCompany, setReqModalCompany] = useState(null)
+  const [reqSubModal, setReqSubModal] = useState(null) // 'add_data' | 'edit_data'
+  const [reqForm, setReqForm] = useState(EMPTY_REQ_FORM)
+  const [reqSubmitting, setReqSubmitting] = useState(false)
+
+  function openReqSubModal(type) {
+    setReqForm(EMPTY_REQ_FORM)
+    setReqSubModal(type)
+  }
+
+  async function submitCompanyDataRequest() {
+    if (!reqModalCompany || !reqSubModal) return
+    const type = reqSubModal
+    let payload = {}
+    if (type === 'add_data') {
+      if (!reqForm.sector && !reqForm.city && !reqForm.unified && !reqForm.cr) {
+        showToastMessage('⚠️ أدخل بياناً واحداً على الأقل')
+        return
+      }
+      payload = {
+        sector: reqForm.sector || null,
+        city: reqForm.city || null,
+        unified_number: reqForm.unified || null,
+        cr_number: reqForm.cr || null,
+      }
+    } else {
+      if (!reqForm.correctValue.trim()) {
+        showToastMessage('⚠️ أدخل القيمة الصحيحة')
+        return
+      }
+      payload = { field: reqForm.field, correct_value: reqForm.correctValue.trim() }
+    }
+
+    try {
+      setReqSubmitting(true)
+      const supabase = getSupabase()
+      let tenantId = null
+      if (user?.id) {
+        const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+        tenantId = userData?.tenant_id || null
+      }
+      const { error } = await supabase.from('company_data_requests').insert([{
+        company_id: reqModalCompany.id,
+        requested_by_tenant_id: tenantId,
+        requested_by_user_id: user?.id || null,
+        request_type: type,
+        payload,
+        note: reqForm.note || null,
+        status: 'pending',
+      }])
+      if (error) throw error
+      showToastMessage('✅ تم إرسال طلبك لإدارة مرصد للمراجعة')
+      setReqSubModal(null)
+      setReqModalCompany(null)
+    } catch (err) {
+      console.error('Company data request failed:', err)
+      showToastMessage('❌ فشل إرسال الطلب')
+    } finally {
+      setReqSubmitting(false)
+    }
+  }
 
   const sectors = ['تقنية', 'مقاولات', 'صناعات', 'نقل', 'خدمات']
   const cities = ['الرياض', 'جدة', 'الدمام', 'الخبر', 'الدعيان']
@@ -419,7 +483,7 @@ export default function Search() {
                   </div>
                 </button>
                 <button
-                  onClick={() => setReqModalCompany(null)}
+                  onClick={() => openReqSubModal('add_data')}
                   style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
                   <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>＋</span>
                   <div>
@@ -428,7 +492,7 @@ export default function Search() {
                   </div>
                 </button>
                 <button
-                  onClick={() => setReqModalCompany(null)}
+                  onClick={() => openReqSubModal('edit_data')}
                   style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '13px', padding: '16px 18px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
                   <span style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#FEF3C7', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flex: 'none' }}>✎</span>
                   <div>
@@ -440,6 +504,114 @@ export default function Search() {
               <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginTop: '18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <span style={{ fontSize: '17px' }}>ℹ</span>
                 <span style={{ fontSize: '13px', color: '#3730A3', fontWeight: 700, lineHeight: 1.6 }}>تُراجَع كل الطلبات من إدارة مرصد قبل اعتمادها وتحديث ملف الشركة.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REQUEST SUB-FORM MODAL (add missing data / request edit) */}
+      {reqModalCompany && reqSubModal && (
+        <div
+          onClick={() => setReqSubModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 110, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+          dir="rtl">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(15,23,42,.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '22px 26px', borderBottom: '1px solid #E2E8F0' }}>
+              <div>
+                <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>
+                  {reqSubModal === 'add_data' ? 'إضافة بيانات ناقصة' : 'طلب تعديل بيانات خاطئة'}
+                </h2>
+                <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '4px' }}>{reqModalCompany.name}</div>
+              </div>
+              <button
+                onClick={() => setReqSubModal(null)}
+                style={{ background: '#F1F5F9', border: 0, borderRadius: '9px', width: '34px', height: '34px', fontSize: '18px', cursor: 'pointer', color: '#64748B', flex: 'none' }}>✕</button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              {reqSubModal === 'add_data' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {[
+                    { key: 'sector', label: 'القطاع', ph: 'مثال: صناعات غذائية' },
+                    { key: 'city', label: 'المدينة', ph: 'مثال: القصيم' },
+                    { key: 'unified', label: 'الرقم الموحّد (700)', ph: '7001234567' },
+                    { key: 'cr', label: 'رقم السجل التجاري', ph: '1010XXXXXX' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
+                      <input
+                        placeholder={f.ph}
+                        value={reqForm[f.key]}
+                        onChange={(e) => setReqForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
+                      />
+                    </div>
+                  ))}
+                  <div style={{ gridColumn: '1/3' }}>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>ملاحظة (اختياري)</label>
+                    <textarea
+                      placeholder="أي تفاصيل إضافية تساعد الإدارة..."
+                      value={reqForm.note}
+                      onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
+                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>الحقل المراد تعديله</label>
+                    <select
+                      value={reqForm.field}
+                      onChange={(e) => setReqForm(prev => ({ ...prev, field: e.target.value }))}
+                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
+                      <option value="name">اسم الشركة</option>
+                      <option value="sector">القطاع</option>
+                      <option value="city">المدينة</option>
+                      <option value="cr_number">رقم السجل التجاري</option>
+                      <option value="unified_number">الرقم الموحّد (700)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>القيمة الصحيحة</label>
+                    <input
+                      placeholder="اكتب القيمة الصحيحة"
+                      value={reqForm.correctValue}
+                      onChange={(e) => setReqForm(prev => ({ ...prev, correctValue: e.target.value }))}
+                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>سبب التعديل (اختياري)</label>
+                    <textarea
+                      placeholder="لماذا البيان الحالي غير دقيق؟"
+                      value={reqForm.note}
+                      onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
+                      style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginTop: '18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '17px' }}>ℹ</span>
+                <span style={{ fontSize: '13px', color: '#3730A3', fontWeight: 700, lineHeight: 1.6 }}>يُراجَع الطلب من إدارة مرصد قبل اعتماده وتحديث ملف الشركة.</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '22px' }}>
+                <button
+                  onClick={() => setReqSubModal(null)}
+                  style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 26px', fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  رجوع
+                </button>
+                <button
+                  onClick={submitCompanyDataRequest}
+                  disabled={reqSubmitting}
+                  style={{ background: reqSubmitting ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '12px 34px', fontSize: '14.5px', fontWeight: 800, cursor: reqSubmitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {reqSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
+                </button>
               </div>
             </div>
           </div>
