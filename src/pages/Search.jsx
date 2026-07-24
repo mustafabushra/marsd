@@ -122,8 +122,8 @@ export default function Search() {
     }
   }
 
-  const sectors = ['تقنية', 'مقاولات', 'صناعات', 'نقل', 'خدمات']
-  const cities = ['الرياض', 'جدة', 'الدمام', 'الخبر', 'الدعيان']
+  const sectors = ['تقنية', 'مقاولات', 'تجارة', 'صناعة', 'نقل', 'خدمات', 'عقارات', 'رعاية صحية']
+  const cities = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الظهران', 'الطائف', 'بريدة', 'تبوك', 'أبها', 'القصيم']
   const risks = ['مخاطر منخفضة', 'مخاطر متوسطة', 'مخاطر عالية']
   const scores = ['70+', '40-70', '<40']
 
@@ -172,7 +172,7 @@ export default function Search() {
     setError('')
   }
 
-  async function handleSearch() {
+  async function handleSearch(activeFilters = filters) {
     if (!query.trim()) {
       showToastMessage('⚠️ أدخل نص البحث')
       return
@@ -180,7 +180,7 @@ export default function Search() {
     setLoading(true)
     setError('')
     try {
-      const result = await searchCompaniesKnowledgeBase(query, filters, 1, 50)
+      const result = await searchCompaniesKnowledgeBase(query, activeFilters, 1, 50)
       let formatted = result.data.map(c => ({
         id: c.id,
         name: c.name,
@@ -196,11 +196,18 @@ export default function Search() {
         reports: c.total_reports_count || 0,
       }))
 
-      if (filters.risk) formatted = formatted.filter(c => c.riskLabel === filters.risk)
-      if (filters.score) {
+      // Client-side filters (the KB RPC only handles source/status).
+      const looseMatch = (val, f) => {
+        const a = (val || '').trim()
+        return a && (a.includes(f) || f.includes(a))
+      }
+      if (activeFilters.sector) formatted = formatted.filter(c => looseMatch(c.sector, activeFilters.sector))
+      if (activeFilters.city) formatted = formatted.filter(c => looseMatch(c.city, activeFilters.city))
+      if (activeFilters.risk) formatted = formatted.filter(c => c.riskLabel === activeFilters.risk)
+      if (activeFilters.score) {
         formatted = formatted.filter(c => {
-          if (filters.score === '70+') return c.score >= 70
-          if (filters.score === '40-70') return c.score >= 40 && c.score < 70
+          if (activeFilters.score === '70+') return c.score >= 70
+          if (activeFilters.score === '40-70') return c.score >= 40 && c.score < 70
           return c.score < 40
         })
       }
@@ -224,7 +231,7 @@ export default function Search() {
     const newFilters = { ...filters, [filterType]: filters[filterType] === value ? null : value }
     setFilters(newFilters)
     setShowFilters({ ...showFilters, [filterType]: false })
-    if (companies.length > 0) handleSearch()
+    if (query.trim()) handleSearch(newFilters)
   }
 
   function handleAddCompany() {
