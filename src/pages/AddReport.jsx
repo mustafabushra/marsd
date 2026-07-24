@@ -117,11 +117,18 @@ export default function AddReport() {
 
   const fetchCompanies = async () => {
     try {
-      const { searchCompaniesKnowledgeBase } = await import('../lib/api')
-      const response = await searchCompaniesKnowledgeBase('', { status: 'approved' }, 1, 1000)
-      setCompanies(response.data?.map(c => ({
-        id: c.id, name: c.name, sector: c.sector, city: c.city, cr: c.cr_number, score: c.trust_score,
-      })) || [])
+      // Companies available for reporting = approved and not suspended (registry-published)
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from('companies')
+        .select('id, name, cr_number, sector, city, trust_scores ( score )')
+        .eq('approved', true)
+        .neq('status', 'suspended')
+        .order('name', { ascending: true })
+        .limit(1000)
+      setCompanies((data || []).map(c => ({
+        id: c.id, name: c.name, sector: c.sector, city: c.city, cr: c.cr_number, score: c.trust_scores?.[0]?.score ?? null,
+      })))
     } catch (err) {
       console.error('Failed to fetch companies:', err)
     } finally {

@@ -113,6 +113,7 @@ export default function AdminBulkImport() {
         sector: r.sector || null,
         city: r.city || null,
         approved: true,
+        status: 'active',
         source: 'community',
       }))
       // Insert in batches
