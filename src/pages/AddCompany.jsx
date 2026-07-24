@@ -147,7 +147,7 @@ export default function AddCompany() {
           entity_id: company.id,
           meta: JSON.stringify({ name: formData.companyName }),
           created_at: new Date().toISOString(),
-        }]).catch(err => console.warn('Audit log warning:', err))
+        }])
       }
 
       setSubmitted(true)

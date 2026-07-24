@@ -69,7 +69,7 @@ export default function AdminCompaniesManagement() {
       const supabase = getSupabase()
       const { error } = await supabase.from('companies').update({ status }).eq('id', company.id)
       if (error) throw error
-      await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: status === 'suspended' ? 'company_suspended' : 'company_reactivated', entity: 'company', entity_id: company.id, created_at: new Date().toISOString() }]).catch(() => {})
+      await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: status === 'suspended' ? 'company_suspended' : 'company_reactivated', entity: 'company', entity_id: company.id, created_at: new Date().toISOString() }])
       setCompanies((prev) => prev.map((c) => (c.id === company.id ? { ...c, status } : c)))
       setDrawer((d) => (d && d.id === company.id ? { ...d, status } : d))
       showToast(status === 'suspended' ? 'تم تعليق الشركة' : 'تم إعادة تفعيل الشركة')

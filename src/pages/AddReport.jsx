@@ -254,7 +254,7 @@ export default function AddReport() {
         await supabase.from('credits_ledger').insert([{
           tenant_id: userData.tenant_id, report_id: reportData.id, amount: -1,
           reason: 'report_submitted', created_at: new Date().toISOString(),
-        }]).catch(err => console.warn('Credit deduction warning:', err))
+        }])
       }
 
       await supabase.from('audit_logs').insert([{
@@ -263,7 +263,7 @@ export default function AddReport() {
         entity: 'report', entity_id: reportData.id,
         meta: JSON.stringify({ company_id: form.companyId, category: form.category, type: form.reportType }),
         created_at: new Date().toISOString(),
-      }]).catch(err => console.warn('Audit log warning:', err))
+      }])
 
       setSuccess(statusValue === 'draft' ? 'draft' : 'submitted')
       setTimeout(() => navigate('/my-reports'), 1800)

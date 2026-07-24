@@ -29,7 +29,7 @@ export default function AdminRequests() {
       const supabase = getSupabase()
       const [{ data: pendingCompanies }, { data: dataRequests }] = await Promise.all([
         supabase.from('companies')
-          .select('id, name, cr_number, unified_number, sector, city, region, entity_type, source, created_at')
+          .select('id, name, cr_number, unified_number, sector, city, region, entity_type, source, cr_file_url, created_at')
           .eq('approved', false).order('created_at', { ascending: false }),
         supabase.from('company_data_requests')
           .select('id, company_id, request_type, payload, note, created_at, companies:company_id ( name, cr_number, sector, city )')
@@ -40,6 +40,7 @@ export default function AdminRequests() {
         ...(pendingCompanies || []).map((c) => ({
           kind: 'add_company', key: 'co-' + c.id, companyId: c.id, requestId: null,
           name: c.name, cr: c.cr_number, unified: c.unified_number, sector: c.sector, city: c.city,
+          crFileUrl: c.cr_file_url,
           by: c.source === 'community' ? 'عضو المجتمع' : 'تسجيل ذاتي',
           date: c.created_at, payload: null, note: null,
         })),
@@ -58,11 +59,27 @@ export default function AdminRequests() {
     }
   }
 
+  const openDoc = (dataUrl) => {
+    if (!dataUrl) return
+    try {
+      if (dataUrl.startsWith('data:')) {
+        const [meta, b64] = dataUrl.split(',')
+        const mime = (meta.match(/data:(.*?);/) || [])[1] || 'application/octet-stream'
+        const bin = atob(b64)
+        const arr = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+        const url = URL.createObjectURL(new Blob([arr], { type: mime }))
+        window.open(url, '_blank')
+      } else {
+        window.open(dataUrl, '_blank')
+      }
+    } catch (e) { window.open(dataUrl, '_blank') }
+  }
+
   const current = items[sel] || null
   const removeCurrent = () => { setItems((prev) => prev.filter((_, i) => i !== sel)); setSel(0) }
   const audit = async (supabase, action, entityId, meta) => {
-    await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action, entity: 'company', entity_id: entityId, meta: meta ? JSON.stringify(meta) : null, created_at: new Date().toISOString() }]).catch(() => {})
-  }
+    await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action, entity: 'company', entity_id: entityId, meta: meta ? JSON.stringify(meta) : null, created_at: new Date().toISOString() }])  }
 
   const approve = async () => {
     if (!current) return
@@ -197,6 +214,17 @@ export default function AdminRequests() {
                       ))
                     )}
                   </div>
+                </div>
+              )}
+
+              {current.kind === 'add_company' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '8px' }}>مستند السجل التجاري المرفق</div>
+                  {current.crFileUrl ? (
+                    <button onClick={() => openDoc(current.crFileUrl)} style={{ display: 'inline-flex', alignItems: 'center', gap: '9px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', fontSize: '13.5px', fontWeight: 700, color: '#1E2A52', cursor: 'pointer', fontFamily: 'inherit' }}>📄 عرض المستند</button>
+                  ) : (
+                    <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600 }}>لم يُرفق مستند السجل التجاري مع هذا الطلب.</div>
+                  )}
                 </div>
               )}
 
