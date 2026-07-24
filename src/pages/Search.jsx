@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase, buildCompanyInsert } from '../lib/api'
+import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase } from '../lib/api'
 import { Search as SearchIcon, X } from 'lucide-react'
 
 const EMPTY_REQ_FORM = { field: 'sector', correctValue: '', note: '' }
@@ -210,32 +210,9 @@ export default function Search() {
     if (companies.length > 0) handleSearch()
   }
 
-  async function handleAddCompany() {
-    if (!query.trim()) {
-      showToastMessage('⚠️ أدخل اسم الشركة أولاً')
-      return
-    }
-
-    if (window.confirm(`تأكيد إضافة الشركة: "${query}"?`)) {
-      try {
-        setLoading(true)
-        const supabase = getSupabase()
-        const { data: existing } = await supabase.from('companies').select('id').or(`name.ilike.%${query}%`).limit(1)
-        if (existing?.length) {
-          showToastMessage('⚠️ الشركة موجودة بالفعل')
-          return
-        }
-
-        const { error } = await supabase.from('companies').insert([buildCompanyInsert({ name: query, approved: false })]).select().single()
-        if (error) throw new Error('فشل إضافة الشركة')
-        showToastMessage(`✅ تم إضافة الشركة`)
-        await handleSearch()
-      } catch (err) {
-        showToastMessage('❌ فشل إضافة الشركة')
-      } finally {
-        setLoading(false)
-      }
-    }
+  function handleAddCompany() {
+    // Carry the searched name into the "Add company" request page (prefilled)
+    navigate('/add-company', { state: { companyName: query.trim() } })
   }
 
   function handleViewReport(companyId) {

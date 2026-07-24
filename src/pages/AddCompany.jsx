@@ -1,10 +1,18 @@
 import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useUser } from '@clerk/react'
+import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 
 export default function AddCompany() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useUser()
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
-    companyName: '',
+    companyName: location.state?.companyName || '',
     registryNumber: '',
     unifiedNumber: '',
     sector: '',
@@ -15,8 +23,69 @@ export default function AddCompany() {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = () => {
-    setSubmitted(true)
+  const handleSubmit = async () => {
+    setError('')
+    if (!formData.companyName.trim()) {
+      setError('اسم الشركة مطلوب')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const supabase = getSupabase()
+
+      // Avoid obvious duplicates by name
+      const { data: existing } = await supabase
+        .from('companies')
+        .select('id')
+        .ilike('name', formData.companyName.trim())
+        .limit(1)
+      if (existing?.length) {
+        setError('⚠️ توجد شركة بهذا الاسم في سجلات مرصد بالفعل')
+        setSubmitting(false)
+        return
+      }
+
+      // companies.cr_number is NOT NULL — generate a placeholder if none provided
+      const crNumber = formData.registryNumber.trim() || `CR${Date.now().toString().slice(-8)}`
+
+      const insert = buildCompanyInsert({
+        name: formData.companyName,
+        crNumber,
+        unifiedNumber: formData.unifiedNumber,
+        sector: formData.sector || null,
+        city: formData.city || null,
+        approved: false,      // pending admin review
+        source: 'community',
+      })
+
+      const { data: company, error: insertError } = await supabase
+        .from('companies')
+        .insert([insert])
+        .select()
+        .single()
+      if (insertError) throw insertError
+
+      // Best-effort audit log (tenant lookup via Clerk user id)
+      if (user?.id) {
+        const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+        await supabase.from('audit_logs').insert([{
+          tenant_id: userData?.tenant_id || null,
+          actor_id: user.id,
+          action: 'company_add_requested',
+          entity: 'company',
+          entity_id: company.id,
+          meta: JSON.stringify({ name: formData.companyName }),
+          created_at: new Date().toISOString(),
+        }]).catch(err => console.warn('Audit log warning:', err))
+      }
+
+      setSubmitted(true)
+    } catch (err) {
+      console.error('Add company request failed:', err)
+      setError(err.message || 'فشل إرسال الطلب')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -26,10 +95,16 @@ export default function AddCompany() {
             <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '14px', padding: '16px 20px', marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center' }}>
               <span style={{ fontSize: '20px' }}>🏢</span>
               <div>
-                <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#3730A3' }}>أضِف شركة غير موجودة في السجل</div>
-                <div style={{ fontSize: '13px', color: '#4338CA', marginTop: '2px', lineHeight: 1.6 }}>يُراجع طلبك من إدارة مرصد للتحقق من السجل التجاري، وبعد الموافقة تُضاف الشركة لقاعدة البيانات وتصبح متاحة للجميع.</div>
+                <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#3730A3' }}>أضِف شركة غير موجودة في سجلات مرصد</div>
+                <div style={{ fontSize: '13px', color: '#4338CA', marginTop: '2px', lineHeight: 1.6 }}>يُراجع طلبك من إدارة مرصد للتحقق من السجل التجاري، وبعد الموافقة تُضاف الشركة لسجلات مرصد وتصبح متاحة للجميع.</div>
               </div>
             </div>
+
+            {error && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', fontSize: '14px', color: '#B91C1C', fontWeight: 700 }}>
+                {error}
+              </div>
+            )}
 
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '32px' }}>
               <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px 0', textAlign: 'right' }}>بيانات الشركة</h2>
@@ -96,8 +171,8 @@ export default function AddCompany() {
               </div>
 
               <div style={{ display: 'flex', gap: '11px', marginTop: '26px', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
-                <button onClick={handleSubmit} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: 'pointer' }}>إرسال طلب الإضافة</button>
-                <button style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer' }}>إلغاء</button>
+                <button onClick={handleSubmit} disabled={submitting} style={{ background: submitting ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>{submitting ? 'جاري الإرسال...' : 'إرسال طلب الإضافة'}</button>
+                <button onClick={() => navigate('/search')} disabled={submitting} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
               </div>
             </div>
           </>
@@ -115,14 +190,14 @@ export default function AddCompany() {
             <div style={{ background: '#F8FAFC', borderRadius: '14px', padding: '22px', maxWidth: '520px', margin: '0 auto 22px' }}>
               <div style={{ fontSize: '15.5px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>هل تعاملت مع هذه الشركة؟ قيّمها الآن</div>
               <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.7, margin: '0 0 16px' }}>أضِف تقييمك من واقع تعاملك لتساهم في بناء مؤشر ثقتها — وتزيد نشاطك كمساهم.</p>
-              <button style={{ background: '#1E2A52', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 32px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <button onClick={() => navigate('/add-report')} style={{ background: '#1E2A52', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 32px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', fontFamily: 'inherit' }}>
                 <EyeIcon />
                 تقييم الشركة الآن
               </button>
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 24px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>العودة للبحث</button>
-              <button style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 24px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>لوحة التحكم</button>
+              <button onClick={() => navigate('/search')} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 24px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>العودة للبحث</button>
+              <button onClick={() => navigate('/dashboard')} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 24px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>لوحة التحكم</button>
             </div>
           </div>
         )}
