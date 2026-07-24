@@ -55,20 +55,20 @@ export default function CompanyDashboard() {
         // Get submitted reports count
         const { count: reportsCount } = await supabase
           .from('reports')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('reporter_tenant_id', userData.tenant_id)
 
         // Get approved reports count
         const { count: approvedCount } = await supabase
           .from('reports')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('reporter_tenant_id', userData.tenant_id)
           .eq('status', 'approved')
 
         // Get watchlist count
         const { count: watchlistCount } = await supabase
           .from('watchlist_items')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('tenant_id', userData.tenant_id)
 
         // Get credits balance
@@ -90,20 +90,24 @@ export default function CompanyDashboard() {
           { label: 'رصيدي من النقاط', value: (creditsData || 0).toString(), icon: '💎', color: '#1E2A52', sub: 'نقاط متراكمة' }
         ])
 
-        const formattedActivity = (notificationsData || []).map(n => ({
-          title: n.message || 'تحديث جديد',
-          time: new Date(n.created_at).toLocaleDateString('ar-SA'),
-          dot: '#16A34A'
-        }))
-
-        if (formattedActivity.length === 0) {
-          formattedActivity.push(
-            { title: 'أهلاً بك في مرصد! ابدأ بالبحث عن شركات', time: 'الآن', dot: '#3B82F6' }
-          )
+        const dotColor = (type) => {
+          if (type === 'report_approved' || type === 'approved') return '#16A34A'
+          if (type === 'report_rejected' || type === 'rejected') return '#DC2626'
+          if (type === 'report_request_info') return '#F59E0B'
+          if (type === 'welcome') return '#3B82F6'
+          return '#7C3AED'
         }
-
+        const formattedActivity = (notificationsData || []).map(n => ({
+          title: n.message || 'تحديث',
+          time: new Date(n.created_at).toLocaleDateString('ar-SA'),
+          dot: dotColor(n.type)
+        }))
         setActivity(formattedActivity)
-        setContribPct(Math.min(Math.floor((approvedCount || 0) * 10 / 10), 100))
+
+        // Real approval rate (approved / total submitted) — 0 when no reports yet
+        const total = reportsCount || 0
+        const approvalRate = total > 0 ? Math.round(((approvedCount || 0) / total) * 100) : 0
+        setContribPct(approvalRate)
       } catch (err) {
         console.error('Error loading dashboard:', err)
       } finally {
@@ -118,7 +122,7 @@ export default function CompanyDashboard() {
 
   if (loading || roleLoading || systemStatus.isLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#64748B', fontWeight: 600 }}>
         جاري التحميل...
       </div>
     )
@@ -172,17 +176,25 @@ export default function CompanyDashboard() {
         {/* Activity */}
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>نشاط حديث</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {activity.map((a, i) => (
-              <div key={i} style={{ display: 'flex', gap: '13px', padding: '13px 0', borderBottom: '1px solid #F1F5F9', flexDirection: 'row-reverse' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: a.dot, marginTop: '5px', flex: 'none' }}></span>
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                  <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#334155', lineHeight: 1.5 }}>{a.title}</div>
-                  <div style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '3px' }}>{a.time}</div>
+          {activity.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '28px 12px', color: '#94A3B8' }}>
+              <div style={{ fontSize: '34px', marginBottom: '8px' }}>🔔</div>
+              <div style={{ fontSize: '14px', fontWeight: 700 }}>لا يوجد نشاط بعد</div>
+              <div style={{ fontSize: '12.5px', marginTop: '4px' }}>ستظهر هنا إشعارات اعتماد تقاريرك وتغيّرات الشركات المتابَعة.</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {activity.map((a, i) => (
+                <div key={i} style={{ display: 'flex', gap: '13px', padding: '13px 0', borderBottom: '1px solid #F1F5F9', flexDirection: 'row-reverse' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: a.dot, marginTop: '5px', flex: 'none' }}></span>
+                  <div style={{ flex: 1, textAlign: 'right' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#334155', lineHeight: 1.5 }}>{a.title}</div>
+                    <div style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '3px' }}>{a.time}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right Column */}
@@ -190,13 +202,13 @@ export default function CompanyDashboard() {
           {/* Give to Get */}
           <div style={{ background: 'linear-gradient(135deg,#1E2A52,#16A34A)', borderRadius: '16px', padding: '24px', color: '#fff' }}>
             <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '8px', textAlign: 'right' }}>فلسفة Give to Get</div>
-            <p style={{ fontSize: '13.5px', color: '#DCFCE7', margin: '0 0 16px 0', lineHeight: 1.6, textAlign: 'right' }}>كل ما ساهمت أكثر، استفدت أكثر — {contribPct >= 50 ? 'أنت مساهم مميز!' : 'استمر في المساهمة'}</p>
+            <p style={{ fontSize: '13.5px', color: '#DCFCE7', margin: '0 0 16px 0', lineHeight: 1.6, textAlign: 'right' }}>كل ما ساهمت أكثر واعتُمدت مساهماتك، استفدت أكثر — {contribPct >= 50 ? 'أنت مساهم موثوق!' : 'استمر في المساهمة'}</p>
             <div style={{ height: '12px', background: 'rgba(255,255,255,.1)', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
               <div style={{ width: `${contribPct}%`, height: '100%', background: 'linear-gradient(90deg,#16A34A,#4ADE80)', borderRadius: '8px' }}></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: 600, textAlign: 'right' }}>
               <span>{contribPct}%</span>
-              <span>من أهداف المساهمة</span>
+              <span>نسبة اعتماد مساهماتك</span>
             </div>
           </div>
 
