@@ -42,7 +42,7 @@ export default function CompanyShell({ user }) {
     '/compare': 'مقارنة الشركات',
     '/users': 'إدارة المستخدمين',
     '/subscription': 'إدارة الاشتراك',
-    '/profile': 'الملف الشخصي',
+    '/profile': 'ملف الشركة',
   }
 
   const matchedLabelKey = Object.keys(screenLabels).find(
@@ -97,7 +97,7 @@ export default function CompanyShell({ user }) {
             { label: 'مقارنة الشركات', icon: CompareIcon, path: '/compare' },
             { label: 'إدارة المستخدمين', icon: UsersIcon, path: '/users' },
             { label: 'إدارة الاشتراك', icon: CreditCardIcon, path: '/subscription' },
-            { label: 'الملف الشخصي', icon: SettingsIcon, path: '/profile' },
+            { label: 'ملف الشركة', icon: SettingsIcon, path: '/profile' },
           ].map(item => {
             const IconComponent = item.icon
             const isActive =
