@@ -1,324 +1,206 @@
 import { useState, useEffect } from 'react'
-import { Search, Trash2, Edit2, Plus, AlertCircle, CheckCircle } from 'lucide-react'
-import * as api from '../lib/api'
+import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
+
+const riskFrom = (score) => {
+  if (score == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B' }
+  if (score >= 70) return { label: 'مخاطر منخفضة', bg: '#ECFDF5', c: '#15803D' }
+  if (score >= 40) return { label: 'مخاطر متوسطة', bg: '#FFFBEB', c: '#B45309' }
+  return { label: 'مخاطر مرتفعة', bg: '#FEF2F2', c: '#B91C1C' }
+}
+const statusMeta = (s) => {
+  if (s === 'suspended') return { label: 'موقوفة', bg: '#FEF2F2', c: '#B91C1C' }
+  if (s === 'pending') return { label: 'قيد المراجعة', bg: '#FFFBEB', c: '#B45309' }
+  return { label: 'نشطة', bg: '#ECFDF5', c: '#15803D' }
+}
 
 export default function AdminCompaniesManagement() {
+  const navigate = useNavigate()
+  const { user } = useUser()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [error, setError] = useState(null)
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
-  const [formData, setFormData] = useState({
-    name: '',
-    crNumber: '',
-    sector: '',
-    city: '',
-    email: '',
-    phone: '',
-    status: 'active'
-  })
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [drawer, setDrawer] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState('')
 
-  useEffect(() => {
-    loadCompanies()
-  }, [])
+  useEffect(() => { fetchCompanies() }, [])
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
 
-  const loadCompanies = async () => {
+  const fetchCompanies = async () => {
     try {
       setLoading(true)
-      setError(null)
-      const response = await api.getAdminCompanies(pagination.page, pagination.limit)
-      const formattedCompanies = (response.data || []).map(c => ({
-        id: c.id,
-        name: c.name,
-        crNumber: c.cr_number,
-        sector: c.sector || '—',
-        city: c.city || '—',
-        status: 'active',
-        trustScore: c.trust_score?.score || 0,
-        riskBand: c.trust_score?.risk_band || 'none',
-        reportsCount: c.trust_score?.approved_reports || 0,
-        createdAt: new Date(c.created_at).toLocaleDateString('ar-SA')
-      }))
-      setCompanies(formattedCompanies)
-      setPagination(response.pagination || {})
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from('companies')
+        .select('id, name, cr_number, sector, city, status, approved, verified, trust_scores ( score )')
+        .eq('approved', true)
+        .order('created_at', { ascending: false })
+        .limit(500)
+      setCompanies((data || []).map((c) => ({ ...c, score: c.trust_scores?.[0]?.score ?? null })))
     } catch (err) {
-      setError(err.message || 'حدث خطأ في تحميل الشركات')
       console.error('Error loading companies:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAddCompany = (e) => {
-    e.preventDefault()
-    setShowAddForm(false)
-    setFormData({ name: '', crNumber: '', sector: '', city: '', email: '', phone: '', status: 'active' })
+  const stats = {
+    total: companies.length,
+    active: companies.filter((c) => c.status !== 'suspended').length,
+    suspended: companies.filter((c) => c.status === 'suspended').length,
+    incomplete: companies.filter((c) => c.score == null).length,
   }
 
-  const handleDeleteCompany = (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذه الشركة؟')) {
-      setCompanies(companies.filter(c => c.id !== id))
-    }
-  }
-
-  const filteredCompanies = companies.filter(c => {
-    const matchesSearch = c.name.includes(searchTerm) || c.crNumber.includes(searchTerm)
-    const matchesStatus = selectedStatus === 'all' || c.status === selectedStatus
-    return matchesSearch && matchesStatus
+  const filtered = companies.filter((c) => {
+    if (filter === 'active' && c.status === 'suspended') return false
+    if (filter === 'suspended' && c.status !== 'suspended') return false
+    if (filter === 'incomplete' && c.score != null) return false
+    const q = search.trim()
+    if (q && !((c.name || '').includes(q) || (c.cr_number || '').includes(q))) return false
+    return true
   })
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
-          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل الشركات...</p>
-        </div>
-      </div>
-    )
+  const setStatus = async (company, status) => {
+    try {
+      setBusy(true)
+      const supabase = getSupabase()
+      const { error } = await supabase.from('companies').update({ status }).eq('id', company.id)
+      if (error) throw error
+      await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: status === 'suspended' ? 'company_suspended' : 'company_reactivated', entity: 'company', entity_id: company.id, created_at: new Date().toISOString() }]).catch(() => {})
+      setCompanies((prev) => prev.map((c) => (c.id === company.id ? { ...c, status } : c)))
+      setDrawer((d) => (d && d.id === company.id ? { ...d, status } : d))
+      showToast(status === 'suspended' ? 'تم تعليق الشركة' : 'تم إعادة تفعيل الشركة')
+    } catch (err) {
+      showToast('❌ تعذّر تغيير الحالة')
+    } finally { setBusy(false) }
   }
 
+  const statChips = [
+    { key: 'all', label: 'إجمالي الشركات', value: stats.total, color: '#1E2A52' },
+    { key: 'active', label: 'نشطة', value: stats.active, color: '#16A34A' },
+    { key: 'suspended', label: 'موقوفة', value: stats.suspended, color: '#DC2626' },
+    { key: 'incomplete', label: 'بيانات ناقصة', value: stats.incomplete, color: '#F59E0B' },
+  ]
+  const chipStyle = (f) => ({ padding: '9px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', border: `1.5px solid ${filter === f ? '#1E2A52' : '#E2E8F0'}`, background: filter === f ? '#1E2A52' : '#fff', color: filter === f ? '#fff' : '#64748B' })
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل الشركات...</div>
+
   return (
-    <div style={{ padding: '32px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px 0', textAlign: 'right' }}>إدارة الشركات</h1>
-        <p style={{ color: '#64748B', fontSize: '14px', textAlign: 'right' }}>إدارة الشركات المسجلة والعملاء</p>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', fontSize: '14px', color: '#991B1B', fontWeight: 600 }}>
-          ⚠️ {error}
-        </div>
-      )}
-
-      {/* Top Controls */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', justifyContent: 'space-between', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#16A34A',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px 16px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px'
-          }}
-        >
-          <Plus size={18} />
-          إضافة شركة جديدة
-        </button>
-
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <input
-            type="text"
-            placeholder="ابحث عن شركة..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '14px',
-              width: '250px',
-              outline: 'none'
-            }}
-          />
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '14px',
-              outline: 'none',
-              minWidth: '150px'
-            }}
-          >
-            <option value="all">جميع الحالات</option>
-            <option value="active">نشطة</option>
-            <option value="inactive">غير نشطة</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Add Form */}
-      {showAddForm && (
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 20px 0', textAlign: 'right' }}>إضافة شركة جديدة</h3>
-          <form onSubmit={handleAddCompany}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <input
-                type="text"
-                placeholder="اسم الشركة"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-              <input
-                type="text"
-                placeholder="رقم السجل التجاري"
-                value={formData.crNumber}
-                onChange={(e) => setFormData({...formData, crNumber: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-              <input
-                type="text"
-                placeholder="القطاع"
-                value={formData.sector}
-                onChange={(e) => setFormData({...formData, sector: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-              <input
-                type="text"
-                placeholder="المدينة"
-                value={formData.city}
-                onChange={(e) => setFormData({...formData, city: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-              <input
-                type="email"
-                placeholder="البريد الإلكتروني"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-              <input
-                type="tel"
-                placeholder="رقم الهاتف"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                required
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', fontSize: '14px', outline: 'none' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 16px', cursor: 'pointer', fontWeight: 600 }}
-              >
-                إلغاء
-              </button>
-              <button
-                type="submit"
-                style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 16px', cursor: 'pointer', fontWeight: 600 }}
-              >
-                إضافة
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Companies Table */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid #E2E8F0', background: '#F8FAFC' }}>
-              <th style={{ padding: '16px', textAlign: 'right', fontWeight: 700, color: '#475569', fontSize: '13px' }}>اسم الشركة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontWeight: 700, color: '#475569', fontSize: '13px' }}>رقم السجل</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontWeight: 700, color: '#475569', fontSize: '13px' }}>القطاع</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontWeight: 700, color: '#475569', fontSize: '13px' }}>مؤشر الثقة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontWeight: 700, color: '#475569', fontSize: '13px' }}>التقارير</th>
-              <th style={{ padding: '16px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: '13px' }}>الحالة</th>
-              <th style={{ padding: '16px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: '13px' }}>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredCompanies.map((company) => (
-              <tr key={company.id} style={{ borderBottom: '1px solid #E2E8F0', '&:hover': { background: '#F8FAFC' } }}>
-                <td style={{ padding: '16px', textAlign: 'right', color: '#0F172A', fontWeight: 600 }}>{company.name}</td>
-                <td style={{ padding: '16px', textAlign: 'right', color: '#64748B', fontSize: '14px' }}>{company.crNumber}</td>
-                <td style={{ padding: '16px', textAlign: 'right', color: '#64748B', fontSize: '14px' }}>{company.sector}</td>
-                <td style={{ padding: '16px', textAlign: 'right', color: '#16A34A', fontWeight: 600, fontSize: '14px' }}>{company.trustScore}%</td>
-                <td style={{ padding: '16px', textAlign: 'right', color: '#64748B', fontSize: '14px' }}>{company.reportsCount}</td>
-                <td style={{ padding: '16px', textAlign: 'center' }}>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: company.status === 'active' ? '#F0FDF4' : '#FEF2F2',
-                    color: company.status === 'active' ? '#166534' : '#991B1B',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600
-                  }}>
-                    {company.status === 'active' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                    {company.status === 'active' ? 'نشطة' : 'غير نشطة'}
-                  </span>
-                </td>
-                <td style={{ padding: '16px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => alert('تعديل الشركة: ' + company.name)}
-                    style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                  >
-                    <Edit2 size={14} />
-                    تعديل
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCompany(company.id)}
-                    style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                  >
-                    <Trash2 size={14} />
-                    حذف
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {filteredCompanies.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
-            <p style={{ margin: 0, fontSize: '14px' }}>لا توجد شركات بالمعايير المختارة</p>
-          </div>
-        )}
-      </div>
+    <div>
+      {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, boxShadow: '0 8px 24px rgba(15,23,42,.25)' }}>{toast}</div>}
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '24px' }}>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px 0' }}>إجمالي الشركات</p>
-          <p style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{companies.length}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px 0' }}>الشركات النشطة</p>
-          <p style={{ fontSize: '24px', fontWeight: 900, color: '#16A34A', margin: 0 }}>{companies.filter(c => c.status === 'active').length}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px 0' }}>متوسط مؤشر الثقة</p>
-          <p style={{ fontSize: '24px', fontWeight: 900, color: '#3B82F6', margin: 0 }}>{Math.round(companies.reduce((a, c) => a + c.trustScore, 0) / companies.length)}%</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: '12px', margin: '0 0 8px 0' }}>إجمالي التقارير</p>
-          <p style={{ fontSize: '24px', fontWeight: 900, color: '#F59E0B', margin: 0 }}>{companies.reduce((a, c) => a + c.reportsCount, 0)}</p>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '14px', marginBottom: '18px' }}>
+        {statChips.map((s) => (
+          <div key={s.key} onClick={() => setFilter(s.key)} style={{ background: '#fff', border: `1px solid ${filter === s.key ? s.color : '#E2E8F0'}`, borderRadius: '14px', padding: '18px 20px', cursor: 'pointer' }}>
+            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{s.label}</div>
+            <div style={{ fontSize: '26px', fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value.toLocaleString('ar-SA')}</div>
+          </div>
+        ))}
       </div>
 
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        tr:hover {
-          background: #F8FAFC !important;
-        }
-      `}</style>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', gap: '11px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '0 14px' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم الشركة أو السجل التجاري" style={{ flex: 1, border: 0, background: 'transparent', padding: '12px 0', fontSize: '14.5px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
+        </div>
+        <button onClick={() => navigate('/admin/bulk-import')} style={{ background: '#F5F3FF', color: '#6D28D9', border: '1.5px solid #DDD6FE', borderRadius: '11px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>⬆ رفع دفعة (Excel)</button>
+      </div>
+
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: '9px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {statChips.map((s) => <span key={s.key} onClick={() => setFilter(s.key)} style={chipStyle(s.key)}>{s.key === 'all' ? 'الكل' : s.label}</span>)}
+        <span style={{ marginInlineStart: 'auto', fontSize: '13px', color: '#94A3B8', fontWeight: 700 }}>عرض {filtered.length} من {companies.length} شركة</span>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.2fr 0.9fr 1.1fr 0.9fr 40px', padding: '14px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12.5px', fontWeight: 800, color: '#64748B' }}>
+          <span>الشركة</span><span>السجل التجاري</span><span>مؤشر الثقة</span><span>المخاطر</span><span>الحالة</span><span></span>
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
+        ) : filtered.map((c) => {
+          const risk = riskFrom(c.score)
+          const st = statusMeta(c.status)
+          return (
+            <div key={c.id} onClick={() => setDrawer(c)} style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.2fr 0.9fr 1.1fr 0.9fr 40px', padding: '13px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <span style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '15px', flex: 'none' }}>{(c.name || '؟').charAt(0)}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}{c.verified ? ' ✔' : ''}</div>
+                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>{c.sector || '—'} · {c.city || '—'}</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600, direction: 'ltr', textAlign: 'right' }}>{c.cr_number || '—'}</span>
+              <span style={{ fontSize: '16px', fontWeight: 900, color: '#1E2A52' }}>{c.score != null ? c.score : '—'}</span>
+              <span><span style={{ background: risk.bg, color: risk.c, borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800 }}>{risk.label}</span></span>
+              <span><span style={{ background: st.bg, color: st.c, borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>{st.label}</span></span>
+              <span style={{ color: '#CBD5E1', fontWeight: 900, fontSize: '18px', textAlign: 'center' }}>‹</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Management drawer */}
+      {drawer && (
+        <>
+          <div onClick={() => setDrawer(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15,23,42,.5)' }}></div>
+          <div dir="rtl" style={{ position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 101, width: '520px', maxWidth: '94vw', background: '#fff', boxShadow: '8px 0 40px rgba(0,0,0,.2)', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 26px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff', zIndex: 2 }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: 0 }}>إدارة الشركة</h3>
+              <button onClick={() => setDrawer(null)} style={{ background: '#F1F5F9', border: 0, borderRadius: '9px', width: '34px', height: '34px', fontSize: '18px', cursor: 'pointer', color: '#64748B' }}>✕</button>
+            </div>
+            <div style={{ padding: '26px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '22px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 900, flex: 'none' }}>{(drawer.name || '؟').charAt(0)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', lineHeight: 1.3 }}>{drawer.name}</h2>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ background: statusMeta(drawer.status).bg, color: statusMeta(drawer.status).c, borderRadius: '7px', padding: '3px 10px', fontSize: '12px', fontWeight: 800 }}>{statusMeta(drawer.status).label}</span>
+                    <span style={{ background: riskFrom(drawer.score).bg, color: riskFrom(drawer.score).c, borderRadius: '7px', padding: '3px 10px', fontSize: '12px', fontWeight: 800 }}>{riskFrom(drawer.score).label}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '22px' }}>
+                {[
+                  ['مؤشر الثقة', drawer.score != null ? drawer.score : '—'],
+                  ['السجل التجاري', drawer.cr_number || '—'],
+                  ['القطاع', drawer.sector || '—'],
+                  ['المدينة', drawer.city || '—'],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '14px' }}>
+                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>{l}</div>
+                    <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '12px' }}>إجراءات الإدارة</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button onClick={() => navigate(`/trust-report/${drawer.id}`)} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                  <span style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flex: 'none' }}>📊</span>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>عرض تقرير الثقة الكامل</div><div style={{ fontSize: '12.5px', color: '#94A3B8' }}>كل المؤشرات والتقارير المعتمدة</div></div>
+                </button>
+                {drawer.status === 'suspended' ? (
+                  <button onClick={() => setStatus(drawer, 'active')} disabled={busy} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '14px 16px', cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                    <span style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flex: 'none' }}>✓</span>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: '14.5px', fontWeight: 800, color: '#15803D' }}>إعادة تفعيل الحساب</div><div style={{ fontSize: '12.5px', color: '#16A34A' }}>استئناف ظهور الشركة في المنصة</div></div>
+                  </button>
+                ) : (
+                  <button onClick={() => setStatus(drawer, 'suspended')} disabled={busy} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FEF2F2', border: '1.5px solid #FECACA', borderRadius: '12px', padding: '14px 16px', cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
+                    <span style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#DC2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flex: 'none' }}>⛔</span>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: '14.5px', fontWeight: 800, color: '#B91C1C' }}>تعليق حساب الشركة</div><div style={{ fontSize: '12.5px', color: '#DC2626' }}>إخفاء مؤقت من نتائج البحث</div></div>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
