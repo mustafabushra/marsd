@@ -63,10 +63,19 @@ export default function CompanyRegister() {
   // Company Step State
   const [companyData, setCompanyData] = useState({
     name: '',
+    nameEn: '',
     crNumber: '',
+    unifiedNumber: '',
+    entityType: '',
     sector: '',
+    mainActivity: '',
+    subActivities: '',
     city: '',
+    region: '',
+    nationalAddress: '',
     foundedYear: new Date().getFullYear(),
+    foundingDate: '',
+    crExpiryDate: '',
     crStatus: 'active',
     email: '',
     phone: '',
@@ -142,6 +151,17 @@ export default function CompanyRegister() {
         sector: companyData.sector,
         foundedYear: companyData.foundedYear,
         crStatus: companyData.crStatus,
+        // Identity fields (Layer 1) — for admin verification against the real CR
+        nameEn: companyData.nameEn,
+        unifiedNumber: companyData.unifiedNumber,
+        entityType: companyData.entityType,
+        region: companyData.region,
+        mainActivity: companyData.mainActivity,
+        subActivities: companyData.subActivities,
+        nationalAddress: companyData.nationalAddress,
+        foundingDate: companyData.foundingDate,
+        crExpiryDate: companyData.crExpiryDate,
+        website: companyData.website,
         firstName: user.firstName,
         lastName: user.lastName
       })
@@ -389,7 +409,9 @@ export default function CompanyRegister() {
                 }}
               >
                 <option value="active">نشط</option>
-                <option value="inactive">ملغى</option>
+                <option value="suspended">موقوف</option>
+                <option value="terminated">منتهٍ / مشطوب</option>
+                <option value="pending">قيد المعالجة</option>
               </select>
             </div>
           </div>
@@ -476,6 +498,30 @@ export default function CompanyRegister() {
                 boxSizing: 'border-box'
               }}
             />
+          </div>
+
+          {/* Optional identity data (for admin verification against the real CR) */}
+          <div style={{ marginBottom: '10px', fontSize: '13px', fontWeight: 800, color: '#64748B' }}>بيانات إضافية للسجل (اختياري — تساعد الإدارة في التحقق)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            {[
+              { f: 'nameEn', label: 'اسم الشركة (إنجليزي)', ph: 'Company Co.' },
+              { f: 'unifiedNumber', label: 'الرقم الموحّد (700)', ph: '7001234567' },
+              { f: 'entityType', label: 'نوع الكيان', ph: 'ذات مسؤولية محدودة' },
+              { f: 'region', label: 'المنطقة', ph: 'منطقة الرياض' },
+              { f: 'mainActivity', label: 'النشاط الرئيسي', ph: 'تجارة الجملة' },
+              { f: 'crExpiryDate', label: 'تاريخ انتهاء السجل', type: 'date' },
+            ].map(({ f, label, ph, type }) => (
+              <div key={f}>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>{label}</label>
+                <input
+                  type={type || 'text'}
+                  value={companyData[f]}
+                  onChange={(e) => handleCompanyChange(f, e.target.value)}
+                  placeholder={ph}
+                  style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
           </div>
 
           {/* Row 6: Description */}
