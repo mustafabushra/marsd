@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignIn } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CLERK_NOT_READY, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton, useClerkReady } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /forgot-password — a real reset, over Clerk.
@@ -144,6 +144,8 @@ export default function ForgotPassword() {
         disabled={busy}
         onEnter={sendCode}
       />
+
+      <CaptchaSlot />
 
       <SubmitButton onClick={sendCode} busy={busy}>
         إرسال رمز الاستعادة

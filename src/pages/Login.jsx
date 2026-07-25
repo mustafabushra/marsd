@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignIn } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /login — our own form driven by Clerk's headless hooks.
@@ -63,6 +63,14 @@ export default function Login() {
         return
       }
 
+      // Bot protection wants the client verified. Clerk renders its widget into
+      // #clerk-captcha, which the page mounts below — reaching here means the
+      // challenge is still outstanding rather than that anything is broken.
+      if (attempt.status === 'needs_client_trust') {
+        setError('أكمل التحقق من أنك لست روبوتاً أدناه ثم اضغط دخول مرة أخرى')
+        return
+      }
+
       // Name the status rather than hiding it: an unhandled one is a bug we
       // want reported, not a dead end the user has to guess at.
       setError(`تعذّر إكمال تسجيل الدخول (${attempt.status || 'حالة غير معروفة'})`)
@@ -106,6 +114,8 @@ export default function Login() {
       <div style={{ textAlign: 'left', marginBottom: '16px' }}>
         <AuthLink href="/forgot-password">نسيت كلمة المرور؟</AuthLink>
       </div>
+
+      <CaptchaSlot />
 
       <SubmitButton onClick={submit} busy={busy}>
         دخول

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignIn } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /admin-login — same credentials as /login, aimed at the admin console.
@@ -53,6 +53,11 @@ export default function AdminLogin() {
         return
       }
 
+      if (attempt.status === 'needs_client_trust') {
+        setError('أكمل التحقق من أنك لست روبوتاً أدناه ثم اضغط دخول مرة أخرى')
+        return
+      }
+
       setError(`تعذّر إكمال تسجيل الدخول (${attempt.status || 'حالة غير معروفة'})`)
     } catch (err) {
       setError(clerkErrorMessage(err, 'تعذّر تسجيل الدخول'))
@@ -94,6 +99,8 @@ export default function AdminLogin() {
       <div style={{ textAlign: 'left', marginBottom: '16px' }}>
         <AuthLink href="/forgot-password">نسيت كلمة المرور؟</AuthLink>
       </div>
+
+      <CaptchaSlot />
 
       <SubmitButton onClick={submit} busy={busy}>
         دخول لوحة الإدارة
