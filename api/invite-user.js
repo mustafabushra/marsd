@@ -26,9 +26,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const VALID_ROLES = ['company_member', 'company_admin']
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-const CLERK_SECRET = process.env.CLERK_SECRET_KEY
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+// Dashboards, shells and copy-paste all add stray whitespace, and piping a
+// value into a CLI on Windows can prepend a BOM. A key that differs from the
+// real one by one invisible character fails as an authentication error, which
+// sends you looking at permissions instead of the value. Normalise on read.
+const clean = (v) => (typeof v === 'string' ? v.replace(/^﻿/, '').trim() : v) || undefined
+
+const CLERK_SECRET = clean(process.env.CLERK_SECRET_KEY)
+const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)
+const SUPABASE_KEY = clean(process.env.SUPABASE_SERVICE_ROLE_KEY) || clean(process.env.VITE_SUPABASE_ANON_KEY)
 
 // A committed .env file does not reach a serverless function — only the host's
 // environment settings do. Name the missing variables so the fix is obvious;
@@ -71,8 +77,9 @@ function describeToken(token) {
 // issuer can be derived without another env var.
 function issuerFromPublishableKey(pk) {
   try {
-    if (!pk) return null
-    const host = Buffer.from(pk.replace(/^pk_(test|live)_/, ''), 'base64').toString('utf8').replace(/\$$/, '')
+    const key = clean(pk)
+    if (!key) return null
+    const host = Buffer.from(key.replace(/^pk_(test|live)_/, ''), 'base64').toString('utf8').replace(/\$$/, '')
     return `https://${host}`
   } catch {
     return null
