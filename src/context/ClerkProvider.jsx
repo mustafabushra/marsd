@@ -1,4 +1,6 @@
 import { ClerkProvider as ClerkAuthProvider } from '@clerk/react'
+import { arSA } from '@clerk/localizations'
+import { clerkAppearance } from '../lib/clerkAppearance'
 
 /**
  * A publishable key carries its own instance host, base64-encoded after the
@@ -59,8 +61,15 @@ export function ClerkProvider({ children }) {
     )
   }
 
+  // Localization and appearance sit here rather than on each component: the
+  // nav's modal sign-in is rendered by Clerk, not by us, so anything passed
+  // per-page would leave that one in English and unstyled.
   return (
-    <ClerkAuthProvider publishableKey={publishableKey}>
+    <ClerkAuthProvider
+      publishableKey={publishableKey}
+      localization={arSA}
+      appearance={clerkAppearance}
+    >
       {children}
     </ClerkAuthProvider>
   )
