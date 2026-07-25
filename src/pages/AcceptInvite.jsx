@@ -27,7 +27,8 @@ export default function AcceptInvite() {
   const [busy, setBusy] = useState(false)
 
   const submit = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     if (password.length < 8) { setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل'); return }
     if (password !== confirm) { setError('كلمتا المرور غير متطابقتين'); return }
 
@@ -97,7 +98,7 @@ export default function AcceptInvite() {
 
       <CaptchaSlot />
 
-      <SubmitButton onClick={submit} busy={busy} disabled={!isLoaded}>
+      <SubmitButton onClick={submit} busy={busy}>
         تفعيل الحساب والانضمام
       </SubmitButton>
     </AuthCard>

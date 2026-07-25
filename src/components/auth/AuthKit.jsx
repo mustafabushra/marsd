@@ -100,6 +100,13 @@ export function CodeField({ label, value, onChange, disabled, onEnter, hint }) {
   )
 }
 
+/**
+ * Only `busy` disables this. Gating it on Clerk's isLoaded produced a button
+ * that sat dead on screen with nothing to explain it — the click did nothing
+ * and there was no message, no cursor change worth noticing, no way to tell a
+ * broken page from a slow one. A click that cannot proceed must say why, so
+ * callers check readiness inside their handler and surface a real message.
+ */
 export function SubmitButton({ children, onClick, busy, disabled }) {
   const off = busy || disabled
   return (

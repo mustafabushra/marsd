@@ -20,7 +20,8 @@ export default function AdminLogin() {
   const [busy, setBusy] = useState(false)
 
   const submit = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام تسجيل الدخول لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const identifier = email.trim().toLowerCase()
     if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
     if (!password) { setError('أدخل كلمة المرور'); return }
@@ -78,7 +79,7 @@ export default function AdminLogin() {
         <AuthLink href="/forgot-password">نسيت كلمة المرور؟</AuthLink>
       </div>
 
-      <SubmitButton onClick={submit} busy={busy} disabled={!isLoaded}>
+      <SubmitButton onClick={submit} busy={busy}>
         دخول لوحة الإدارة
       </SubmitButton>
     </AuthCard>

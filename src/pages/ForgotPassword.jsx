@@ -30,7 +30,8 @@ export default function ForgotPassword() {
   const [busy, setBusy] = useState(false)
 
   const sendCode = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام الاستعادة لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const identifier = email.trim().toLowerCase()
     if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
 
@@ -48,7 +49,8 @@ export default function ForgotPassword() {
   }
 
   const resetPassword = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام الاستعادة لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     if (code.length !== 6) { setError('الرمز مكوّن من 6 أرقام'); return }
     if (password.length < 8) { setError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل'); return }
     if (password !== confirm) { setError('كلمتا المرور غير متطابقتين'); return }
@@ -140,7 +142,7 @@ export default function ForgotPassword() {
         onEnter={sendCode}
       />
 
-      <SubmitButton onClick={sendCode} busy={busy} disabled={!isLoaded}>
+      <SubmitButton onClick={sendCode} busy={busy}>
         إرسال رمز الاستعادة
       </SubmitButton>
     </AuthCard>

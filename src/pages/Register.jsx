@@ -29,7 +29,8 @@ export default function Register() {
   const [busy, setBusy] = useState(false)
 
   const startSignUp = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const address = email.trim().toLowerCase()
     if (!firstName.trim()) { setError('أدخل الاسم الأول'); return }
     if (!address) { setError('أدخل بريدك الإلكتروني'); return }
@@ -55,7 +56,8 @@ export default function Register() {
   }
 
   const verify = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     if (code.length !== 6) { setError('الرمز مكوّن من 6 أرقام'); return }
 
     setError('')
@@ -78,7 +80,8 @@ export default function Register() {
   }
 
   const resendCode = async () => {
-    if (!isLoaded || busy) return
+    if (busy) return
+    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     setError('')
     setBusy(true)
     try {
@@ -161,7 +164,7 @@ export default function Register() {
 
       <CaptchaSlot />
 
-      <SubmitButton onClick={startSignUp} busy={busy} disabled={!isLoaded}>
+      <SubmitButton onClick={startSignUp} busy={busy}>
         إنشاء الحساب
       </SubmitButton>
     </AuthCard>
