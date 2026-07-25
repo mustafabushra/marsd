@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 
 /**
@@ -22,12 +22,16 @@ import { getSupabase } from '../lib/api'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
-  const { isLoaded, userId, sessionId } = useAuth()
+  const { isLoaded, userId } = useAuth()
+  const { isLoaded: isUserLoaded, user } = useUser()
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // React StrictMode mounts effects twice in dev; without this guard the
+  // "create the user row" branch runs twice and the second insert collides.
+  const startedRef = useRef(false)
 
   useEffect(() => {
-    if (!isLoaded) {
+    // Both hooks must be ready: useAuth gives us the id, useUser the email.
+    if (!isLoaded || !isUserLoaded) {
       return // Wait for Clerk to load
     }
 
@@ -37,21 +41,17 @@ export default function AuthCallback() {
       return
     }
 
+    if (startedRef.current) return
+    startedRef.current = true
     determineRoute()
-  }, [isLoaded, userId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isUserLoaded, userId])
 
   async function determineRoute() {
     try {
-      setLoading(true)
       const supabase = getSupabase()
 
-      // 1. Get Clerk user email
-      const clerkUser = await fetch('/api/clerk/user').then(r => r.json())
-      if (!clerkUser || !clerkUser.email) {
-        throw new Error('فشل الحصول على بيانات المستخدم من Clerk')
-      }
-
-      // 2. Query users table
+      // 1. Query users table
       let { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, email, tenant_id, role, status')
@@ -59,8 +59,13 @@ export default function AuthCallback() {
         .single()
 
       if (userError && userError.code === 'PGRST116') {
-        // User doesn't exist yet - create it.
-        const email = clerkUser.email.toLowerCase().trim()
+        // User doesn't exist yet - create it. The email comes from the Clerk
+        // session already loaded in the browser (same source the onboarding and
+        // registration pages use) — no server round-trip needed.
+        const email = (user?.primaryEmailAddress?.emailAddress || '').toLowerCase().trim()
+        if (!email) {
+          throw new Error('لم يتم العثور على بريد إلكتروني في حسابك')
+        }
 
         // Honor a pending invitation for this email, if any: attach the new
         // user to the inviting tenant with the invited role instead of sending
@@ -80,6 +85,8 @@ export default function AuthCallback() {
           .insert([{
             id: userId,
             email,
+            first_name: user?.firstName || null,
+            last_name: user?.lastName || null,
             role: invite?.role || 'company_member',
             status: 'active',
             tenant_id: invite?.tenant_id || null,
@@ -105,13 +112,13 @@ export default function AuthCallback() {
         throw new Error('فشل البحث عن المستخدم')
       }
 
-      // 3. If no tenant, go to onboarding
+      // 2. If no tenant, go to onboarding
       if (!userData.tenant_id) {
         navigate('/company-onboarding')
         return
       }
 
-      // 4. User has tenant - check company status
+      // 3. User has tenant - check company status
       const { data: tenantData, error: tenantError } = await supabase
         .from('tenants')
         .select('company_id')
@@ -122,13 +129,13 @@ export default function AuthCallback() {
         throw new Error('فشل البحث عن بيانات الشركة')
       }
 
-      // 5. If no company, go to onboarding
+      // 4. If no company, go to onboarding
       if (!tenantData.company_id) {
         navigate('/company-onboarding')
         return
       }
 
-      // 6. Check company status
+      // 5. Check company status
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('status')
@@ -165,8 +172,6 @@ export default function AuthCallback() {
       setTimeout(() => {
         navigate('/dashboard')
       }, 3000)
-    } finally {
-      setLoading(false)
     }
   }
 
