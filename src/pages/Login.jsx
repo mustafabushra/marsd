@@ -1,75 +1,88 @@
-import { SignIn } from '@clerk/react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSignIn } from '@clerk/react'
+import { clerkErrorMessage } from '../lib/clerkErrors'
+import { AuthCard, AuthLink, ErrorBanner, Field, SubmitButton } from '../components/auth/AuthKit'
 
+/**
+ * /login — our own form driven by Clerk's headless useSignIn.
+ *
+ * Sends the session to /auth/callback rather than straight to /dashboard: the
+ * callback is what reads the user's tenant and company status and decides where
+ * they actually belong (onboarding, pending approval, dashboard).
+ */
 export default function Login() {
   const navigate = useNavigate()
+  const { isLoaded, signIn, setActive } = useSignIn()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!isLoaded || busy) return
+    const identifier = email.trim().toLowerCase()
+    if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
+    if (!password) { setError('أدخل كلمة المرور'); return }
+
+    setError('')
+    setBusy(true)
+    try {
+      const attempt = await signIn.create({ identifier, password })
+
+      if (attempt.status === 'complete') {
+        await setActive({ session: attempt.createdSessionId })
+        navigate('/auth/callback', { replace: true })
+        return
+      }
+
+      // Anything else means the instance asks for a second step we do not
+      // render (MFA, for example). Say so plainly instead of failing silently.
+      setError('حسابك يتطلب خطوة تحقق إضافية غير مدعومة هنا — تواصل مع الدعم')
+    } catch (err) {
+      setError(clerkErrorMessage(err, 'تعذّر تسجيل الدخول'))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <main style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '50px 28px',
-      minHeight: 'calc(100vh - 70px)',
-      background: '#F8FAFC'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px'
-      }}>
-        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: 900,
-            color: '#0F172A',
-            margin: '0 0 8px 0'
-          }}>
-            تسجيل الدخول
-          </h1>
-          <p style={{
-            fontSize: '15px',
-            color: '#64748B',
-            margin: 0
-          }}>
-            أدخل بيانات اعتمادك للوصول إلى حسابك
-          </p>
-        </div>
+    <AuthCard
+      title="تسجيل الدخول"
+      subtitle="أدخل بياناتك للوصول إلى حساب شركتك"
+      footer={<>ليس لديك حساب؟ <AuthLink href="/register">أنشئ حساب شركة</AuthLink></>}
+    >
+      <ErrorBanner>{error}</ErrorBanner>
 
-        <SignIn
-          appearance={{
-            elements: {
-              rootBox: 'w-full',
-              card: 'shadow-lg rounded-2xl',
-              formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-semibold',
-              formFieldInput: 'border border-gray-200 rounded-lg px-4 py-3',
-            }
-          }}
-          redirectUrl="/dashboard"
-          signUpUrl="/register"
-        />
+      <Field
+        label="البريد الإلكتروني"
+        type="email"
+        value={email}
+        onChange={setEmail}
+        placeholder="name@company.com"
+        autoComplete="email"
+        disabled={busy}
+        onEnter={submit}
+      />
 
-        <p style={{
-          textAlign: 'center',
-          marginTop: '20px',
-          fontSize: '14px',
-          color: '#64748B'
-        }}>
-          ليس لديك حساب؟{' '}
-          <a
-            href="/register"
-            style={{
-              color: '#3B82F6',
-              textDecoration: 'none',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-            onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-          >
-            إنشاء حساب جديد
-          </a>
-        </p>
+      <Field
+        label="كلمة المرور"
+        type="password"
+        value={password}
+        onChange={setPassword}
+        placeholder="••••••••"
+        autoComplete="current-password"
+        disabled={busy}
+        onEnter={submit}
+      />
+
+      <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+        <AuthLink href="/forgot-password">نسيت كلمة المرور؟</AuthLink>
       </div>
-    </main>
+
+      <SubmitButton onClick={submit} busy={busy} disabled={!isLoaded}>
+        دخول
+      </SubmitButton>
+    </AuthCard>
   )
 }

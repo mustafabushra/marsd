@@ -1,394 +1,148 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSignIn } from '@clerk/react'
+import { clerkErrorMessage } from '../lib/clerkErrors'
+import { AuthCard, AuthLink, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton } from '../components/auth/AuthKit'
 
+/**
+ * /forgot-password — a real reset, over Clerk.
+ *
+ * The previous version never contacted anything: it awaited setTimeout(1000),
+ * announced "تم إرسال رمز التحقق", advanced the step, and accepted any six
+ * digits. Every visitor who genuinely lost their password was walked through a
+ * flow that could not possibly restore access to their account.
+ *
+ * Two steps, both real:
+ *   1. reset_password_email_code — Clerk emails the code
+ *   2. attemptFirstFactor with the code and the new password, then activate
+ *      the returned session so the user lands signed in.
+ */
 export default function ForgotPassword() {
   const navigate = useNavigate()
+  const { isLoaded, signIn, setActive } = useSignIn()
   const [step, setStep] = useState('email')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const handleSendCode = async () => {
-    if (!email) {
-      setError('الرجاء إدخال عنوان بريدك الإلكتروني')
-      return
-    }
-    if (!email.includes('@')) {
-      setError('البريد الإلكتروني غير صحيح')
-      return
-    }
+  const sendCode = async () => {
+    if (!isLoaded || busy) return
+    const identifier = email.trim().toLowerCase()
+    if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
+
     setError('')
-    setIsLoading(true)
+    setBusy(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setSuccess('تم إرسال رمز التحقق إلى بريدك الإلكتروني')
-      setTimeout(() => {
-        setStep('code')
-        setSuccess('')
-      }, 1500)
+      await signIn.create({ strategy: 'reset_password_email_code', identifier })
+      setNotice(`أرسلنا رمزاً من 6 أرقام إلى ${identifier}`)
+      setStep('reset')
     } catch (err) {
-      setError('حدث خطأ. حاول لاحقاً')
+      setError(clerkErrorMessage(err, 'تعذّر إرسال رمز الاستعادة'))
     } finally {
-      setIsLoading(false)
+      setBusy(false)
     }
   }
 
-  const handleVerifyCode = async () => {
-    if (!code) {
-      setError('الرجاء إدخال الرمز')
-      return
-    }
-    if (code.length !== 6) {
-      setError('الرمز يجب أن يكون 6 أرقام')
-      return
-    }
+  const resetPassword = async () => {
+    if (!isLoaded || busy) return
+    if (code.length !== 6) { setError('الرمز مكوّن من 6 أرقام'); return }
+    if (password.length < 8) { setError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل'); return }
+    if (password !== confirm) { setError('كلمتا المرور غير متطابقتين'); return }
+
     setError('')
-    setIsLoading(true)
+    setBusy(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setSuccess('تم التحقق من الرمز بنجاح')
-      setTimeout(() => {
-        setStep('password')
-        setSuccess('')
-      }, 1500)
+      const attempt = await signIn.attemptFirstFactor({
+        strategy: 'reset_password_email_code',
+        code,
+        password,
+      })
+
+      if (attempt.status === 'complete') {
+        await setActive({ session: attempt.createdSessionId })
+        navigate('/auth/callback', { replace: true })
+        return
+      }
+
+      setError('حسابك يتطلب خطوة تحقق إضافية غير مدعومة هنا — تواصل مع الدعم')
     } catch (err) {
-      setError('رمز غير صحيح')
+      setError(clerkErrorMessage(err, 'تعذّر تعيين كلمة المرور'))
     } finally {
-      setIsLoading(false)
+      setBusy(false)
     }
   }
 
-  const handleResetPassword = async () => {
-    if (!newPassword) {
-      setError('الرجاء إدخال كلمة المرور الجديدة')
-      return
-    }
-    if (newPassword.length < 8) {
-      setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setError('كلمات المرور غير متطابقة')
-      return
-    }
-    setError('')
-    setIsLoading(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setSuccess('تم تحديث كلمة المرور بنجاح')
-      setTimeout(() => {
-        navigate('/login')
-      }, 1500)
-    } catch (err) {
-      setError('فشل تحديث كلمة المرور')
-    } finally {
-      setIsLoading(false)
-    }
+  if (step === 'reset') {
+    return (
+      <AuthCard
+        title="تعيين كلمة مرور جديدة"
+        subtitle="أدخل الرمز الذي وصلك مع كلمة المرور الجديدة"
+        footer={<TextButton onClick={() => { setStep('email'); setError(''); setNotice('') }} disabled={busy}>← استخدام بريد آخر</TextButton>}
+      >
+        <ErrorBanner>{error}</ErrorBanner>
+        <InfoBanner>{notice}</InfoBanner>
+
+        <CodeField
+          label="رمز الاستعادة"
+          value={code}
+          onChange={setCode}
+          disabled={busy}
+          hint="لم يصلك؟ تحقّق من مجلد الرسائل غير المرغوبة."
+        />
+
+        <Field
+          label="كلمة المرور الجديدة"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          disabled={busy}
+          hint="8 أحرف على الأقل."
+        />
+
+        <Field
+          label="تأكيد كلمة المرور"
+          type="password"
+          value={confirm}
+          onChange={setConfirm}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          disabled={busy}
+          onEnter={resetPassword}
+        />
+
+        <SubmitButton onClick={resetPassword} busy={busy}>حفظ كلمة المرور والدخول</SubmitButton>
+      </AuthCard>
+    )
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F8FAFC 0%, #E0F2FE 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      fontFamily: 'Tajawal, sans-serif',
-    }}>
-      <div style={{
-        background: '#fff',
-        borderRadius: '16px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
-        padding: '40px',
-        maxWidth: '420px',
-        width: '100%',
-      }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1E2A52', margin: '0 0 8px 0' }}>
-            استعادة كلمة المرور
-          </h1>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-            أدخل بيانات حسابك للتحقق
-          </p>
-        </div>
+    <AuthCard
+      title="استعادة كلمة المرور"
+      subtitle="أدخل بريدك وسنرسل لك رمزاً لتعيين كلمة مرور جديدة"
+      footer={<>تذكّرتها؟ <AuthLink href="/login">العودة لتسجيل الدخول</AuthLink></>}
+    >
+      <ErrorBanner>{error}</ErrorBanner>
 
-        {/* Error Message */}
-        {error && (
-          <div style={{
-            background: '#FEE2E2',
-            border: '1px solid #FECACA',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            color: '#DC2626',
-            fontSize: '14px',
-            textAlign: 'right',
-          }}>
-            {error}
-          </div>
-        )}
+      <Field
+        label="البريد الإلكتروني"
+        type="email"
+        value={email}
+        onChange={setEmail}
+        placeholder="name@company.com"
+        autoComplete="email"
+        disabled={busy}
+        onEnter={sendCode}
+      />
 
-        {/* Success Message */}
-        {success && (
-          <div style={{
-            background: '#DCFCE7',
-            border: '1px solid #86EFAC',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            color: '#15803D',
-            fontSize: '14px',
-            textAlign: 'right',
-          }}>
-            {success}
-          </div>
-        )}
-
-        {/* Step 1: Email */}
-        {step === 'email' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#1E2A52',
-                marginBottom: '8px',
-                textAlign: 'right',
-              }}>
-                عنوان البريد الإلكتروني
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1.5px solid #E2E8F0',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontFamily: 'Tajawal',
-                  textAlign: 'right',
-                  boxSizing: 'border-box',
-                  transition: 'all 0.2s',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#16A34A'
-                  e.target.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#E2E8F0'
-                  e.target.style.boxShadow = 'none'
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleSendCode}
-              disabled={isLoading}
-              style={{
-                padding: '12px 24px',
-                background: isLoading ? '#CCCCCC' : '#16A34A',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: 800,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                opacity: isLoading ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => !isLoading && (e.target.style.background = '#15A34A', e.target.style.transform = 'translateY(-2px)')}
-              onMouseLeave={(e) => !isLoading && (e.target.style.background = '#16A34A', e.target.style.transform = 'translateY(0)')}
-            >
-              {isLoading ? 'جاري الإرسال...' : 'إرسال رمز التحقق'}
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Code */}
-        {step === 'code' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>
-              تم إرسال رمز تحقق إلى {email}
-            </p>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#1E2A52',
-                marginBottom: '8px',
-                textAlign: 'right',
-              }}>
-                رمز التحقق (6 أرقام)
-              </label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value.slice(0, 6))}
-                placeholder="000000"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1.5px solid #E2E8F0',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontFamily: 'monospace',
-                  textAlign: 'center',
-                  boxSizing: 'border-box',
-                  letterSpacing: '8px',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleVerifyCode}
-              disabled={isLoading}
-              style={{
-                padding: '12px 24px',
-                background: isLoading ? '#CCCCCC' : '#16A34A',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: 800,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1,
-              }}
-            >
-              {isLoading ? 'جاري التحقق...' : 'التحقق من الرمز'}
-            </button>
-
-            <button
-              onClick={() => setStep('email')}
-              style={{
-                padding: '12px 24px',
-                background: '#F8FAFC',
-                color: '#1E2A52',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              تغيير البريد الإلكتروني
-            </button>
-          </div>
-        )}
-
-        {/* Step 3: Password */}
-        {step === 'password' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#1E2A52',
-                marginBottom: '8px',
-                textAlign: 'right',
-              }}>
-                كلمة المرور الجديدة
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1.5px solid #E2E8F0',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontFamily: 'Tajawal',
-                  textAlign: 'right',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#1E2A52',
-                marginBottom: '8px',
-                textAlign: 'right',
-              }}>
-                تأكيد كلمة المرور
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1.5px solid #E2E8F0',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontFamily: 'Tajawal',
-                  textAlign: 'right',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleResetPassword}
-              disabled={isLoading}
-              style={{
-                padding: '12px 24px',
-                background: isLoading ? '#CCCCCC' : '#16A34A',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: 800,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1,
-              }}
-            >
-              {isLoading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
-            </button>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-            هل تتذكر كلمة المرور؟{' '}
-            <button
-              onClick={() => navigate('/login')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#16A34A',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                textDecoration: 'none',
-              }}
-            >
-              عد إلى تسجيل الدخول
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
+      <SubmitButton onClick={sendCode} busy={busy} disabled={!isLoaded}>
+        إرسال رمز الاستعادة
+      </SubmitButton>
+    </AuthCard>
   )
 }
