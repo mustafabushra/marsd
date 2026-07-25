@@ -30,6 +30,22 @@ const CLERK_SECRET = process.env.CLERK_SECRET_KEY
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
 
+// A committed .env file does not reach a serverless function — only the host's
+// environment settings do. Name the missing variables so the fix is obvious;
+// never echo a value.
+function missingEnvVars() {
+  const missing = []
+  if (!CLERK_SECRET) missing.push('CLERK_SECRET_KEY')
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL')
+  if (!SUPABASE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
+  return missing
+}
+
+// Step 3 reads another user's row to authorize the caller. Under RLS the anon
+// key cannot see it, so the request would fail later with a confusing "no
+// company linked". Fail here instead, naming the real cause.
+const HAS_SERVICE_ROLE = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+
 const clerkApi = (path, init = {}) =>
   fetch(`https://api.clerk.com/v1${path}`, {
     ...init,
@@ -64,8 +80,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
-  if (!CLERK_SECRET || !SUPABASE_URL || !SUPABASE_KEY) {
-    return res.status(500).json({ error: 'الخادم غير مُهيّأ: مفاتيح البيئة ناقصة' })
+  const missing = missingEnvVars()
+  if (missing.length) {
+    return res.status(500).json({
+      error: `الخادم غير مُهيّأ — أضف هذه المتغيرات في إعدادات البيئة على Vercel: ${missing.join('، ')}`,
+      missingEnvVars: missing,
+    })
+  }
+  if (!HAS_SERVICE_ROLE) {
+    return res.status(500).json({
+      error: 'الخادم يستخدم مفتاح anon — الدعوة تحتاج SUPABASE_SERVICE_ROLE_KEY لتجاوز RLS عند التحقق من صلاحية المدير',
+      missingEnvVars: ['SUPABASE_SERVICE_ROLE_KEY'],
+    })
   }
 
   try {
