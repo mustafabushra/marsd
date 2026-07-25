@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignIn } from '@clerk/react'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CLERK_NOT_READY, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /forgot-password — a real reset, over Clerk.
@@ -20,6 +20,7 @@ import { AuthCard, AuthLink, CodeField, ErrorBanner, Field, InfoBanner, SubmitBu
 export default function ForgotPassword() {
   const navigate = useNavigate()
   const { isLoaded, signIn, setActive } = useSignIn()
+  const waitForClerk = useClerkReady(isLoaded)
   const [step, setStep] = useState('email')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -31,13 +32,14 @@ export default function ForgotPassword() {
 
   const sendCode = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام الاستعادة لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const identifier = email.trim().toLowerCase()
     if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
 
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       await signIn.create({ strategy: 'reset_password_email_code', identifier })
       setNotice(`أرسلنا رمزاً من 6 أرقام إلى ${identifier}`)
       setStep('reset')
@@ -50,7 +52,6 @@ export default function ForgotPassword() {
 
   const resetPassword = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام الاستعادة لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     if (code.length !== 6) { setError('الرمز مكوّن من 6 أرقام'); return }
     if (password.length < 8) { setError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل'); return }
     if (password !== confirm) { setError('كلمتا المرور غير متطابقتين'); return }
@@ -58,6 +59,8 @@ export default function ForgotPassword() {
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       const attempt = await signIn.attemptFirstFactor({
         strategy: 'reset_password_email_code',
         code,

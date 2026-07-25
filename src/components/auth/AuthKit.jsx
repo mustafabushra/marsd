@@ -8,6 +8,39 @@
  * #E2E8F0 / #16A34A) rather than theme/themeConstants.js, which no page imports.
  */
 
+import { useCallback, useEffect, useRef } from 'react'
+
+/**
+ * Wait for Clerk to finish loading instead of refusing the click.
+ *
+ * useSignIn/useSignUp report isLoaded false until clerk.browser.js has been
+ * fetched and initialised — a second or two normally, longer on a development
+ * instance or a slow connection. Someone who types their password and presses
+ * the button inside that window used to be told to reload the page, which threw
+ * away what they had typed to fix a wait that resolves on its own.
+ *
+ * Returns an awaitable gate: already-ready resolves at once, otherwise it polls
+ * a ref (state captured at render time would be stale inside the handler) until
+ * ready or the deadline passes. Callers set their busy state first, so the
+ * button reads "جارٍ…" for the duration rather than looking ignored.
+ */
+export function useClerkReady(isLoaded) {
+  const ready = useRef(isLoaded)
+  useEffect(() => { ready.current = isLoaded }, [isLoaded])
+
+  return useCallback(async (timeoutMs = 12000) => {
+    if (ready.current) return true
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 120))
+      if (ready.current) return true
+    }
+    return false
+  }, [])
+}
+
+export const CLERK_NOT_READY = 'تعذّر الاتصال بنظام المصادقة. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.'
+
 const C = {
   ink: '#0F172A',
   muted: '#64748B',

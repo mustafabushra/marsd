@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSignUp } from '@clerk/react'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CaptchaSlot, ErrorBanner, Field, SubmitButton } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /accept-invite — where an invitation email lands.
@@ -21,6 +21,7 @@ export default function AcceptInvite() {
   const [params] = useSearchParams()
   const ticket = params.get('__clerk_ticket')
   const { isLoaded, signUp, setActive } = useSignUp()
+  const waitForClerk = useClerkReady(isLoaded)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -28,13 +29,14 @@ export default function AcceptInvite() {
 
   const submit = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     if (password.length < 8) { setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل'); return }
     if (password !== confirm) { setError('كلمتا المرور غير متطابقتين'); return }
 
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       const attempt = await signUp.create({ strategy: 'ticket', ticket, password })
 
       if (attempt.status === 'complete') {

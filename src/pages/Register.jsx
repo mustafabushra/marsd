@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignUp } from '@clerk/react'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, CaptchaSlot, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /register — founding a new company account.
@@ -18,6 +18,7 @@ import { AuthCard, AuthLink, CaptchaSlot, CodeField, ErrorBanner, Field, InfoBan
 export default function Register() {
   const navigate = useNavigate()
   const { isLoaded, signUp, setActive } = useSignUp()
+  const waitForClerk = useClerkReady(isLoaded)
   const [step, setStep] = useState('details')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -30,7 +31,6 @@ export default function Register() {
 
   const startSignUp = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const address = email.trim().toLowerCase()
     if (!firstName.trim()) { setError('أدخل الاسم الأول'); return }
     if (!address) { setError('أدخل بريدك الإلكتروني'); return }
@@ -39,6 +39,8 @@ export default function Register() {
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       await signUp.create({
         emailAddress: address,
         password,
@@ -57,12 +59,13 @@ export default function Register() {
 
   const verify = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     if (code.length !== 6) { setError('الرمز مكوّن من 6 أرقام'); return }
 
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       const attempt = await signUp.attemptEmailAddressVerification({ code })
 
       if (attempt.status === 'complete') {
@@ -81,10 +84,11 @@ export default function Register() {
 
   const resendCode = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام التسجيل لم يكتمل تحميله بعد — حدّث الصفحة'); return }
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
       setNotice('أرسلنا رمزاً جديداً — تحقق من بريدك')
     } catch (err) {

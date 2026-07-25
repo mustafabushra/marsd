@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignIn } from '@clerk/react'
 import { clerkErrorMessage } from '../lib/clerkErrors'
-import { AuthCard, AuthLink, ErrorBanner, Field, SubmitButton } from '../components/auth/AuthKit'
+import { AuthCard, AuthLink, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
  * /login — our own form driven by Clerk's headless useSignIn.
@@ -14,6 +14,7 @@ import { AuthCard, AuthLink, ErrorBanner, Field, SubmitButton } from '../compone
 export default function Login() {
   const navigate = useNavigate()
   const { isLoaded, signIn, setActive } = useSignIn()
+  const waitForClerk = useClerkReady(isLoaded)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,7 +22,6 @@ export default function Login() {
 
   const submit = async () => {
     if (busy) return
-    if (!isLoaded) { setError('نظام تسجيل الدخول لم يكتمل تحميله بعد — انتظر لحظة أو حدّث الصفحة'); return }
     const identifier = email.trim().toLowerCase()
     if (!identifier) { setError('أدخل بريدك الإلكتروني'); return }
     if (!password) { setError('أدخل كلمة المرور'); return }
@@ -29,6 +29,8 @@ export default function Login() {
     setError('')
     setBusy(true)
     try {
+      if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
+
       const attempt = await signIn.create({ identifier, password })
 
       if (attempt.status === 'complete') {
