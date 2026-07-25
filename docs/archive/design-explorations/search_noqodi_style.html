@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مرصد - البحث عن الشركات</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #16A34A;
+            --primary-dark: #15803D;
+            --dark-navy: #1E293B;
+            --neutral-50: #F8FAFC;
+            --neutral-100: #F1F5F9;
+            --neutral-200: #E2E8F0;
+            --neutral-400: #CBD5E1;
+            --neutral-600: #475569;
+            --neutral-700: #334155;
+            --neutral-900: #0F172A;
+            --success-light: #E8F5E9;
+            --warning-light: #FFF8E1;
+            --danger-light: #FFEBEE;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+            color: var(--neutral-900);
+            line-height: 1.5;
+        }
+
+        /* HEADER */
+        header {
+            background: #fff;
+            border-bottom: 1px solid var(--neutral-200);
+            padding: 16px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--neutral-900);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+        }
+
+        .header-search {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .header-search input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--neutral-200);
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: right;
+            background: var(--neutral-50);
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .header-icons button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        /* MAIN CONTENT */
+        main {
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* PAGE TITLE */
+        .page-title {
+            text-align: right;
+            margin-bottom: 32px;
+        }
+
+        .page-title h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        /* SEARCH AREA */
+        .search-area {
+            margin-bottom: 40px;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 16px 40px 16px 16px;
+            border: 1px solid var(--neutral-200);
+            border-radius: 8px;
+            font-size: 15px;
+            text-align: right;
+            background: #fff;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            opacity: 0.5;
+        }
+
+        /* SEARCH BUTTON */
+        .search-button {
+            display: inline-block;
+            background: var(--dark-navy);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+
+        .search-button:hover {
+            background: #0f1419;
+        }
+
+        /* FILTERS */
+        .filters {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            background: var(--neutral-100);
+            border: 1px solid var(--neutral-200);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--neutral-700);
+            transition: all 0.2s;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--primary);
+            background: rgba(22, 163, 74, 0.05);
+        }
+
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* RESULTS HEADER */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .results-info {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .search-count {
+            background: #FFF8E1;
+            border: 1px solid #FEE68A;
+            color: #B45309;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .results-count {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--neutral-600);
+        }
+
+        .add-button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* COMPANIES GRID */
+        .companies-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .company-card {
+            background: #fff;
+            border: 1px solid var(--neutral-200);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: right;
+            transition: all 0.3s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .company-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: var(--neutral-300);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .company-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--neutral-900);
+            margin-bottom: 4px;
+        }
+
+        .company-meta {
+            font-size: 12px;
+            color: var(--neutral-600);
+            margin-bottom: 12px;
+        }
+
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-weight: 700;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .score-circle.score-high {
+            background: conic-gradient(var(--primary) 0deg 329deg, #E0E0E0 329deg 360deg);
+            color: var(--primary);
+        }
+
+        .score-circle.score-medium {
+            background: conic-gradient(#F59E0B 0deg 216deg, #E0E0E0 216deg 360deg);
+            color: #F59E0B;
+        }
+
+        .score-circle.score-low {
+            background: conic-gradient(#EF4444 0deg 144deg, #E0E0E0 144deg 360deg);
+            color: #EF4444;
+        }
+
+        .score-text {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .card-body {
+            margin-bottom: 16px;
+        }
+
+        .risk-status {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .risk-status.low {
+            color: #15803D;
+        }
+
+        .risk-status.medium {
+            color: #B45309;
+        }
+
+        .risk-status.high {
+            color: #DC2626;
+        }
+
+        .card-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--neutral-600);
+            padding-top: 12px;
+            border-top: 1px solid var(--neutral-100);
+        }
+
+        .view-button {
+            width: 100%;
+            padding: 10px;
+            background: var(--dark-navy);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: all 0.2s;
+        }
+
+        .view-button:hover {
+            background: #0f1419;
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center;
+            padding: 60px 40px;
+            background: var(--neutral-50);
+            border-radius: 8px;
+            border: 1px dashed var(--neutral-200);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--neutral-900);
+            margin-bottom: 8px;
+        }
+
+        .empty-text {
+            font-size: 13px;
+            color: var(--neutral-600);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .empty-action {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ADD COMPANY BUTTON */
+        .add-company-bottom {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 1024px) {
+            .companies-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .companies-grid {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 24px;
+            }
+
+            .page-title h1 {
+                font-size: 24px;
+            }
+
+            .filters {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <div class="header-left">
+            <a href="#" class="logo">
+                <div class="logo-icon">✓</div>
+                مرصد
+            </a>
+            <div class="header-search">
+                <input type="text" placeholder="... ابحث عن شركة">
+            </div>
+        </div>
+        <div class="header-icons">
+            <button>🔔</button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main>
+        <!-- PAGE TITLE -->
+        <div class="page-title">
+            <h1>البحث عن الشركات</h1>
+        </div>
+
+        <!-- SEARCH SECTION -->
+        <div class="search-area">
+            <div class="search-box">
+                <input type="text" placeholder="ابحث برقم السجل التجاري...">
+                <span class="search-icon">🔍</span>
+            </div>
+            <button class="search-button">بحث</button>
+
+            <!-- FILTERS -->
+            <div class="filters">
+                <span style="font-size: 13px; color: var(--neutral-600); font-weight: 600;">:تصفية</span>
+                <button class="filter-chip active">القطاع ▼</button>
+                <button class="filter-chip">المدينة ▼</button>
+                <button class="filter-chip">مستوى المخاطر ▼</button>
+                <button class="filter-chip">مؤشر الثقة ▼</button>
+            </div>
+        </div>
+
+        <!-- RESULTS HEADER -->
+        <div class="results-header">
+            <div class="results-info">
+                <span class="search-count">عمليات بحث منقية: 128 من 200</span>
+                <span class="results-count">6 نتائج</span>
+            </div>
+            <button class="add-button">+ إضافة شركة</button>
+        </div>
+
+        <!-- COMPANIES GRID -->
+        <div class="companies-grid">
+            <!-- CARD 1 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-high">
+                        <span>91</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">شركة واحة الابتكار التقنية</div>
+                        <div class="company-meta">تقنية • الرياض</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status low">● مخاطر منخفضة</div>
+                    <div class="card-stats">
+                        <span>48 تقرير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+
+            <!-- CARD 2 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-high">
+                        <span>82</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">شركة نجد للمقاولات المحدودة</div>
+                        <div class="company-meta">مقاولات • الرياض</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status low">● مخاطر منخفضة</div>
+                    <div class="card-stats">
+                        <span>34 تقرير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+
+            <!-- CARD 3 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-high">
+                        <span>67</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">مؤسسة الخليج للتجارة</div>
+                        <div class="company-meta">تجارة جملة • الدمام</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status medium">● مخاطر متوسطة</div>
+                    <div class="card-stats">
+                        <span>12 تقرير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+
+            <!-- CARD 4 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-medium">
+                        <span>58</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">شركة تيوب للمنشآت</div>
+                        <div class="company-meta">مقاولات • الرياض</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status medium">● مخاطر متوسطة</div>
+                    <div class="card-stats">
+                        <span>9 تقارير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+
+            <!-- CARD 5 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-low">
+                        <span>41</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">شركة البحر الأحمر اللوجستية</div>
+                        <div class="company-meta">لوجستيات • جدة</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status high">● مخاطر مرتفعة</div>
+                    <div class="card-stats">
+                        <span>27 تقرير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+
+            <!-- CARD 6 -->
+            <div class="company-card">
+                <div class="card-header">
+                    <div class="score-circle score-low">
+                        <span>38</span>
+                        <span class="score-text">من 100</span>
+                    </div>
+                    <div>
+                        <div class="company-name">مصنع القصيم للصناعات الغذائية</div>
+                        <div class="company-meta">صناعات غذائية • القصيم</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="risk-status high">● بيانات غير كافية</div>
+                    <div class="card-stats">
+                        <span>3 تقارير</span>
+                    </div>
+                </div>
+                <button class="view-button">عرض التقرير</button>
+            </div>
+        </div>
+
+        <!-- EMPTY STATE EXAMPLE (Hidden by default) -->
+        <div class="empty-state" style="display: none;">
+            <div class="empty-icon">🔍</div>
+            <div class="empty-title">لم تجد الشركة التي تبحث عنها؟</div>
+            <div class="empty-text">
+                تأكد من صحة اسم الشركة أو رقم السجل التجاري، وإذا كانت الشركة موجودة<br>
+                يمكنك طلب إضافة بيانات / تقرير عنها مباشرة.
+            </div>
+            <button class="empty-action">طلب إضافة بيانات / تقرير</button>
+        </div>
+
+        <button class="add-company-bottom">+ إضافة شركة للتسجيل</button>
+    </main>
+</body>
+</html>
