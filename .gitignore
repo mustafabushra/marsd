@@ -3,6 +3,8 @@ node_modules/
 .next/
 .env
 .env.local
+# Holds a real CLERK_SECRET_KEY — never commit. Template: .env.clerk.example
+.env.clerk
 .vercel
 marsad-staging.bundle
 # Allow production env vars for Vercel
