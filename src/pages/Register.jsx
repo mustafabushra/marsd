@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSignUp } from '@clerk/react'
+import { useSignUp } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
 import { AuthCard, AuthLink, CaptchaSlot, CLERK_NOT_READY, CodeField, ErrorBanner, Field, InfoBanner, SubmitButton, TextButton, useClerkReady } from '../components/auth/AuthKit'
 

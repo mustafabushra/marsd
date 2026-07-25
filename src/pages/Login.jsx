@@ -1,11 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSignIn } from '@clerk/react'
+import { useSignIn } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
 import { AuthCard, AuthLink, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
 /**
- * /login — our own form driven by Clerk's headless useSignIn.
+ * /login — our own form driven by Clerk's headless hooks.
+ *
+ * The hooks come from @clerk/react/legacy, an export path the package defines
+ * for exactly this shape. The package root ships a Signal-based useSignIn
+ * instead — { signIn, errors, fetchStatus }, where create() resolves to
+ * { error } rather than throwing and carries no status. Against that hook the
+ * classic destructure silently yields undefined for isLoaded and setActive:
+ * every readiness check fails and no error is ever surfaced.
  *
  * Sends the session to /auth/callback rather than straight to /dashboard: the
  * callback is what reads the user's tenant and company status and decides where
@@ -31,7 +38,14 @@ export default function Login() {
     try {
       if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
 
-      const attempt = await signIn.create({ identifier, password })
+      let attempt = await signIn.create({ identifier, password })
+
+      // create() does not always settle in one call: depending on the instance
+      // it can come back asking for the password as an explicit first factor
+      // rather than consuming the one just passed.
+      if (attempt.status === 'needs_first_factor') {
+        attempt = await signIn.attemptFirstFactor({ strategy: 'password', password })
+      }
 
       if (attempt.status === 'complete') {
         await setActive({ session: attempt.createdSessionId })
@@ -39,9 +53,19 @@ export default function Login() {
         return
       }
 
-      // Anything else means the instance asks for a second step we do not
-      // render (MFA, for example). Say so plainly instead of failing silently.
-      setError('حسابك يتطلب خطوة تحقق إضافية غير مدعومة هنا — تواصل مع الدعم')
+      if (attempt.status === 'needs_second_factor') {
+        setError('حسابك محمي بالتحقق بخطوتين، وهو غير مدعوم في هذه الشاشة بعد — تواصل مع الدعم')
+        return
+      }
+
+      if (attempt.status === 'needs_identifier') {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة')
+        return
+      }
+
+      // Name the status rather than hiding it: an unhandled one is a bug we
+      // want reported, not a dead end the user has to guess at.
+      setError(`تعذّر إكمال تسجيل الدخول (${attempt.status || 'حالة غير معروفة'})`)
     } catch (err) {
       setError(clerkErrorMessage(err, 'تعذّر تسجيل الدخول'))
     } finally {

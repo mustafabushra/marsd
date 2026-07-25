@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSignIn } from '@clerk/react'
+import { useSignIn } from '@clerk/react/legacy'
 import { clerkErrorMessage } from '../lib/clerkErrors'
 import { AuthCard, AuthLink, CLERK_NOT_READY, ErrorBanner, Field, SubmitButton, useClerkReady } from '../components/auth/AuthKit'
 
@@ -31,7 +31,11 @@ export default function AdminLogin() {
     try {
       if (!(await waitForClerk())) { setError(CLERK_NOT_READY); return }
 
-      const attempt = await signIn.create({ identifier, password })
+      let attempt = await signIn.create({ identifier, password })
+
+      if (attempt.status === 'needs_first_factor') {
+        attempt = await signIn.attemptFirstFactor({ strategy: 'password', password })
+      }
 
       if (attempt.status === 'complete') {
         await setActive({ session: attempt.createdSessionId })
@@ -39,7 +43,17 @@ export default function AdminLogin() {
         return
       }
 
-      setError('حسابك يتطلب خطوة تحقق إضافية غير مدعومة هنا — تواصل مع الدعم')
+      if (attempt.status === 'needs_second_factor') {
+        setError('حسابك محمي بالتحقق بخطوتين، وهو غير مدعوم في هذه الشاشة بعد — تواصل مع الدعم')
+        return
+      }
+
+      if (attempt.status === 'needs_identifier') {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة')
+        return
+      }
+
+      setError(`تعذّر إكمال تسجيل الدخول (${attempt.status || 'حالة غير معروفة'})`)
     } catch (err) {
       setError(clerkErrorMessage(err, 'تعذّر تسجيل الدخول'))
     } finally {
