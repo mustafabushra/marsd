@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ClerkProvider } from './context/ClerkProvider'
@@ -70,6 +71,43 @@ import ReportKnowledgeBase from './pages/ReportKnowledgeBase'
 import AuthCallback from './pages/AuthCallback'
 
 /**
+ * Clerk loads its script from a CDN, and until it answers the whole app is one
+ * loading screen. When that request fails there is no error and no timeout —
+ * the screen just stays, indistinguishable from a slow network. Give it a
+ * deadline and then say what is wrong.
+ */
+function AuthLoading() {
+  const [stalled, setStalled] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setStalled(true), 12000)
+    return () => clearTimeout(t)
+  }, [])
+
+  const wrap = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '18px', padding: '24px' }
+
+  if (!stalled) return <div style={wrap}>جاري التحميل...</div>
+
+  return (
+    <div style={wrap}>
+      <div style={{ maxWidth: '560px', textAlign: 'center', background: '#fff', border: '1px solid #FDE68A', borderRadius: '16px', padding: '28px' }}>
+        <h1 style={{ fontSize: '18px', fontWeight: 900, color: '#92400E', margin: '0 0 12px' }}>⚠️ تعذّر تحميل نظام تسجيل الدخول</h1>
+        <p style={{ fontSize: '14.5px', color: '#334155', lineHeight: 1.9, margin: '0 0 18px' }}>
+          لم يستجب Clerk خلال 12 ثانية. غالباً انقطاع في الشبكة، أو حجب للنطاق، أو خطأ في إعداد المفتاح.
+          افتح وحدة تحكم المتصفح (F12) لرؤية السبب.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ background: '#0F172A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 26px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
  * AppContent Component
  * Separated from App to allow useAuth hook access within provider
  */
@@ -79,17 +117,7 @@ function AppContent() {
 
   // Show loading state while initializing auth
   if (!isLoaded) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        fontSize: '18px',
-      }}>
-        جاري التحميل...
-      </div>
-    )
+    return <AuthLoading />
   }
 
   return (
