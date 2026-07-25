@@ -38,7 +38,6 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminRequests from './pages/AdminRequests'
 import AdminReports from './pages/AdminReports'
 import AdminBulkImport from './pages/AdminBulkImport'
-import AdminCompanies from './pages/AdminCompanies'
 import AdminCompaniesManagement from './pages/AdminCompaniesManagement'
 import AdminUsers from './pages/AdminUsers'
 import AdminLogs from './pages/AdminLogs'
@@ -68,9 +67,6 @@ import CompanyClaimPending from './pages/CompanyClaimPending'
 import AdminClaimRequests from './pages/AdminClaimRequests'
 import CompanyKnowledgeBase from './pages/CompanyKnowledgeBase'
 import ReportKnowledgeBase from './pages/ReportKnowledgeBase'
-import ModalDemo from './pages/ModalDemo'
-import SupabaseTest from './pages/SupabaseTest'
-import TestSupabase from './pages/TestSupabase'
 import AuthCallback from './pages/AuthCallback'
 
 /**
@@ -99,12 +95,6 @@ function AppContent() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Modal Demo Route */}
-        <Route path="/modals-demo" element={<ModalDemo />} />
-
-        {/* Supabase Test Route */}
-        <Route path="/supabase-test" element={<SupabaseTest />} />
-
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>
           <Route path="/" element={<Landing />} />
@@ -128,7 +118,6 @@ function AppContent() {
         <Route path="/account-suspended" element={<AccountSuspended />} />
         <Route path="/registration-pending" element={<RegistrationPending />} />
         <Route path="/company-claim-pending" element={<CompanyClaimPending />} />
-        <Route path="/test-supabase" element={<TestSupabase />} />
 
         {/* Company Routes - Protected & Company Status Checked */}
         <Route element={<CompanyStatusRouter><CompanyShell user={user} /></CompanyStatusRouter>}>
