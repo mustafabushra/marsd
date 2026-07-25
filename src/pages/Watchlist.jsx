@@ -3,6 +3,8 @@ import { useUser } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase, searchCompaniesKnowledgeBase } from '../lib/api'
 import { useSystemStatus } from '../hooks/useSystemStatus'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { watchlistRoom } from '../lib/entitlements'
 
 const riskOf = (s) => {
   if (s == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B', gauge: '#CBD5E1' }
@@ -15,6 +17,7 @@ export default function Watchlist() {
   const navigate = useNavigate()
   const { user } = useUser()
   const systemStatus = useSystemStatus()
+  const { entitlements } = useEntitlements()
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState([])
   const [tenantId, setTenantId] = useState(null)
@@ -117,6 +120,13 @@ export default function Watchlist() {
       const supabase = getSupabase()
       const { data: existing } = await supabase.from('watchlist_items').select('id').eq('tenant_id', tenantId).eq('company_id', company.id).limit(1)
       if (existing?.length) { showToast('ℹ️ الشركة موجودة في القائمة'); return }
+
+      const room = await watchlistRoom(entitlements, tenantId)
+      if (!room.allowed) {
+        showToast(`باقتك تتيح ${room.ceiling} شركة في قوائم المراقبة، وقد بلغتها. احذف شركة أو رقّ باقتك.`)
+        return
+      }
+
       const { error } = await supabase.from('watchlist_items').insert([{ tenant_id: tenantId, company_id: company.id, list_name: 'المراقبة' }])
       if (error) throw error
       await supabase.from('audit_logs').insert([{ actor_id: user?.id, action: 'added_to_watchlist', entity: 'watchlist', entity_id: company.id, meta: JSON.stringify({ company_name: company.name }), created_at: new Date().toISOString() }])

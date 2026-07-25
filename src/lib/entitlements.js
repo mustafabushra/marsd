@@ -317,6 +317,43 @@ export async function spendCredits(entitlements, action, { amount = null } = {})
   }
 }
 
+/**
+ * Is there room for another company on the watchlist?
+ *
+ * A watchlist entry is held, not consumed: the ceiling is on how many a company
+ * may have at once, so it must be counted live rather than tracked as usage.
+ * Two screens add to the watchlist — the list itself and search results — and
+ * this is shared between them so the rule cannot end up enforced in one place
+ * and not the other.
+ *
+ * Returns { allowed, used, ceiling }. ceiling is Infinity when unlimited.
+ */
+export async function watchlistRoom(entitlements, tenantId) {
+  const ceiling = limitOf(entitlements, 'watchlist_items')
+
+  if (!tenantId || ceiling === UNLIMITED || entitlements?.degraded || entitlements?.enforcementDisabled) {
+    return { allowed: true, used: 0, ceiling: Infinity }
+  }
+
+  try {
+    const { count, error } = await getSupabase()
+      .from('watchlist_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+    if (error) throw error
+
+    const used = count || 0
+    // Credits widen this the same way they widen everything else on a
+    // Give-to-Get plan: contributing earns room.
+    const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
+    return { allowed: used < allowance, used, ceiling: allowance }
+  } catch (err) {
+    // Counting failed: let it through rather than blocking on a bad request.
+    console.error('Failed to check watchlist room:', err)
+    return { allowed: true, used: 0, ceiling: Infinity }
+  }
+}
+
 /** Human-readable ceiling, for UI. */
 export function formatLimit(value) {
   return value === UNLIMITED || value === Infinity ? 'بلا حد' : String(value)

@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase } from '../lib/api'
 import { Search as SearchIcon, X } from 'lucide-react'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { watchlistRoom } from '../lib/entitlements'
 
 const EMPTY_REQ_FORM = { sector: '', city: '', region: '', unified: '', entityType: '', mainActivity: '', field: 'sector', correctValue: '', note: '' }
 
 export default function Search() {
   const navigate = useNavigate()
   const { user } = useUser()
+  const { entitlements } = useEntitlements()
   const [companies, setCompanies] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -48,6 +51,13 @@ export default function Search() {
         .limit(1)
       if (existing?.length) {
         showToastMessage('ℹ️ الشركة موجودة في قائمة المراقبة')
+        setReqModalCompany(null)
+        return
+      }
+
+      const room = await watchlistRoom(entitlements, userData.tenant_id)
+      if (!room.allowed) {
+        showToastMessage(`باقتك تتيح ${room.ceiling} شركة في قوائم المراقبة، وقد بلغتها`)
         setReqModalCompany(null)
         return
       }

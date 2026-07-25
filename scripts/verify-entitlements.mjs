@@ -43,7 +43,12 @@ check('باقة free موجودة ومفعّلة', !!free?.active)
 check('free تحمل Give-to-Get', free?.give_to_get_enabled === true)
 check('free لها حدود مضبوطة', Number(free?.limits?.searches_per_month) === 10, `searches=${free?.limits?.searches_per_month}`)
 check('الباقات المدفوعة موقوفة', (plans.data || []).filter((p) => p.code !== 'free').every((p) => !p.active))
-check('المدفوعة تحمل ميزات جاهزة', (plans.data || []).find((p) => p.code === 'pro')?.features?.includes('api_access') === true)
+// Which feature belongs to which plan is asserted cell by cell in
+// verify-plan-matrix.mjs. Here the point is only that the paid plans were
+// seeded complete rather than switched off and left empty — this check named
+// api_access on pro until the agreed matrix moved it to enterprise, which made
+// a correct database look broken.
+check('المدفوعة مبذورة بميزاتها', (plans.data || []).filter((p) => p.code !== 'free').every((p) => (p.features || []).length > 0))
 
 // 2) The embed the entitlement resolver depends on. This is the shape that was
 //    broken: a bad column here nulls the whole row rather than erroring loudly.

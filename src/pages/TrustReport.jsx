@@ -179,6 +179,14 @@ export default function TrustReport() {
   }
 
   const tier = report.status === 'full' ? 'full' : report.status === 'limited' ? 'locked' : report.tier === 'preliminary' ? 'prelim' : 'none'
+
+  // Two different questions, deliberately kept apart. `tier` asks whether this
+  // company has enough approved reports to support a full score — a property of
+  // the data. This asks whether the viewer's plan includes seeing how that score
+  // was reached. Conflating them would tell a free member that a well-covered
+  // company has thin data, which is false and discourages the contribution that
+  // would deepen it.
+  const canSeeFull = can('full_trust_report')
   const score = report.score || 0
 
   return (
@@ -323,7 +331,28 @@ export default function TrustReport() {
         </div>
       )}
 
-      {tier === 'full' && (
+      {/* The score itself is shown to everyone above; what the plan governs is
+          the reasoning behind it — composition, breakdown, history, and the
+          reports it rests on. A free member sees that the number is real and
+          that there is substance behind it, which is a better argument for
+          upgrading than an empty page. */}
+      {tier === 'full' && !canSeeFull && (
+        <div style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: '16px', padding: '26px', marginBottom: '18px', textAlign: 'center' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#92400E', margin: '0 0 10px' }}>🔒 التفاصيل الكاملة لمؤشر الثقة</h3>
+          <p style={{ fontSize: '14px', color: '#78350F', lineHeight: 1.9, margin: '0 auto 18px', maxWidth: '520px' }}>
+            لهذه الشركة تقييم كامل مبنيّ على {report?.approvedReports || 0} تقريراً معتمداً.
+            تركيبة الدرجة، وملخص التقارير، وسجل تغيّر التقييم، وأحدث التقارير — تأتي مع الباقات المدفوعة.
+          </p>
+          <button
+            onClick={() => navigate('/subscription')}
+            style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 26px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            عرض الباقات
+          </button>
+        </div>
+      )}
+
+      {tier === 'full' && canSeeFull && (
         <>
           <div style={{
             background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
