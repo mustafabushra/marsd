@@ -46,6 +46,39 @@ function missingEnvVars() {
 // company linked". Fail here instead, naming the real cause.
 const HAS_SERVICE_ROLE = !!process.env.SUPABASE_SERVICE_ROLE_KEY
 
+// Diagnostics for a rejected token. Reads the payload WITHOUT verifying it —
+// only ever used to explain a failure that already happened, never to trust
+// anything. Returns claims that identify the issuer and timing, no user data.
+function describeToken(token) {
+  try {
+    const [, payload] = String(token).split('.')
+    if (!payload) return { malformed: true }
+    const json = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    const now = Math.floor(Date.now() / 1000)
+    return {
+      iss: json.iss || null,
+      azp: json.azp || null,
+      exp: json.exp || null,
+      expiredSecondsAgo: json.exp ? now - json.exp : null,
+      serverClockSkewHint: json.iat ? now - json.iat : null,
+    }
+  } catch {
+    return { malformed: true }
+  }
+}
+
+// A Clerk publishable key base64-encodes its own instance host, so the expected
+// issuer can be derived without another env var.
+function issuerFromPublishableKey(pk) {
+  try {
+    if (!pk) return null
+    const host = Buffer.from(pk.replace(/^pk_(test|live)_/, ''), 'base64').toString('utf8').replace(/\$$/, '')
+    return `https://${host}`
+  } catch {
+    return null
+  }
+}
+
 const clerkApi = (path, init = {}) =>
   fetch(`https://api.clerk.com/v1${path}`, {
     ...init,
@@ -104,8 +137,25 @@ export default async function handler(req, res) {
     try {
       const claims = await verifyToken(token, { secretKey: CLERK_SECRET })
       callerId = claims.sub
-    } catch {
-      return res.status(401).json({ error: 'جلسة غير صالحة' })
+    } catch (err) {
+      // Swallowing this made every rejection look identical. Clerk's reason is
+      // safe to pass on — it names the check that failed, never a key. The
+      // unverified claims say which instance minted the token, which is what
+      // separates "expired" from "signed by a different Clerk instance"; both
+      // reach this line and they need opposite fixes.
+      const t = describeToken(token)
+      const expected = issuerFromPublishableKey(process.env.VITE_CLERK_PUBLISHABLE_KEY)
+      const parts = [err?.reason || err?.message || 'سبب غير معروف']
+      if (t.malformed) parts.push('التوكن غير صالح البنية')
+      if (t.iss) parts.push(`المُصدِر ${t.iss}`)
+      if (expected && t.iss && expected !== t.iss) parts.push(`لكن المتوقع ${expected}`)
+      if (typeof t.expiredSecondsAgo === 'number' && t.expiredSecondsAgo > 0) {
+        parts.push(`منتهٍ منذ ${t.expiredSecondsAgo} ثانية`)
+      }
+      return res.status(401).json({
+        error: `جلسة غير صالحة — ${parts.join(' · ')}`,
+        detail: { reason: err?.reason || null, message: err?.message || null, token: t, expectedIssuer: expected },
+      })
     }
 
     // 2) Validate input.
