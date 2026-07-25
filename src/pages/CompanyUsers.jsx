@@ -21,7 +21,7 @@ const S = {
 const isExpired = (invite) => !!invite.expires_at && new Date(invite.expires_at) < new Date()
 
 export default function CompanyUsers() {
-  const { user } = useUser()
+  const { isLoaded: isUserLoaded, user } = useUser()
   const { getToken } = useAuth()
   const [users, setUsers] = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
@@ -43,7 +43,19 @@ export default function CompanyUsers() {
   const activeAdmins = users.filter((u) => u.rawRole === 'company_admin' && u.active)
   const isLastActiveAdmin = (u) => u.rawRole === 'company_admin' && u.active && activeAdmins.length <= 1
 
-  useEffect(() => { if (user?.id) loadUsers() }, [user?.id])
+  // `loading` starts true and only loadUsers clears it, so gating the effect on
+  // user?.id alone left the page on "جاري التحميل..." indefinitely whenever the
+  // session resolved without a user. Wait for Clerk, then always settle.
+  useEffect(() => {
+    if (!isUserLoaded) return
+    if (user?.id) {
+      loadUsers()
+    } else {
+      setError('انتهت الجلسة — أعد تسجيل الدخول')
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserLoaded, user?.id])
 
   const loadUsers = async () => {
     try {

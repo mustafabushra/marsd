@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
@@ -22,13 +22,11 @@ export default function CompanyShell({ user }) {
   const { organizationName, userRole } = useClerkOrganization()
   const { needsOnboarding, loading } = useCompanyOnboarding()
 
-  // Redirect to onboarding if needed (except if already on dashboard/etc)
+  // This used to render a loading message and stop there — no navigation ever
+  // followed, so a user who reached it sat on "جاري التحميل..." forever. Do the
+  // redirect the comment always promised.
   if (!loading && needsOnboarding && location.pathname.startsWith('/dashboard')) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        جاري التحميل...
-      </div>
-    )
+    return <Navigate to="/company-onboarding" replace />
   }
 
   const screenLabels = {
