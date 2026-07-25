@@ -153,7 +153,7 @@ export async function loadEntitlements(tenantId) {
  * outright, and quietly accruing points there would leave a balance nobody can
  * explain. Returns the points awarded, 0 when the action earns nothing.
  */
-export async function awardCredits(entitlements, action, { reportId = null } = {}) {
+export async function awardCredits(entitlements, action, { reportId = null, userId = null } = {}) {
   if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
 
   const rule = entitlements.giveToGetRules?.earn?.[action]
@@ -162,19 +162,108 @@ export async function awardCredits(entitlements, action, { reportId = null } = {
 
   try {
     const supabase = getSupabase()
+    // `action` is the reason. The earn keys in give_to_get_rules and the values
+    // credits_ledger_reason_check permits are deliberately the same vocabulary;
+    // translating between them is how the previous write ended up sending
+    // 'report_submitted' to a constraint that never allowed it.
     const { error } = await supabase.from('credits_ledger').insert([{
       tenant_id: entitlements.tenantId,
       report_id: reportId,
+      user_id: userId,
       amount: points,
-      reason: action === 'report_approved' ? 'report_approved' : 'admin_adjustment',
+      reason: action,
     }])
-    if (error) throw error
+    if (error) {
+      // 23505 is the one-award-per-report index doing its job: the report was
+      // already paid for. Not a failure, and not worth a console entry.
+      if (error.code === '23505') return 0
+      throw error
+    }
     return points
   } catch (err) {
     // Never fail the contribution because its reward could not be written; the
     // work the user did is what matters, and the ledger can be reconciled.
     console.error('Failed to award credits:', err)
     return 0
+  }
+}
+
+/**
+ * Award credits to a tenant that is not the caller's own.
+ *
+ * Approval is the case: an administrator approves a report and the points go to
+ * the company that filed it. Their plan decides whether they earn at all, so
+ * this resolves that tenant's plan rather than the reviewer's — and the rate
+ * comes from settings, never from a number written at the call site.
+ *
+ * Returns the points awarded, 0 when the plan does not earn or the report has
+ * already been paid for.
+ */
+export async function awardCreditsToTenant(tenantId, action, { reportId = null, userId = null } = {}) {
+  if (!tenantId) return 0
+
+  try {
+    const supabase = getSupabase()
+
+    const [subRes, settingsRes] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('plans(give_to_get_enabled)')
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+      supabase.from('system_settings').select('value').eq('key', 'give_to_get_rules').maybeSingle(),
+    ])
+
+    if (!subRes.data?.plans?.give_to_get_enabled) return 0
+
+    const points = Number(settingsRes.data?.value?.earn?.[action]?.points) || 0
+    if (points <= 0) return 0
+
+    const { error } = await supabase.from('credits_ledger').insert([{
+      tenant_id: tenantId,
+      report_id: reportId,
+      user_id: userId,
+      amount: points,
+      reason: action,
+    }])
+    if (error) {
+      if (error.code === '23505') return 0   // already awarded for this report
+      throw error
+    }
+    return points
+  } catch (err) {
+    console.error('Failed to award credits to tenant:', err)
+    return 0
+  }
+}
+
+/**
+ * Spend credits, or report that there are none to spend.
+ *
+ * Writes the negative entry only when the balance covers it, so the ledger can
+ * never go below zero by racing itself. Returns false when the caller should
+ * stop rather than proceed unpaid.
+ */
+export async function spendCredits(entitlements, action, { amount = null } = {}) {
+  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return true // nothing to spend on a paid plan
+
+  const rule = entitlements.giveToGetRules?.spend?.[action]
+  const cost = Number(amount ?? rule?.points) || 0
+  if (cost <= 0) return true
+  if ((entitlements.credits || 0) < cost) return false
+
+  try {
+    const supabase = getSupabase()
+    const { error } = await supabase.from('credits_ledger').insert([{
+      tenant_id: entitlements.tenantId,
+      amount: -cost,
+      reason: action,
+    }])
+    if (error) throw error
+    return true
+  } catch (err) {
+    console.error('Failed to spend credits:', err)
+    return false
   }
 }
 

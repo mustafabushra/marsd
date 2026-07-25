@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { awardCreditsToTenant } from '../lib/entitlements'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
@@ -55,17 +56,21 @@ export default function AdminReports() {
         .update({ status: 'approved', approved_at: new Date().toISOString() })
         .eq('id', current.id)
       if (error) throw error
-      // Award credits to the reporter
-      await supabase.from('credits_ledger').insert([{
-        tenant_id: current.reporter_tenant_id, report_id: current.id, amount: 10,
-        reason: 'report_approved', created_at: new Date().toISOString(),
-      }])
+      // Award the reporting company, at the rate settings hold and only if
+      // their plan earns that way. The amount used to be the literal 10 written
+      // here, so the figure shown on /subscription — read from
+      // give_to_get_rules — described something the code did not do, and paid
+      // plans that grant their entitlements outright accrued points anyway.
+      const awarded = await awardCreditsToTenant(current.reporter_tenant_id, 'report_approved', {
+        reportId: current.id,
+        userId: user?.id || null,
+      })
       // Recompute trust score (best effort)
       await supabase.rpc('compute_trust_score', { p_company_id: current.target_company_id })
       // Audit + notify
       await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_approved', entity: 'report', entity_id: current.id, created_at: new Date().toISOString() }])
       await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_approved', title: 'تم اعتماد تقريرك', message: 'تم اعتماد تقريرك وإضافته لمؤشر الثقة.', is_read: false, created_at: new Date().toISOString() }])
-      showToast('✅ تم اعتماد التقرير')
+      showToast(awarded > 0 ? `✅ تم اعتماد التقرير ومنح ${awarded} نقطة للشركة المُبلِّغة` : '✅ تم اعتماد التقرير')
       removeCurrent()
     } catch (err) {
       showToast('❌ فشل الاعتماد: ' + (err?.message || 'خطأ غير معروف'))

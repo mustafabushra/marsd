@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { awardCredits, UNLIMITED } from '../lib/entitlements'
 
 const ENTITY_TYPES = ['مؤسسة', 'شركة ذات مسؤولية محدودة', 'شركة مساهمة', 'شركة تضامن', 'شركة توصية بسيطة']
 const ENTERPRISE_SIZES = ['متناهية الصغر', 'صغيرة', 'متوسطة', 'كبيرة']
@@ -16,8 +18,10 @@ export default function AddCompany() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useUser()
+  const { entitlements, limitOf, refresh: refreshEntitlements } = useEntitlements()
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [creditsEarned, setCreditsEarned] = useState(0)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     companyName: location.state?.companyName || '',
@@ -90,6 +94,34 @@ export default function AddCompany() {
     try {
       const supabase = getSupabase()
 
+      // Plan ceiling on registry contributions, checked against the database so
+      // a colleague's additions since this page loaded still count. Credits
+      // widen the allowance rather than bypassing it — contributing is exactly
+      // what earns the room to contribute more.
+      const ceiling = limitOf('companies_per_month')
+      if (ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled && user?.id) {
+        const { data: me } = await supabase.from('users').select('tenant_id').eq('id', user.id).maybeSingle()
+        if (me?.tenant_id) {
+          const monthStart = new Date()
+          monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+
+          const { count } = await supabase
+            .from('audit_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', me.tenant_id)
+            .eq('action', 'company_add_requested')
+            .gte('created_at', monthStart.toISOString())
+
+          const used = count || 0
+          const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
+          if (used >= allowance) {
+            setError(`بلغت حد باقتك: ${used} من ${allowance} شركة هذا الشهر. رقّ باقتك أو انتظر بداية الشهر القادم.`)
+            setSubmitting(false)
+            return
+          }
+        }
+      }
+
       // Avoid obvious duplicates by name
       const { data: existing } = await supabase
         .from('companies')
@@ -148,6 +180,18 @@ export default function AddCompany() {
           meta: JSON.stringify({ name: formData.companyName }),
           created_at: new Date().toISOString(),
         }])
+      }
+
+      // Give-to-Get: adding a company to the registry is a contribution, and on
+      // a plan that earns it is paid for here. Awarding on submission rather
+      // than on approval is deliberate — the entry is a real one either way, and
+      // a contributor should not have to wait on a review queue to see that the
+      // arrangement is real. Reports are different: those are claims about
+      // another company, and only approval establishes they were sound.
+      const earned = await awardCredits(entitlements, 'company_added', { userId: user?.id || null })
+      if (earned > 0) {
+        await refreshEntitlements()
+        setCreditsEarned(earned)
       }
 
       setSubmitted(true)
@@ -295,10 +339,18 @@ export default function AddCompany() {
             </div>
             <h2 style={{ fontSize: '23px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>تم إرسال طلب إضافة الشركة</h2>
             <p style={{ fontSize: '15px', color: '#64748B', lineHeight: 1.75, margin: '0 auto 22px', maxWidth: '480px' }}>سيراجع فريق مرصد السجل التجاري للتحقق منه. بمجرد الموافقة تُضاف الشركة لقاعدة البيانات وتصبح متاحة للبحث والتقييم من جميع الأعضاء.</p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '12px 20px', marginBottom: '26px', color: '#15803D' }}>
-              <TrendingUpIcon />
-              <span style={{ fontSize: '14px', fontWeight: 800, color: '#15803D' }}>زاد نشاطك كمساهم إلى 78% — 89 مساهمة</span>
-            </div>
+            {/* This read "زاد نشاطك كمساهم إلى 78% — 89 مساهمة" for everyone,
+                every time: two numbers written into the markup that belonged to
+                no one. What replaces it is the ledger entry this submission
+                actually created, and it appears only when one was. */}
+            {creditsEarned > 0 && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '12px 20px', marginBottom: '26px', color: '#15803D' }}>
+                <TrendingUpIcon />
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#15803D' }}>
+                  +{creditsEarned} نقطة لرصيد شركتك · الرصيد الآن {entitlements?.credits ?? creditsEarned}
+                </span>
+              </div>
+            )}
             <div style={{ background: '#F8FAFC', borderRadius: '14px', padding: '22px', maxWidth: '520px', margin: '0 auto 22px' }}>
               <div style={{ fontSize: '15.5px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>هل تعاملت مع هذه الشركة؟ قيّمها الآن</div>
               <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.7, margin: '0 0 16px' }}>أضِف تقييمك من واقع تعاملك لتساهم في بناء مؤشر ثقتها — وتزيد نشاطك كمساهم.</p>

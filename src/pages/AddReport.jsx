@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { Search as SearchIcon, Send } from 'lucide-react'
 import { getSupabase } from '../lib/api'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { UNLIMITED } from '../lib/entitlements'
 
 const STEPS = [
   { n: 1, label: 'اختيار الشركة' },
@@ -84,6 +86,7 @@ export default function AddReport() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useUser()
+  const { entitlements, limitOf, refresh: refreshEntitlements } = useEntitlements()
   const prefill = location.state || {}
 
   const [step, setStep] = useState(1)
@@ -247,6 +250,35 @@ export default function AddReport() {
       const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
       if (!userData?.tenant_id) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
+      // Plan ceiling on submitted reports. Counted against the database rather
+      // than a cached figure, because the limit is per company and a colleague
+      // may have submitted since this page loaded. Drafts are free: the limit
+      // is on what reaches review, not on what someone is still writing.
+      if (statusValue === 'pending_review') {
+        const ceiling = limitOf('reports_per_month')
+        if (ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
+          const monthStart = new Date()
+          monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+
+          const { count } = await supabase
+            .from('reports')
+            .select('id', { count: 'exact', head: true })
+            .eq('reporter_tenant_id', userData.tenant_id)
+            .neq('status', 'draft')
+            .gte('created_at', monthStart.toISOString())
+
+          const used = count || 0
+          const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
+          if (used >= allowance) {
+            throw new Error(
+              entitlements?.giveToGetEnabled
+                ? `بلغت حد باقتك: ${used} من ${allowance} تقريراً هذا الشهر. أضف شركات أو استكمل بياناتها لكسب رصيد يوسّع حدّك.`
+                : `بلغت حد باقتك: ${used} من ${allowance} تقريراً هذا الشهر. رقّ باقتك للمزيد.`,
+            )
+          }
+        }
+      }
+
       // BR-05: no duplicate report for same company within 90 days (submit only)
       if (statusValue === 'pending_review') {
         const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
@@ -264,12 +296,14 @@ export default function AddReport() {
         .from('reports').insert([buildPayload(statusValue, userData.tenant_id)]).select().single()
       if (submitError) throw submitError
 
-      if (statusValue === 'pending_review') {
-        await supabase.from('credits_ledger').insert([{
-          tenant_id: userData.tenant_id, report_id: reportData.id, amount: -1,
-          reason: 'report_submitted', created_at: new Date().toISOString(),
-        }])
-      }
+      // Nothing is written to credits_ledger here. This used to deduct one
+      // point with reason 'report_submitted', a value the CHECK constraint has
+      // never permitted, and the insert's error was never read — so every
+      // submission failed silently and the ledger stayed empty.
+      //
+      // Beyond the constraint, the direction was wrong: Give-to-Get pays for
+      // contributions that turn out to be real. The award happens on approval,
+      // in the admin review flow, where that is finally known.
 
       await supabase.from('audit_logs').insert([{
         tenant_id: userData.tenant_id, actor_id: user.id,
