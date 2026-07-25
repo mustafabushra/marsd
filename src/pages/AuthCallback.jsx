@@ -36,8 +36,12 @@ export default function AuthCallback() {
     }
 
     if (!userId) {
-      // Not authenticated - redirect to login
-      navigate('/login')
+      // Invitations sent before /accept-invite existed still point here, and
+      // they arrive carrying an unconsumed __clerk_ticket. Sending those to
+      // /login strands the invitee: they have no password yet. Hand the ticket
+      // to the page that can actually redeem it.
+      const ticket = new URLSearchParams(window.location.search).get('__clerk_ticket')
+      navigate(ticket ? `/accept-invite?__clerk_ticket=${encodeURIComponent(ticket)}` : '/login', { replace: true })
       return
     }
 

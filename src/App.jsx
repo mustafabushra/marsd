@@ -69,6 +69,7 @@ import AdminClaimRequests from './pages/AdminClaimRequests'
 import CompanyKnowledgeBase from './pages/CompanyKnowledgeBase'
 import ReportKnowledgeBase from './pages/ReportKnowledgeBase'
 import AuthCallback from './pages/AuthCallback'
+import AcceptInvite from './pages/AcceptInvite'
 
 /**
  * Clerk loads its script from a CDN, and until it answers the whole app is one
@@ -138,6 +139,7 @@ function AppContent() {
         </Route>
 
         {/* Auth Routes - No layout */}
+        <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -204,7 +204,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         email_address: email,
         public_metadata: { tenant_id: tenantId, role },
-        redirect_url: `${origin}/auth/callback`,
+        // Must land on a page that renders <SignUp/>: Clerk appends
+        // __clerk_ticket here and only that component can consume it. Pointing
+        // this at /auth/callback left the ticket unread and the invitee signed
+        // out. /accept-invite forces /auth/callback once sign-up completes.
+        redirect_url: `${origin}/accept-invite`,
         notify: true,
         ignore_existing: true,
       }),
