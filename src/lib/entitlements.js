@@ -1,0 +1,184 @@
+import { getSupabase } from './api'
+
+/**
+ * What a tenant is allowed to do, resolved from the database.
+ *
+ * Every gate in the app asks this one module. The alternative — a condition per
+ * page — is how limits drift apart: one screen checks a plan name, another a
+ * hard-coded number, and changing a ceiling means finding all of them. Here the
+ * plan is data (plans.limits, plans.features), so an operator raises a limit or
+ * moves a feature between plans from the admin panel and the app follows on the
+ * next load.
+ *
+ * Two rules govern the resolution, and both fail open rather than shut:
+ *
+ *   - A limit key that is absent is unlimited, not zero. A plan that forgot to
+ *     mention searches must not lock a paying tenant out of search.
+ *   - If the lookup itself fails — network, RLS, a tenant with no subscription —
+ *     the caller is allowed through and `degraded` is set. Billing accuracy is
+ *     not worth blocking a customer over a failed request; the flag is there so
+ *     the UI can say so rather than pretend everything is fine.
+ */
+
+export const UNLIMITED = -1
+
+const PERIOD = () => new Date().toISOString().slice(0, 7) // 'YYYY-MM'
+
+/** Ceiling for a limit key. Absent or -1 means no ceiling. */
+export function limitOf(entitlements, key) {
+  const raw = entitlements?.limits?.[key]
+  if (raw === undefined || raw === null) return UNLIMITED
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : UNLIMITED
+}
+
+/** Does the plan unlock this feature key? See system_settings.feature_catalog. */
+export function can(entitlements, feature) {
+  if (!entitlements) return false
+  if (entitlements.degraded || entitlements.enforcementDisabled) return true
+  return Array.isArray(entitlements.features) && entitlements.features.includes(feature)
+}
+
+/**
+ * How many of `key` remain this period.
+ *
+ * Credits extend the ceiling rather than replacing it: on a Give-to-Get plan a
+ * tenant that has earned points can go past the plan's own limit, which is the
+ * whole point of the arrangement. Returns Infinity when unlimited.
+ */
+export function remaining(entitlements, key) {
+  if (!entitlements) return 0
+  if (entitlements.degraded || entitlements.enforcementDisabled) return Infinity
+
+  const ceiling = limitOf(entitlements, key)
+  if (ceiling === UNLIMITED) return Infinity
+
+  const used = entitlements.usage?.[key] || 0
+  const base = Math.max(0, ceiling - used)
+
+  if (!entitlements.giveToGetEnabled) return base
+  return base + Math.max(0, entitlements.credits || 0)
+}
+
+/** Whether one more of `key` is permitted right now. */
+export function allows(entitlements, key, count = 1) {
+  return remaining(entitlements, key) >= count
+}
+
+/**
+ * Read the tenant's plan, credits and usage.
+ *
+ * One call per page rather than per action: the numbers move slowly and a gate
+ * that re-queries on every keystroke is worse than one that is a few seconds
+ * stale. Callers refresh after an action that spends.
+ */
+export async function loadEntitlements(tenantId) {
+  const degraded = (reason) => ({
+    tenantId,
+    plan: null,
+    limits: {},
+    features: [],
+    credits: 0,
+    usage: {},
+    giveToGetEnabled: false,
+    enforcementDisabled: false,
+    degraded: true,
+    reason,
+  })
+
+  if (!tenantId) return degraded('لا يوجد كيان مرتبط بالحساب')
+
+  try {
+    const supabase = getSupabase()
+
+    const [subRes, settingsRes, creditsRes, quotaRes] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('status, current_period_end, plans(id, code, name, description, price_monthly, limits, features, active, give_to_get_enabled)')
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+      supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['give_to_get_rules', 'entitlements_enforcement', 'feature_catalog']),
+      supabase
+        .from('credits_ledger')
+        .select('amount')
+        .eq('tenant_id', tenantId),
+      supabase
+        .from('view_quota_usage')
+        .select('period, views_count')
+        .eq('tenant_id', tenantId)
+        .eq('period', PERIOD())
+        .maybeSingle(),
+    ])
+
+    const plan = subRes.data?.plans || null
+    if (!plan) return degraded('لا توجد باقة مرتبطة بالكيان')
+
+    const settings = Object.fromEntries((settingsRes.data || []).map((r) => [r.key, r.value]))
+    const enforcement = settings.entitlements_enforcement || {}
+
+    // The ledger is append-only and holds both earnings and spends, so the
+    // balance is its sum — never a stored counter that can drift from it.
+    const credits = (creditsRes.data || []).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+
+    return {
+      tenantId,
+      plan,
+      planCode: plan.code,
+      limits: plan.limits || {},
+      features: plan.features || [],
+      credits,
+      usage: { searches_per_month: quotaRes.data?.views_count || 0 },
+      giveToGetEnabled: !!plan.give_to_get_enabled,
+      giveToGetRules: settings.give_to_get_rules || null,
+      featureCatalog: settings.feature_catalog || {},
+      enforcementDisabled: enforcement.enabled === false,
+      subscriptionStatus: subRes.data?.status || null,
+      periodEnd: subRes.data?.current_period_end || null,
+      degraded: false,
+      reason: null,
+    }
+  } catch (err) {
+    console.error('Failed to resolve entitlements:', err)
+    return degraded(err?.message || 'تعذّر قراءة بيانات الباقة')
+  }
+}
+
+/**
+ * Record a contribution and credit it, when the plan earns that way.
+ *
+ * No-ops on a paid plan: Basic, Pro and Enterprise grant their entitlements
+ * outright, and quietly accruing points there would leave a balance nobody can
+ * explain. Returns the points awarded, 0 when the action earns nothing.
+ */
+export async function awardCredits(entitlements, action, { reportId = null } = {}) {
+  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
+
+  const rule = entitlements.giveToGetRules?.earn?.[action]
+  const points = Number(rule?.points) || 0
+  if (points <= 0) return 0
+
+  try {
+    const supabase = getSupabase()
+    const { error } = await supabase.from('credits_ledger').insert([{
+      tenant_id: entitlements.tenantId,
+      report_id: reportId,
+      amount: points,
+      reason: action === 'report_approved' ? 'report_approved' : 'admin_adjustment',
+    }])
+    if (error) throw error
+    return points
+  } catch (err) {
+    // Never fail the contribution because its reward could not be written; the
+    // work the user did is what matters, and the ledger can be reconciled.
+    console.error('Failed to award credits:', err)
+    return 0
+  }
+}
+
+/** Human-readable ceiling, for UI. */
+export function formatLimit(value) {
+  return value === UNLIMITED || value === Infinity ? 'بلا حد' : String(value)
+}

@@ -1,241 +1,279 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { getSupabase } from '../lib/api'
+
+/**
+ * /admin/plans — the control surface for what every plan allows.
+ *
+ * This page used to hold three plans in useState — برونز, فضي, ذهبي — with
+ * invented customer counts. Editing one changed nothing anywhere and the edit
+ * itself vanished on reload, so the platform's pricing appeared configurable
+ * while every limit in the app was in fact unenforced.
+ *
+ * It now reads and writes public.plans. What is edited here is what
+ * useEntitlements resolves: raising a ceiling, moving a feature between plans,
+ * or switching a plan on takes effect for tenants on their next load, with no
+ * deploy. That is the whole reason limits are jsonb columns rather than
+ * constants.
+ *
+ * `code` is deliberately not editable. The application checks it; name and price
+ * are display, and must stay free to change without breaking a gate.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+const input = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '9px 11px', fontSize: '13.5px', fontFamily: 'inherit', outline: 'none' }
+const btn = (bg, fg, border) => ({ background: bg, color: fg, border: border || 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' })
+
+const LIMIT_LABELS = {
+  searches_per_month: 'بحث/شهر',
+  reports_per_month: 'تقارير/شهر',
+  companies_per_month: 'شركات/شهر',
+  users: 'مستخدمون',
+  watchlist_items: 'قوائم المراقبة',
+  compare_items: 'مقارنة',
+}
 
 export default function AdminPlans() {
-  const [plans, setPlans] = useState([
-    { id: 1, name: 'برونز', monthlyPrice: 500, yearlyPrice: 5000, features: ['5 تقارير/شهر', 'دعم عام', 'قاعدة 100 شركة'], status: 'active', customers: 45 },
-    { id: 2, name: 'فضي', monthlyPrice: 1500, yearlyPrice: 15000, features: ['50 تقارير/شهر', 'أولوية دعم', 'قاعدة 1000 شركة'], status: 'active', customers: 28 },
-    { id: 3, name: 'ذهبي', monthlyPrice: 5000, yearlyPrice: 50000, features: ['بلا حد للتقارير', 'دعم 24/7', 'قاعدة غير محدودة'], status: 'active', customers: 12 },
-  ])
+  const [plans, setPlans] = useState([])
+  const [catalog, setCatalog] = useState({})
+  const [counts, setCounts] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const [editing, setEditing] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData] = useState({ name: '', monthlyPrice: '', yearlyPrice: '', features: '' })
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
 
-  const handleAddPlan = () => {
-    if (!formData.name || !formData.monthlyPrice || !formData.yearlyPrice) return
-    const newPlan = {
-      id: Math.max(...plans.map(p => p.id), 0) + 1,
-      ...formData,
-      monthlyPrice: parseInt(formData.monthlyPrice),
-      yearlyPrice: parseInt(formData.yearlyPrice),
-      features: formData.features.split(',').map(f => f.trim()),
-      status: 'active',
-      customers: 0
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const supabase = getSupabase()
+
+      const [plansRes, settingsRes, subsRes] = await Promise.all([
+        supabase.from('plans').select('*').order('sort_order', { ascending: true }),
+        supabase.from('system_settings').select('value').eq('key', 'feature_catalog').maybeSingle(),
+        supabase.from('subscriptions').select('plan_id'),
+      ])
+
+      if (plansRes.error) throw plansRes.error
+      setPlans(plansRes.data || [])
+      setCatalog(settingsRes.data?.value || {})
+
+      // Real subscriber counts, not decoration: switching a plan off matters
+      // more when you can see who is on it.
+      const tally = {}
+      for (const row of subsRes.data || []) tally[row.plan_id] = (tally[row.plan_id] || 0) + 1
+      setCounts(tally)
+    } catch (err) {
+      setError(err.message || 'تعذّر تحميل الباقات')
+    } finally {
+      setLoading(false)
     }
-    setPlans([...plans, newPlan])
-    setFormData({ name: '', monthlyPrice: '', yearlyPrice: '', features: '' })
-    setShowAddForm(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const patch = async (plan, changes, message) => {
+    try {
+      setBusyId(plan.id)
+      const supabase = getSupabase()
+      const { error: e } = await supabase.from('plans').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', plan.id)
+      if (e) throw e
+      await load()
+      showToast(message)
+    } catch (err) {
+      showToast('❌ ' + (err.message || 'تعذّر الحفظ'))
+    } finally {
+      setBusyId(null)
+    }
   }
 
-  const toggleStatus = (id) => {
-    setPlans(plans.map(p => p.id === id ? { ...p, status: p.status === 'active' ? 'disabled' : 'active' } : p))
+  const toggleActive = (plan) => {
+    if (plan.is_default && plan.active) {
+      showToast('❌ لا يمكن إيقاف الباقة الافتراضية — الكيانات الجديدة تُسند إليها')
+      return
+    }
+    const subscribers = counts[plan.id] || 0
+    if (plan.active && subscribers > 0 &&
+        !window.confirm(`${subscribers} كيان مشترك في «${plan.name}». إيقافها يمنع الاشتراكات الجديدة فقط ولا يغيّر صلاحيات المشتركين الحاليين. متابعة؟`)) return
+    patch(plan, { active: !plan.active }, plan.active ? 'أُوقفت الباقة' : 'فُعِّلت الباقة')
   }
 
-  const deletePlan = (id) => {
-    setPlans(plans.filter(p => p.id !== id))
+  const toggleGiveToGet = (plan) =>
+    patch(plan, { give_to_get_enabled: !plan.give_to_get_enabled },
+      plan.give_to_get_enabled ? 'أُلغي Give-to-Get لهذه الباقة' : 'فُعِّل Give-to-Get لهذه الباقة')
+
+  const saveEdit = async () => {
+    if (!editing) return
+    const limits = {}
+    for (const key of Object.keys(LIMIT_LABELS)) {
+      const raw = String(editing.limits?.[key] ?? '').trim()
+      if (raw === '') continue                    // absent means unlimited
+      const n = Number(raw)
+      if (!Number.isFinite(n)) { showToast(`❌ قيمة غير صحيحة في «${LIMIT_LABELS[key]}»`); return }
+      limits[key] = n
+    }
+    const price = Number(editing.price_monthly)
+    if (!Number.isFinite(price) || price < 0) { showToast('❌ السعر غير صحيح'); return }
+    if (!editing.name.trim()) { showToast('❌ اسم الباقة مطلوب'); return }
+
+    await patch(
+      editing,
+      {
+        name: editing.name.trim(),
+        description: (editing.description || '').trim() || null,
+        price_monthly: price,
+        limits,
+        features: editing.features || [],
+      },
+      'حُفظت الباقة',
+    )
+    setEditing(null)
+  }
+
+  const toggleFeature = (key) => {
+    setEditing((p) => {
+      const has = (p.features || []).includes(key)
+      return { ...p, features: has ? p.features.filter((f) => f !== key) : [...(p.features || []), key] }
+    })
+  }
+
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: 'row-reverse' }}>
-        <div>
-          <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-            إدارة الباقات
-          </h1>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-            إنشاء وتعديل خطط الاشتراك
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          style={{
-            padding: '10px 20px',
-            background: '#16A34A',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          {showAddForm ? 'إلغاء' : '+ باقة جديدة'}
-        </button>
+    <div>
+      {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, maxWidth: '420px' }}>{toast}</div>}
+
+      {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>}
+
+      <div style={{ marginBottom: '18px' }}>
+        <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>الباقات والصلاحيات ({plans.length})</h3>
+        <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0, lineHeight: 1.8 }}>
+          ما تعدّله هنا يُطبَّق على الكيانات مباشرة عند تحميلهم التالي — بلا نشر ولا تعديل كود.
+        </p>
       </div>
 
-      {/* Add Form */}
-      {showAddForm && (
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>
-            باقة جديدة
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <input
-              type="text"
-              placeholder="اسم الباقة"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              style={{
-                padding: '10px 12px',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontFamily: 'Tajawal',
-                textAlign: 'right',
-              }}
-            />
-            <input
-              type="number"
-              placeholder="السعر الشهري (ريال)"
-              value={formData.monthlyPrice}
-              onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
-              style={{
-                padding: '10px 12px',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontFamily: 'Tajawal',
-                textAlign: 'right',
-              }}
-            />
-            <input
-              type="number"
-              placeholder="السعر السنوي (ريال)"
-              value={formData.yearlyPrice}
-              onChange={(e) => setFormData({ ...formData, yearlyPrice: e.target.value })}
-              style={{
-                padding: '10px 12px',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontFamily: 'Tajawal',
-                textAlign: 'right',
-              }}
-            />
-            <textarea
-              placeholder="المميزات (مفصولة بفاصلة)"
-              value={formData.features}
-              onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-              style={{
-                padding: '10px 12px',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontFamily: 'Tajawal',
-                textAlign: 'right',
-                gridColumn: '1 / -1',
-                minHeight: '80px',
-              }}
-            />
-          </div>
-          <button
-            onClick={handleAddPlan}
-            style={{
-              marginTop: '16px',
-              padding: '10px 20px',
-              background: '#16A34A',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              width: '100%',
-            }}
-          >
-            حفظ الباقة
-          </button>
+      {plans.length === 0 && (
+        <div style={{ ...card, padding: '30px', textAlign: 'center', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', fontSize: '14px', lineHeight: 1.9 }}>
+          لا توجد باقات في قاعدة البيانات. شغّل الهجرة <code style={{ direction: 'ltr', display: 'inline-block' }}>011_plans_entitlements.sql</code> لبذر الباقات الأربع.
         </div>
       )}
 
-      {/* Plans Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-        {plans.map(plan => (
-          <div key={plan.id} style={{
-            background: '#fff',
-            border: '1px solid #E2E8F0',
-            borderRadius: '12px',
-            padding: '20px',
-          }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0' }}>
-                  {plan.name}
-                </h3>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
-                  {plan.customers} عميل
-                </p>
-              </div>
-              <span style={{
-                padding: '4px 10px',
-                background: plan.status === 'active' ? '#DCFCE7' : '#FEE2E2',
-                color: plan.status === 'active' ? '#15803D' : '#DC2626',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-              }}>
-                {plan.status === 'active' ? 'نشط' : 'معطل'}
-              </span>
-            </div>
+      <div style={{ display: 'grid', gap: '14px' }}>
+        {plans.map((plan) => {
+          const isEditing = editing?.id === plan.id
+          const subscribers = counts[plan.id] || 0
 
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#F8FAFC', borderRadius: '8px' }}>
-              <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '6px' }}>السعر الشهري</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A52' }}>
-                {plan.monthlyPrice} ر.س
-              </div>
-              <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
-                أو {plan.yearlyPrice} ر.س سنويًا
-              </div>
-            </div>
+          return (
+            <div key={plan.id} style={{ ...card, padding: '20px', opacity: plan.active ? 1 : 0.72 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                    <span style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>{plan.name}</span>
+                    <code style={{ background: '#F1F5F9', color: '#475569', borderRadius: '6px', padding: '2px 8px', fontSize: '11.5px', direction: 'ltr' }}>{plan.code}</code>
+                    <span style={{ background: plan.active ? '#ECFDF5' : '#FEE2E2', color: plan.active ? '#15803D' : '#B91C1C', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>
+                      {plan.active ? 'مفعّلة' : 'موقوفة'}
+                    </span>
+                    {plan.is_default && <span style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>افتراضية</span>}
+                    {plan.give_to_get_enabled && <span style={{ background: '#F0FDF4', color: '#15803D', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>Give-to-Get</span>}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748B' }}>
+                    {Number(plan.price_monthly) > 0 ? `${Number(plan.price_monthly).toLocaleString('en-US')} ر.س / شهرياً` : 'مجانية'} · {subscribers} مشترك
+                  </div>
+                </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
-                المميزات:
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button disabled={busyId === plan.id} onClick={() => setEditing(isEditing ? null : { ...plan, limits: { ...(plan.limits || {}) }, features: [...(plan.features || [])] })} style={btn('#F1F5F9', '#334155')}>
+                    {isEditing ? 'إلغاء' : 'تعديل'}
+                  </button>
+                  <button disabled={busyId === plan.id} onClick={() => toggleGiveToGet(plan)} style={btn(plan.give_to_get_enabled ? '#FEF3C7' : '#F0FDF4', plan.give_to_get_enabled ? '#92400E' : '#15803D', '1px solid ' + (plan.give_to_get_enabled ? '#FDE68A' : '#BBF7D0'))}>
+                    {plan.give_to_get_enabled ? 'إيقاف Give-to-Get' : 'تفعيل Give-to-Get'}
+                  </button>
+                  <button disabled={busyId === plan.id} onClick={() => toggleActive(plan)} style={btn(plan.active ? '#FEF2F2' : '#F0FDF4', plan.active ? '#B91C1C' : '#15803D', '1px solid ' + (plan.active ? '#FECACA' : '#BBF7D0'))}>
+                    {plan.active ? 'إيقاف' : 'تفعيل'}
+                  </button>
+                </div>
               </div>
-              <ul style={{ margin: 0, paddingRight: '20px', textAlign: 'right' }}>
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} style={{ fontSize: '12px', color: '#475569', marginBottom: '4px' }}>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                onClick={() => toggleStatus(plan.id)}
-                style={{
-                  padding: '8px 12px',
-                  background: plan.status === 'active' ? '#FEE2E2' : '#DCFCE7',
-                  color: plan.status === 'active' ? '#DC2626' : '#15803D',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {plan.status === 'active' ? 'تعطيل' : 'تفعيل'}
-              </button>
-              <button
-                onClick={() => deletePlan(plan.id)}
-                style={{
-                  padding: '8px 12px',
-                  background: '#FEE2E2',
-                  color: '#DC2626',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                حذف
-              </button>
+              {!isEditing ? (
+                <>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    {Object.entries(LIMIT_LABELS).map(([key, label]) => {
+                      const v = plan.limits?.[key]
+                      const text = v === undefined || v === null || Number(v) === -1 ? 'بلا حد' : v
+                      return (
+                        <span key={key} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px 12px', fontSize: '12.5px', color: '#334155', fontWeight: 700 }}>
+                          {label}: <strong style={{ color: '#0F172A' }}>{text}</strong>
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+                    {(plan.features || []).length === 0
+                      ? <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>لا ميزات إضافية</span>
+                      : plan.features.map((f) => (
+                        <span key={f} style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '7px', padding: '5px 11px', fontSize: '12px', fontWeight: 700 }}>{catalog[f] || f}</span>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '12px', marginBottom: '14px' }}>
+                    <label>
+                      <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>الاسم</span>
+                      <input style={input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+                    </label>
+                    <label>
+                      <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>السعر الشهري (ر.س)</span>
+                      <input style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={editing.price_monthly ?? ''} onChange={(e) => setEditing({ ...editing, price_monthly: e.target.value })} />
+                    </label>
+                  </div>
+
+                  <label style={{ display: 'block', marginBottom: '14px' }}>
+                    <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>الوصف</span>
+                    <input style={input} value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+                  </label>
+
+                  <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>
+                    الحدود <span style={{ fontWeight: 600, color: '#94A3B8' }}>— اكتب \u200E-1\u200E أو اترك الحقل فارغاً ليصبح بلا حد</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '10px', marginBottom: '16px' }}>
+                    {Object.entries(LIMIT_LABELS).map(([key, label]) => (
+                      <label key={key}>
+                        <span style={{ display: 'block', fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>{label}</span>
+                        <input
+                          style={{ ...input, direction: 'ltr', textAlign: 'left' }}
+                          value={editing.limits?.[key] ?? ''}
+                          onChange={(e) => setEditing({ ...editing, limits: { ...editing.limits, [key]: e.target.value } })}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>الميزات</div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                    {Object.keys(catalog).length === 0 && <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>لا يوجد فهرس ميزات — شغّل الهجرة 011</span>}
+                    {Object.entries(catalog).map(([key, label]) => {
+                      const on = (editing.features || []).includes(key)
+                      return (
+                        <button key={key} onClick={() => toggleFeature(key)} style={{ ...btn(on ? '#16A34A' : '#F1F5F9', on ? '#fff' : '#475569'), fontSize: '12.5px', padding: '7px 13px' }}>
+                          {on ? '✓ ' : ''}{label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '9px' }}>
+                    <button disabled={busyId === plan.id} onClick={saveEdit} style={btn('#16A34A', '#fff')}>حفظ التغييرات</button>
+                    <button disabled={busyId === plan.id} onClick={() => setEditing(null)} style={btn('#F1F5F9', '#64748B')}>إلغاء</button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
