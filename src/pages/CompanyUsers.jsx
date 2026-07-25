@@ -4,6 +4,21 @@ import { UserPlus, Trash2, RotateCcw } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const ROLE_LABEL = { company_admin: 'مدير', company_member: 'محرّر' }
+const USERS_GRID = '1.6fr 2fr 1.15fr 0.85fr 1.05fr 1.25fr'
+const INVITES_GRID = '2fr 1fr 1fr 1.4fr'
+
+// Shared inline-style fragments — the page styles inline throughout; these just
+// keep the repeated values in one place.
+const S = {
+  card: { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' },
+  headRow: { background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B' },
+  badge: (bg, fg) => ({ background: bg, color: fg, borderRadius: '7px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap' }),
+  btn: (bg, fg, border) => ({ background: bg, color: fg, border: border || 0, borderRadius: '7px', padding: '6px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'inherit' }),
+  input: { border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', background: '#fff' },
+}
+
+const isExpired = (invite) => !!invite.expires_at && new Date(invite.expires_at) < new Date()
 
 export default function CompanyUsers() {
   const { user } = useUser()
@@ -22,6 +37,11 @@ export default function CompanyUsers() {
   const [toast, setToast] = useState('')
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
+
+  // A company must never be able to lock itself out: the last *active* admin
+  // can be neither demoted nor deactivated.
+  const activeAdmins = users.filter((u) => u.rawRole === 'company_admin' && u.active)
+  const isLastActiveAdmin = (u) => u.rawRole === 'company_admin' && u.active && activeAdmins.length <= 1
 
   useEffect(() => { if (user?.id) loadUsers() }, [user?.id])
 
@@ -48,15 +68,17 @@ export default function CompanyUsers() {
         name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'مستخدم',
         email: u.email,
         rawRole: u.role,
-        role: u.role === 'company_admin' ? 'مدير' : 'محرر',
+        role: ROLE_LABEL[u.role] || u.role,
         active: u.status === 'active',
         isSelf: u.id === user.id,
         lastLogin: u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-GB') : 'لم يسجّل دخول',
       })))
 
+      // Expiry is shown, not filtered out — a silently vanished invite looks
+      // like the invite was never sent.
       const { data: invites } = await supabase
         .from('pending_invites')
-        .select('id, email, role, status, created_at')
+        .select('id, email, role, status, created_at, expires_at')
         .eq('tenant_id', me.tenant_id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
@@ -68,20 +90,35 @@ export default function CompanyUsers() {
     }
   }
 
+  const writeAudit = async (entry) => {
+    try {
+      const supabase = getSupabase()
+      await supabase.from('audit_logs').insert([{
+        tenant_id: tenantId,
+        actor_id: user.id,
+        entity: 'user',
+        created_at: new Date().toISOString(),
+        ...entry,
+      }])
+    } catch {
+      // Auditing must never block the operation the admin actually asked for.
+    }
+  }
+
   const handleInvite = async () => {
     const email = inviteEmail.trim().toLowerCase()
     setError('')
     if (!email) { setError('أدخل البريد الإلكتروني'); return }
     if (!EMAIL_RE.test(email)) { setError('صيغة البريد الإلكتروني غير صحيحة'); return }
     if (users.some((u) => (u.email || '').toLowerCase() === email)) { setError('هذا البريد مسجّل بالفعل ضمن مستخدمي الشركة'); return }
-    if (pendingInvites.some((i) => (i.email || '').toLowerCase() === email)) { setError('توجد دعوة معلّقة لهذا البريد بالفعل'); return }
+    if (pendingInvites.some((i) => (i.email || '').toLowerCase() === email)) { setError('توجد دعوة معلّقة لهذا البريد بالفعل — استخدم "إعادة إرسال"'); return }
 
     setSubmitting(true)
     try {
       if (!tenantId) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
       // Prefer the server endpoint, which sends a real Clerk invitation email.
-      const server = await tryServerInvite(email, inviteRole)
+      const server = await callServerInvite(email, inviteRole)
       if (server.error) { setError(server.error); return }
 
       if (!server.emailSent) {
@@ -97,10 +134,7 @@ export default function CompanyUsers() {
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         }])
         if (invErr) throw invErr
-        await supabase.from('audit_logs').insert([{
-          tenant_id: tenantId, actor_id: user.id, action: 'user_invited', entity: 'user',
-          meta: { email, role: inviteRole, delivery: 'record_only' }, created_at: new Date().toISOString(),
-        }])
+        await writeAudit({ action: 'user_invited', meta: { email, role: inviteRole, delivery: 'record_only' } })
       }
 
       setInviteEmail('')
@@ -117,10 +151,40 @@ export default function CompanyUsers() {
     }
   }
 
+  const resendInvite = async (invite) => {
+    if (!window.confirm(`إعادة إرسال الدعوة إلى ${invite.email}؟ ستُجدَّد صلاحيتها 7 أيام.`)) return
+    setBusyId(invite.id)
+    try {
+      const server = await callServerInvite(invite.email, invite.role, true)
+      if (server.error) { showToast(`❌ ${server.error}`); return }
+
+      if (server.emailSent) {
+        await loadUsers()
+        showToast(`✅ أُعيد إرسال الدعوة إلى ${invite.email}`)
+        return
+      }
+
+      // No server: at least refresh the expiry so the invite stops reading as dead.
+      const supabase = getSupabase()
+      const { error: e } = await supabase
+        .from('pending_invites')
+        .update({ expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .eq('id', invite.id)
+      if (e) throw e
+      await writeAudit({ action: 'user_invite_resent', entity_id: invite.id, meta: { email: invite.email, delivery: 'record_only' } })
+      await loadUsers()
+      showToast('✅ جُدِّدت صلاحية الدعوة (الإرسال بالبريد يحتاج نشر الخادم)')
+    } catch (err) {
+      showToast('❌ تعذّرت إعادة الإرسال: ' + (err?.message || ''))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   // Calls /api/invite-user. Distinguishes a real business error (JSON 4xx from
   // our function) from the endpoint simply not being deployed (network error or
   // the SPA fallback serving index.html), so we only fall back in the latter.
-  const tryServerInvite = async (email, role) => {
+  const callServerInvite = async (email, role, resend = false) => {
     let token
     try { token = await getToken() } catch { token = null }
     if (!token) return { emailSent: false }
@@ -129,7 +193,7 @@ export default function CompanyUsers() {
       resp = await fetch('/api/invite-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, resend }),
       })
     } catch { return { emailSent: false } }
     const ct = resp.headers.get('content-type') || ''
@@ -141,31 +205,57 @@ export default function CompanyUsers() {
   }
 
   const cancelInvite = async (invite) => {
-    if (!window.confirm(`إلغاء الدعوة المعلّقة لـ ${invite.email}؟`)) return
+    if (!window.confirm(`إلغاء الدعوة لـ ${invite.email}؟`)) return
     try {
       setBusyId(invite.id)
       const supabase = getSupabase()
       const { error: e } = await supabase.from('pending_invites').delete().eq('id', invite.id)
       if (e) throw e
+      await writeAudit({ action: 'user_invite_cancelled', entity_id: invite.id, meta: { email: invite.email, role: invite.role } })
       setPendingInvites((prev) => prev.filter((i) => i.id !== invite.id))
       showToast('تم إلغاء الدعوة')
-    } catch (err) {
+    } catch {
       showToast('❌ تعذّر إلغاء الدعوة')
+    } finally { setBusyId(null) }
+  }
+
+  const changeRole = async (u, nextRole) => {
+    if (nextRole === u.rawRole) return
+    if (nextRole === 'company_member' && isLastActiveAdmin(u)) {
+      showToast('❌ لا يمكن تخفيض آخر مدير نشط — عيّن مديراً آخر أولاً')
+      return
+    }
+    const warning = u.isSelf && nextRole === 'company_member'
+      ? `\n\n⚠️ أنت تخفّض حسابك — ستفقد صلاحيات إدارة المستخدمين فوراً.`
+      : ''
+    if (!window.confirm(`تغيير دور ${u.name} من "${ROLE_LABEL[u.rawRole]}" إلى "${ROLE_LABEL[nextRole]}"؟${warning}`)) return
+
+    try {
+      setBusyId(u.id)
+      const supabase = getSupabase()
+      const { error: e } = await supabase.from('users').update({ role: nextRole }).eq('id', u.id)
+      if (e) throw e
+      await writeAudit({ action: 'user_role_changed', entity_id: u.id, meta: { email: u.email, from: u.rawRole, to: nextRole } })
+      await loadUsers()
+      showToast(`تم تغيير دور ${u.name} إلى ${ROLE_LABEL[nextRole]}`)
+    } catch (err) {
+      showToast('❌ تعذّر تغيير الدور: ' + (err?.message || ''))
     } finally { setBusyId(null) }
   }
 
   const setUserActive = async (u, active) => {
     if (u.isSelf && !active) { showToast('لا يمكنك تعطيل حسابك'); return }
+    if (!active && isLastActiveAdmin(u)) {
+      showToast('❌ لا يمكن تعطيل آخر مدير نشط — عيّن مديراً آخر أولاً')
+      return
+    }
     if (!window.confirm(active ? `إعادة تفعيل ${u.name}؟` : `تعطيل ${u.name}؟`)) return
     try {
       setBusyId(u.id)
       const supabase = getSupabase()
       const { error: e } = await supabase.from('users').update({ status: active ? 'active' : 'inactive' }).eq('id', u.id)
       if (e) throw e
-      await supabase.from('audit_logs').insert([{
-        tenant_id: tenantId, actor_id: user.id, action: active ? 'user_reactivated' : 'user_deactivated',
-        entity: 'user', entity_id: u.id, created_at: new Date().toISOString(),
-      }])
+      await writeAudit({ action: active ? 'user_reactivated' : 'user_deactivated', entity_id: u.id, meta: { email: u.email } })
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)))
       showToast(active ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم')
     } catch (err) {
@@ -177,19 +267,24 @@ export default function CompanyUsers() {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
   }
 
+  const expiredCount = pendingInvites.filter(isExpired).length
+
   return (
     <div>
-      {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, boxShadow: '0 8px 24px rgba(15,23,42,.25)' }}>{toast}</div>}
+      {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '420px' }}>{toast}</div>}
 
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>المستخدمون ({users.length})</h3>
           {pendingInvites.length > 0 && (
-            <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>{pendingInvites.length} دعوة معلّقة</span>
+            <span style={S.badge('#FEF3C7', '#92400E')}>{pendingInvites.length} دعوة معلّقة</span>
+          )}
+          {expiredCount > 0 && (
+            <span style={S.badge('#FEE2E2', '#B91C1C')}>{expiredCount} منتهية</span>
           )}
         </div>
         {isAdmin && (
@@ -200,13 +295,19 @@ export default function CompanyUsers() {
       </div>
 
       {!isAdmin && (
-        <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', fontSize: '13.5px', color: '#3730A3', fontWeight: 700 }}>ℹ إدارة المستخدمين (الدعوة والتعطيل) متاحة لمدير الشركة فقط. يمكنك عرض القائمة.</div>
+        <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', fontSize: '13.5px', color: '#3730A3', fontWeight: 700 }}>ℹ إدارة المستخدمين (الدعوة وتغيير الأدوار والتعطيل) متاحة لمدير الشركة فقط. يمكنك عرض القائمة.</div>
+      )}
+
+      {isAdmin && activeAdmins.length <= 1 && (
+        <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', fontSize: '13.5px', color: '#92400E', fontWeight: 700 }}>
+          ⚠️ يوجد مدير نشط واحد فقط. لحماية الشركة من فقدان الوصول، لا يمكن تخفيض دوره أو تعطيله حتى تعيّن مديراً آخر.
+        </div>
       )}
 
       {isAdmin && showInviteForm && (
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', marginBottom: '18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <input type="email" placeholder="البريد الإلكتروني" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleInvite()} style={{ flex: 1, minWidth: '200px', border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', outline: 'none', direction: 'ltr', textAlign: 'left', fontFamily: 'inherit' }} />
-          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} style={{ border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', background: '#fff' }}>
+        <div style={{ ...S.card, borderRadius: '12px', padding: '16px', marginBottom: '18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input type="email" placeholder="البريد الإلكتروني" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleInvite()} style={{ ...S.input, flex: 1, minWidth: '200px', direction: 'ltr', textAlign: 'left' }} />
+          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} style={S.input}>
             <option value="company_member">محرّر</option>
             <option value="company_admin">مدير</option>
           </select>
@@ -216,52 +317,80 @@ export default function CompanyUsers() {
       )}
 
       {/* Current users */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflowX: 'auto', marginBottom: '20px' }}>
-        <div style={{ minWidth: '640px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 2fr 0.9fr 0.9fr 1.1fr 1fr', padding: '15px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B' }}>
+      <div style={{ ...S.card, overflowX: 'auto', marginBottom: '20px' }}>
+        <div style={{ minWidth: '760px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: USERS_GRID, padding: '15px 22px', ...S.headRow }}>
             <span>الاسم</span><span>البريد الإلكتروني</span><span>الدور</span><span>الحالة</span><span>آخر دخول</span><span>{isAdmin ? 'الإجراءات' : ''}</span>
           </div>
           {users.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>لا يوجد مستخدمون بعد</div>
-          ) : users.map((u) => (
-            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1.7fr 2fr 0.9fr 0.9fr 1.1fr 1fr', padding: '14px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center' }}>
-              <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{u.name}{u.isSelf && <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}> (أنت)</span>}</span>
-              <span style={{ fontSize: '13.5px', color: '#64748B', direction: 'ltr', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</span>
-              <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700 }}>{u.role}</span>
-              <span><span style={{ background: u.active ? '#ECFDF5' : '#FEE2E2', color: u.active ? '#15803D' : '#B91C1C', borderRadius: '7px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800 }}>{u.active ? 'نشط' : 'معطّل'}</span></span>
-              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{u.lastLogin}</span>
-              <span style={{ display: 'flex', gap: '8px' }}>
-                {isAdmin && !u.isSelf && (
-                  u.active ? (
-                    <button onClick={() => setUserActive(u, false)} disabled={busyId === u.id} title="تعطيل" style={{ background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA', borderRadius: '7px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit' }}><Trash2 size={13} /> تعطيل</button>
+          ) : users.map((u) => {
+            const roleLocked = isLastActiveAdmin(u)
+            return (
+              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: USERS_GRID, padding: '14px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{u.name}{u.isSelf && <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}> (أنت)</span>}</span>
+                <span style={{ fontSize: '13.5px', color: '#64748B', direction: 'ltr', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</span>
+                <span>
+                  {isAdmin ? (
+                    <select
+                      value={u.rawRole}
+                      disabled={busyId === u.id || roleLocked}
+                      title={roleLocked ? 'آخر مدير نشط — لا يمكن تغيير دوره' : 'تغيير الدور'}
+                      onChange={(e) => changeRole(u, e.target.value)}
+                      style={{ ...S.input, padding: '6px 8px', fontSize: '13px', fontWeight: 700, color: '#334155', cursor: roleLocked ? 'not-allowed' : 'pointer', opacity: roleLocked ? 0.6 : 1, width: '100%' }}
+                    >
+                      <option value="company_member">محرّر</option>
+                      <option value="company_admin">مدير</option>
+                    </select>
                   ) : (
-                    <button onClick={() => setUserActive(u, true)} disabled={busyId === u.id} title="تفعيل" style={{ background: '#F0FDF4', color: '#15803D', border: '1px solid #BBF7D0', borderRadius: '7px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit' }}><RotateCcw size={13} /> تفعيل</button>
-                  )
-                )}
-              </span>
-            </div>
-          ))}
+                    <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700 }}>{u.role}</span>
+                  )}
+                </span>
+                <span><span style={S.badge(u.active ? '#ECFDF5' : '#FEE2E2', u.active ? '#15803D' : '#B91C1C')}>{u.active ? 'نشط' : 'معطّل'}</span></span>
+                <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{u.lastLogin}</span>
+                <span style={{ display: 'flex', gap: '8px' }}>
+                  {isAdmin && !u.isSelf && (
+                    u.active ? (
+                      <button onClick={() => setUserActive(u, false)} disabled={busyId === u.id || roleLocked} title={roleLocked ? 'آخر مدير نشط — لا يمكن تعطيله' : 'تعطيل'} style={{ ...S.btn('#FEF2F2', '#B91C1C', '1px solid #FECACA'), cursor: roleLocked ? 'not-allowed' : 'pointer', opacity: roleLocked ? 0.5 : 1 }}><Trash2 size={13} /> تعطيل</button>
+                    ) : (
+                      <button onClick={() => setUserActive(u, true)} disabled={busyId === u.id} title="تفعيل" style={S.btn('#F0FDF4', '#15803D', '1px solid #BBF7D0')}><RotateCcw size={13} /> تفعيل</button>
+                    )
+                  )}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
       {/* Pending invites */}
       {pendingInvites.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: '16px', overflowX: 'auto' }}>
-          <div style={{ minWidth: '520px' }}>
+        <div style={{ ...S.card, border: '1px solid #FDE68A', overflowX: 'auto' }}>
+          <div style={{ minWidth: '620px' }}>
             <div style={{ padding: '14px 22px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', fontSize: '14px', fontWeight: 900, color: '#92400E' }}>الدعوات المعلّقة</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '12px 22px', background: '#FEFCE8', borderBottom: '1px solid #FDE68A', fontSize: '12.5px', fontWeight: 800, color: '#92400E' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: INVITES_GRID, padding: '12px 22px', background: '#FEFCE8', borderBottom: '1px solid #FDE68A', fontSize: '12.5px', fontWeight: 800, color: '#92400E' }}>
               <span>البريد الإلكتروني</span><span>الدور</span><span>الحالة</span><span>{isAdmin ? 'إجراء' : ''}</span>
             </div>
-            {pendingInvites.map((invite) => (
-              <div key={invite.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '13px 22px', borderBottom: '1px solid #FEF3C7', alignItems: 'center' }}>
-                <span style={{ fontSize: '13.5px', color: '#334155', direction: 'ltr', textAlign: 'right' }}>{invite.email}</span>
-                <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700 }}>{invite.role === 'company_admin' ? 'مدير' : 'محرّر'}</span>
-                <span><span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800 }}>معلّقة</span></span>
-                <span>{isAdmin && (
-                  <button onClick={() => cancelInvite(invite)} disabled={busyId === invite.id} style={{ background: '#fff', color: '#B91C1C', border: '1px solid #FECACA', borderRadius: '7px', padding: '6px 12px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
-                )}</span>
-              </div>
-            ))}
+            {pendingInvites.map((invite) => {
+              const expired = isExpired(invite)
+              return (
+                <div key={invite.id} style={{ display: 'grid', gridTemplateColumns: INVITES_GRID, padding: '13px 22px', borderBottom: '1px solid #FEF3C7', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13.5px', color: '#334155', direction: 'ltr', textAlign: 'right' }}>{invite.email}</span>
+                  <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700 }}>{ROLE_LABEL[invite.role] || invite.role}</span>
+                  <span>
+                    <span style={expired ? S.badge('#FEE2E2', '#B91C1C') : S.badge('#FEF3C7', '#92400E')}>{expired ? 'منتهية' : 'معلّقة'}</span>
+                  </span>
+                  <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {isAdmin && (
+                      <>
+                        <button onClick={() => resendInvite(invite)} disabled={busyId === invite.id} title="إعادة إرسال الدعوة" style={S.btn('#F0FDF4', '#15803D', '1px solid #BBF7D0')}><RotateCcw size={13} /> إعادة إرسال</button>
+                        <button onClick={() => cancelInvite(invite)} disabled={busyId === invite.id} style={S.btn('#fff', '#B91C1C', '1px solid #FECACA')}>إلغاء</button>
+                      </>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

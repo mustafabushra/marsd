@@ -12,16 +12,53 @@
 // The invited role/tenant are carried in the invitation's public_metadata and
 // consumed on sign-up by /auth/callback (which attaches the new user to the
 // tenant). See src/pages/AuthCallback.jsx.
+//
+// Body: { email, role, resend? }
+//  - resend=false (default): a still-pending invite for that email is a 409.
+//  - resend=true: the existing invite row is refreshed (new expiry) and the
+//    email goes out again. Clerk rejects a duplicate pending invitation, so we
+//    revoke the old one first — see revokePendingClerkInvitations().
 
 import { verifyToken } from '@clerk/backend'
 import { createClient } from '@supabase/supabase-js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const VALID_ROLES = ['company_member', 'company_admin']
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 const CLERK_SECRET = process.env.CLERK_SECRET_KEY
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+
+const clerkApi = (path, init = {}) =>
+  fetch(`https://api.clerk.com/v1${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${CLERK_SECRET}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+
+// Clerk refuses to create a second pending invitation for the same address, so
+// a resend must revoke whatever is outstanding first. Best-effort: if Clerk's
+// list/revoke calls fail we still try the create below and surface its error.
+async function revokePendingClerkInvitations(email) {
+  try {
+    const resp = await clerkApi(`/invitations?status=pending&query=${encodeURIComponent(email)}`)
+    if (!resp.ok) return
+    const body = await resp.json().catch(() => null)
+    const list = Array.isArray(body) ? body : body?.data
+    if (!Array.isArray(list)) return
+    await Promise.all(
+      list
+        .filter((inv) => String(inv?.email_address || '').toLowerCase() === email)
+        .map((inv) => clerkApi(`/invitations/${inv.id}/revoke`, { method: 'POST' })),
+    )
+  } catch {
+    // Non-fatal — the create call below reports the real problem.
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -49,6 +86,7 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
     const email = String(body.email || '').trim().toLowerCase()
     const role = String(body.role || 'company_member')
+    const resend = body.resend === true
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'صيغة البريد الإلكتروني غير صحيحة' })
     if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'دور غير صالح' })
 
@@ -61,19 +99,25 @@ export default async function handler(req, res) {
     if (caller.role !== 'company_admin') return res.status(403).json({ error: 'الدعوة متاحة لمدير الشركة فقط' })
     const tenantId = caller.tenant_id
 
-    // 4) Reject duplicates (existing member or already-pending invite in tenant).
+    // 4) An address that already belongs to a member is always a conflict. An
+    //    outstanding invite is a conflict only when this is not a resend.
     const { data: existingUser } = await supabase
       .from('users').select('id').eq('tenant_id', tenantId).ilike('email', email).maybeSingle()
     if (existingUser) return res.status(409).json({ error: 'هذا البريد مسجّل بالفعل ضمن مستخدمي الشركة' })
     const { data: existingInvite } = await supabase
       .from('pending_invites').select('id').eq('tenant_id', tenantId).ilike('email', email).eq('status', 'pending').maybeSingle()
-    if (existingInvite) return res.status(409).json({ error: 'توجد دعوة معلّقة لهذا البريد بالفعل' })
+    if (existingInvite && !resend) {
+      return res.status(409).json({ error: 'توجد دعوة معلّقة لهذا البريد بالفعل' })
+    }
+    if (resend && !existingInvite) {
+      return res.status(404).json({ error: 'لا توجد دعوة معلّقة لإعادة إرسالها' })
+    }
 
     // 5) Create the Clerk invitation — Clerk sends the email.
+    if (resend) await revokePendingClerkInvitations(email)
     const origin = process.env.APP_URL || `https://${req.headers.host}`
-    const clerkResp = await fetch('https://api.clerk.com/v1/invitations', {
+    const clerkResp = await clerkApi('/invitations', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${CLERK_SECRET}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email_address: email,
         public_metadata: { tenant_id: tenantId, role },
@@ -88,21 +132,28 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: msg })
     }
 
-    // 6) Record the pending invite (source of truth for the UI list).
-    const { error: insErr } = await supabase.from('pending_invites').insert([{
-      tenant_id: tenantId,
-      email,
-      role,
-      invited_by: callerId,
-      status: 'pending',
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }])
-    if (insErr) {
+    // 6) Record the invite (source of truth for the UI list). A resend refreshes
+    //    the existing row — role and expiry — instead of adding a second one.
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString()
+    const { error: writeErr } = existingInvite
+      ? await supabase
+          .from('pending_invites')
+          .update({ role, invited_by: callerId, expires_at: expiresAt })
+          .eq('id', existingInvite.id)
+      : await supabase.from('pending_invites').insert([{
+          tenant_id: tenantId,
+          email,
+          role,
+          invited_by: callerId,
+          status: 'pending',
+          expires_at: expiresAt,
+        }])
+    if (writeErr) {
       // Email already went out; surface a soft warning rather than a hard fail.
-      return res.status(200).json({ emailSent: true, recorded: false, warning: insErr.message })
+      return res.status(200).json({ emailSent: true, recorded: false, resent: resend, warning: writeErr.message })
     }
 
-    return res.status(200).json({ emailSent: true, recorded: true, clerkInvitationId: clerkData.id })
+    return res.status(200).json({ emailSent: true, recorded: true, resent: resend, clerkInvitationId: clerkData.id })
   } catch (err) {
     return res.status(500).json({ error: err?.message || 'خطأ غير متوقع' })
   }
