@@ -1,4 +1,4 @@
-import { UserButton, SignInButton, SignUpButton, useUser } from '@clerk/react'
+import { UserButton, useUser } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
 
 export default function ClerkNavBar() {
@@ -102,9 +102,15 @@ export default function ClerkNavBar() {
               />
             </>
           ) : (
+            // Plain links to our own routes. These were SignInButton and
+            // SignUpButton in modal mode, which opened Clerk's dialog over the
+            // page: a second, unstyled entry point to the same flows that
+            // /login and /register already own, with no URL of its own to link
+            // to, bookmark, or return to with the back button.
             <>
-              <SignInButton mode="modal">
-                <button style={{
+              <button
+                onClick={() => navigate('/login')}
+                style={{
                   background: '#fff',
                   color: '#1E2A52',
                   border: '1.5px solid #E2E8F0',
@@ -115,21 +121,21 @@ export default function ClerkNavBar() {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                  onMouseEnter={(e) => {
-                    e.target.style.background = '#F1F5F9'
-                    e.target.style.borderColor = '#CBD5E1'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.background = '#fff'
-                    e.target.style.borderColor = '#E2E8F0'
-                  }}
-                >
-                  تسجيل دخول
-                </button>
-              </SignInButton>
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#F1F5F9'
+                  e.target.style.borderColor = '#CBD5E1'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#fff'
+                  e.target.style.borderColor = '#E2E8F0'
+                }}
+              >
+                تسجيل دخول
+              </button>
 
-              <SignUpButton mode="modal">
-                <button style={{
+              <button
+                onClick={() => navigate('/register')}
+                style={{
                   background: '#1E2A52',
                   color: '#fff',
                   border: 'none',
@@ -140,12 +146,11 @@ export default function ClerkNavBar() {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                  onMouseEnter={(e) => e.target.style.background = '#16213E'}
-                  onMouseLeave={(e) => e.target.style.background = '#1E2A52'}
-                >
-                  إنشاء حساب
-                </button>
-              </SignUpButton>
+                onMouseEnter={(e) => e.target.style.background = '#16213E'}
+                onMouseLeave={(e) => e.target.style.background = '#1E2A52'}
+              >
+                إنشاء حساب
+              </button>
             </>
           )}
         </div>
