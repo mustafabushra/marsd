@@ -105,12 +105,16 @@ export async function loadEntitlements(tenantId) {
         .from('credits_ledger')
         .select('amount')
         .eq('tenant_id', tenantId),
+      // Distinct companies opened this month. Counted from audit_logs, which
+      // records the company id, rather than view_quota_usage, which holds a bare
+      // counter that cannot say whether a company was seen before — and a member
+      // is not charged twice for the same company.
       supabase
-        .from('view_quota_usage')
-        .select('period, views_count')
+        .from('audit_logs')
+        .select('entity_id')
         .eq('tenant_id', tenantId)
-        .eq('period', PERIOD())
-        .maybeSingle(),
+        .eq('action', 'company_report_viewed')
+        .gte('created_at', new Date(new Date().setDate(1)).toISOString().slice(0, 10)),
     ])
 
     const plan = subRes.data?.plans || null
@@ -130,7 +134,9 @@ export async function loadEntitlements(tenantId) {
       limits: plan.limits || {},
       features: plan.features || [],
       credits,
-      usage: { searches_per_month: quotaRes.data?.views_count || 0 },
+      usage: {
+        searches_per_month: new Set((quotaRes.data || []).map((r) => r.entity_id).filter(Boolean)).size,
+      },
       giveToGetEnabled: !!plan.give_to_get_enabled,
       giveToGetRules: settings.give_to_get_rules || null,
       featureCatalog: settings.feature_catalog || {},
@@ -153,6 +159,40 @@ export async function loadEntitlements(tenantId) {
  * outright, and quietly accruing points there would leave a balance nobody can
  * explain. Returns the points awarded, 0 when the action earns nothing.
  */
+/**
+ * Trim an award to what remains under the monthly earning ceiling.
+ *
+ * Contribution is deliberately unlimited — the registry is the asset. But
+ * credits widen the plan's own limits, so unlimited earning would turn the free
+ * plan into an unlimited one and the paid tiers would lose their meaning from
+ * that direction. The cap keeps contribution free while keeping what it buys
+ * finite.
+ *
+ * Counts only positive entries: spending must not create room to earn again.
+ * Returns the points that may be granted, possibly a partial award, or 0.
+ */
+async function applyMonthlyCap(supabase, entitlements, points) {
+  const cap = Number(entitlements?.giveToGetRules?.monthly_earn_cap) || 0
+  if (cap <= 0) return points   // no ceiling configured
+
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const { data, error } = await supabase
+    .from('credits_ledger')
+    .select('amount')
+    .eq('tenant_id', entitlements.tenantId)
+    .gt('amount', 0)
+    .gte('created_at', monthStart.toISOString())
+
+  // A failed count must not silently uncap the month.
+  if (error) return 0
+
+  const earned = (data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  return Math.max(0, Math.min(points, cap - earned))
+}
+
 export async function awardCredits(entitlements, action, { reportId = null, userId = null } = {}) {
   if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
 
@@ -162,6 +202,9 @@ export async function awardCredits(entitlements, action, { reportId = null, user
 
   try {
     const supabase = getSupabase()
+
+    const capped = await applyMonthlyCap(supabase, entitlements, points)
+    if (capped <= 0) return 0
     // `action` is the reason. The earn keys in give_to_get_rules and the values
     // credits_ledger_reason_check permits are deliberately the same vocabulary;
     // translating between them is how the previous write ended up sending
@@ -170,7 +213,7 @@ export async function awardCredits(entitlements, action, { reportId = null, user
       tenant_id: entitlements.tenantId,
       report_id: reportId,
       user_id: userId,
-      amount: points,
+      amount: capped,
       reason: action,
     }])
     if (error) {
@@ -179,7 +222,7 @@ export async function awardCredits(entitlements, action, { reportId = null, user
       if (error.code === '23505') return 0
       throw error
     }
-    return points
+    return capped
   } catch (err) {
     // Never fail the contribution because its reward could not be written; the
     // work the user did is what matters, and the ledger can be reconciled.
@@ -216,21 +259,28 @@ export async function awardCreditsToTenant(tenantId, action, { reportId = null, 
 
     if (!subRes.data?.plans?.give_to_get_enabled) return 0
 
-    const points = Number(settingsRes.data?.value?.earn?.[action]?.points) || 0
+    const rules = settingsRes.data?.value
+    const points = Number(rules?.earn?.[action]?.points) || 0
     if (points <= 0) return 0
+
+    // The ceiling belongs to the earning tenant, not the reviewer, so it is
+    // applied against their ledger here too — otherwise approval would be the
+    // one path around it.
+    const capped = await applyMonthlyCap(supabase, { tenantId, giveToGetRules: rules }, points)
+    if (capped <= 0) return 0
 
     const { error } = await supabase.from('credits_ledger').insert([{
       tenant_id: tenantId,
       report_id: reportId,
       user_id: userId,
-      amount: points,
+      amount: capped,
       reason: action,
     }])
     if (error) {
       if (error.code === '23505') return 0   // already awarded for this report
       throw error
     }
-    return points
+    return capped
   } catch (err) {
     console.error('Failed to award credits to tenant:', err)
     return 0

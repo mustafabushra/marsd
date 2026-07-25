@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { getSupabase, searchCompaniesKnowledgeBase } from '../lib/api'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { UNLIMITED } from '../lib/entitlements'
+import { FeatureLocked } from '../components/LimitGate'
 
+// Fallback only. How many companies may be compared is a plan limit
+// (compare_items); this is what applies when a plan does not name one.
 const MAX = 4
 
 const riskOf = (s) => {
@@ -28,6 +33,7 @@ const METRICS = [
 
 export default function Compare() {
   const navigate = useNavigate()
+  const { can, limitOf, loading: entLoading, entitlements } = useEntitlements()
   const [items, setItems] = useState([])
   const [addOpen, setAddOpen] = useState(false)
   const [addSearch, setAddSearch] = useState('')
@@ -37,6 +43,12 @@ export default function Compare() {
   const [toast, setToast] = useState('')
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
+
+  // How wide a comparison may be comes from the plan. A plan that names no
+  // ceiling gets the fallback rather than an unbounded table the layout cannot
+  // hold.
+  const compareCeiling = limitOf('compare_items')
+  const maxItems = compareCeiling === UNLIMITED || compareCeiling <= 0 ? MAX : compareCeiling
 
   const runSearch = async (q) => {
     if (!q.trim()) { setAddResults([]); return }
@@ -55,7 +67,7 @@ export default function Compare() {
   }, [addSearch, addOpen])
 
   const addCompany = async (company) => {
-    if (items.length >= MAX) { showToast(`يمكن مقارنة حتى ${MAX} شركات`); return }
+    if (items.length >= maxItems) { showToast(`باقتك تتيح مقارنة حتى ${maxItems} شركات`); return }
     try {
       setAddingId(company.id)
       const supabase = getSupabase()
@@ -81,7 +93,7 @@ export default function Compare() {
       }
       setItems((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]))
       setAddResults((prev) => prev.filter((r) => r.id !== company.id))
-      if (items.length + 1 >= MAX) setAddOpen(false)
+      if (items.length + 1 >= maxItems) setAddOpen(false)
     } catch (e) {
       showToast('❌ تعذّر إضافة الشركة')
     } finally { setAddingId(null) }
@@ -118,6 +130,21 @@ export default function Compare() {
 
   const gridCols = `minmax(150px, 1.4fr) ${items.map(() => 'minmax(150px, 1fr)').join(' ')}`
 
+  // Comparison is a paid feature. The page states that rather than hiding the
+  // route, so a member who reaches it — from the sidebar, a bookmark, a
+  // colleague's link — learns what it is and what includes it, instead of
+  // meeting a blank screen.
+  if (!entLoading && !can('compare')) {
+    return (
+      <div style={{ maxWidth: '620px', margin: '40px auto' }}>
+        <FeatureLocked
+          feature="compare"
+          featureName={entitlements?.featureCatalog?.compare || 'مقارنة الشركات'}
+        />
+      </div>
+    )
+  }
+
   return (
     <div>
       {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, boxShadow: '0 8px 24px rgba(15,23,42,.25)' }}>{toast}</div>}
@@ -125,10 +152,10 @@ export default function Compare() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>مقارنة الشركات</h3>
-          <p style={{ fontSize: '13px', color: '#94A3B8', margin: '3px 0 0', fontWeight: 600 }}>قارن حتى {MAX} شركات من واقع مؤشرات مرصد الحقيقية</p>
+          <p style={{ fontSize: '13px', color: '#94A3B8', margin: '3px 0 0', fontWeight: 600 }}>قارن حتى {maxItems} شركات من واقع مؤشرات مرصد الحقيقية</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }} disabled={items.length >= MAX} style={{ background: items.length >= MAX ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: items.length >= MAX ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>+ إضافة شركة</button>
+          <button onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }} disabled={items.length >= maxItems} style={{ background: items.length >= maxItems ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: items.length >= maxItems ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>+ إضافة شركة</button>
           <button onClick={exportExcel} disabled={items.length === 0} style={{ background: '#fff', color: items.length ? '#15803D' : '#94A3B8', border: `1.5px solid ${items.length ? '#BBF7D0' : '#E2E8F0'}`, borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: items.length ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>⬇ تصدير Excel</button>
           <button onClick={() => window.print()} disabled={items.length === 0} style={{ background: '#fff', color: items.length ? '#1E2A52' : '#94A3B8', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: items.length ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>🖨 طباعة / PDF</button>
         </div>

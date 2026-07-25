@@ -250,30 +250,28 @@ export default function AddReport() {
       const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
       if (!userData?.tenant_id) throw new Error('لم يتم العثور على شركة مرتبطة بحسابك')
 
-      // Plan ceiling on submitted reports. Counted against the database rather
-      // than a cached figure, because the limit is per company and a colleague
-      // may have submitted since this page loaded. Drafts are free: the limit
-      // is on what reaches review, not on what someone is still writing.
+      // How many reports a company may file is not limited — reports are what
+      // the registry is made of, and metering them meters the product. What is
+      // limited is how many may sit unreviewed at once.
+      //
+      // This is a queue control, not an abuse control. Abuse is already covered:
+      // BR-05 below allows one report per target company per 90 days, so no
+      // volume of filing can be aimed at a single competitor. What this prevents
+      // is one tenant filling the review queue and making it unusable for
+      // everyone else — and it clears itself as reviews complete.
       if (statusValue === 'pending_review') {
-        const ceiling = limitOf('reports_per_month')
+        const ceiling = limitOf('pending_reports')
         if (ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
-          const monthStart = new Date()
-          monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-
           const { count } = await supabase
             .from('reports')
             .select('id', { count: 'exact', head: true })
             .eq('reporter_tenant_id', userData.tenant_id)
-            .neq('status', 'draft')
-            .gte('created_at', monthStart.toISOString())
+            .eq('status', 'pending_review')
 
-          const used = count || 0
-          const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
-          if (used >= allowance) {
+          if ((count || 0) >= ceiling) {
             throw new Error(
-              entitlements?.giveToGetEnabled
-                ? `بلغت حد باقتك: ${used} من ${allowance} تقريراً هذا الشهر. أضف شركات أو استكمل بياناتها لكسب رصيد يوسّع حدّك.`
-                : `بلغت حد باقتك: ${used} من ${allowance} تقريراً هذا الشهر. رقّ باقتك للمزيد.`,
+              `لديك ${count} تقريراً قيد المراجعة، وهو حد باقتك (${ceiling}). ` +
+              'إرسال التقارير غير محدود — انتظر مراجعة تقاريرك الحالية ثم واصل.',
             )
           }
         }

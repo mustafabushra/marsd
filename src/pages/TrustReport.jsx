@@ -5,12 +5,18 @@ import { DocumentIcon } from '../components/icons'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { UNLIMITED } from '../lib/entitlements'
+import { hasViewedCompany, recordCompanyView } from '../lib/companyViews'
+import { LimitReached } from '../components/LimitGate'
 
 export default function TrustReport() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { role } = useUserRole()
   const systemStatus = useSystemStatus()
+  const { entitlements, limitOf, remaining, can, loading: entLoading, refresh: refreshEntitlements } = useEntitlements()
+  const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [company, setCompany] = useState(null)
@@ -26,6 +32,24 @@ export default function TrustReport() {
           setError('معرّف الشركة مفقود')
           setLoading(false)
           return
+        }
+
+        // Meter the lookup before fetching anything. A company already opened
+        // this month is free to open again, so a revisit never costs and never
+        // records a second time.
+        const tenantId = entitlements?.tenantId
+        const ceiling = limitOf('searches_per_month')
+        let alreadySeen = true
+
+        if (tenantId && ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
+          alreadySeen = await hasViewedCompany(tenantId, id)
+          if (!alreadySeen && remaining('searches_per_month') <= 0) {
+            setQuotaBlocked(true)
+            setLoading(false)
+            return
+          }
+        } else if (tenantId) {
+          alreadySeen = await hasViewedCompany(tenantId, id)
         }
 
         // Load complete company profile from Knowledge Base (single source of truth)
@@ -80,6 +104,14 @@ export default function TrustReport() {
         setTimeline(timelineData.data || [])
         setTrends(trendsData.data || [])
         setSummary(summaryData.data || [])
+
+        // Charged only once the report actually loaded, and only the first time
+        // this company is opened this month. Recording before the fetch would
+        // bill a member for a page that then failed.
+        if (entitlements?.tenantId && !alreadySeen) {
+          await recordCompanyView(entitlements.tenantId, id, null)
+          await refreshEntitlements()
+        }
       } catch (err) {
         setError(err.message || 'خطأ في تحميل البيانات')
       } finally {
@@ -87,8 +119,29 @@ export default function TrustReport() {
       }
     }
 
-    loadReport()
-  }, [id])
+    // Wait for entitlements: starting before they resolve would meter against
+    // an empty plan and let the first lookup through unmetered every time.
+    if (!entLoading) loadReport()
+  }, [id, entLoading])
+
+  if (quotaBlocked) {
+    const ceiling = limitOf('searches_per_month')
+    return (
+      <div style={{ maxWidth: '620px', margin: '40px auto' }}>
+        <LimitReached
+          title="بلغت حد عمليات البحث لهذا الشهر"
+          detail={
+            `باقتك تتيح ${ceiling} شركة في الشهر، وقد اطّلعت عليها جميعاً. ` +
+            'الشركات التي فتحتها هذا الشهر تبقى متاحة لك بلا احتساب إضافي' +
+            (entitlements?.giveToGetEnabled
+              ? '. أضف شركة للسجل أو أرسل تقريراً لكسب رصيد يوسّع حدّك فوراً.'
+              : '.')
+          }
+          giveToGet={!!entitlements?.giveToGetEnabled}
+        />
+      </div>
+    )
+  }
 
   if (loading) {
     return (

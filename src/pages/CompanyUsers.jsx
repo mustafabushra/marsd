@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useUser, useAuth } from '@clerk/react'
 import { UserPlus, Trash2, RotateCcw } from 'lucide-react'
 import { getSupabase } from '../lib/api'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { UNLIMITED } from '../lib/entitlements'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ROLE_LABEL = { company_admin: 'مدير', company_member: 'محرّر' }
@@ -23,6 +25,7 @@ const isExpired = (invite) => !!invite.expires_at && new Date(invite.expires_at)
 export default function CompanyUsers() {
   const { isLoaded: isUserLoaded, user } = useUser()
   const { getToken } = useAuth()
+  const { entitlements, limitOf } = useEntitlements()
   const [users, setUsers] = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
   const [tenantId, setTenantId] = useState(null)
@@ -124,6 +127,23 @@ export default function CompanyUsers() {
     if (!EMAIL_RE.test(email)) { setError('صيغة البريد الإلكتروني غير صحيحة'); return }
     if (users.some((u) => (u.email || '').toLowerCase() === email)) { setError('هذا البريد مسجّل بالفعل ضمن مستخدمي الشركة'); return }
     if (pendingInvites.some((i) => (i.email || '').toLowerCase() === email)) { setError('توجد دعوة معلّقة لهذا البريد بالفعل — استخدم "إعادة إرسال"'); return }
+
+    // Seats are counted before the invitation goes out, and pending invitations
+    // count against them: an invitation is a seat already promised, and letting
+    // a company invite past its plan on the grounds that nobody has accepted yet
+    // would put it over the moment they did.
+    const seats = limitOf('users')
+    if (seats !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
+      const taken = users.length + pendingInvites.length
+      if (taken >= seats) {
+        setError(
+          `باقتك تتيح ${seats} ${seats === 2 ? 'مستخدمَين' : 'مستخدمين'}، ` +
+          `ولديك ${users.length} مستخدماً${pendingInvites.length ? ` و${pendingInvites.length} دعوة معلّقة` : ''}. ` +
+          'ألغِ دعوة معلّقة أو عطّل مستخدماً، أو رقّ باقتك لمقاعد أكثر.',
+        )
+        return
+      }
+    }
 
     setSubmitting(true)
     try {

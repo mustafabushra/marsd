@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
-import { awardCredits, UNLIMITED } from '../lib/entitlements'
+import { awardCredits } from '../lib/entitlements'
 
 const ENTITY_TYPES = ['مؤسسة', 'شركة ذات مسؤولية محدودة', 'شركة مساهمة', 'شركة تضامن', 'شركة توصية بسيطة']
 const ENTERPRISE_SIZES = ['متناهية الصغر', 'صغيرة', 'متوسطة', 'كبيرة']
@@ -18,7 +18,7 @@ export default function AddCompany() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useUser()
-  const { entitlements, limitOf, refresh: refreshEntitlements } = useEntitlements()
+  const { entitlements, refresh: refreshEntitlements } = useEntitlements()
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [creditsEarned, setCreditsEarned] = useState(0)
@@ -94,33 +94,10 @@ export default function AddCompany() {
     try {
       const supabase = getSupabase()
 
-      // Plan ceiling on registry contributions, checked against the database so
-      // a colleague's additions since this page loaded still count. Credits
-      // widen the allowance rather than bypassing it — contributing is exactly
-      // what earns the room to contribute more.
-      const ceiling = limitOf('companies_per_month')
-      if (ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled && user?.id) {
-        const { data: me } = await supabase.from('users').select('tenant_id').eq('id', user.id).maybeSingle()
-        if (me?.tenant_id) {
-          const monthStart = new Date()
-          monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-
-          const { count } = await supabase
-            .from('audit_logs')
-            .select('id', { count: 'exact', head: true })
-            .eq('tenant_id', me.tenant_id)
-            .eq('action', 'company_add_requested')
-            .gte('created_at', monthStart.toISOString())
-
-          const used = count || 0
-          const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
-          if (used >= allowance) {
-            setError(`بلغت حد باقتك: ${used} من ${allowance} شركة هذا الشهر. رقّ باقتك أو انتظر بداية الشهر القادم.`)
-            setSubmitting(false)
-            return
-          }
-        }
-      }
+      // No ceiling on adding companies, on any plan. A registry entry is a fact
+      // about an entity — verifiable, neutral, reviewed before it is published,
+      // and harmless if wrong. Capping it would throttle the asset the product
+      // is built on in order to protect nothing.
 
       // Avoid obvious duplicates by name
       const { data: existing } = await supabase
