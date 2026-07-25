@@ -30,7 +30,18 @@ alter table public.plans add column if not exists give_to_get_enabled boolean de
 -- Marks the plan handed to a tenant that has never subscribed.
 alter table public.plans add column if not exists is_default boolean default false;
 
-update public.plans set code = lower(regexp_replace(name, '[^a-zA-Z0-9]+', '_', 'g'))
+-- Adopt the plans already in this database rather than duplicating them. Their
+-- names are Arabic, so a code cannot be derived by transliterating: stripping
+-- non-latin characters collapses every one of them to the same string. Map the
+-- four known names, and fall back to something unique for anything else so the
+-- index below cannot fail on a row nobody anticipated.
+update public.plans set code = case
+  when name in ('مجاني', 'المجانية', 'Free')             then 'free'
+  when name in ('أساسي', 'الأساسية', 'Basic')            then 'basic'
+  when name in ('احترافي', 'الاحترافية', 'Pro')          then 'pro'
+  when name in ('مؤسسات', 'المؤسسية', 'Enterprise')      then 'enterprise'
+  else 'plan_' || left(replace(id::text, '-', ''), 8)
+end
 where code is null;
 
 create unique index if not exists idx_plans_code on public.plans(code);
@@ -94,17 +105,42 @@ values
     4
   )
 on conflict (code) do update set
-  name                = excluded.name,
-  description         = excluded.description,
-  price_monthly       = excluded.price_monthly,
   limits              = excluded.limits,
   features            = excluded.features,
   is_default          = excluded.is_default,
   give_to_get_enabled = excluded.give_to_get_enabled,
   sort_order          = excluded.sort_order,
+  description         = coalesce(public.plans.description, excluded.description),
   updated_at          = now();
-  -- `active` is intentionally not overwritten: once an operator switches a plan
-  -- on from the admin panel, re-running this migration must not switch it back.
+  -- Deliberately absent from the update list:
+  --   name, price_monthly — this database already carries four plans with their
+  --     own Arabic names and real prices. Those are commercial decisions; a
+  --     migration that seeds entitlement machinery has no business restating
+  --     them, and the values above are only defaults for an empty database.
+  --   active — once an operator switches a plan on from the admin panel,
+  --     re-running this must not switch it back. The one-time policy below
+  --     handles the initial state instead.
+
+-- ============================================================================
+-- 2b) Initial activation policy — first application only
+-- ============================================================================
+-- The requirement is that everyone sits on Free for now while the paid plans
+-- stay fully defined and switched off. That is a starting state, not a rule to
+-- reassert: after an operator opens Basic from the panel, re-running this
+-- migration must leave it open. schema_migrations is written by the runner
+-- after the file succeeds, so its absence marks the first application.
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'schema_migrations'
+  ) or not exists (
+    select 1 from public.schema_migrations where filename = '011_plans_entitlements.sql'
+  ) then
+    update public.plans set active = (code = 'free'), updated_at = now();
+  end if;
+end $$;
 
 -- ============================================================================
 -- 3) Give-to-Get rates, and the catalogue of feature keys

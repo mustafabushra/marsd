@@ -9,3 +9,6 @@ node_modules/
 marsad-staging.bundle
 # Allow production env vars for Vercel
 !.env.production
+
+# Database credentials for scripts/run-migration.mjs — never commit
+.env.migrations
