@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -15,8 +17,10 @@ export default function AdminDashboard() {
   const [risk, setRisk] = useState({ low: 0, med: 0, high: 0 })
   const [sectors, setSectors] = useState([])
 
-  useEffect(() => {
-    const load = async () => {
+  // Lifted out of the effect so the realtime subscription can re-run it. What
+  // arrives after a change is what a fresh page would have shown, which is the
+  // property that matters on a screen people act on.
+  const load = useCallback(async () => {
       try {
         const supabase = getSupabase()
 
@@ -76,9 +80,16 @@ export default function AdminDashboard() {
       } finally {
         setLoading(false)
       }
-    }
-    load()
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Everything this screen counts. Platform staff see all tenants, so no filter
+  // is applied — the policies already decide that, and narrowing here would hide
+  // exactly the cross-tenant movement the panel exists to watch.
+  const { connected, liveAt } = useLiveData(load, {
+    tables: ['companies', 'reports', 'tenants', 'subscriptions', 'trust_scores', 'users', 'claim_requests', 'registration_requests', 'company_data_requests'],
+  })
 
   const riskTotal = risk.low + risk.med + risk.high || 1
   const lowPct = (risk.low / riskTotal) * 100
@@ -97,6 +108,16 @@ export default function AdminDashboard() {
 
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 3px' }}>نظرة عامة على المنصة</h1>
+          <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0 }}>
+            {opsPending > 0 ? `${opsPending} عنصراً بانتظار إجراء` : 'لا يوجد ما ينتظر إجراءً'}
+          </p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
+      </div>
+
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '18px', marginBottom: '18px' }}>
         {kpis.map((k, i) => (

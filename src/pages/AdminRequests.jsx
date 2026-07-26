@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 import { awardCreditsToTenant } from '../lib/entitlements'
 
 const FIELD_LABELS = {
@@ -22,6 +24,7 @@ export default function AdminRequests() {
   const [toast, setToast] = useState('')
 
   useEffect(() => { fetchAll() }, [])
+
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
 
   const fetchAll = async () => {
@@ -59,6 +62,15 @@ export default function AdminRequests() {
       setLoading(false)
     }
   }
+
+  // Declared after fetchAll, not before: the binding does not exist until here.
+  //
+  // A review queue is where a stale view costs most — two administrators working
+  // the same list would otherwise both open the same request, and the second
+  // would act on something already decided.
+  const { connected, liveAt } = useLiveData(fetchAll, {
+    tables: ['companies', 'company_data_requests', 'claim_requests', 'registration_requests'],
+  })
 
   const openDoc = (dataUrl) => {
     if (!dataUrl) return

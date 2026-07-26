@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 import { awardCreditsToTenant } from '../lib/entitlements'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
@@ -38,6 +40,13 @@ export default function AdminReports() {
       setLoading(false)
     }
   }
+
+  // Declared after fetchReports: passing it above would read the binding before
+  // it is initialised, which is what broke the build the first time.
+  //
+  // Same reason as the requests queue — a report decided by one reviewer must
+  // leave every other reviewer's list without either of them reloading.
+  const { connected, liveAt } = useLiveData(fetchReports, { tables: ['reports'] })
 
   const current = reports[sel] || null
 
@@ -89,11 +98,12 @@ export default function AdminReports() {
         .update({ status: 'rejected', rejected_at: new Date().toISOString(), rejection_reason: reason || 'تم الرفض من قبل الإدارة' })
         .eq('id', current.id)
       if (error) throw error
-      // Refund the credit deducted at submission
-      await supabase.from('credits_ledger').insert([{
-        tenant_id: current.reporter_tenant_id, report_id: current.id, amount: 1,
-        reason: 'report_rejected_refund', created_at: new Date().toISOString(),
-      }])
+      // No refund is written. This inserted one credit with reason
+      // 'report_rejected_refund' — a value the CHECK constraint has never
+      // allowed, so the write always failed, and its error was never read. It
+      // was refunding a deduction that no longer happens either: submitting a
+      // report costs nothing, and approval is what pays. Rejecting therefore
+      // has nothing to reverse.
       await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_rejected', entity: 'report', entity_id: current.id, meta: JSON.stringify({ reason }), created_at: new Date().toISOString() }])
       await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_rejected', title: 'تم رفض تقريرك', message: reason || 'راجع ملاحظات الإدارة.', is_read: false, created_at: new Date().toISOString() }])
       showToast('تم رفض التقرير')

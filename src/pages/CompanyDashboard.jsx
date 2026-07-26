@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
@@ -22,8 +24,12 @@ export default function CompanyDashboard() {
   const [activity, setActivity] = useState([])
   const [contribPct, setContribPct] = useState('0')
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
+  // Lifted out of the effect so the realtime subscription can call it. The
+  // dashboard already knew how to load itself; making that reusable is the
+  // whole change — no screen learns to apply an insert or a delete to its own
+  // shape, which would be three more code paths per screen, each able to drift
+  // from the query that produced the original.
+  const loadDashboardData = useCallback(async () => {
       try {
         const supabase = getSupabase()
 
@@ -113,12 +119,18 @@ export default function CompanyDashboard() {
       } finally {
         setLoading(false)
       }
-    }
-
-    if (user?.id) {
-      loadDashboardData()
-    }
   }, [user?.id])
+
+  useEffect(() => {
+    if (user?.id) loadDashboardData()
+  }, [user?.id, loadDashboardData])
+
+  // Anything that moves a number on this screen: a report reviewed, credits
+  // granted, a watchlist entry added by a colleague, a score recomputed.
+  const { connected, liveAt } = useLiveData(loadDashboardData, {
+    tables: ['reports', 'credits_ledger', 'watchlist_items', 'trust_scores', 'notifications'],
+    enabled: !!user?.id,
+  })
 
   if (loading || roleLoading || systemStatus.isLoading) {
     return (
@@ -150,9 +162,12 @@ export default function CompanyDashboard() {
 
   return (
     <div>
-      <div style={{ marginBottom: '22px' }}>
-        <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
-        <p style={{ fontSize: '15px', color: '#64748B', margin: 0, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
+      <div style={{ marginBottom: '22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
+          <p style={{ fontSize: '15px', color: '#64748B', margin: 0, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
 
       {/* KPIs Grid */}
