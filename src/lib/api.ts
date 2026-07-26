@@ -122,6 +122,22 @@ export function buildCompanyInsert(input: CompanyInsertInput): Record<string, an
   }
 }
 
+/**
+ * The Supabase client, carrying the signed-in user's Clerk identity.
+ *
+ * Every request used to go out with the anon key alone, which is published in
+ * the browser bundle and identifies nobody. Row-level security had nothing to
+ * work with: policies calling auth.uid() saw null, so the tables with RLS on
+ * were shut to everyone, and the tables with it off were open to everyone.
+ *
+ * The accessToken callback hands Supabase the Clerk session token instead.
+ * Supabase is configured to trust Clerk as a third-party provider, verifies it
+ * against Clerk's keys, and auth.jwt() ->> 'sub' becomes the Clerk user id that
+ * public.users is keyed by — which is what the policies compare against.
+ *
+ * Returning null is the signed-out case and falls back to the anon key, which
+ * is correct: a visitor reading public company data has no identity to present.
+ */
 export function getSupabase(): SupabaseClient {
   if (!supabaseClient) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -131,7 +147,22 @@ export function getSupabase(): SupabaseClient {
       throw new Error('Supabase configuration missing')
     }
 
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      accessToken: async () => {
+        try {
+          // Read Clerk off the window rather than through a hook: this module is
+          // imported by plain functions as well as components, and a hook here
+          // would restrict where data access may happen.
+          const clerk = (globalThis as any).Clerk
+          if (!clerk?.session) return null
+          return (await clerk.session.getToken()) ?? null
+        } catch {
+          // A token that cannot be fetched must not take the request down with
+          // it; the request proceeds unauthenticated and RLS decides.
+          return null
+        }
+      },
+    })
   }
 
   return supabaseClient
