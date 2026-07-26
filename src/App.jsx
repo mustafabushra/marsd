@@ -27,6 +27,7 @@ import Search from './pages/Search'
 import AddCompany from './pages/AddCompany'
 import AddReport from './pages/AddReport'
 import MyReports from './pages/MyReports'
+import MyCompanies from './pages/MyCompanies'
 import TrustReport from './pages/TrustReport'
 import Watchlist from './pages/Watchlist'
 import Compare from './pages/Compare'
@@ -156,6 +157,7 @@ function AppContent() {
           <Route path="/add-company" element={<CompanyRoute><AddCompany /></CompanyRoute>} />
           <Route path="/add-report" element={<CompanyRoute><AddReport /></CompanyRoute>} />
           <Route path="/my-reports" element={<CompanyRoute><MyReports /></CompanyRoute>} />
+          <Route path="/my-companies" element={<CompanyRoute><MyCompanies /></CompanyRoute>} />
           <Route path="/trust-report/:id" element={<CompanyRoute><TrustReport /></CompanyRoute>} />
           <Route path="/watchlist" element={<CompanyRoute><Watchlist /></CompanyRoute>} />
           <Route path="/compare" element={<CompanyRoute><Compare /></CompanyRoute>} />

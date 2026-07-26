@@ -6,7 +6,7 @@ import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
 import { useEntitlements } from '../hooks/useEntitlements'
-import { UNLIMITED } from '../lib/entitlements'
+import { isPaidWithCredits, spendCredits, UNLIMITED } from '../lib/entitlements'
 import { hasViewedCompany, recordCompanyView } from '../lib/companyViews'
 import { LimitReached } from '../components/LimitGate'
 
@@ -40,13 +40,17 @@ export default function TrustReport() {
         const tenantId = entitlements?.tenantId
         const ceiling = limitOf('searches_per_month')
         let alreadySeen = true
+        let payWithCredits = false
 
         if (tenantId && ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
           alreadySeen = await hasViewedCompany(tenantId, id)
-          if (!alreadySeen && remaining('searches_per_month') <= 0) {
-            setQuotaBlocked(true)
-            setLoading(false)
-            return
+          if (!alreadySeen) {
+            if (remaining('searches_per_month') <= 0) {
+              setQuotaBlocked(true)
+              setLoading(false)
+              return
+            }
+            payWithCredits = isPaidWithCredits(entitlements, 'searches_per_month')
           }
         } else if (tenantId) {
           alreadySeen = await hasViewedCompany(tenantId, id)
@@ -109,6 +113,13 @@ export default function TrustReport() {
         // this company is opened this month. Recording before the fetch would
         // bill a member for a page that then failed.
         if (entitlements?.tenantId && !alreadySeen) {
+          // Past the plan's own allowance, the lookup is paid for out of the
+          // balance. The debit runs first: recording the view without it would
+          // consume the lookup and leave the balance untouched.
+          if (payWithCredits) {
+            const paid = await spendCredits(entitlements, 'search_unlock')
+            if (!paid) { setQuotaBlocked(true); setLoading(false); return }
+          }
           await recordCompanyView(entitlements.tenantId, id, null)
           await refreshEntitlements()
         }

@@ -30,6 +30,12 @@ const SERVICE_KEY = clean(process.env.SUPABASE_SERVICE_ROLE_KEY)
 // that says which one was wrong.
 const EARN_ACTIONS = ['company_added', 'company_completed', 'documents_uploaded', 'report_approved']
 
+// Spending draws the balance down. It runs here for the same reason earning
+// does — the ledger takes writes only from the server — and it checks the
+// balance in the same request that debits it, so a client cannot spend what it
+// does not have by asking twice at once.
+const SPEND_ACTIONS = ['search_unlock']
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -57,7 +63,8 @@ export default async function handler(req, res) {
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
     const action = String(body.action || '')
-    if (!EARN_ACTIONS.includes(action)) {
+    const spending = SPEND_ACTIONS.includes(action)
+    if (!spending && !EARN_ACTIONS.includes(action)) {
       return res.status(400).json({ error: `إجراء غير معروف: ${action || '—'}` })
     }
 
@@ -90,6 +97,34 @@ export default async function handler(req, res) {
     }
 
     const rules = setting?.value || {}
+
+    // Spending: read the balance and debit it in the same request. The balance
+    // is the sum of the ledger rather than a stored figure, so it cannot drift
+    // from the entries that produced it.
+    if (spending) {
+      const cost = Number(rules.spend?.[action]?.points) || 0
+      if (cost <= 0) return res.status(200).json({ spent: 0, reason: 'لا تكلفة لهذا الإجراء' })
+
+      const { data: ledger, error: balErr } = await supabase
+        .from('credits_ledger').select('amount').eq('tenant_id', tenantId)
+      if (balErr) return res.status(500).json({ error: 'تعذّر قراءة الرصيد' })
+
+      const balance = (ledger || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
+      if (balance < cost) {
+        return res.status(200).json({ spent: 0, balance, reason: 'الرصيد لا يكفي', insufficient: true })
+      }
+
+      const { error: spendErr } = await supabase.from('credits_ledger').insert([{
+        tenant_id: tenantId,
+        user_id: callerId,
+        amount: -cost,
+        reason: action,
+      }])
+      if (spendErr) throw spendErr
+
+      return res.status(200).json({ spent: cost, balance: balance - cost })
+    }
+
     const points = Number(rules.earn?.[action]?.points) || 0
     if (points <= 0) return res.status(200).json({ awarded: 0, reason: 'لا نقاط لهذا الإجراء' })
 

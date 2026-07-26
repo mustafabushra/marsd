@@ -42,10 +42,21 @@ export function can(entitlements, feature) {
 /**
  * How many of `key` remain this period.
  *
- * Credits extend the ceiling rather than replacing it: on a Give-to-Get plan a
- * tenant that has earned points can go past the plan's own limit, which is the
- * whole point of the arrangement. Returns Infinity when unlimited.
+ * The plan's own allowance is consumed first; credits are what is left after it
+ * runs out, and they are spent — not added to a ceiling that resets. That
+ * distinction matters more than it looks: while credits merely widened the
+ * limit, earning 200 points once bought 200 extra lookups every month
+ * thereafter, for ever. A single month's contribution became a permanent
+ * upgrade, which is not an exchange.
+ *
+ * Only searching draws on credits today, so only that key is offered the
+ * balance. A limit nothing spends against would otherwise appear to be
+ * extendable and never actually extend.
+ *
+ * Returns Infinity when unlimited.
  */
+const SPENDABLE = new Set(['searches_per_month'])
+
 export function remaining(entitlements, key) {
   if (!entitlements) return 0
   if (entitlements.degraded || entitlements.enforcementDisabled) return Infinity
@@ -54,10 +65,21 @@ export function remaining(entitlements, key) {
   if (ceiling === UNLIMITED) return Infinity
 
   const used = entitlements.usage?.[key] || 0
-  const base = Math.max(0, ceiling - used)
+  const fromPlan = Math.max(0, ceiling - used)
 
-  if (!entitlements.giveToGetEnabled) return base
-  return base + Math.max(0, entitlements.credits || 0)
+  if (!entitlements.giveToGetEnabled || !SPENDABLE.has(key)) return fromPlan
+
+  const cost = Number(entitlements.giveToGetRules?.spend?.search_unlock?.points) || 1
+  const fromCredits = Math.floor(Math.max(0, entitlements.credits || 0) / cost)
+  return fromPlan + fromCredits
+}
+
+/** Is this lookup being paid for with credits rather than the plan's allowance? */
+export function isPaidWithCredits(entitlements, key) {
+  if (!entitlements?.giveToGetEnabled || !SPENDABLE.has(key)) return false
+  const ceiling = limitOf(entitlements, key)
+  if (ceiling === UNLIMITED) return false
+  return (entitlements.usage?.[key] || 0) >= ceiling
 }
 
 /** Whether one more of `key` is permitted right now. */
@@ -208,6 +230,37 @@ async function callAwardEndpoint(payload) {
 export async function awardCredits(entitlements, action, { reportId = null } = {}) {
   if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
   return callAwardEndpoint({ action, reportId })
+}
+
+/**
+ * Draw the balance down for something the plan's allowance no longer covers.
+ *
+ * The server checks the balance in the same request that debits it, so this
+ * cannot be raced into an overdraft by asking twice at once. Returns true when
+ * the spend succeeded — or when there was nothing to spend, which is the case
+ * on a paid plan and means the caller should simply proceed.
+ */
+export async function spendCredits(entitlements, action) {
+  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return true
+
+  try {
+    const clerk = globalThis.Clerk
+    const token = clerk?.session ? await clerk.session.getToken() : null
+    if (!token) return false
+
+    const resp = await fetch('/api/award-credits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action }),
+    })
+    if (!(resp.headers.get('content-type') || '').includes('application/json')) return false
+
+    const data = await resp.json().catch(() => null)
+    return !!data && Number(data.spent) > 0
+  } catch (err) {
+    console.error('Failed to spend credits:', err)
+    return false
+  }
 }
 
 /**
