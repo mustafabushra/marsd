@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { awardCreditsToTenant } from '../lib/entitlements'
+import { notifyTenant } from '../lib/notify'
 
 const FIELD_LABELS = {
   name: 'اسم الشركة', name_en: 'الاسم (إنجليزي)', cr_number: 'رقم السجل التجاري', unified_number: 'الرقم الموحّد (700)',
@@ -108,47 +109,92 @@ export default function AdminRequests() {
       : 0
   }
 
+  // Who filed this, so the decision can be told to them. companies carries no
+  // submitter, so for an added company the contributor is read from the audit
+  // entry written when it was filed; a data request names its own tenant.
+  const contributorOf = async (supabase, item) => {
+    if (item.kind === 'add_company') {
+      const { data } = await supabase
+        .from('audit_logs')
+        .select('tenant_id')
+        .eq('action', 'company_add_requested')
+        .eq('entity_id', item.companyId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      return data?.tenant_id || null
+    }
+    const { data } = await supabase
+      .from('company_data_requests')
+      .select('tenant_id')
+      .eq('id', item.requestId)
+      .maybeSingle()
+    return data?.tenant_id || null
+  }
+
+  // Every write here is read back. A row RLS filters out of an UPDATE matches
+  // nothing and raises nothing, so "no error" is not evidence that a request was
+  // approved — and this screen grants credits on the strength of that belief.
+  const wrote = async (query, message) => {
+    const { data, error } = await query.select('id')
+    if (error) throw error
+    if (!data?.length) throw new Error(message)
+    return data
+  }
+
   const approve = async () => {
     if (!current) return
     let awarded = 0
     try {
       setActionLoading(true)
       const supabase = getSupabase()
+      const contributor = await contributorOf(supabase, current)
+
       if (current.kind === 'add_company') {
-        const { error } = await supabase.from('companies').update({ approved: true, status: 'active' }).eq('id', current.companyId)
-        if (error) throw error
+        await wrote(
+          supabase.from('companies').update({ approved: true, status: 'active' }).eq('id', current.companyId),
+          'لم تُحفظ الموافقة على الشركة — تحقّق من صلاحيتك')
         await audit(supabase, 'company_approved', current.companyId)
 
-        // Credit the company that contributed the entry, now that it has been
-        // verified. companies carries no submitter, so the contributor is read
-        // from the audit entry written when it was filed.
-        const { data: origin } = await supabase
-          .from('audit_logs')
-          .select('tenant_id')
-          .eq('action', 'company_add_requested')
-          .eq('entity_id', current.companyId)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-
-        if (origin?.tenant_id) {
-          awarded = await awardCreditsToTenant(origin.tenant_id, 'company_added')
-        }
+        if (contributor) awarded = await awardCreditsToTenant(contributor, 'company_added')
       } else if (current.kind === 'add_data') {
         const p = current.payload || {}
         const update = {}
         Object.keys(p).forEach((k) => { if (p[k]) update[k] = p[k] })
-        if (Object.keys(update).length) await supabase.from('companies').update(update).eq('id', current.companyId)
-        await supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId)
+        if (Object.keys(update).length) {
+          await wrote(
+            supabase.from('companies').update(update).eq('id', current.companyId),
+            'لم تُحفظ بيانات الشركة — تحقّق من صلاحيتك')
+        }
+        await wrote(
+          supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId),
+          'لم تُحفظ حالة الطلب')
         await audit(supabase, 'company_data_added', current.companyId, update)
         awarded = await awardForDataRequest(supabase, current.requestId)
       } else if (current.kind === 'edit_data') {
         const p = current.payload || {}
-        if (p.field && p.correct_value != null) await supabase.from('companies').update({ [p.field]: p.correct_value }).eq('id', current.companyId)
-        await supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId)
+        if (p.field && p.correct_value != null) {
+          await wrote(
+            supabase.from('companies').update({ [p.field]: p.correct_value }).eq('id', current.companyId),
+            'لم يُحفظ التصحيح — تحقّق من صلاحيتك')
+        }
+        await wrote(
+          supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId),
+          'لم تُحفظ حالة الطلب')
         await audit(supabase, 'company_data_edited', current.companyId, p)
         awarded = await awardForDataRequest(supabase, current.requestId)
       }
+
+      if (contributor) {
+        await notifyTenant(contributor, 'company_approved', {
+          title: 'قُبلت مساهمتك',
+          message: awarded > 0
+            ? `أُضيفت ${awarded} نقطة لرصيدك مقابل «${current.name || 'الشركة'}».`
+            : `اعتُمدت مساهمتك في «${current.name || 'الشركة'}».`,
+          meta: { company_id: current.companyId, credits: awarded },
+        })
+      }
+
       showToast(awarded > 0 ? `✅ تمت الموافقة ومُنحت ${awarded} نقطة للشركة المساهِمة` : '✅ تمت الموافقة')
       removeCurrent()
     } catch (err) {
@@ -162,13 +208,30 @@ export default function AdminRequests() {
     try {
       setActionLoading(true)
       const supabase = getSupabase()
+      const contributor = await contributorOf(supabase, current)
+
       if (current.kind === 'add_company') {
-        await supabase.from('companies').delete().eq('id', current.companyId)
+        // Read the contributor before the row goes: the audit entry survives the
+        // delete, but reading it afterwards depends on nothing having cascaded.
+        const { data, error } = await supabase.from('companies').delete().eq('id', current.companyId).select('id')
+        if (error) throw error
+        if (!data?.length) throw new Error('لم يُحذف السجل — تحقّق من صلاحيتك')
         await audit(supabase, 'company_add_rejected', current.companyId)
       } else {
-        await supabase.from('company_data_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', current.requestId)
+        await wrote(
+          supabase.from('company_data_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', current.requestId),
+          'لم يُحفظ الرفض — تحقّق من صلاحيتك')
         await audit(supabase, 'company_data_rejected', current.companyId)
       }
+
+      if (contributor) {
+        await notifyTenant(contributor, 'report_rejected', {
+          title: 'لم تُقبل مساهمتك',
+          message: `راجَعت إدارة مرصد مساهمتك في «${current.name || 'الشركة'}» ولم تُعتمد.`,
+          meta: { company_id: current.companyId },
+        })
+      }
+
       showToast('تم رفض الطلب')
       removeCurrent()
     } catch (err) {

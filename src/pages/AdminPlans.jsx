@@ -78,8 +78,12 @@ export default function AdminPlans() {
     try {
       setBusyId(plan.id)
       const supabase = getSupabase()
-      const { error: e } = await supabase.from('plans').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', plan.id)
+      const { data, error: e } = await supabase.from('plans').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', plan.id).select('id')
       if (e) throw e
+      // An UPDATE that RLS filters out matches nothing and raises nothing. On
+      // this screen that would mean an operator believing a plan limit was
+      // raised while every company stayed capped at the old one.
+      if (!data?.length) throw new Error('لم يُحفظ التعديل — تحقّق من صلاحيتك')
       await load()
       showToast(message)
     } catch (err) {

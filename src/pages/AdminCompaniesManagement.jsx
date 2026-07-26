@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase, trustScoreOf } from '../lib/api'
+import { notifyTenant } from '../lib/notify'
 
 const riskFrom = (score) => {
   if (score == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B' }
@@ -67,8 +68,22 @@ export default function AdminCompaniesManagement() {
     try {
       setBusy(true)
       const supabase = getSupabase()
-      const { error } = await supabase.from('companies').update({ status }).eq('id', company.id)
+      const { data, error } = await supabase.from('companies').update({ status }).eq('id', company.id).select('id, status')
       if (error) throw error
+      // An UPDATE that RLS filters out matches nothing and raises nothing.
+      if (!data?.length) throw new Error('لم تُحفظ الحالة — تحقّق من صلاحيتك')
+
+      // If a tenant owns this company record, the change is about them.
+      const { data: owner } = await supabase.from('tenants').select('id').eq('company_id', company.id).maybeSingle()
+      if (owner?.id) {
+        await notifyTenant(owner.id, 'company_data_updated', {
+          title: status === 'suspended' ? 'عُلِّق سجل شركتك' : 'أُعيد تفعيل سجل شركتك',
+          message: status === 'suspended'
+            ? `لم يعد سجل «${company.name}» ظاهراً في نتائج البحث.`
+            : `عاد سجل «${company.name}» للظهور في مرصد.`,
+          meta: { company_id: company.id, status },
+        })
+      }
       await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: status === 'suspended' ? 'company_suspended' : 'company_reactivated', entity: 'company', entity_id: company.id, created_at: new Date().toISOString() }])
       setCompanies((prev) => prev.map((c) => (c.id === company.id ? { ...c, status } : c)))
       setDrawer((d) => (d && d.id === company.id ? { ...d, status } : d))

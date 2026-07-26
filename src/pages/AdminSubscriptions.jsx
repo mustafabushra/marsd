@@ -1,237 +1,210 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
-import { AlertCircle } from 'lucide-react'
+import { notifyTenant } from '../lib/notify'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+
+/**
+ * /admin/subscriptions — which plan each company is on, and until when.
+ *
+ * The screen has never displayed a subscription. Its select asked for
+ * plans(name, price) — the column is price_monthly — and PostgREST rejects the
+ * whole request when one embedded column is unknown, so subsData came back null
+ * every time and the list rendered empty. The formatter then read s.start_date,
+ * s.end_date, s.plan_name and s.price, none of which exist either; the columns
+ * are current_period_start and current_period_end, and the price belongs to the
+ * plan. Four wrong names in one screen, none of which could produce a visible
+ * error because the first one already emptied the list.
+ *
+ * Renewing wrote end_date and did not read the row back, so it reported success
+ * on a column that is not there.
+ *
+ * Changing what a company is subscribed to is a decision about that company.
+ * It now tells them.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+const COLS = '1.6fr 1.2fr 1fr 1.2fr 1fr 1.4fr'
+
+const STATUS = {
+  active:   { label: 'نشط',   bg: '#ECFDF5', c: '#15803D' },
+  past_due: { label: 'متأخر', bg: '#FFFBEB', c: '#B45309' },
+  canceled: { label: 'ملغى',  bg: '#FEE2E2', c: '#DC2626' },
+  expired:  { label: 'منتهٍ', bg: '#F1F5F9', c: '#64748B' },
+}
+
+const RENEW_DAYS = 30
 
 export default function AdminSubscriptions() {
-  const [subscriptions, setSubscriptions] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [updateLoading, setUpdateLoading] = useState(null)
+  const { user } = useUser()
+  const [rows, setRows] = useState([])
+  const [plans, setPlans] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState(null)
+  const [toast, setToast] = useState('')
 
-  useEffect(() => {
-    fetchSubscriptions()
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4500) }
+
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const supabase = getSupabase()
+      const [{ data, error: e }, { data: planRows }] = await Promise.all([
+        supabase
+          .from('subscriptions')
+          .select(`
+            id, tenant_id, plan_id, status, current_period_start, current_period_end, created_at,
+            tenants ( id, name ),
+            plans ( id, code, name, price_monthly )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase.from('plans').select('id, code, name, price_monthly, active').order('sort_order'),
+      ])
+      if (e) throw e
+      setRows(data || [])
+      setPlans(planRows || [])
+    } catch (err) {
+      setError(err.message || 'تعذّر تحميل الاشتراكات')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const fetchSubscriptions = async () => {
+  useEffect(() => { load() }, [load])
+
+  const { connected, liveAt } = useLiveData(load, { tables: ['subscriptions', 'plans', 'tenants'] })
+
+  const save = async (row, patch, notice) => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setBusyId(row.id)
       const supabase = getSupabase()
 
-      // Fetch subscriptions with tenant and plan info
-      const { data: subsData, error: subsError } = await supabase
+      const { data, error: e } = await supabase
         .from('subscriptions')
-        .select(`
-          *,
-          tenant:tenants(id, name),
-          plan:plans(name, price),
-          users:tenants(users(id))
-        `)
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', row.id)
+        .select('id, status, plan_id, current_period_end')
+      if (e) throw e
+      // An UPDATE filtered out by RLS matches nothing and reports nothing.
+      if (!data?.length) throw new Error('لم يُحفظ التغيير — تحقّق من صلاحيتك')
 
-      if (subsError) throw new Error(subsError.message)
+      await supabase.from('audit_logs').insert([{
+        actor_id: user?.id,
+        action: 'subscription_changed',
+        entity: 'subscription',
+        entity_id: row.id,
+        tenant_id: row.tenant_id,
+        meta: JSON.stringify(patch),
+        created_at: new Date().toISOString(),
+      }])
 
-      // Format the data
-      const formatted = (subsData || []).map(s => ({
-        id: s.id,
-        tenant: s.tenant?.name || 'مجهولة',
-        plan: s.plan_name || 'basic',
-        status: s.status || 'active',
-        startDate: new Date(s.start_date).toLocaleDateString('en-GB'),
-        endDate: new Date(s.end_date).toLocaleDateString('en-GB'),
-        amount: s.price || 0,
-        users: s.users?.length || 0,
-      }))
+      await notifyTenant(row.tenant_id, 'subscription_changed', {
+        title: 'تغيّر اشتراكك',
+        message: notice,
+        meta: { subscription_id: row.id, ...patch },
+      })
 
-      setSubscriptions(formatted)
+      await load()
+      showToast(`✅ ${notice}`)
     } catch (err) {
-      setError(err.message || 'حدث خطأ في تحميل الاشتراكات')
-      console.error('Error fetching subscriptions:', err)
+      showToast(`❌ ${err.message}`)
     } finally {
-      setIsLoading(false)
+      setBusyId(null)
     }
   }
 
-  const handleRenew = async (id) => {
-    try {
-      setUpdateLoading(id)
-      const supabase = getSupabase()
-      const newEndDate = new Date()
-      newEndDate.setDate(newEndDate.getDate() + 90)
-
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({
-          status: 'active',
-          end_date: newEndDate.toISOString(),
-        })
-        .eq('id', id)
-
-      if (error) throw new Error(error.message)
-
-      setSubscriptions(subscriptions.map(s =>
-        s.id === id
-          ? {
-              ...s,
-              status: 'active',
-              startDate: new Date().toLocaleDateString('en-GB'),
-              endDate: newEndDate.toLocaleDateString('en-GB'),
-            }
-          : s
-      ))
-      setError(null)
-    } catch (err) {
-      setError(err.message || 'فشل تجديد الاشتراك')
-      console.error('Error renewing subscription:', err)
-    } finally {
-      setUpdateLoading(null)
-    }
+  const renew = (row) => {
+    const from = row.current_period_end && new Date(row.current_period_end) > new Date()
+      ? new Date(row.current_period_end)   // extend, don't shorten an unexpired term
+      : new Date()
+    const end = new Date(from)
+    end.setDate(end.getDate() + RENEW_DAYS)
+    return save(row,
+      { status: 'active', current_period_start: new Date().toISOString(), current_period_end: end.toISOString() },
+      `جُدّد اشتراكك حتى ${end.toLocaleDateString('en-GB')}`)
   }
 
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
-          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل الاشتراكات...</p>
-        </div>
-      </div>
-    )
+  const changePlan = (row, planId) => {
+    const plan = plans.find((p) => p.id === planId)
+    if (!plan || planId === row.plan_id) return
+    return save(row, { plan_id: planId }, `أصبحت باقتك «${plan.name}»`)
+  }
+
+  const cancel = (row) => save(row, { status: 'canceled' }, 'أُلغي اشتراكك — حسابك على الباقة الافتراضية')
+
+  const daysLeft = (row) => {
+    if (!row.current_period_end) return null
+    return Math.ceil((new Date(row.current_period_end) - new Date()) / 86400000)
+  }
+
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل الاشتراكات...</div>
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-          إدارة الاشتراكات
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          إدارة اشتراكات الشركات والباقات ({subscriptions.length})
-        </p>
-      </div>
-
-      {/* Error Alert */}
-      {error && (
-        <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <AlertCircle size={20} color='#991B1B' style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
-            <p style={{ fontWeight: 600, color: '#991B1B', margin: '0 0 4px', fontSize: '14px' }}>خطأ</p>
-            <p style={{ fontSize: '13px', color: '#7F1D1D', margin: 0 }}>{error}</p>
-          </div>
-        </div>
+    <div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '460px', lineHeight: 1.8 }}>{toast}</div>
       )}
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>الاشتراكات النشطة</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#16A34A', margin: 0, textAlign: 'right' }}>
-            {subscriptions.filter(s => s.status === 'active').length}
-          </p>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px', textAlign: 'right' }}>الاشتراكات</h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>{rows.length} اشتراكاً · كل تغيير هنا يصل الشركة إشعاراً</p>
         </div>
-
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>إجمالي الإيرادات الشهرية</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#0369A1', margin: 0, textAlign: 'right' }}>
-            {subscriptions.filter(s => s.status === 'active').reduce((sum, s) => sum + s.amount, 0).toLocaleString('en-US')} ر.س
-          </p>
-        </div>
-
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>الاشتراكات منتهية الصلاحية</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#DC2626', margin: 0, textAlign: 'right' }}>
-            {subscriptions.filter(s => s.status === 'expired').length}
-          </p>
-        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
 
-      {/* Table */}
-      <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>الشركة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>الباقة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>المبلغ</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>المستخدمون</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>تاريخ الانتهاء</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>الحالة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569' }}>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subscriptions.map(sub => (
-              <tr key={sub.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {sub.tenant}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#475569', borderLeft: '1px solid #E2E8F0' }}>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '4px 10px',
-                    background: sub.plan === 'enterprise' ? '#F0E5FF' : sub.plan === 'pro' ? '#E0F2FE' : '#F0F0F0',
-                    color: sub.plan === 'enterprise' ? '#7C3AED' : sub.plan === 'pro' ? '#0369A1' : '#64748B',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}>
-                    {sub.plan === 'enterprise' ? 'مؤسسات' : sub.plan === 'pro' ? 'احترافية' : 'أساسية'}
-                  </span>
-                </td>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {sub.amount.toLocaleString('en-US')} ر.س
-                </td>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', borderLeft: '1px solid #E2E8F0' }}>
-                  {sub.users}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#64748B', borderLeft: '1px solid #E2E8F0' }}>
-                  {sub.endDate}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', borderLeft: '1px solid #E2E8F0' }}>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '4px 10px',
-                    background: sub.status === 'active' ? '#DCFCE7' : '#FEE2E2',
-                    color: sub.status === 'active' ? '#15803D' : '#DC2626',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}>
-                    {sub.status === 'active' ? 'نشط' : 'منتهي'}
-                  </span>
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px' }}>
-                  {sub.status !== 'active' && (
-                    <button
-                      onClick={() => handleRenew(sub.id)}
-                      disabled={updateLoading === sub.id}
-                      style={{
-                        padding: '6px 12px',
-                        background: updateLoading === sub.id ? '#E2E8F0' : '#16A34A',
-                        color: updateLoading === sub.id ? '#94A3B8' : '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: updateLoading === sub.id ? 'not-allowed' : 'pointer',
-                        opacity: updateLoading === sub.id ? 0.7 : 1,
-                      }}
-                    >
-                      {updateLoading === sub.id ? 'جاري...' : 'تجديد'}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {error && (
+        <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>⚠️ {error}</div>
+      )}
 
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
+          <span>الشركة</span><span>الباقة</span><span>الشهري</span><span>ينتهي</span><span>الحالة</span><span>الإجراءات</span>
+        </div>
+
+        {rows.length === 0 ? (
+          <div style={{ padding: '44px', textAlign: 'center', color: '#64748B', fontSize: '14px', fontWeight: 600 }}>لا توجد اشتراكات</div>
+        ) : rows.map((row) => {
+          const s = STATUS[row.status] || { label: row.status, bg: '#F1F5F9', c: '#64748B' }
+          const left = daysLeft(row)
+          return (
+            <div key={row.id} style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', textAlign: 'right', opacity: busyId === row.id ? 0.55 : 1 }}>
+              <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{row.tenants?.name || '—'}</span>
+
+              <select
+                value={row.plan_id || ''}
+                onChange={(e) => changePlan(row, e.target.value)}
+                disabled={busyId === row.id}
+                style={{ border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '7px 10px', fontSize: '13px', fontFamily: 'inherit', background: '#fff', maxWidth: '140px' }}
+              >
+                {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+
+              <span style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>
+                {Number(row.plans?.price_monthly || 0).toLocaleString('en-US')} ر.س
+              </span>
+
+              <span style={{ fontSize: '13px', color: left != null && left < 7 ? '#B45309' : '#64748B', fontWeight: 700 }}>
+                {row.current_period_end ? new Date(row.current_period_end).toLocaleDateString('en-GB') : '—'}
+                {left != null && <span style={{ fontSize: '11.5px', display: 'block', color: '#94A3B8' }}>{left >= 0 ? `${left} يوماً` : 'منتهٍ'}</span>}
+              </span>
+
+              <span><span style={{ background: s.bg, color: s.c, borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>{s.label}</span></span>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={() => renew(row)} disabled={busyId === row.id} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '8px', padding: '7px 13px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>تجديد {RENEW_DAYS} يوماً</button>
+                {row.status === 'active' && (
+                  <button onClick={() => cancel(row)} disabled={busyId === row.id} style={{ background: '#FEE2E2', color: '#B91C1C', border: 0, borderRadius: '8px', padding: '7px 13px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

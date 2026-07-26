@@ -1,124 +1,155 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { notifyUser } from '../lib/notify'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+
+/**
+ * /admin/claim-requests — someone says a company in the registry is theirs.
+ *
+ * Approving a claim is the moment a person becomes a customer, and every step of
+ * it was broken:
+ *
+ *   · The notification named user_id and omitted tenant_id, which is NOT NULL,
+ *     so the insert always failed — and its error was swallowed by
+ *     .catch(console.warn). It also JSON.stringify'd the payload into a jsonb
+ *     column, so payload.message would have been undefined even had it landed.
+ *     The notifications table holds zero rows; not one claimant has ever been
+ *     told anything.
+ *
+ *   · The check for an existing tenant was .eq('id', userId) — a Clerk text id
+ *     compared against a uuid primary key, with a .catch swallowing the type
+ *     error. It could never match, so every approval took the create-a-tenant
+ *     branch.
+ *
+ *   · That branch selected companies.email, which does not exist — the column is
+ *     official_email — so the select was rejected, company came back null, and
+ *     the next line read company.name off it.
+ *
+ *   · And the user was linked with users.company_id while the whole application
+ *     reads users.tenant_id. Even past the crash, the claimant would have ended
+ *     up outside the tenant that had just been created for them.
+ *
+ * Approving a claim is now one thing: attach the claimant to the tenant that
+ * owns the company, creating that tenant if the company has none, and tell them.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
 
 export default function AdminClaimRequests() {
+  const { user } = useUser()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedRequest, setSelectedRequest] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [processingId, setProcessingId] = useState(null)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
 
-  useEffect(() => {
-    fetchClaimRequests()
-  }, [])
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4500) }
 
-  const fetchClaimRequests = async () => {
-    setLoading(true)
+  const load = useCallback(async () => {
     try {
-      const supabase = getSupabase()
-      // Query pending claim requests
-      const { data, error: fetchError } = await supabase
+      setError('')
+      const { data, error: e } = await getSupabase()
         .from('claim_requests')
         .select(`
-          id,
-          company_id,
-          user_id,
-          status,
-          submitted_at,
-          companies (id, name, cr_number),
-          users (id, email, first_name, last_name)
+          id, company_id, user_id, status, submitted_at, rejection_reason,
+          companies ( id, name, cr_number, city, sector ),
+          users ( id, email, first_name, last_name )
         `)
         .eq('status', 'pending')
         .order('submitted_at', { ascending: false })
-
-      if (fetchError) throw fetchError
+      if (e) throw e
       setRequests(data || [])
     } catch (err) {
       setError(err.message || 'فشل تحميل طلبات الملكية')
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const { connected, liveAt } = useLiveData(load, { tables: ['claim_requests'] })
+
+  /** The tenant that owns this company, created if there is none. */
+  const tenantForCompany = async (companyId) => {
+    const supabase = getSupabase()
+
+    const { data: existing } = await supabase
+      .from('tenants').select('id').eq('company_id', companyId).maybeSingle()
+    if (existing?.id) return existing.id
+
+    // official_email, not email. The old code asked for a column that does not
+    // exist, which rejects the whole select rather than returning it null.
+    const { data: company, error: cErr } = await supabase
+      .from('companies')
+      .select('name, cr_number, official_email, phone, sector, city')
+      .eq('id', companyId)
+      .single()
+    if (cErr) throw cErr
+
+    const { data: created, error: tErr } = await supabase
+      .from('tenants')
+      .insert([{
+        name: company.name,
+        cr_number: company.cr_number,
+        email: company.official_email || '',   // NOT NULL, may be blank
+        phone: company.phone || '',
+        sector: company.sector || '',
+        city: company.city || '',
+        company_id: companyId,
+        status: 'active',
+      }])
+      .select('id')
+    if (tErr) throw tErr
+    if (!created?.length) throw new Error('تعذّر إنشاء كيان الشركة')
+    return created[0].id
   }
 
-  const handleApproveClaim = async (claimId, userId, companyId) => {
+  const approve = async (req) => {
     if (processingId) return
-    setProcessingId(claimId)
+    setProcessingId(req.id)
     setError('')
-
     try {
       const supabase = getSupabase()
+      const tenantId = await tenantForCompany(req.company_id)
 
-      // Update claim status
-      const { error: updateError } = await supabase
-        .from('claim_requests')
-        .update({
-          status: 'approved',
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', claimId)
-
-      if (updateError) throw updateError
-
-      // Create or update tenant for this user
-      const { data: existingTenant } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('id', userId) // Assuming user_id might be tenant_id too
-        .single()
-        .catch(() => ({ data: null }))
-
-      if (!existingTenant) {
-        // Create new tenant for this user
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name, cr_number, email, phone, sector, city')
-          .eq('id', companyId)
-          .single()
-
-        const { error: tenantError } = await supabase
-          .from('tenants')
-          .insert([{
-            name: company.name,
-            cr_number: company.cr_number,
-            email: company.email || '',
-            phone: company.phone || '',
-            sector: company.sector || '',
-            city: company.city || '',
-            company_id: companyId,
-            status: 'active'
-          }])
-
-        if (tenantError) throw tenantError
-      }
-
-      // Update user to link to company
-      const { error: userError } = await supabase
+      // tenant_id, not company_id: users.tenant_id is what every screen and
+      // every policy in the platform reads. Writing the other column linked the
+      // claimant to nothing.
+      const { data: linked, error: uErr } = await supabase
         .from('users')
-        .update({
-          company_id: companyId,
-          status: 'active'
-        })
-        .eq('id', userId)
+        .update({ tenant_id: tenantId, role: 'company_admin', status: 'active' })
+        .eq('id', req.user_id)
+        .select('id, tenant_id')
+      if (uErr) throw uErr
+      if (!linked?.length) throw new Error('لم يُربط المستخدم بالشركة — تحقّق من صلاحيتك')
 
-      if (userError) throw userError
+      const { data: claim, error: cErr } = await supabase
+        .from('claim_requests')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user?.id, tenant_id: tenantId })
+        .eq('id', req.id)
+        .select('id, status')
+      if (cErr) throw cErr
+      if (!claim?.length) throw new Error('لم تُحفظ حالة الطلب')
 
-      // Notify user
-      await supabase
-        .from('notifications')
-        .insert([{
-          user_id: userId,
-          type: 'claim_approved',
-          payload: JSON.stringify({
-            message: '✅ تمت الموافقة على طلب ملكيتك!'
-          })
-        }])
-        .catch(err => console.warn('Notification warning:', err))
+      await notifyUser(req.user_id, tenantId, 'claim_approved', {
+        title: 'تمت الموافقة على طلب الملكية',
+        message: `أصبحت مسؤولاً عن «${req.companies?.name}» في مرصد.`,
+        meta: { company_id: req.company_id },
+      })
 
-      // Refresh list
-      await fetchClaimRequests()
-      alert('✅ تمت الموافقة على طلب الملكية')
+      await supabase.from('audit_logs').insert([{
+        actor_id: user?.id, action: 'claim_approved', entity: 'claim_request', entity_id: req.id,
+        meta: JSON.stringify({ company_id: req.company_id, user_id: req.user_id }),
+        created_at: new Date().toISOString(),
+      }])
+
+      await load()
+      showToast('✅ تمت الموافقة، ورُبط الحساب بالشركة')
     } catch (err) {
       setError(err.message || 'فشل الموافقة على الطلب')
     } finally {
@@ -126,48 +157,49 @@ export default function AdminClaimRequests() {
     }
   }
 
-  const handleRejectClaim = async (claimId, userId) => {
-    if (!rejectionReason.trim()) {
-      setError('يجب إدخال سبب الرفض')
-      return
-    }
-
+  const reject = async (req) => {
+    if (!rejectionReason.trim()) { setError('يجب إدخال سبب الرفض'); return }
     if (processingId) return
-    setProcessingId(claimId)
+    setProcessingId(req.id)
     setError('')
-
     try {
       const supabase = getSupabase()
-
-      // Update claim status
-      const { error: updateError } = await supabase
+      const { data, error: e } = await supabase
         .from('claim_requests')
         .update({
           status: 'rejected',
-          rejection_reason: rejectionReason,
-          reviewed_at: new Date().toISOString()
+          rejection_reason: rejectionReason.trim(),
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
         })
-        .eq('id', claimId)
+        .eq('id', req.id)
+        .select('id, status')
+      if (e) throw e
+      if (!data?.length) throw new Error('لم يُحفظ الرفض — تحقّق من صلاحيتك')
 
-      if (updateError) throw updateError
+      // A rejected claimant may have no tenant at all, and tenant_id is NOT
+      // NULL. Where the company already has an owner the message goes there;
+      // otherwise there is nowhere to put it, and the reason is on the row.
+      const { data: owner } = await supabase
+        .from('tenants').select('id').eq('company_id', req.company_id).maybeSingle()
+      if (owner?.id) {
+        await notifyUser(req.user_id, owner.id, 'claim_rejected', {
+          title: 'رُفض طلب الملكية',
+          message: rejectionReason.trim(),
+          meta: { company_id: req.company_id },
+        })
+      }
 
-      // Notify user
-      await supabase
-        .from('notifications')
-        .insert([{
-          user_id: userId,
-          type: 'claim_rejected',
-          payload: JSON.stringify({
-            message: `❌ تم رفض طلب الملكية.\nالسبب: ${rejectionReason}`
-          })
-        }])
-        .catch(err => console.warn('Notification warning:', err))
+      await supabase.from('audit_logs').insert([{
+        actor_id: user?.id, action: 'claim_rejected', entity: 'claim_request', entity_id: req.id,
+        meta: JSON.stringify({ reason: rejectionReason.trim() }),
+        created_at: new Date().toISOString(),
+      }])
 
-      // Refresh list
       setRejectionReason('')
-      await fetchClaimRequests()
-      setSelectedRequest(null)
-      alert('✅ تم رفض الطلب')
+      setSelectedId(null)
+      await load()
+      showToast('تم رفض الطلب')
     } catch (err) {
       setError(err.message || 'فشل رفض الطلب')
     } finally {
@@ -176,160 +208,81 @@ export default function AdminClaimRequests() {
   }
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>جاري التحميل...</div>
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
   }
 
   return (
-    <main style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '24px', textAlign: 'right' }}>
-        طلبات ملكية الشركات
-      </h1>
+    <div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '460px', lineHeight: 1.8 }}>{toast}</div>
+      )}
+
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px', textAlign: 'right' }}>طلبات ملكية الشركات</h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>الموافقة تربط مقدّم الطلب بحساب الشركة مديراً لها</p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
+      </div>
 
       {error && (
-        <div style={{
-          background: '#FEE2E2',
-          color: '#991B1B',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px'
-        }}>
-          {error}
-        </div>
+        <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>⚠️ {error}</div>
       )}
 
       {requests.length === 0 ? (
-        <div style={{
-          background: '#F8FAFC',
-          padding: '40px',
-          borderRadius: '12px',
-          textAlign: 'center',
-          color: '#64748B'
-        }}>
-          لا توجد طلبات ملكية معلقة
+        <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
+          <div style={{ fontSize: '38px', marginBottom: '10px' }}>📭</div>
+          <p style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, margin: 0 }}>لا توجد طلبات ملكية معلّقة</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-          {/* List */}
-          <div>
-            {requests.map(req => (
-              <div
-                key={req.id}
-                onClick={() => setSelectedRequest(req)}
-                style={{
-                  background: selectedRequest?.id === req.id ? '#F0FDF4' : '#fff',
-                  border: selectedRequest?.id === req.id ? '2px solid #16A34A' : '1px solid #E2E8F0',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  marginBottom: '12px',
-                  cursor: 'pointer'
-                }}
-              >
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '4px' }}>
-                  {req.companies.name}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {requests.map((r) => {
+            const busy = processingId === r.id
+            const rejecting = selectedId === r.id
+            const claimant = `${r.users?.first_name || ''} ${r.users?.last_name || ''}`.trim() || r.users?.email || '—'
+            return (
+              <div key={r.id} style={{ ...card, padding: '22px', opacity: busy ? 0.6 : 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
+                  <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>{r.companies?.name || 'شركة'}</h3>
+                    <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
+                      سجل {r.companies?.cr_number || '—'}{r.companies?.city ? ` · ${r.companies.city}` : ''}
+                      <br />
+                      مقدّم الطلب: <strong style={{ color: '#334155' }}>{claimant}</strong> — {r.users?.email}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+                    {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}
+                  </span>
                 </div>
-                <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '8px' }}>
-                  {req.users.email}
-                </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                  {new Date(req.submitted_at).toLocaleDateString('en-GB')}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Details & Actions */}
-          {selectedRequest && (
-            <div style={{
-              background: '#F8FAFC',
-              borderRadius: '12px',
-              padding: '24px',
-              border: '1px solid #E2E8F0'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, marginBottom: '16px' }}>
-                تفاصيل الطلب
-              </h3>
+                {rejecting && (
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="سبب الرفض — يصل لمقدّم الطلب"
+                    style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '80px', resize: 'vertical', marginTop: '14px' }}
+                  />
+                )}
 
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>الشركة</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                  {selectedRequest.companies.name}
+                <div style={{ display: 'flex', gap: '10px', flexDirection: 'row-reverse', marginTop: '16px' }}>
+                  {!rejecting ? (
+                    <>
+                      <button onClick={() => approve(r)} disabled={busy} style={{ flex: 1, padding: '12px 16px', background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>✓ موافقة</button>
+                      <button onClick={() => { setSelectedId(r.id); setRejectionReason('') }} disabled={busy} style={{ flex: 1, padding: '12px 16px', background: '#FEE2E2', color: '#DC2626', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>✕ رفض</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => reject(r)} disabled={busy || !rejectionReason.trim()} style={{ flex: 1, padding: '12px 16px', background: rejectionReason.trim() ? '#DC2626' : '#CBD5E1', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: rejectionReason.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>تأكيد الرفض</button>
+                      <button onClick={() => { setSelectedId(null); setRejectionReason('') }} style={{ flex: 1, padding: '12px 16px', background: '#F1F5F9', color: '#334155', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+                    </>
+                  )}
                 </div>
               </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>رقم السجل</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                  {selectedRequest.companies.cr_number}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>المستخدم</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                  {selectedRequest.users.email}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>سبب الرفض</div>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="اختياري - يُرسل للمستخدم"
-                  style={{
-                    width: '100%',
-                    minHeight: '80px',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <button
-                  onClick={() => handleRejectClaim(selectedRequest.id, selectedRequest.user_id)}
-                  disabled={processingId}
-                  style={{
-                    background: '#DC2626',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    cursor: processingId ? 'not-allowed' : 'pointer',
-                    opacity: processingId ? 0.6 : 1
-                  }}
-                >
-                  {processingId === selectedRequest.id ? 'جاري...' : 'رفض'}
-                </button>
-
-                <button
-                  onClick={() => handleApproveClaim(selectedRequest.id, selectedRequest.user_id, selectedRequest.company_id)}
-                  disabled={processingId}
-                  style={{
-                    background: '#16A34A',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    cursor: processingId ? 'not-allowed' : 'pointer',
-                    opacity: processingId ? 0.6 : 1
-                  }}
-                >
-                  {processingId === selectedRequest.id ? 'جاري...' : 'موافقة'}
-                </button>
-              </div>
-            </div>
-          )}
+            )
+          })}
         </div>
       )}
-    </main>
+    </div>
   )
 }

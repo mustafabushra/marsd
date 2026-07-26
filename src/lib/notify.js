@@ -78,6 +78,32 @@ const PREF_KEY = {
   credits_awarded: 'credits_awarded',
 }
 
+/**
+ * Notify one person, when the decision is about them rather than about a company.
+ *
+ * A claim on a company is answered before the claimant belongs to anything, so
+ * there is no tenant to fan out to — but tenant_id is NOT NULL. The claim itself
+ * names the company, and the tenant that owns it is where the notification
+ * belongs; if no tenant owns it yet, the row cannot be written and saying so is
+ * better than pretending.
+ */
+export async function notifyUser(userId, tenantId, type, { title, message, meta = {} } = {}) {
+  if (!userId || !tenantId || !type) return 0
+  try {
+    const { error } = await getSupabase().from('notifications').insert([{
+      user_id: userId,
+      tenant_id: tenantId,
+      type,
+      payload: { title, message, ...meta },
+    }])
+    if (error) throw error
+    return 1
+  } catch (err) {
+    console.error('Failed to write notification:', err)
+    return 0
+  }
+}
+
 /** The title and body of a notification, whatever shape it was stored in. */
 export function notificationText(row) {
   const p = row?.payload || {}
@@ -92,15 +118,31 @@ const TYPE_TITLES = {
   report_rejected: 'تم رفض تقريرك',
   report_request_info: 'مطلوب توضيح على تقريرك',
   company_approved: 'تمت الموافقة على الشركة',
+  company_rejected: 'لم تُقبل الشركة',
+  claim_approved: 'تمت الموافقة على طلب الملكية',
+  claim_rejected: 'رُفض طلب الملكية',
+  subscription_changed: 'تغيّر اشتراكك',
+  tenant_status_changed: 'تغيّرت حالة حسابك',
+  company_data_updated: 'حُدِّثت بيانات شركتك',
   credits_awarded: 'أُضيفت نقاط لرصيدك',
   welcome: 'أهلاً بك في مرصد',
 }
 
+const GOOD = { icon: '✓', color: '#15803D', bg: '#ECFDF5' }
+const BAD = { icon: '✕', color: '#B91C1C', bg: '#FEF2F2' }
+const INFO = { icon: 'ℹ', color: '#1E40AF', bg: '#EEF2FF' }
+
 export const NOTIFICATION_STYLE = {
-  report_approved: { icon: '✓', color: '#15803D', bg: '#ECFDF5' },
-  company_approved: { icon: '✓', color: '#15803D', bg: '#ECFDF5' },
+  report_approved: GOOD,
+  company_approved: GOOD,
+  claim_approved: GOOD,
+  report_rejected: BAD,
+  company_rejected: BAD,
+  claim_rejected: BAD,
   credits_awarded: { icon: '💎', color: '#1E2A52', bg: '#EEF2FF' },
-  report_rejected: { icon: '✕', color: '#B91C1C', bg: '#FEF2F2' },
   report_request_info: { icon: '!', color: '#92400E', bg: '#FFFBEB' },
+  subscription_changed: INFO,
+  tenant_status_changed: { icon: '!', color: '#92400E', bg: '#FFFBEB' },
+  company_data_updated: INFO,
   welcome: { icon: '👋', color: '#1E40AF', bg: '#EEF2FF' },
 }

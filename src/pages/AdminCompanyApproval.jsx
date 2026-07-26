@@ -1,8 +1,30 @@
 import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { COMPANY_STATUS } from '../lib/constants'
+import { notifyTenant } from '../lib/notify'
+
+/**
+ * /admin/company-approval — letting a registered company onto the platform.
+ *
+ * Approving and rejecting both wrote a notification naming tenant_id and
+ * omitting user_id, which is NOT NULL, so the insert always failed. The failure
+ * was caught and logged as "non-blocking", which is true of the write and false
+ * of the consequence: no company has ever been told it was approved or rejected.
+ * The payload was JSON.stringify'd into a jsonb column too, so payload.message
+ * would have been undefined even had the row landed.
+ *
+ * The audit entry recorded supabase.auth.getUser() as the actor. Identity here
+ * is Clerk; that call returns nothing, so every approval in the log is
+ * attributed to no one.
+ *
+ * And the status update was not read back. A row RLS filters out of an UPDATE
+ * returns no error and no rows, so the screen removed the company from the list
+ * and said "تمت الموافقة" whether or not anything had been written.
+ */
 
 export default function AdminCompanyApproval() {
+  const { user } = useUser()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCompany, setSelectedCompany] = useState(null)
@@ -81,23 +103,26 @@ export default function AdminCompanyApproval() {
       const company = companies.find(c => c.id === companyId)
 
       // Update company status in companies table (SOURCE OF TRUTH)
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('companies')
         .update({
           status: COMPANY_STATUS.APPROVED,
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)
+        .select('id, status')
 
       if (updateError) throw updateError
+      // No error is not evidence: an UPDATE that RLS filters out matches nothing
+      // and reports nothing. The row count is the only proof it happened.
+      if (!updated?.length) throw new Error('لم تُحفظ الموافقة — تحقّق من صلاحيتك')
 
       // Log the action (non-blocking)
       try {
-        const { data: authUser } = await supabase.auth.getUser()
         const { error: auditError } = await supabase
           .from('audit_logs')
           .insert([{
-            actor_id: authUser.user?.id,
+            actor_id: user?.id,
             action: 'company_approved',
             entity: 'company',
             entity_id: companyId,
@@ -114,26 +139,14 @@ export default function AdminCompanyApproval() {
         console.warn('⚠️ Audit log error (non-blocking):', auditErr.message)
       }
 
-      // Create notification for tenant (non-blocking)
+      // notifyTenant writes what the table accepts, addresses every member of
+      // the company, and reads its own error.
       if (company?.tenant_id) {
-        try {
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert([{
-              tenant_id: company.tenant_id,
-              type: 'company_approved',
-              payload: JSON.stringify({
-                message: '✅ تم الموافقة على تسجيل شركتك! يمكنك الآن الوصول الكامل للمنصة.',
-                cr_number: crNumber
-              })
-            }])
-
-          if (notifError) {
-            console.warn('⚠️ Notification warning (non-blocking):', notifError.message)
-          }
-        } catch (notifErr) {
-          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
-        }
+        await notifyTenant(company.tenant_id, 'company_approved', {
+          title: 'تمت الموافقة على تسجيل شركتك',
+          message: 'يمكنك الآن استخدام مرصد بالكامل.',
+          meta: { cr_number: crNumber, company_id: companyId },
+        })
       }
 
       // Remove from list and show success
@@ -162,23 +175,24 @@ export default function AdminCompanyApproval() {
       const company = companies.find(c => c.id === companyId)
 
       // Update company status in companies table (SOURCE OF TRUTH)
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('companies')
         .update({
           status: COMPANY_STATUS.REJECTED,
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId)
+        .select('id, status')
 
       if (updateError) throw updateError
+      if (!updated?.length) throw new Error('لم يُحفظ الرفض — تحقّق من صلاحيتك')
 
       // Log the action (non-blocking)
       try {
-        const { data: authUser } = await supabase.auth.getUser()
         const { error: auditError } = await supabase
           .from('audit_logs')
           .insert([{
-            actor_id: authUser.user?.id,
+            actor_id: user?.id,
             action: 'company_rejected',
             entity: 'company',
             entity_id: companyId,
@@ -195,26 +209,12 @@ export default function AdminCompanyApproval() {
         console.warn('⚠️ Audit log error (non-blocking):', auditErr.message)
       }
 
-      // Create notification for tenant (non-blocking)
       if (company?.tenant_id) {
-        try {
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert([{
-              tenant_id: company.tenant_id,
-              type: 'company_rejected',
-              payload: JSON.stringify({
-                message: `❌ تم رفض تسجيل شركتك.\nالسبب: ${rejectionReason}`,
-                cr_number: crNumber
-              })
-            }])
-
-          if (notifError) {
-            console.warn('⚠️ Notification warning (non-blocking):', notifError.message)
-          }
-        } catch (notifErr) {
-          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
-        }
+        await notifyTenant(company.tenant_id, 'company_rejected', {
+          title: 'لم يُقبل تسجيل شركتك',
+          message: rejectionReason.trim(),
+          meta: { cr_number: crNumber, company_id: companyId },
+        })
       }
 
       // Remove from list and show success

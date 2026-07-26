@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
+import { notifyTenant } from '../lib/notify'
 import { AlertCircle } from 'lucide-react'
 
 export default function AdminTenants() {
@@ -64,12 +65,26 @@ export default function AdminTenants() {
       const tenant = tenants.find(t => t.id === tenantId)
       const newStatus = tenant.status === 'active' ? 'suspended' : 'active'
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('tenants')
         .update({ status: newStatus })
         .eq('id', tenantId)
+        .select('id, status')
 
       if (error) throw new Error(error.message)
+      // An UPDATE that RLS filters out matches nothing and raises nothing, so
+      // the row count is the only thing that says it happened.
+      if (!data?.length) throw new Error('لم تُحفظ الحالة — تحقّق من صلاحيتك')
+
+      // Suspending a company stops its people working. Finding that out by
+      // discovering the platform no longer responds is not acceptable.
+      await notifyTenant(tenantId, 'tenant_status_changed', {
+        title: newStatus === 'active' ? 'أُعيد تفعيل حسابك' : 'أُوقف حساب شركتك',
+        message: newStatus === 'active'
+          ? 'يمكنك استخدام مرصد من جديد.'
+          : 'للاستفسار تواصل مع إدارة مرصد.',
+        meta: { status: newStatus },
+      })
 
       setTenants(tenants.map(t =>
         t.id === tenantId ? { ...t, status: newStatus } : t

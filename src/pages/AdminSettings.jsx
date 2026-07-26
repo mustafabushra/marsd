@@ -56,11 +56,17 @@ export default function AdminSettings() {
   const save = async (key, value) => {
     try {
       setBusyKey(key)
-      const { error: e } = await getSupabase()
+      const { data, error: e } = await getSupabase()
         .from('system_settings')
         .update({ value, updated_at: new Date().toISOString() })
         .eq('key', key)
+        .select('key')
       if (e) throw e
+      // These settings are read by the database at the moment of each write —
+      // plan enforcement, Give-to-Get rates, the trust model. A save that
+      // reports success without landing leaves the whole platform on the old
+      // rule while the panel shows the new one.
+      if (!data?.length) throw new Error('لم يُحفظ الإعداد — تحقّق من صلاحيتك')
       await load()
       setDraft((d) => { const n = { ...d }; delete n[key]; return n })
       showToast('حُفظ الإعداد — يسري على الجميع عند التحميل التالي')

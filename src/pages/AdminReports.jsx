@@ -62,10 +62,15 @@ export default function AdminReports() {
     try {
       setActionLoading('approve')
       const supabase = getSupabase()
-      const { error } = await supabase.from('reports')
+      const { data: approved, error } = await supabase.from('reports')
         .update({ status: 'approved', approved_at: new Date().toISOString() })
         .eq('id', current.id)
+        .select('id, status')
       if (error) throw error
+      // Credits are granted on the strength of this line. An UPDATE filtered out
+      // by RLS raises nothing, so without the row count the platform would pay
+      // for an approval that never happened.
+      if (!approved?.length) throw new Error('لم يُحفظ الاعتماد — تحقّق من صلاحيتك')
       // Award the reporting company, at the rate settings hold and only if
       // their plan earns that way. The amount used to be the literal 10 written
       // here, so the figure shown on /subscription — read from
@@ -95,10 +100,12 @@ export default function AdminReports() {
     try {
       setActionLoading('reject')
       const supabase = getSupabase()
-      const { error } = await supabase.from('reports')
+      const { data: rejected, error } = await supabase.from('reports')
         .update({ status: 'rejected', rejected_at: new Date().toISOString(), rejection_reason: reason || 'تم الرفض من قبل الإدارة' })
         .eq('id', current.id)
+        .select('id, status')
       if (error) throw error
+      if (!rejected?.length) throw new Error('لم يُحفظ الرفض — تحقّق من صلاحيتك')
       // No refund is written. This inserted one credit with reason
       // 'report_rejected_refund' — a value the CHECK constraint has never
       // allowed, so the write always failed, and its error was never read. It
@@ -120,12 +127,17 @@ export default function AdminReports() {
     try {
       setActionLoading('info')
       const supabase = getSupabase()
-      await supabase.from('reports').update({ status: 'request_info' }).eq('id', current.id)
+      const { data: asked, error: askErr } = await supabase.from('reports')
+        .update({ status: 'request_info' })
+        .eq('id', current.id)
+        .select('id, status')
+      if (askErr) throw askErr
+      if (!asked?.length) throw new Error('لم يُحفظ الطلب — تحقّق من صلاحيتك')
       await notifyTenant(current.reporter_tenant_id, 'report_request_info', { title: 'مطلوب توضيح على تقريرك', message: 'يرجى إضافة تفاصيل أو مستندات إضافية.', meta: { reportId: current.id } })
       showToast('تم طلب توضيح')
       removeCurrent()
     } catch (err) {
-      showToast('❌ تعذّر الإجراء')
+      showToast('❌ ' + (err.message || 'تعذّر الإجراء'))
     } finally { setActionLoading(null) }
   }
 
