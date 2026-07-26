@@ -77,7 +77,11 @@ export default function CompanyUsers() {
         .order('created_at', { ascending: true })
 
       const rows = companyUsers || []
-      setIsAdmin(rows.find((u) => u.id === user.id)?.role === 'company_admin')
+      // A platform administrator administers companies too — checking only for
+      // company_admin locked whoever runs Marsad out of the screen that manages
+      // members of the company they belong to.
+      const myRole = rows.find((u) => u.id === user.id)?.role
+      setIsAdmin(myRole === 'company_admin' || myRole === 'platform_admin')
       setUsers(rows.map((u) => ({
         id: u.id,
         name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'مستخدم',

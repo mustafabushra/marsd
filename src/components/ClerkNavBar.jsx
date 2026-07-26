@@ -1,10 +1,14 @@
 import { UserButton, useUser } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
+import { useUserRole } from '../hooks/useUserRole'
 
 export default function ClerkNavBar() {
   const navigate = useNavigate()
-  const { isSignedIn, user } = useUser()
-  const isAdmin = user?.publicMetadata?.role === 'admin'
+  const { isSignedIn } = useUser()
+  // From the database, like every other admin check — Clerk metadata guards
+  // nothing, and a button that appears on a different signal than the route it
+  // opens leads people to /unauthorized.
+  const { isPlatformAdmin: isAdmin } = useUserRole()
 
   return (
     <header style={{

@@ -1,12 +1,24 @@
 import { Navigate } from 'react-router-dom'
 import { useUser, useOrganization } from '@clerk/react'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
+import { useUserRole } from '../hooks/useUserRole'
 
+/**
+ * Admin screens, gated on the role the database enforces.
+ *
+ * This asked Clerk — organization membership, or publicMetadata.role ===
+ * 'admin' — while every policy behind those screens checks users.role ===
+ * 'platform_admin'. Two switches for one permission, kept in step by hand:
+ * an operator marked in Clerk but not in the database reaches the panel and
+ * every save is silently refused, and one marked only in the database can write
+ * but cannot get to the screens. Only the database enforces anything, so the
+ * gate reads the same value the policies do.
+ */
 export function AdminRoute({ children }) {
   const { isLoaded, user } = useUser()
-  const { organization } = useOrganization()
+  const { loading: roleLoading, isPlatformAdmin } = useUserRole()
 
-  if (!isLoaded) {
+  if (!isLoaded || roleLoading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>جاري التحميل...</div>
   }
 
@@ -14,12 +26,7 @@ export function AdminRoute({ children }) {
     return <Navigate to="/login" replace />
   }
 
-  // Check if user has admin role in any organization
-  // For now, we'll check organization metadata or use a simpler approach
-  const userRole = organization?.membership?.role
-  const isAdminUser = userRole === 'admin' || user?.publicMetadata?.role === 'admin'
-
-  if (!isAdminUser) {
+  if (!isPlatformAdmin) {
     return <Navigate to="/unauthorized" replace />
   }
 
@@ -28,7 +35,6 @@ export function AdminRoute({ children }) {
 
 export function CompanyRoute({ children }) {
   const { isLoaded, user } = useUser()
-  const { organization } = useOrganization()
   const { needsOnboarding, loading: onboardingLoading } = useCompanyOnboarding()
 
   if (!isLoaded || onboardingLoading) {
@@ -44,14 +50,10 @@ export function CompanyRoute({ children }) {
     return <Navigate to="/company-onboarding" replace />
   }
 
-  // Check if user is admin - only redirect if explicitly marked as admin
-  const userRole = organization?.membership?.role
-  const isAdminUser = userRole === 'admin' || user?.publicMetadata?.role === 'admin'
-
-  if (isAdminUser) {
-    return <Navigate to="/admin" replace />
-  }
-
-  // Allow company users with or without organization
+  // A platform administrator is no longer bounced to /admin from here. One
+  // account may hold both jobs — running Marsad and belonging to a company on
+  // it — and redirecting made the company screens unreachable for whoever does.
+  // The admin panel is a destination, not somewhere to be sent from every
+  // company page.
   return children
 }
