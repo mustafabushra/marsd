@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { CloseIcon, FileIcon } from '../components/icons'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 export default function MyReports() {
   const { user } = useUser()
@@ -16,8 +18,8 @@ export default function MyReports() {
   const [reports, setReports] = useState([])
   const [filterStatus, setFilterStatus] = useState('all')
 
-  useEffect(() => {
-    const loadReports = async () => {
+  const loadReports = useCallback(async () => {
+      if (!user?.id) { setLoading(false); return }
       try {
         const supabase = getSupabase()
 
@@ -114,12 +116,16 @@ export default function MyReports() {
       } finally {
         setLoading(false)
       }
-    }
-
-    if (user?.id) {
-      loadReports()
-    }
   }, [user?.id])
+
+  useEffect(() => { loadReports() }, [loadReports])
+
+  // A report leaves this screen's "قيد المراجعة" the moment Marsad acts on it,
+  // and the credit it earns lands in the same instant.
+  const { connected, liveAt } = useLiveData(loadReports, {
+    tables: ['reports', 'review_actions', 'credits_ledger'],
+    enabled: !!user?.id,
+  })
 
   const handleOpenDrawer = (report) => {
     setSelectedReport(report)
@@ -155,7 +161,8 @@ export default function MyReports() {
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '9px', marginBottom: '18px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '9px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <LiveBadge connected={connected} liveAt={liveAt} />
         {['all', 'pending_review', 'approved', 'rejected'].map(s => {
           const labels = { all: 'الكل', pending_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض' }
           const colors = { all: { bg: '#1E2A52', c: '#fff', border: '#1E2A52' }, pending_review: { bg: '#fff', c: '#B45309', border: '#FDE68A' }, approved: { bg: '#fff', c: '#15803D', border: '#BBF7D0' }, rejected: { bg: '#fff', c: '#B91C1C', border: '#FECACA' } }

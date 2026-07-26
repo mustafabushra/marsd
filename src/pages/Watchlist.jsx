@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase, searchCompaniesKnowledgeBase } from '../lib/api'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { watchlistRoom } from '../lib/entitlements'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 const riskOf = (s) => {
   if (s == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B', gauge: '#CBD5E1' }
@@ -63,23 +65,29 @@ export default function Watchlist() {
     }))
   }
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        if (!user?.id) { setLoading(false); return }
-        const supabase = getSupabase()
-        const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-        if (!userData?.tenant_id) { setLoading(false); return }
-        setTenantId(userData.tenant_id)
-        await loadWatchlist(userData.tenant_id)
-      } catch (err) {
-        console.error('Error loading watchlist:', err)
-      } finally {
-        setLoading(false)
-      }
+  const init = useCallback(async () => {
+    try {
+      if (!user?.id) { setLoading(false); return }
+      const supabase = getSupabase()
+      const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+      if (!userData?.tenant_id) { setLoading(false); return }
+      setTenantId(userData.tenant_id)
+      await loadWatchlist(userData.tenant_id)
+    } catch (err) {
+      console.error('Error loading watchlist:', err)
+    } finally {
+      setLoading(false)
     }
-    init()
   }, [user?.id])
+
+  useEffect(() => { init() }, [init])
+
+  // A colleague adding or removing a company, and a score moving underneath one
+  // already on the list — the second is the reason to watch a company at all.
+  const { connected, liveAt } = useLiveData(init, {
+    tables: ['watchlist_items', 'trust_scores'],
+    enabled: !!user?.id,
+  })
 
   const handleRemove = async (itemId, companyName) => {
     try {
@@ -129,12 +137,16 @@ export default function Watchlist() {
 
       const { error } = await supabase.from('watchlist_items').insert([{ tenant_id: tenantId, company_id: company.id, list_name: 'المراقبة' }])
       if (error) throw error
+
       await supabase.from('audit_logs').insert([{ actor_id: user?.id, action: 'added_to_watchlist', entity: 'watchlist', entity_id: company.id, meta: JSON.stringify({ company_name: company.name }), created_at: new Date().toISOString() }])
       await loadWatchlist(tenantId)
       setAddResults((prev) => prev.filter((c) => c.id !== company.id))
       showToast('✅ تمت الإضافة لقائمة المراقبة')
     } catch (err) {
-      showToast('❌ فشلت الإضافة')
+      // The limit is enforced by a trigger now, and it says exactly what is wrong
+      // and in Arabic. Replacing that with "فشلت الإضافة" throws away the only
+      // part of the message the user could act on.
+      showToast(`❌ ${err.message || 'فشلت الإضافة'}`)
     } finally {
       setAddingId(null)
     }
@@ -170,7 +182,10 @@ export default function Watchlist() {
       {/* Companies */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُتابَعة {companies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 700 }}>({companies.length})</span>}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُتابَعة {companies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 700 }}>({companies.length})</span>}</h3>
+            <LiveBadge connected={connected} liveAt={liveAt} />
+          </div>
           <button
             onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }}
             disabled={!systemStatus.accountActive}

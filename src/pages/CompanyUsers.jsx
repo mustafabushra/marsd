@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useUser, useAuth } from '@clerk/react'
 import { UserPlus, Trash2, RotateCcw } from 'lucide-react'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ROLE_LABEL = { company_admin: 'مدير', company_member: 'محرّر' }
@@ -60,7 +62,7 @@ export default function CompanyUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUserLoaded, user?.id])
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setError('')
       const supabase = getSupabase()
@@ -107,7 +109,14 @@ export default function CompanyUsers() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  // Seats change from three directions: an invitation accepted, a colleague
+  // deactivated by another admin, and the platform changing what the plan allows.
+  const { connected, liveAt } = useLiveData(loadUsers, {
+    tables: ['users', 'pending_invites'],
+    enabled: !!user?.id,
+  })
 
   const writeAudit = async (entry) => {
     try {
@@ -316,6 +325,7 @@ export default function CompanyUsers() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>المستخدمون ({users.length})</h3>
+          <LiveBadge connected={connected} liveAt={liveAt} />
           {pendingInvites.length > 0 && (
             <span style={S.badge('#FEF3C7', '#92400E')}>{pendingInvites.length} دعوة معلّقة</span>
           )}

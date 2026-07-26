@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 /**
  * /my-companies — the registry entries this company contributed.
@@ -96,6 +98,13 @@ export default function MyCompanies() {
 
   useEffect(() => { if (isLoaded) load() }, [isLoaded, load])
 
+  // A company sits here as "قيد المراجعة" until Marsad approves it, and the
+  // credit for adding it lands at the same moment.
+  const { connected, liveAt } = useLiveData(load, {
+    tables: ['companies', 'audit_logs', 'credits_ledger'],
+    enabled: !!user?.id,
+  })
+
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
   }
@@ -113,7 +122,10 @@ export default function MyCompanies() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُرسلة ({items.length})</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُرسلة ({items.length})</h3>
+            <LiveBadge connected={connected} liveAt={liveAt} />
+          </div>
           <p style={{ fontSize: '13px', color: '#94A3B8', margin: '3px 0 0', fontWeight: 600 }}>
             الشركات التي أضافها فريقك لسجل مرصد وحالة مراجعتها
           </p>

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { formatLimit, limitOf, UNLIMITED } from '../lib/entitlements'
 import { UsageMeter } from '../components/LimitGate'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 /**
  * /subscription — the plan a company is on, what it allows, and what it has left.
@@ -38,8 +40,7 @@ export default function Subscription() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    const load = async () => {
+  const load = useCallback(async () => {
       if (!user?.id) { setLoading(false); return }
       try {
         const supabase = getSupabase()
@@ -80,9 +81,17 @@ export default function Subscription() {
       } finally {
         setLoading(false)
       }
-    }
-    load()
   }, [user?.id])
+
+  useEffect(() => { load() }, [load])
+
+  // The plans themselves are live: an operator raising a limit or switching a
+  // plan on in the admin panel changes what this screen offers, without anyone
+  // being asked to reload.
+  const { connected, liveAt } = useLiveData(load, {
+    tables: ['plans', 'subscriptions', 'credits_ledger'],
+    enabled: !!user?.id,
+  })
 
   if (loading || entLoading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
@@ -151,7 +160,10 @@ export default function Subscription() {
 
       {/* Limits and consumption */}
       <div style={{ ...card, padding: '22px', marginBottom: '18px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>حدود باقتك واستهلاكها</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap', margin: '0 0 16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>حدود باقتك واستهلاكها</h3>
+          <LiveBadge connected={connected} liveAt={liveAt} />
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '12px' }}>
           {Object.keys(LIMIT_LABELS).map((key) => {
             const ceiling = limitOf(entitlements, key)

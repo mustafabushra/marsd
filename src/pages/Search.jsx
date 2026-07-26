@@ -72,7 +72,9 @@ export default function Search() {
       setReqModalCompany(null)
     } catch (err) {
       console.error('Add to watchlist failed:', err)
-      showToastMessage('❌ فشلت الإضافة لقائمة المراقبة')
+      // The plan limit is a trigger now, and its message names the ceiling and
+      // what to do about it. A generic failure line discards that.
+      showToastMessage(`❌ ${err.message || 'فشلت الإضافة لقائمة المراقبة'}`)
     } finally {
       setReqSubmitting(false)
     }
