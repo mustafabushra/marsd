@@ -139,35 +139,25 @@ for (const [i, c] of COMPANIES.entries()) {
     madeReports++
   }
 
-  // The score follows from the reports rather than being asserted: a company
-  // whose reports say it pays late must not be able to show a clean score.
-  const { rows: [agg] } = await db.query(
-    `select count(*)::int as n,
-            count(*) filter (where payment_commitment = 'full')::int as ontime,
-            count(*) filter (where defaulted)::int as defaults,
-            coalesce(avg(delay_days), 0)::int as avg_delay
-     from public.reports where target_company_id = $1 and status = 'approved'`,
+  // The score follows from the reports, and it is the product's own function
+  // that derives it — not a second formula living here.
+  //
+  // This used to compute its own: on-time ratio, defaults, average delay, into a
+  // number written straight into trust_scores. It was a better model than the
+  // one in the database, which counted approved reports and read nothing else —
+  // so the demo showed 95 for the company that pays and 20 for the one that does
+  // not, while production would have given both 98. The good formula was visible
+  // and the broken one was live, and the seed was what hid it. 031 moved this
+  // model into compute_trust_score where it belongs; the seed now calls it, so
+  // what the screens show during a demo is what the platform actually does.
+  await db.query('select public.compute_trust_score($1)', [company.id])
+
+  const { rows: [ts] } = await db.query(
+    'select score, risk_band, tier, approved_reports from public.trust_scores where company_id = $1',
     [company.id],
   )
-
-  await db.query('delete from public.trust_scores where company_id = $1', [company.id])
-  if (agg.n > 0) {
-    const score = Math.max(5, Math.min(98, Math.round(
-      50 + (agg.ontime / agg.n) * 45 - (agg.defaults / agg.n) * 40 - Math.min(20, agg.avg_delay / 5),
-    )))
-    const band = score >= 70 ? 'low' : score >= 40 ? 'medium' : 'high'
-    // Five approved reports is the threshold the report page treats as a full
-    // score; below it the product says the data is preliminary, and the seed
-    // has to be able to produce that state too.
-    const tier = agg.n >= 5 ? 'full' : 'preliminary'
-
-    await db.query(
-      `insert into public.trust_scores (company_id, score, risk_band, tier, approved_reports, breakdown, computed_at)
-       values ($1,$2,$3,$4,$5,$6, now())`,
-      [company.id, score, band, tier, agg.n,
-       JSON.stringify({ official: 30, community: 50, platform: 20, on_time_pct: Math.round((agg.ontime / agg.n) * 100), avg_delay: agg.avg_delay, defaults: agg.defaults })],
-    )
-    console.log(`  ${c.name}  ·  ${agg.n} تقرير  ·  ${score} (${band})  ·  ${tier}`)
+  if (ts && ts.approved_reports > 0) {
+    console.log(`  ${c.name}  ·  ${ts.approved_reports} تقرير  ·  ${ts.score} (${ts.risk_band})  ·  ${ts.tier}`)
   } else {
     console.log(`  ${c.name}  ·  بلا تقارير — لاختبار حالة "بيانات غير كافية"`)
   }

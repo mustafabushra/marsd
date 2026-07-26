@@ -1,279 +1,254 @@
-import { useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+
+/**
+ * /admin/trust-score — the model behind the number, and what it currently says.
+ *
+ * The screen held sliders for financial_stability, payment_history and four
+ * other factors, none of which exist anywhere in the platform. Moving them
+ * changed a useState object and nothing else. Meanwhile the function that
+ * actually produced every score on Marsad counted approved reports and read
+ * nothing about them: six reports saying "لم يُسدَّد" and six saying "تم السداد"
+ * both scored 98.
+ *
+ * 031 replaced that with the model the seed had been using — on-time ratio,
+ * defaults, average delay — and made every constant in it a setting rather than
+ * a literal. This edits those settings, shows what the live distribution looks
+ * like under them, and recomputes every company when they change. Editing the
+ * model without recomputing would change what future scores mean while silently
+ * disagreeing with every score already on screen.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+const input = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '9px', padding: '10px 12px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', textAlign: 'right' }
+
+// path → what the operator is actually deciding
+const FIELDS = [
+  { path: ['thresholds', 'preliminary_min_reports'], label: 'أقل عدد تقارير لإصدار درجة', hint: 'تحته: «بيانات غير كافية» بلا تقييم' },
+  { path: ['thresholds', 'full_min_reports'], label: 'عدد التقارير لدرجة نهائية', hint: 'تحته تُوصف الدرجة بأنها أولية' },
+  { path: ['weights', 'base'], label: 'الأساس', hint: 'درجة شركة سجلّها متوسط' },
+  { path: ['weights', 'on_time'], label: 'وزن السداد في موعده', hint: 'يُضاف كاملاً إذا سدّدت في كل تعامل' },
+  { path: ['weights', 'default'], label: 'وزن التعثّر', hint: 'يُخصم كاملاً إذا تعثّرت في كل تعامل' },
+  { path: ['weights', 'delay_penalty_cap'], label: 'سقف خصم التأخير', hint: 'أقصى ما يكلّفه التأخير وحده' },
+  { path: ['weights', 'delay_days_per_point'], label: 'أيام التأخير لكل نقطة خصم', hint: 'متوسط التأخير مقسوماً على هذا الرقم' },
+  { path: ['clamp', 'floor'], label: 'أدنى درجة ممكنة', hint: 'لشركة مُقيَّمة — لا ينطبق على «بيانات غير كافية»' },
+  { path: ['clamp', 'ceiling'], label: 'أعلى درجة ممكنة', hint: '' },
+  { path: ['bands', 'low_min'], label: 'حد نطاق «مخاطر منخفضة»', hint: 'الدرجة عنده فأعلى تُعرض خضراء' },
+  { path: ['bands', 'medium_min'], label: 'حد نطاق «مخاطر متوسطة»', hint: 'تحته: مخاطر مرتفعة' },
+]
+
+const BANDS = {
+  low: { label: 'مخاطر منخفضة', c: '#16A34A', bg: '#ECFDF5' },
+  medium: { label: 'مخاطر متوسطة', c: '#F59E0B', bg: '#FFFBEB' },
+  high: { label: 'مخاطر مرتفعة', c: '#DC2626', bg: '#FEF2F2' },
+  none: { label: 'بيانات غير كافية', c: '#64748B', bg: '#F1F5F9' },
+}
+
+const get = (obj, path) => path.reduce((o, k) => o?.[k], obj)
+const set = (obj, path, value) => {
+  const next = structuredClone(obj)
+  let cur = next
+  for (const k of path.slice(0, -1)) { cur[k] = cur[k] ?? {}; cur = cur[k] }
+  cur[path[path.length - 1]] = value
+  return next
+}
 
 export default function AdminTrustScore() {
-  const [weights, setWeights] = useState({
-    financial_stability: 30,
-    payment_history: 25,
-    business_growth: 20,
-    compliance: 15,
-    market_reputation: 10,
-  })
+  const { user } = useUser()
+  const [rules, setRules] = useState(null)
+  const [draft, setDraft] = useState(null)
+  const [scores, setScores] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState('')
 
-  const [testResults, setTestResults] = useState([
-    { id: 1, company: 'أكمل للمقاولات', calculated: 78, expected: 75, difference: '+3%', status: 'pass' },
-    { id: 2, company: 'نوفا للتسويق', calculated: 52, expected: 50, difference: '+2%', status: 'pass' },
-  ])
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 5000) }
 
-  const [testCompany, setTestCompany] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const supabase = getSupabase()
+      const [{ data: setting, error: e1 }, { data: ts, error: e2 }] = await Promise.all([
+        supabase.from('system_settings').select('value').eq('key', 'trust_score_rules').maybeSingle(),
+        supabase.from('trust_scores').select('score, risk_band, tier, approved_reports, computed_at, companies ( name )').order('score', { ascending: false }).limit(200),
+      ])
+      if (e1) throw e1
+      if (e2) throw e2
 
-  const handleWeightChange = (field, value) => {
-    const newWeights = { ...weights, [field]: parseInt(value) }
-    const total = Object.values(newWeights).reduce((a, b) => a + b, 0)
-    if (total === 100) {
-      setWeights(newWeights)
+      setRules(setting?.value || null)
+      setDraft((d) => d ?? setting?.value ?? null)
+      setScores(ts || [])
+    } catch (err) {
+      setError(err.message || 'تعذّر التحميل')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const { connected, liveAt } = useLiveData(load, { tables: ['trust_scores', 'system_settings'] })
+
+  const dirty = draft && rules && JSON.stringify(draft) !== JSON.stringify(rules)
+
+  const save = async () => {
+    try {
+      setSaving(true)
+      const supabase = getSupabase()
+
+      const { data, error: e } = await supabase
+        .from('system_settings')
+        .update({ value: draft, updated_by: user?.id, updated_at: new Date().toISOString() })
+        .eq('key', 'trust_score_rules')
+        .select('key')
+      if (e) throw e
+      if (!data?.length) throw new Error('لم تُحفظ المعادلة — تحقّق من صلاحيتك')
+
+      // Saving without this leaves every score on the platform reflecting the
+      // model that was just replaced.
+      const { data: n, error: e2 } = await supabase.rpc('recompute_all_trust_scores')
+      if (e2) throw e2
+
+      await supabase.from('audit_logs').insert([{
+        actor_id: user?.id, action: 'trust_score_rules_updated', entity: 'system_settings',
+        meta: JSON.stringify(draft), created_at: new Date().toISOString(),
+      }])
+
+      await load()
+      showToast(`✅ حُفظت المعادلة وأُعيد احتساب ${n} شركة`)
+    } catch (err) {
+      showToast(`❌ ${err.message}`)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const runTest = () => {
-    if (!testCompany) return
-    const mockScore = Math.floor(Math.random() * 100)
-    const newTest = {
-      id: testResults.length + 1,
-      company: testCompany,
-      calculated: mockScore,
-      expected: mockScore - Math.floor(Math.random() * 5),
-      difference: `+${Math.floor(Math.random() * 5)}%`,
-      status: Math.random() > 0.2 ? 'pass' : 'fail',
+  const recompute = async () => {
+    try {
+      setSaving(true)
+      const { data: n, error: e } = await getSupabase().rpc('recompute_all_trust_scores')
+      if (e) throw e
+      await load()
+      showToast(`✅ أُعيد احتساب ${n} شركة`)
+    } catch (err) {
+      showToast(`❌ ${err.message}`)
+    } finally {
+      setSaving(false)
     }
-    setTestResults([...testResults, newTest])
-    setTestCompany('')
   }
 
-  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0)
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+  }
+
+  const rated = scores.filter((s) => s.tier !== 'none')
+  const dist = Object.keys(BANDS).map((b) => ({ band: b, n: scores.filter((s) => s.risk_band === b).length }))
+  const avg = rated.length ? Math.round(rated.reduce((a, s) => a + s.score, 0) / rated.length) : 0
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-          معايرة مؤشر الثقة
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          اختبار وضبط خوارزمية حساب مؤشر الثقة
-        </p>
+    <div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '440px', lineHeight: 1.8 }}>{toast}</div>
+      )}
+
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px', textAlign: 'right' }}>معادلة درجة الثقة</h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>الدرجة تُحتسب من سلوك السداد في التقارير المعتمدة — لا من عددها</p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
 
-      {/* Weights Configuration */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>
-          أوزان المعايير
-        </h2>
+      {error && (
+        <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>
+      )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-          {Object.entries(weights).map(([key, value]) => (
-            <div key={key}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
-                  {value}%
-                </span>
-                <label style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', textAlign: 'right' }}>
-                  {key === 'financial_stability' && 'الاستقرار المالي'}
-                  {key === 'payment_history' && 'سجل الدفع'}
-                  {key === 'business_growth' && 'نمو الأعمال'}
-                  {key === 'compliance' && 'الامتثال'}
-                  {key === 'market_reputation' && 'سمعة السوق'}
-                </label>
+      {/* Distribution */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '14px', marginBottom: '18px' }}>
+        {dist.map((d) => {
+          const b = BANDS[d.band]
+          return (
+            <div key={d.band} style={{ ...card, padding: '18px' }}>
+              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>{b.label}</div>
+              <div style={{ fontSize: '28px', fontWeight: 900, color: b.c, textAlign: 'right' }}>{d.n}</div>
+            </div>
+          )
+        })}
+        <div style={{ ...card, padding: '18px' }}>
+          <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>متوسط الدرجة المُقيَّمة</div>
+          <div style={{ fontSize: '28px', fontWeight: 900, color: '#1E2A52', textAlign: 'right' }}>{avg}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.05fr', gap: '18px', alignItems: 'start' }}>
+        {/* The model */}
+        <div style={{ ...card, padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>المعاملات</h3>
+          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
+            الدرجة = الأساس + (نسبة السداد في موعده × وزنها) − (نسبة التعثّر × وزنها) − خصم التأخير
+          </p>
+
+          {draft && FIELDS.map((f) => (
+            <div key={f.path.join('.')} style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '12px', alignItems: 'center', marginBottom: '13px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{f.label}</div>
+                {f.hint && <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, lineHeight: 1.7 }}>{f.hint}</div>}
               </div>
               <input
-                type="range"
-                min="0"
-                max="100"
-                value={value}
-                onChange={(e) => handleWeightChange(key, e.target.value)}
-                style={{ width: '100%' }}
+                type="number"
+                value={get(draft, f.path) ?? ''}
+                onChange={(e) => setDraft(set(draft, f.path, e.target.value === '' ? '' : Number(e.target.value)))}
+                style={input}
               />
             </div>
           ))}
-        </div>
 
-        <div style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: totalWeight === 100 ? '#DCFCE7' : '#FEF3C7',
-          borderRadius: '8px',
-          textAlign: 'center',
-          fontSize: '14px',
-          fontWeight: 600,
-          color: totalWeight === 100 ? '#15803D' : '#B45309',
-        }}>
-          إجمالي الأوزان: {totalWeight}% {totalWeight === 100 && '✓'}
-        </div>
-
-        <button
-          style={{
-            marginTop: '16px',
-            padding: '10px 20px',
-            background: totalWeight === 100 ? '#16A34A' : '#CCCCCC',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: totalWeight === 100 ? 'pointer' : 'not-allowed',
-            width: '100%',
-          }}
-          disabled={totalWeight !== 100}
-        >
-          حفظ الأوزان
-        </button>
-      </div>
-
-      {/* Testing Panel */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>
-          اختبار الحساب
-        </h2>
-
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-          <button
-            onClick={runTest}
-            disabled={!testCompany}
-            style={{
-              padding: '10px 16px',
-              background: testCompany ? '#16A34A' : '#CCCCCC',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: testCompany ? 'pointer' : 'not-allowed',
-            }}
-          >
-            تشغيل الاختبار
-          </button>
-          <input
-            type="text"
-            placeholder="أدخل اسم الشركة للاختبار"
-            value={testCompany}
-            onChange={(e) => setTestCompany(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              border: '1.5px solid #E2E8F0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontFamily: 'Tajawal',
-              textAlign: 'right',
-            }}
-          />
-        </div>
-
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{
-            padding: '8px 12px',
-            background: '#F8FAFC',
-            color: '#1E2A52',
-            border: '1px solid #E2E8F0',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          {showAdvanced ? '▼' : '◀'} الاختبارات المتقدمة
-        </button>
-
-        {showAdvanced && (
-          <div style={{ marginTop: '16px', padding: '12px', background: '#F8FAFC', borderRadius: '8px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              <button style={{
-                padding: '8px 12px',
-                background: '#E0F2FE',
-                color: '#0369A1',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                تصدير الاختبارات
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+            <button onClick={save} disabled={!dirty || saving} style={{ background: dirty && !saving ? '#16A34A' : '#CBD5E1', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 24px', fontSize: '14px', fontWeight: 800, cursor: dirty && !saving ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+              {saving ? 'جاري الحفظ...' : 'حفظ وإعادة الاحتساب'}
+            </button>
+            {dirty && (
+              <button onClick={() => setDraft(rules)} disabled={saving} style={{ background: '#F1F5F9', color: '#334155', border: 0, borderRadius: '10px', padding: '11px 20px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                تراجع
               </button>
-              <button style={{
-                padding: '8px 12px',
-                background: '#F3E8FF',
-                color: '#7C3AED',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                مقارنة الخوارزميات
-              </button>
-              <button style={{
-                padding: '8px 12px',
-                background: '#FEE2E2',
-                color: '#DC2626',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                إعادة تعيين النتائج
-              </button>
-              <button style={{
-                padding: '8px 12px',
-                background: '#FEF3C7',
-                color: '#B45309',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                تقرير الدقة
-              </button>
-            </div>
+            )}
+            <button onClick={recompute} disabled={saving} style={{ background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 20px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+              إعادة احتساب الكل
+            </button>
           </div>
-        )}
-      </div>
+          {dirty && (
+            <p style={{ fontSize: '12.5px', color: '#B45309', margin: '12px 2px 0', fontWeight: 700, lineHeight: 1.9, textAlign: 'right' }}>
+              الحفظ يُعيد احتساب درجات كل الشركات فوراً — الدرجات المعروضة الآن ستتغيّر.
+            </p>
+          )}
+        </div>
 
-      {/* Results Table */}
-      <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>الشركة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>المحسوب</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>المتوقع</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>الفرق</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569' }}>النتيجة</th>
-            </tr>
-          </thead>
-          <tbody>
-            {testResults.map(result => (
-              <tr key={result.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {result.company}
-                </td>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#1E2A52', fontWeight: 700, borderLeft: '1px solid #E2E8F0' }}>
-                  {result.calculated}
-                </td>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#64748B', borderLeft: '1px solid #E2E8F0' }}>
-                  {result.expected}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#16A34A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {result.difference}
-                </td>
-                <td style={{ padding: '16px' }}>
-                  <span style={{
-                    padding: '4px 10px',
-                    background: result.status === 'pass' ? '#DCFCE7' : '#FEE2E2',
-                    color: result.status === 'pass' ? '#15803D' : '#DC2626',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}>
-                    {result.status === 'pass' ? '✓ نجح' : '✗ فشل'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* What it produces */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div style={{ padding: '18px 20px 14px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>الدرجات الحالية</h3>
+            <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '4px 0 0', fontWeight: 600, textAlign: 'right' }}>{scores.length} شركة مُحتسبة</p>
+          </div>
+          <div style={{ maxHeight: '620px', overflowY: 'auto' }}>
+            {scores.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600 }}>لا توجد درجات محتسبة بعد</div>
+            ) : scores.map((s, i) => {
+              const b = BANDS[s.risk_band] || BANDS.none
+              return (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.7fr 0.7fr 1fr 0.8fr', gap: '10px', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #F1F5F9', textAlign: 'right' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.companies?.name || '—'}</span>
+                  <span style={{ fontSize: '17px', fontWeight: 900, color: b.c }}>{s.tier === 'none' ? '—' : s.score}</span>
+                  <span><span style={{ fontSize: '11.5px', fontWeight: 800, background: b.bg, color: b.c, padding: '3px 9px', borderRadius: '6px' }}>{b.label}</span></span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{s.approved_reports} تقرير</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     </div>
   )
