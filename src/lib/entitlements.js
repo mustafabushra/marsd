@@ -160,162 +160,76 @@ export async function loadEntitlements(tenantId) {
  * explain. Returns the points awarded, 0 when the action earns nothing.
  */
 /**
- * Trim an award to what remains under the monthly earning ceiling.
+ * Ask the server to record a contribution.
  *
- * Contribution is deliberately unlimited — the registry is the asset. But
- * credits widen the plan's own limits, so unlimited earning would turn the free
- * plan into an unlimited one and the paid tiers would lose their meaning from
- * that direction. The cap keeps contribution free while keeping what it buys
- * finite.
+ * The browser no longer writes to credits_ledger, and RLS enforces that: the
+ * balance decides what a plan allows, so it cannot be writable by the party it
+ * benefits. Any client-side rule permissive enough to credit a member for
+ * their contribution is permissive enough for that member to choose the amount.
  *
- * Counts only positive entries: spending must not create room to earn again.
- * Returns the points that may be granted, possibly a partial award, or 0.
+ * Nothing that decides the outcome is sent from here. The rate, the plan's
+ * eligibility, and the monthly ceiling are all read server-side from the same
+ * settings the admin panel edits — a request carries an action name, and the
+ * server decides what it is worth.
+ *
+ * Returns the points awarded, 0 for anything else. A failed award never fails
+ * the contribution: the work the member did is what matters, and the ledger can
+ * be reconciled.
  */
-async function applyMonthlyCap(supabase, entitlements, points) {
-  const cap = Number(entitlements?.giveToGetRules?.monthly_earn_cap) || 0
-  if (cap <= 0) return points   // no ceiling configured
-
-  const monthStart = new Date()
-  monthStart.setDate(1)
-  monthStart.setHours(0, 0, 0, 0)
-
-  const { data, error } = await supabase
-    .from('credits_ledger')
-    .select('amount')
-    .eq('tenant_id', entitlements.tenantId)
-    .gt('amount', 0)
-    .gte('created_at', monthStart.toISOString())
-
-  // A failed count must not silently uncap the month.
-  if (error) return 0
-
-  const earned = (data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  return Math.max(0, Math.min(points, cap - earned))
-}
-
-export async function awardCredits(entitlements, action, { reportId = null, userId = null } = {}) {
-  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
-
-  const rule = entitlements.giveToGetRules?.earn?.[action]
-  const points = Number(rule?.points) || 0
-  if (points <= 0) return 0
-
+async function callAwardEndpoint(payload) {
   try {
-    const supabase = getSupabase()
+    const clerk = globalThis.Clerk
+    const token = clerk?.session ? await clerk.session.getToken() : null
+    if (!token) return 0
 
-    const capped = await applyMonthlyCap(supabase, entitlements, points)
-    if (capped <= 0) return 0
-    // `action` is the reason. The earn keys in give_to_get_rules and the values
-    // credits_ledger_reason_check permits are deliberately the same vocabulary;
-    // translating between them is how the previous write ended up sending
-    // 'report_submitted' to a constraint that never allowed it.
-    const { error } = await supabase.from('credits_ledger').insert([{
-      tenant_id: entitlements.tenantId,
-      report_id: reportId,
-      user_id: userId,
-      amount: capped,
-      reason: action,
-    }])
-    if (error) {
-      // 23505 is the one-award-per-report index doing its job: the report was
-      // already paid for. Not a failure, and not worth a console entry.
-      if (error.code === '23505') return 0
-      throw error
+    const resp = await fetch('/api/award-credits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    })
+
+    // Not our JSON: the endpoint is not deployed and the SPA fallback served
+    // index.html. Nothing was awarded, and nothing is broken by saying so.
+    if (!(resp.headers.get('content-type') || '').includes('application/json')) return 0
+
+    const data = await resp.json().catch(() => null)
+    if (!resp.ok) {
+      console.error('Award refused:', data?.error)
+      return 0
     }
-    return capped
+    return Number(data?.awarded) || 0
   } catch (err) {
-    // Never fail the contribution because its reward could not be written; the
-    // work the user did is what matters, and the ledger can be reconciled.
     console.error('Failed to award credits:', err)
     return 0
   }
 }
 
+/** Credit the signed-in user's own company. */
+export async function awardCredits(entitlements, action, { reportId = null } = {}) {
+  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
+  return callAwardEndpoint({ action, reportId })
+}
+
 /**
- * Award credits to a tenant that is not the caller's own.
- *
- * Approval is the case: an administrator approves a report and the points go to
- * the company that filed it. Their plan decides whether they earn at all, so
- * this resolves that tenant's plan rather than the reviewer's — and the rate
- * comes from settings, never from a number written at the call site.
- *
- * Returns the points awarded, 0 when the plan does not earn or the report has
- * already been paid for.
+ * Credit a company other than the caller's — the approval case, where an
+ * administrator approves a report and the points go to the company that filed
+ * it. The server requires platform_admin for this, so the check is not one a
+ * modified client can skip.
  */
-export async function awardCreditsToTenant(tenantId, action, { reportId = null, userId = null } = {}) {
+export async function awardCreditsToTenant(tenantId, action, { reportId = null } = {}) {
   if (!tenantId) return 0
-
-  try {
-    const supabase = getSupabase()
-
-    const [subRes, settingsRes] = await Promise.all([
-      supabase
-        .from('subscriptions')
-        .select('plans(give_to_get_enabled)')
-        .eq('tenant_id', tenantId)
-        .maybeSingle(),
-      supabase.from('system_settings').select('value').eq('key', 'give_to_get_rules').maybeSingle(),
-    ])
-
-    if (!subRes.data?.plans?.give_to_get_enabled) return 0
-
-    const rules = settingsRes.data?.value
-    const points = Number(rules?.earn?.[action]?.points) || 0
-    if (points <= 0) return 0
-
-    // The ceiling belongs to the earning tenant, not the reviewer, so it is
-    // applied against their ledger here too — otherwise approval would be the
-    // one path around it.
-    const capped = await applyMonthlyCap(supabase, { tenantId, giveToGetRules: rules }, points)
-    if (capped <= 0) return 0
-
-    const { error } = await supabase.from('credits_ledger').insert([{
-      tenant_id: tenantId,
-      report_id: reportId,
-      user_id: userId,
-      amount: capped,
-      reason: action,
-    }])
-    if (error) {
-      if (error.code === '23505') return 0   // already awarded for this report
-      throw error
-    }
-    return capped
-  } catch (err) {
-    console.error('Failed to award credits to tenant:', err)
-    return 0
-  }
+  return callAwardEndpoint({ action, reportId, tenantId })
 }
 
-/**
- * Spend credits, or report that there are none to spend.
- *
- * Writes the negative entry only when the balance covers it, so the ledger can
- * never go below zero by racing itself. Returns false when the caller should
- * stop rather than proceed unpaid.
- */
-export async function spendCredits(entitlements, action, { amount = null } = {}) {
-  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return true // nothing to spend on a paid plan
-
-  const rule = entitlements.giveToGetRules?.spend?.[action]
-  const cost = Number(amount ?? rule?.points) || 0
-  if (cost <= 0) return true
-  if ((entitlements.credits || 0) < cost) return false
-
-  try {
-    const supabase = getSupabase()
-    const { error } = await supabase.from('credits_ledger').insert([{
-      tenant_id: entitlements.tenantId,
-      amount: -cost,
-      reason: action,
-    }])
-    if (error) throw error
-    return true
-  } catch (err) {
-    console.error('Failed to spend credits:', err)
-    return false
-  }
-}
+// spendCredits lived here and was never called. Credits currently widen a
+// ceiling rather than being drawn down — remaining() adds the balance to the
+// plan's allowance — so nothing in the product deducts them, and the settings'
+// `spend` rates describe an arrangement that does not exist yet. Written
+// speculatively, kept as dead weight, and now it would fail silently against
+// RLS as well: the ledger takes writes only from the server. If drawing down is
+// ever wanted, it belongs in api/award-credits.js alongside the granting, where
+// the balance can be checked and debited in one place that the browser cannot
+// reach around.
 
 /**
  * Is there room for another company on the watchlist?
