@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { getSupabase, searchCompaniesKnowledgeBase } from '../lib/api'
+import { getSupabase, searchCompaniesKnowledgeBase, trustScoreOf } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
 import { FeatureLocked } from '../components/LimitGate'
@@ -85,7 +85,7 @@ export default function Compare() {
         city: c.city || null,
         cr_number: c.cr_number || null,
         verified: !!c.verified,
-        trustScore: c.trust_scores?.[0]?.score ?? null,
+        trustScore: trustScoreOf(c)?.score ?? null,
         approvedReports: n,
         avgDelay: n ? Math.round(approved.reduce((s, r) => s + (r.delay_days || 0), 0) / n) : null,
         defaults: approved.filter((r) => r.defaulted).length,

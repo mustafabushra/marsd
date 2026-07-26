@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { getSupabase } from '../lib/api'
+import { getSupabase, trustScoreOf } from '../lib/api'
 
 const riskFrom = (score) => {
   if (score == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B' }
@@ -39,7 +39,7 @@ export default function AdminCompaniesManagement() {
         .eq('approved', true)
         .order('created_at', { ascending: false })
         .limit(500)
-      setCompanies((data || []).map((c) => ({ ...c, score: c.trust_scores?.[0]?.score ?? null })))
+      setCompanies((data || []).map((c) => ({ ...c, score: trustScoreOf(c)?.score ?? null })))
     } catch (err) {
       console.error('Error loading companies:', err)
     } finally {

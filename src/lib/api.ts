@@ -138,6 +138,26 @@ export function buildCompanyInsert(input: CompanyInsertInput): Record<string, an
  * Returning null is the signed-out case and falls back to the anon key, which
  * is correct: a visitor reading public company data has no identity to present.
  */
+/**
+ * The trust score off an embedded row, whichever shape PostgREST sent.
+ *
+ * trust_scores.company_id carries a UNIQUE constraint, so PostgREST treats the
+ * relationship as to-one and embeds an object. Eleven call sites read
+ * `trust_scores?.[0]`, which is how you read a to-many embed — every one of them
+ * resolved to undefined, and the score never reached the screen from any of
+ * them. It looked like missing data rather than a misread shape, which is why
+ * it survived.
+ *
+ * Handling both shapes rather than just the current one: dropping that unique
+ * constraint, or keeping score history per company, would flip the embed back to
+ * an array and quietly break these paths again.
+ */
+export function trustScoreOf(row: any): any {
+  const t = row?.trust_scores
+  if (!t) return null
+  return Array.isArray(t) ? (t[0] ?? null) : t
+}
+
 export function getSupabase(): SupabaseClient {
   if (!supabaseClient) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -826,8 +846,8 @@ export async function getCompanyDashboard() {
       status: tenantData?.status
     },
     stats: {
-      trustScore: companyData?.trust_scores?.[0]?.score || null,
-      trustTier: companyData?.trust_scores?.[0]?.tier || 'none',
+      trustScore: trustScoreOf(companyData)?.score || null,
+      trustTier: trustScoreOf(companyData)?.tier || 'none',
       approvedReportsCount: recentReports?.filter(r => r.status === 'approved').length || 0,
       watchedByCount: watchlistCount?.length || 0,
       creditsBalance: creditBalance || 0,
@@ -890,7 +910,7 @@ export async function searchCompanies(q: string, page = 1, limit = 20) {
     return {
       data: companies?.map(c => ({
         ...c,
-        trust_score: c.trust_scores?.[0] || null,
+        trust_score: trustScoreOf(c) || null,
       })) || [],
       pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
     }
@@ -922,7 +942,7 @@ export async function searchCompanies(q: string, page = 1, limit = 20) {
     return {
       data: companies?.map(c => ({
         ...c,
-        trust_score: c.trust_scores?.[0] || null,
+        trust_score: trustScoreOf(c) || null,
       })) || [],
       pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
     }
@@ -952,7 +972,7 @@ export async function searchCompanies(q: string, page = 1, limit = 20) {
   return {
     data: fullCompanies?.map(c => ({
       ...c,
-      trust_score: c.trust_scores?.[0] || null,
+      trust_score: trustScoreOf(c) || null,
     })) || [],
     pagination: { page, limit, total: companyIds.length, pages: Math.ceil((companyIds.length) / limit) },
   }
@@ -995,7 +1015,7 @@ export async function getCompanyReport(companyId: string) {
     .eq('id', subscription?.plan_id)
     .single()
 
-  const trustScore = company.trust_scores?.[0]
+  const trustScore = trustScoreOf(company)
   const planName = plan?.name || 'مجاني'
 
   // Gating logic based on plan
@@ -1395,7 +1415,7 @@ export async function getWatchlist(page = 1, limit = 20) {
     data: watchlist?.map(w => ({
       id: w.id,
       ...w.company,
-      trust_score: w.company?.trust_scores?.[0] || null,
+      trust_score: trustScoreOf(w.company) || null,
     })) || [],
     pagination: {
       page,
@@ -1595,7 +1615,7 @@ export async function getAdminCompanies(page = 1, limit = 20) {
   if (error) throw new Error('Failed to fetch companies: ' + error.message)
 
   return {
-    data: companies?.map(c => ({ ...c, trust_score: c.trust_scores?.[0] || null })) || [],
+    data: companies?.map(c => ({ ...c, trust_score: trustScoreOf(c) || null })) || [],
     pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
 }

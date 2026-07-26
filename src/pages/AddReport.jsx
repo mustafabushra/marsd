@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { Search as SearchIcon, Send } from 'lucide-react'
-import { getSupabase } from '../lib/api'
+import { getSupabase, trustScoreOf } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
 
@@ -130,7 +130,7 @@ export default function AddReport() {
         .order('name', { ascending: true })
         .limit(1000)
       setCompanies((data || []).map(c => ({
-        id: c.id, name: c.name, sector: c.sector, city: c.city, cr: c.cr_number, score: c.trust_scores?.[0]?.score ?? null,
+        id: c.id, name: c.name, sector: c.sector, city: c.city, cr: c.cr_number, score: trustScoreOf(c)?.score ?? null,
       })))
     } catch (err) {
       console.error('Failed to fetch companies:', err)
