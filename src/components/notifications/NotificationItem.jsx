@@ -9,7 +9,6 @@ export default function NotificationItem({ notification, onClose }) {
     const icons = {
       report_approved: '✓',
       score_changed: '📊',
-      request_received: '💼',
       watchlist_alert: '⚠️',
     }
     return icons[type] || '📬'
@@ -19,7 +18,6 @@ export default function NotificationItem({ notification, onClose }) {
     const titles = {
       report_approved: 'تم قبول التقرير',
       score_changed: 'تحديث مؤشر الثقة',
-      request_received: 'طلب أعمال جديد',
       watchlist_alert: 'تنبيه قائمة المراقبة',
     }
     return titles[type] || 'إشعار جديد'
@@ -29,7 +27,6 @@ export default function NotificationItem({ notification, onClose }) {
     const colors = {
       report_approved: '#10B981',
       score_changed: '#F59E0B',
-      request_received: '#3B82F6',
       watchlist_alert: '#EF4444',
     }
     return colors[type] || '#6B7280'

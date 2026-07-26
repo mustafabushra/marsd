@@ -7,7 +7,6 @@ const initialState = {
   unreadCount: 0,
   loading: false,
   error: null,
-  filter: 'all', // all | unread | report_approved | score_changed | request_received | watchlist_alert
 }
 
 const notificationReducer = (state, action) => {

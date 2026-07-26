@@ -62,7 +62,6 @@ export default function NotificationHistoryPage() {
     { value: 'unread', label: 'غير المقروءة' },
     { value: 'report_approved', label: 'التقارير المقبولة' },
     { value: 'score_changed', label: 'تحديثات المؤشر' },
-    { value: 'request_received', label: 'طلبات الأعمال' },
     { value: 'watchlist_alert', label: 'تنبيهات قائمة المراقبة' },
   ]
 

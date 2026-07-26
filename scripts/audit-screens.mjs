@@ -35,7 +35,6 @@ const COMPANY_SCREENS = {
   'Subscription.jsx': 'الاشتراك',
   'Profile.jsx': 'ملف الشركة',
   'Notifications.jsx': 'الإشعارات',
-  'BusinessRequests.jsx': 'طلبات الأعمال',
 }
 
 const rows = []

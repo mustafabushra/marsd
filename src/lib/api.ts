@@ -1478,84 +1478,6 @@ export async function markNotificationRead(notificationId: string) {
 }
 
 // ============================================================================
-// BUSINESS REQUESTS API
-// ============================================================================
-
-export async function listBusinessRequests() {
-  const supabase = getSupabase()
-  const user = await supabase.auth.getUser()
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.data.user?.id)
-    .single()
-
-  const { data: requests, error } = await supabase
-    .from('business_requests')
-    .select(`
-      *,
-      from_tenant:tenants!business_requests_from_tenant_id_fkey(id, name),
-      to_tenant:tenants!business_requests_to_tenant_id_fkey(id, name)
-    `)
-    .or(`from_tenant_id.eq.${userData?.tenant_id},to_tenant_id.eq.${userData?.tenant_id}`)
-
-  if (error) {
-    throw new Error('Failed to fetch requests: ' + error.message)
-  }
-
-  return { data: requests || [] }
-}
-
-export async function createBusinessRequest(toTenantId: string, subject: string, body: string) {
-  const supabase = getSupabase()
-  const user = await supabase.auth.getUser()
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.data.user?.id)
-    .single()
-
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 30)
-
-  const { error } = await supabase
-    .from('business_requests')
-    .insert([
-      {
-        from_tenant_id: userData?.tenant_id,
-        to_tenant_id: toTenantId,
-        subject,
-        body,
-        status: 'pending',
-        expires_at: expiresAt.toISOString(),
-      },
-    ])
-
-  if (error) {
-    throw new Error('Failed to create request: ' + error.message)
-  }
-
-  return { success: true }
-}
-
-export async function respondToBusinessRequest(requestId: string, accept: boolean) {
-  const supabase = getSupabase()
-
-  const { error } = await supabase
-    .from('business_requests')
-    .update({ status: accept ? 'accepted' : 'rejected' })
-    .eq('id', requestId)
-
-  if (error) {
-    throw new Error('Failed to respond: ' + error.message)
-  }
-
-  return { success: true }
-}
-
-// ============================================================================
 // ADMIN API
 // ============================================================================
 
@@ -1572,27 +1494,6 @@ export async function getAdminDashboard() {
     totalUsers: users?.length || 0,
     pendingReports: reports?.filter(r => r.status === 'pending_review').length || 0,
     approvedReports: reports?.filter(r => r.status === 'approved').length || 0,
-  }
-}
-
-export async function getAdminRequests(page = 1, limit = 20) {
-  const supabase = getSupabase()
-  const offset = (page - 1) * limit
-
-  const { data: requests, count, error } = await supabase
-    .from('business_requests')
-    .select(`
-      *,
-      from_tenant:tenants!business_requests_from_tenant_id_fkey(id, name),
-      to_tenant:tenants!business_requests_to_tenant_id_fkey(id, name)
-    `, { count: 'exact' })
-    .range(offset, offset + limit - 1)
-
-  if (error) throw new Error('Failed to fetch requests: ' + error.message)
-
-  return {
-    data: requests || [],
-    pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
 }
 

@@ -35,7 +35,6 @@ import CompanyUsers from './pages/CompanyUsers'
 import Subscription from './pages/Subscription'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
-import BusinessRequests from './pages/BusinessRequests'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminRequests from './pages/AdminRequests'
 import AdminReports from './pages/AdminReports'
@@ -165,7 +164,6 @@ function AppContent() {
           <Route path="/subscription" element={<CompanyRoute><Subscription /></CompanyRoute>} />
           <Route path="/profile" element={<CompanyRoute><Profile /></CompanyRoute>} />
           <Route path="/notifications" element={<CompanyRoute><Notifications /></CompanyRoute>} />
-          <Route path="/business-requests" element={<CompanyRoute><BusinessRequests /></CompanyRoute>} />
         </Route>
 
         {/* Admin Routes - Protected */}

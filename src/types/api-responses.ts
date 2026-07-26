@@ -199,18 +199,6 @@ export interface AuditLog {
   status: 'success' | 'failure'
 }
 
-export interface BusinessRequest {
-  id: string
-  type: string
-  status: 'pending' | 'approved' | 'rejected'
-  requestedBy: string
-  requestedAt: Date | string
-  approvedBy?: string
-  approvedAt?: Date | string
-  rejectionReason?: string
-  data?: Record<string, any>
-}
-
 // ============================================================================
 // PAGINATION & FILTERING
 // ============================================================================

@@ -40,7 +40,6 @@ import type {
   TrustScore,
   AdminUser,
   AuditLog,
-  BusinessRequest,
   PaginationParams,
   ApiError,
   ApiResponse,
@@ -558,36 +557,6 @@ class ApiClient {
         'GET',
         '/admin/audit-logs',
         { params }
-      )
-    },
-
-    getBusinessRequests: async (
-      params?: PaginationParams & { status?: string }
-    ): Promise<PaginatedResponse<BusinessRequest>> => {
-      return this.request<PaginatedResponse<BusinessRequest>>(
-        'GET',
-        '/admin/requests',
-        { params }
-      )
-    },
-
-    approveBusinessRequest: async (
-      requestId: string
-    ): Promise<BusinessRequest> => {
-      return this.request<BusinessRequest>(
-        'POST',
-        `/admin/requests/${requestId}/approve`
-      )
-    },
-
-    rejectBusinessRequest: async (
-      requestId: string,
-      reason: string
-    ): Promise<BusinessRequest> => {
-      return this.request<BusinessRequest>(
-        'POST',
-        `/admin/requests/${requestId}/reject`,
-        { body: { reason } }
       )
     },
 
