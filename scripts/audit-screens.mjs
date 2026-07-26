@@ -73,13 +73,44 @@ for (const r of rows) {
   if (r.writes.length) console.log(`         يكتب: ${r.writes.join(' · ')}`)
 }
 
-// Admin screens: the question there is only whether they touch the database.
-console.log('\n  شاشات لوحة الإدارة — أيها ما زال بيانات وهمية:\n')
-const adminFake = []
-for (const f of readdirSync(PAGES).filter((f) => f.startsWith('Admin') && f.endsWith('.jsx'))) {
+// Admin screens: does the screen reach the database at all, and do its controls
+// do anything?
+//
+// The first version of this looked for getSupabase and .from('…') and called
+// AdminUsers invented data. It reads real users through api.getAdminUsers —
+// going through the api module is a way of reaching the database, not evidence
+// of not reaching it. A check that knows only one spelling of "real" reports the
+// other spelling as fake, and a false accusation costs as much attention as a
+// missed one.
+console.log('\n  شاشات لوحة الإدارة:\n')
+
+const adminFiles = readdirSync(PAGES)
+  .filter((f) => f.startsWith('Admin') && f.endsWith('.jsx') && f !== 'AdminLogin.jsx')
+
+const fake = []
+const dead = []
+
+for (const f of adminFiles) {
   const src = readFileSync(join(PAGES, f), 'utf8')
-  if (f === 'AdminLogin.jsx') continue                    // a sign-in form, not a data screen
-  if (!/getSupabase|from\(['"]/.test(src)) adminFake.push(f.replace('.jsx', ''))
+  const name = f.replace('.jsx', '')
+
+  const reachesDb = /getSupabase|\.from\(['"]|from '\.\.\/lib\/api'|api\.\w+\(/.test(src)
+  if (!reachesDb) { fake.push(name); continue }
+
+  // A <button> with no onClick and no type="submit" is furniture. Counting them
+  // is crude — a few are genuinely decorative — but a screen with several is
+  // worth opening.
+  const buttons = [...src.matchAll(/<button\b[^>]*?>/gs)]
+  const inert = buttons.filter((b) => !/onClick|type=["']submit["']/.test(b[0])).length
+  if (inert > 0) dead.push({ name, inert, total: buttons.length })
 }
-console.log(adminFake.length ? adminFake.map((f) => `    ❌ ${f}`).join('\n') : '    ✅ كلها تقرأ من القاعدة')
-console.log(`\n  ${adminFake.length} من ${readdirSync(PAGES).filter((f) => f.startsWith('Admin') && f.endsWith('.jsx')).length - 1}\n`)
+
+console.log('  بيانات مُختلقة — لا تصل القاعدة إطلاقاً:')
+console.log(fake.length ? fake.map((f) => `    ❌ ${f}`).join('\n') : '    ✅ لا يوجد')
+
+console.log('\n  أزرار بلا onClick:')
+console.log(dead.length
+  ? dead.sort((a, b) => b.inert - a.inert).map((d) => `    ⚠️  ${d.name}: ${d.inert} من ${d.total}`).join('\n')
+  : '    ✅ لا يوجد')
+
+console.log(`\n  ${fake.length} مُختلقة · ${dead.length} فيها أزرار معطّلة · من ${adminFiles.length}\n`)
