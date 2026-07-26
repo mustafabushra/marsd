@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { awardCreditsToTenant } from '../lib/entitlements'
+import { notifyTenant } from '../lib/notify'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
@@ -78,7 +79,7 @@ export default function AdminReports() {
       await supabase.rpc('compute_trust_score', { p_company_id: current.target_company_id })
       // Audit + notify
       await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_approved', entity: 'report', entity_id: current.id, created_at: new Date().toISOString() }])
-      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_approved', title: 'تم اعتماد تقريرك', message: 'تم اعتماد تقريرك وإضافته لمؤشر الثقة.', is_read: false, created_at: new Date().toISOString() }])
+      await notifyTenant(current.reporter_tenant_id, 'report_approved', { title: 'تم اعتماد تقريرك', message: 'تم اعتماد تقريرك وإضافته لمؤشر الثقة.', meta: { reportId: current.id } })
       showToast(awarded > 0 ? `✅ تم اعتماد التقرير ومنح ${awarded} نقطة للشركة المُبلِّغة` : '✅ تم اعتماد التقرير')
       removeCurrent()
     } catch (err) {
@@ -105,7 +106,7 @@ export default function AdminReports() {
       // report costs nothing, and approval is what pays. Rejecting therefore
       // has nothing to reverse.
       await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action: 'report_rejected', entity: 'report', entity_id: current.id, meta: JSON.stringify({ reason }), created_at: new Date().toISOString() }])
-      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_rejected', title: 'تم رفض تقريرك', message: reason || 'راجع ملاحظات الإدارة.', is_read: false, created_at: new Date().toISOString() }])
+      await notifyTenant(current.reporter_tenant_id, 'report_rejected', { title: 'تم رفض تقريرك', message: reason || 'راجع ملاحظات الإدارة.', meta: { reportId: current.id } })
       showToast('تم رفض التقرير')
       removeCurrent()
     } catch (err) {
@@ -120,7 +121,7 @@ export default function AdminReports() {
       setActionLoading('info')
       const supabase = getSupabase()
       await supabase.from('reports').update({ status: 'request_info' }).eq('id', current.id)
-      await supabase.from('notifications').insert([{ tenant_id: current.reporter_tenant_id, type: 'report_request_info', title: 'مطلوب توضيح على تقريرك', message: 'يرجى إضافة تفاصيل/مستندات إضافية.', is_read: false, created_at: new Date().toISOString() }])
+      await notifyTenant(current.reporter_tenant_id, 'report_request_info', { title: 'مطلوب توضيح على تقريرك', message: 'يرجى إضافة تفاصيل أو مستندات إضافية.', meta: { reportId: current.id } })
       showToast('تم طلب توضيح')
       removeCurrent()
     } catch (err) {

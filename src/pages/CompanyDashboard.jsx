@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
+import { notificationText } from '../lib/notify'
 import { LiveBadge } from '../components/LiveBadge'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
@@ -82,9 +83,12 @@ export default function CompanyDashboard() {
           .rpc('get_credit_balance', { p_tenant_id: userData.tenant_id })
 
         // Get recent notifications (activity)
+        // payload, not message: the table has never had a message column, so
+        // this select was rejected outright and the activity feed was empty for
+        // every user regardless of what had happened on their account.
         const { data: notificationsData } = await supabase
           .from('notifications')
-          .select('id, type, message, created_at')
+          .select('id, type, payload, created_at')
           .eq('tenant_id', userData.tenant_id)
           .order('created_at', { ascending: false })
           .limit(5)
@@ -104,7 +108,7 @@ export default function CompanyDashboard() {
           return '#7C3AED'
         }
         const formattedActivity = (notificationsData || []).map(n => ({
-          title: n.message || 'تحديث',
+          title: notificationText(n).message || notificationText(n).title,
           time: new Date(n.created_at).toLocaleDateString('en-GB'),
           dot: dotColor(n.type)
         }))

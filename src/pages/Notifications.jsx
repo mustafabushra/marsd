@@ -1,232 +1,169 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
+import { notificationText, NOTIFICATION_STYLE } from '../lib/notify'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+
+/**
+ * /notifications — what the platform has actually told this user.
+ *
+ * The page held five notifications in useState, about companies that do not
+ * exist, with timestamps written into the source. Every visitor saw the same
+ * five, for ever, and marking one read changed nothing beyond the render.
+ *
+ * Underneath, the real thing was broken in the other direction: every report
+ * approval, rejection and information request wrote a notification whose columns
+ * did not match the table — title, message and is_read do not exist, and the
+ * required user_id was never supplied — so the insert always failed, its error
+ * was never read, and the table stayed empty. A screen showing invented data and
+ * a pipeline producing none, each hiding the other: a page full of notifications
+ * looks exactly like a working system.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+const DEFAULT_STYLE = { icon: '•', color: '#475569', bg: '#F1F5F9' }
 
 export default function Notifications() {
   const navigate = useNavigate()
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'report',
-      title: 'تقرير جديد معتمد',
-      message: 'تم اعتماد تقريرك عن شركة النور للتجارة',
-      timestamp: '2026-07-15 14:30',
-      read: false,
-      icon: '✓',
-    },
-    {
-      id: 2,
-      type: 'warning',
-      title: 'تنبيه مراقبة',
-      message: 'انخفض مؤشر شركة البناء المتحدة عن 60',
-      timestamp: '2026-07-15 12:00',
-      read: false,
-      icon: '⚠️',
-    },
-    {
-      id: 3,
-      type: 'info',
-      title: 'اشتراك قريب الانتهاء',
-      message: 'سينتهي اشتراكك بعد 7 أيام',
-      timestamp: '2026-07-14 10:30',
-      read: true,
-      icon: 'ℹ️',
-    },
-  ])
+  const { isLoaded, user } = useUser()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState(null)
 
-  const [filter, setFilter] = useState('all')
+  const load = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return }
+    try {
+      setError('')
+      const { data, error: e } = await getSupabase()
+        .from('notifications')
+        .select('id, type, payload, read_at, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (e) throw e
+      setItems(data || [])
+    } catch (err) {
+      setError(err.message || 'تعذّر تحميل الإشعارات')
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
 
-  const filteredNotifications = filter === 'all'
-    ? notifications
-    : notifications.filter(n => n.type === filter)
+  useEffect(() => { if (isLoaded) load() }, [isLoaded, load])
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  const { connected, liveAt } = useLiveData(load, { tables: ['notifications'], enabled: !!user?.id })
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, read: true } : n
-    ))
+  // read_at carries the time, not a boolean: when something was read is worth
+  // more than the fact that it was, and a timestamp cannot disagree with itself.
+  const markRead = async (id) => {
+    try {
+      setBusyId(id)
+      const { error: e } = await getSupabase()
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', id)
+      if (e) throw e
+      await load()
+    } catch (err) {
+      setError(err.message || 'تعذّر التحديث')
+    } finally { setBusyId(null) }
   }
 
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(n => n.id !== id))
+  const markAllRead = async () => {
+    const unread = items.filter((n) => !n.read_at).map((n) => n.id)
+    if (!unread.length) return
+    try {
+      setBusyId('all')
+      const { error: e } = await getSupabase()
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', unread)
+      if (e) throw e
+      await load()
+    } catch (err) {
+      setError(err.message || 'تعذّر التحديث')
+    } finally { setBusyId(null) }
   }
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })))
+  const openFor = (n) => {
+    if (n.type?.startsWith('report_')) navigate('/my-reports')
+    else if (n.type === 'company_approved') navigate('/my-companies')
+    else if (n.type === 'credits_awarded') navigate('/subscription')
   }
+
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+  }
+
+  const unreadCount = items.filter((n) => !n.read_at).length
 
   return (
-    <div style={{ padding: '24px', background: '#F8FAFC', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-          الإشعارات
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          أنت لديك {unreadCount} إشعار جديد
-        </p>
-      </div>
+    <div>
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>
+      )}
 
-      {/* Controls */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        gap: '12px',
-        flexDirection: 'row-reverse'
-      }}>
-        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row-reverse' }}>
-          <button
-            onClick={() => setFilter('all')}
-            style={{
-              padding: '8px 16px',
-              background: filter === 'all' ? '#16A34A' : '#F8FAFC',
-              color: filter === 'all' ? '#fff' : '#1E2A52',
-              border: filter === 'all' ? 'none' : '1.5px solid #E2E8F0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            الكل
-          </button>
-          <button
-            onClick={() => setFilter('report')}
-            style={{
-              padding: '8px 16px',
-              background: filter === 'report' ? '#16A34A' : '#F8FAFC',
-              color: filter === 'report' ? '#fff' : '#1E2A52',
-              border: filter === 'report' ? 'none' : '1.5px solid #E2E8F0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            التقارير
-          </button>
-          <button
-            onClick={() => setFilter('warning')}
-            style={{
-              padding: '8px 16px',
-              background: filter === 'warning' ? '#16A34A' : '#F8FAFC',
-              color: filter === 'warning' ? '#fff' : '#1E2A52',
-              border: filter === 'warning' ? 'none' : '1.5px solid #E2E8F0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            التنبيهات
-          </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الإشعارات</h3>
+          {unreadCount > 0 && (
+            <span style={{ background: '#FEE2E2', color: '#B91C1C', borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800 }}>{unreadCount} غير مقروء</span>
+          )}
+          <LiveBadge connected={connected} liveAt={liveAt} />
         </div>
-
         {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              color: '#16A34A',
-              border: '1.5px solid #16A34A',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            وضع علامة كمقروء
+          <button onClick={markAllRead} disabled={busyId === 'all'} style={{ background: '#F1F5F9', color: '#334155', border: 0, borderRadius: '9px', padding: '9px 18px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            تعليم الكل كمقروء
           </button>
         )}
       </div>
 
-      {/* Notifications List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {filteredNotifications.length === 0 ? (
-          <div style={{
-            background: '#fff',
-            border: '1px dashed #CBD5E1',
-            borderRadius: '12px',
-            padding: '40px 24px',
-            textAlign: 'center',
-            color: '#64748B',
-          }}>
-            <p style={{ fontSize: '16px', margin: '0 0 8px 0' }}>✨ لا توجد إشعارات</p>
-            <p style={{ fontSize: '14px', margin: 0 }}>أنت على اطلاع بكل شيء</p>
-          </div>
-        ) : (
-          filteredNotifications.map(notification => (
-            <div
-              key={notification.id}
-              onClick={() => markAsRead(notification.id)}
-              style={{
-                background: notification.read ? '#fff' : '#F0FDF4',
-                border: `1px solid ${notification.read ? '#E2E8F0' : '#DCFCE7'}`,
-                borderRadius: '12px',
-                padding: '16px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'flex-start',
-                opacity: notification.read ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              <div style={{ fontSize: '24px' }}>{notification.icon}</div>
-
-              <div style={{ flex: 1, textAlign: 'right' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0' }}>
-                  {notification.title}
-                  {!notification.read && (
-                    <span style={{
-                      display: 'inline-block',
-                      width: '8px',
-                      height: '8px',
-                      background: '#16A34A',
-                      borderRadius: '50%',
-                      marginRight: '8px'
-                    }} />
-                  )}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 4px 0' }}>
-                  {notification.message}
-                </p>
-                <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>
-                  {notification.timestamp}
-                </p>
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  deleteNotification(notification.id)
-                }}
+      {items.length === 0 ? (
+        <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔔</div>
+          <h4 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>لا توجد إشعارات</h4>
+          <p style={{ fontSize: '13.5px', color: '#64748B', lineHeight: 1.9, margin: 0 }}>
+            ستصلك هنا إشعارات اعتماد تقاريرك، وقبول الشركات التي تضيفها، والنقاط التي تكسبها.
+          </p>
+        </div>
+      ) : (
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {items.map((n, i) => {
+            const { title, message } = notificationText(n)
+            const s = NOTIFICATION_STYLE[n.type] || DEFAULT_STYLE
+            const unread = !n.read_at
+            return (
+              <div
+                key={n.id}
+                onClick={() => { if (unread) markRead(n.id); openFor(n) }}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#DC2626',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  padding: 0,
+                  display: 'flex', gap: '14px', padding: '16px 20px', cursor: 'pointer',
+                  borderBottom: i < items.length - 1 ? '1px solid #F1F5F9' : 'none',
+                  background: unread ? '#FAFCFF' : '#fff',
+                  opacity: busyId === n.id ? 0.6 : 1,
                 }}
               >
-                ✕
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: s.bg, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 900, flex: 'none' }}>
+                  {s.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{title}</span>
+                    {unread && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3B82F6', flex: 'none' }} />}
+                  </div>
+                  {message && <div style={{ fontSize: '13.5px', color: '#64748B', lineHeight: 1.8 }}>{message}</div>}
+                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '5px' }}>
+                    {new Date(n.created_at).toLocaleString('en-GB')}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
