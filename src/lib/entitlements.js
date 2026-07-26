@@ -309,11 +309,18 @@ export async function watchlistRoom(entitlements, tenantId) {
       .eq('tenant_id', tenantId)
     if (error) throw error
 
+    // The allowance is whatever remaining() says, computed against the count
+    // just read. It used to add the credit balance here directly, which made
+    // this the second place a ceiling was worked out — and the two disagreed:
+    // remaining() excludes watchlist from what credits extend, while this added
+    // them, so a tenant with 45 points had a limit of 48 instead of 3. Exactly
+    // the drift that having one resolver was supposed to prevent, introduced by
+    // writing a second calculation next to it.
     const used = count || 0
-    // Credits widen this the same way they widen everything else on a
-    // Give-to-Get plan: contributing earns room.
-    const allowance = ceiling + (entitlements?.giveToGetEnabled ? (entitlements.credits || 0) : 0)
-    return { allowed: used < allowance, used, ceiling: allowance }
+    const withUsage = { ...entitlements, usage: { ...(entitlements.usage || {}), watchlist_items: used } }
+    const left = remaining(withUsage, 'watchlist_items')
+
+    return { allowed: left > 0, used, ceiling }
   } catch (err) {
     // Counting failed: let it through rather than blocking on a bad request.
     console.error('Failed to check watchlist room:', err)

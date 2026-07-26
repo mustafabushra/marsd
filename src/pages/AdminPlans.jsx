@@ -27,6 +27,7 @@ const LIMIT_LABELS = {
   searches_per_month: 'بحث/شهر',
   reports_per_month: 'تقارير/شهر',
   companies_per_month: 'شركات/شهر',
+  pending_reports: 'تقارير قيد المراجعة',
   users: 'مستخدمون',
   watchlist_items: 'قوائم المراقبة',
   compare_items: 'مقارنة',
@@ -105,10 +106,17 @@ export default function AdminPlans() {
 
   const saveEdit = async () => {
     if (!editing) return
-    const limits = {}
+
+    // Start from what the plan already holds rather than from an empty object.
+    // Building it only from the keys this form knows about deleted every other
+    // one on save — pending_reports vanished from the free plan that way, and
+    // the limit simply stopped applying, with nothing to indicate it had gone.
+    // A form should not silently drop what it does not render.
+    const limits = { ...(editing.limits || {}) }
+
     for (const key of Object.keys(LIMIT_LABELS)) {
       const raw = String(editing.limits?.[key] ?? '').trim()
-      if (raw === '') continue                    // absent means unlimited
+      if (raw === '') { delete limits[key]; continue }   // cleared means unlimited
       const n = Number(raw)
       if (!Number.isFinite(n)) { showToast(`❌ قيمة غير صحيحة في «${LIMIT_LABELS[key]}»`); return }
       limits[key] = n
