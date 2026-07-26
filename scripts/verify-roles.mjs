@@ -58,7 +58,24 @@ const { rows: users } = await c.query(`
      select count(*) from public.users p
       where p.tenant_id = u.tenant_id and p.id <> u.id and p.status = 'active') desc, u.created_at`)
 
-const { rows: [anyCompany] } = await c.query('select id from public.companies limit 1')
+// Not just any company: BR-05 refuses a second report on the same company from
+// the same tenant inside 90 days, and the plan caps how many reports may sit in
+// the review queue. Both are business rules, not permissions — a probe that
+// cannot tell them apart calls a role forbidden when the truth is that this
+// particular company was a bad choice of target. It reported exactly that on its
+// first run here, twice.
+const freshTarget = async (tenantId) => {
+  const { rows } = await c.query(`
+    select co.id
+      from public.companies co
+     where not exists (
+       select 1 from public.reports r
+        where r.target_company_id = co.id
+          and r.reporter_tenant_id = $1
+          and r.created_at > now() - interval '90 days')
+     limit 1`, [tenantId])
+  return rows[0] || null
+}
 
 let failures = 0
 let unchecked = 0
@@ -93,11 +110,13 @@ for (const role of Object.keys(EXPECTED)) {
     return allowed
   }
 
+  const target = u.tenant_id ? await freshTarget(u.tenant_id) : null
+
   const checks = {
-    canAddReport: u.tenant_id && anyCompany
+    canAddReport: target
       ? await attempt(
           `insert into public.reports (reporter_tenant_id, target_company_id, dealt_at)
-           values ($1, $2, now())`, [u.tenant_id, anyCompany.id])
+           values ($1, $2, now())`, [u.tenant_id, target.id])
       : null,
 
     canEditCompany: u.company_id
