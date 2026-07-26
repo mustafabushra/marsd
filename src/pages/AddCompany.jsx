@@ -4,7 +4,6 @@ import { useUser } from '@clerk/react'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
-import { awardCredits } from '../lib/entitlements'
 
 const ENTITY_TYPES = ['مؤسسة', 'شركة ذات مسؤولية محدودة', 'شركة مساهمة', 'شركة تضامن', 'شركة توصية بسيطة']
 const ENTERPRISE_SIZES = ['متناهية الصغر', 'صغيرة', 'متوسطة', 'كبيرة']
@@ -18,10 +17,12 @@ export default function AddCompany() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useUser()
-  const { entitlements, refresh: refreshEntitlements } = useEntitlements()
+  const { entitlements } = useEntitlements()
+  // Shown as a promise, not a receipt: the award happens when an administrator
+  // approves the entry.
+  const pointsOnApproval = Number(entitlements?.giveToGetRules?.earn?.company_added?.points) || 0
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [creditsEarned, setCreditsEarned] = useState(0)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     companyName: location.state?.companyName || '',
@@ -159,17 +160,15 @@ export default function AddCompany() {
         }])
       }
 
-      // Give-to-Get: adding a company to the registry is a contribution, and on
-      // a plan that earns it is paid for here. Awarding on submission rather
-      // than on approval is deliberate — the entry is a real one either way, and
-      // a contributor should not have to wait on a review queue to see that the
-      // arrangement is real. Reports are different: those are claims about
-      // another company, and only approval establishes they were sound.
-      const earned = await awardCredits(entitlements, 'company_added', { userId: user?.id || null })
-      if (earned > 0) {
-        await refreshEntitlements()
-        setCreditsEarned(earned)
-      }
+      // No credit is awarded here. It used to be, on the reasoning that a
+      // contributor should not wait on a review queue — which ignored what the
+      // reward buys: forty junk entries would reach the monthly ceiling of 200
+      // points immediately, and 200 points is 200 extra searches. Paying before
+      // verification pays for unverified data, on a platform whose product is
+      // verified data.
+      //
+      // The row is inserted with approved: false and earns when an
+      // administrator approves it, in AdminRequests.
 
       setSubmitted(true)
     } catch (err) {
@@ -318,13 +317,13 @@ export default function AddCompany() {
             <p style={{ fontSize: '15px', color: '#64748B', lineHeight: 1.75, margin: '0 auto 22px', maxWidth: '480px' }}>سيراجع فريق مرصد السجل التجاري للتحقق منه. بمجرد الموافقة تُضاف الشركة لقاعدة البيانات وتصبح متاحة للبحث والتقييم من جميع الأعضاء.</p>
             {/* This read "زاد نشاطك كمساهم إلى 78% — 89 مساهمة" for everyone,
                 every time: two numbers written into the markup that belonged to
-                no one. What replaces it is the ledger entry this submission
-                actually created, and it appears only when one was. */}
-            {creditsEarned > 0 && (
+                nobody. It says what will happen instead, and only where points
+                are actually on offer. */}
+            {entitlements?.giveToGetEnabled && pointsOnApproval > 0 && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '12px 20px', marginBottom: '26px', color: '#15803D' }}>
                 <TrendingUpIcon />
                 <span style={{ fontSize: '14px', fontWeight: 800, color: '#15803D' }}>
-                  +{creditsEarned} نقطة لرصيد شركتك · الرصيد الآن {entitlements?.credits ?? creditsEarned}
+                  +{pointsOnApproval} نقطة لرصيد شركتك عند اعتماد الإضافة
                 </span>
               </div>
             )}

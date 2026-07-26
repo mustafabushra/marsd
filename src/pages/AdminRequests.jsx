@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { awardCreditsToTenant } from '../lib/entitlements'
 
 const FIELD_LABELS = {
   name: 'اسم الشركة', name_en: 'الاسم (إنجليزي)', cr_number: 'رقم السجل التجاري', unified_number: 'الرقم الموحّد (700)',
@@ -81,8 +82,23 @@ export default function AdminRequests() {
   const audit = async (supabase, action, entityId, meta) => {
     await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action, entity: 'company', entity_id: entityId, meta: meta ? JSON.stringify(meta) : null, created_at: new Date().toISOString() }])  }
 
+  // Completing a company's data is a contribution and earns on approval, like
+  // adding one. The contributing tenant is recorded on the request itself.
+  const awardForDataRequest = async (supabase, requestId) => {
+    if (!requestId) return 0
+    const { data: req } = await supabase
+      .from('company_data_requests')
+      .select('requested_by_tenant_id')
+      .eq('id', requestId)
+      .maybeSingle()
+    return req?.requested_by_tenant_id
+      ? awardCreditsToTenant(req.requested_by_tenant_id, 'company_completed')
+      : 0
+  }
+
   const approve = async () => {
     if (!current) return
+    let awarded = 0
     try {
       setActionLoading(true)
       const supabase = getSupabase()
@@ -90,6 +106,22 @@ export default function AdminRequests() {
         const { error } = await supabase.from('companies').update({ approved: true, status: 'active' }).eq('id', current.companyId)
         if (error) throw error
         await audit(supabase, 'company_approved', current.companyId)
+
+        // Credit the company that contributed the entry, now that it has been
+        // verified. companies carries no submitter, so the contributor is read
+        // from the audit entry written when it was filed.
+        const { data: origin } = await supabase
+          .from('audit_logs')
+          .select('tenant_id')
+          .eq('action', 'company_add_requested')
+          .eq('entity_id', current.companyId)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (origin?.tenant_id) {
+          awarded = await awardCreditsToTenant(origin.tenant_id, 'company_added')
+        }
       } else if (current.kind === 'add_data') {
         const p = current.payload || {}
         const update = {}
@@ -97,13 +129,15 @@ export default function AdminRequests() {
         if (Object.keys(update).length) await supabase.from('companies').update(update).eq('id', current.companyId)
         await supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId)
         await audit(supabase, 'company_data_added', current.companyId, update)
+        awarded = await awardForDataRequest(supabase, current.requestId)
       } else if (current.kind === 'edit_data') {
         const p = current.payload || {}
         if (p.field && p.correct_value != null) await supabase.from('companies').update({ [p.field]: p.correct_value }).eq('id', current.companyId)
         await supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId)
         await audit(supabase, 'company_data_edited', current.companyId, p)
+        awarded = await awardForDataRequest(supabase, current.requestId)
       }
-      showToast('✅ تمت الموافقة')
+      showToast(awarded > 0 ? `✅ تمت الموافقة ومُنحت ${awarded} نقطة للشركة المساهِمة` : '✅ تمت الموافقة')
       removeCurrent()
     } catch (err) {
       console.error(err); showToast('❌ فشلت الموافقة: ' + (err?.message || 'خطأ غير معروف'))
