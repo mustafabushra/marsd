@@ -15,7 +15,7 @@ import { getSupabase } from './api'
  * live in the payload, which is what jsonb is there for.
  */
 
-/** Notify every member of a tenant. Returns how many rows were written. */
+/** Notify every member of a tenant who has not switched this type off. */
 export async function notifyTenant(tenantId, type, { title, message, meta = {} } = {}) {
   if (!tenantId || !type) return 0
 
@@ -24,14 +24,19 @@ export async function notifyTenant(tenantId, type, { title, message, meta = {} }
 
     const { data: members, error: memberErr } = await supabase
       .from('users')
-      .select('id')
+      .select('id, notification_prefs')
       .eq('tenant_id', tenantId)
       .eq('status', 'active')
     if (memberErr) throw memberErr
-    if (!members?.length) return 0
+
+    // The preference is read here, at the one place that writes a notification,
+    // so a switch cannot be honoured on one path and ignored on another.
+    const key = PREF_KEY[type]
+    const wanted = members?.filter((m) => !key || m.notification_prefs?.[key] !== false) || []
+    if (!wanted.length) return 0
 
     const { error } = await supabase.from('notifications').insert(
-      members.map((m) => ({
+      wanted.map((m) => ({
         user_id: m.id,
         tenant_id: tenantId,
         type,
@@ -40,11 +45,37 @@ export async function notifyTenant(tenantId, type, { title, message, meta = {} }
     )
     // Read the error. Not reading it is why this was broken for so long.
     if (error) throw error
-    return members.length
+    return wanted.length
   } catch (err) {
     console.error('Failed to write notification:', err)
     return 0
   }
+}
+
+/**
+ * The switches offered on /profile, and the notification types they silence.
+ *
+ * Only types the platform actually sends appear here. The page used to offer
+ * "تغيّر تقييم شركة مراقَبة", which nothing has ever emitted — a switch for an
+ * event that cannot happen is the same lie as a switch that does not save.
+ *
+ * A type absent from PREF_KEY cannot be switched off: welcome is the account's
+ * first message and there is nowhere to have opted out of it yet.
+ */
+export const NOTIFICATION_PREFS = [
+  { key: 'report_approved', label: 'اعتماد تقرير' },
+  { key: 'report_rejected', label: 'رفض تقرير' },
+  { key: 'report_request_info', label: 'طلب توضيح على تقرير' },
+  { key: 'company_approved', label: 'قبول طلب إضافة شركة' },
+  { key: 'credits_awarded', label: 'إضافة نقاط للرصيد' },
+]
+
+const PREF_KEY = {
+  report_approved: 'report_approved',
+  report_rejected: 'report_rejected',
+  report_request_info: 'report_request_info',
+  company_approved: 'company_approved',
+  credits_awarded: 'credits_awarded',
 }
 
 /** The title and body of a notification, whatever shape it was stored in. */
