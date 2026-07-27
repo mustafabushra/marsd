@@ -50,7 +50,7 @@ const GROUPS = [
   ] },
   { key: 'monitoring', title: 'المراقبة', items: [
     { label: 'حالة النظام', path: '/admin/system-health' },
-    { label: '🔒 كشف الاحتيال', path: '/admin/fraud-detection' },
+    { label: 'سجل المساهمين', path: '/admin/fraud-detection' },
     { label: '🔒 التكاملات', path: '/admin/integrations' },
   ] },
 ]
@@ -77,7 +77,7 @@ const SCREEN_LABELS = {
   '/admin/company-verification': 'التحقق من الشركات',
   '/admin/knowledge-base/companies': 'مستودع الشركات',
   '/admin/knowledge-base/reports': 'مستودع التقارير',
-  '/admin/fraud-detection': 'كشف الاحتيال (قيد التطوير)',
+  '/admin/fraud-detection': 'سجل المساهمين ومعالجة البلاغات الكيدية',
   '/admin/integrations': 'التكاملات (قيد التطوير)',
   '/admin/email-templates': 'نماذج البريد (قيد التطوير)',
   '/admin/system-health': 'حالة النظام',
