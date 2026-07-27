@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
-import { getSupabase } from '../lib/api'
 import { allows, can, limitOf, loadEntitlements, remaining } from '../lib/entitlements'
 
 /**
@@ -27,11 +26,10 @@ export function useEntitlements() {
       return
     }
     try {
-      const supabase = getSupabase()
-      const { data } = await supabase.from('users').select('tenant_id').eq('id', user.id).maybeSingle()
-      setEntitlements(await loadEntitlements(data?.tenant_id))
-    } catch {
-      setEntitlements(await loadEntitlements(null))
+      // No tenant lookup here any more: my_entitlements resolves it from the
+      // session inside the database, which removes a full round trip from the
+      // wait every gated screen sits behind.
+      setEntitlements(await loadEntitlements())
     } finally {
       setLoading(false)
     }

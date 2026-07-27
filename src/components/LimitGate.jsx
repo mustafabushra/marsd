@@ -73,6 +73,45 @@ export function FeatureLocked({ feature, featureName }) {
 }
 
 /**
+ * Wraps a screen whose whole content depends on the plan including a feature.
+ *
+ * Every gate on this platform was written as `if (!loading && !can(x)) return
+ * <Locked/>`, which reads correctly and behaves backwards. While the plan is
+ * still being fetched, `loading` is true, so the condition is false, so the
+ * component falls through and renders the feature. Comparison showed a free
+ * member the full comparison table for as long as the lookup took — Clerk, then
+ * a query for the tenant, then the plan itself — and then replaced it with a
+ * lock. The user reported it as the screen locking ten seconds after opening,
+ * which is exactly what it did.
+ *
+ * A permission that cannot yet be established is not a permission. This waits
+ * rather than guessing, which is the same rule useUserRole follows when it
+ * returns null instead of falling back to a role.
+ *
+ * Written as a component rather than a convention so the next screen inherits
+ * the behaviour instead of having to remember it.
+ */
+export function FeatureGate({ loading, allowed, feature, featureName, children }) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>
+        جاري التحميل...
+      </div>
+    )
+  }
+
+  if (!allowed) {
+    return (
+      <div style={{ maxWidth: '620px', margin: '40px auto' }}>
+        <FeatureLocked feature={feature} featureName={featureName} />
+      </div>
+    )
+  }
+
+  return children
+}
+
+/**
  * The running count next to a gated action.
  *
  * Shown before the limit bites, not after: someone on their ninth of ten

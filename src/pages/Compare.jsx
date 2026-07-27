@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { getSupabase, searchCompaniesKnowledgeBase, trustScoreOf } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
-import { FeatureLocked } from '../components/LimitGate'
+import { FeatureGate } from '../components/LimitGate'
 
 // Fallback only. How many companies may be compared is a plan limit
 // (compare_items); this is what applies when a plan does not name one.
@@ -134,18 +134,18 @@ export default function Compare() {
   // route, so a member who reaches it — from the sidebar, a bookmark, a
   // colleague's link — learns what it is and what includes it, instead of
   // meeting a blank screen.
-  if (!entLoading && !can('compare')) {
-    return (
-      <div style={{ maxWidth: '620px', margin: '40px auto' }}>
-        <FeatureLocked
-          feature="compare"
-          featureName={entitlements?.featureCatalog?.compare || 'مقارنة الشركات'}
-        />
-      </div>
-    )
-  }
-
+  //
+  // This was `if (!entLoading && !can('compare'))`, which reads correctly and
+  // behaves backwards: while the plan is still loading the condition is false,
+  // so the whole comparison table rendered first and the lock replaced it a few
+  // seconds later. FeatureGate waits instead of guessing.
   return (
+    <FeatureGate
+      loading={entLoading}
+      allowed={can('compare')}
+      feature="compare"
+      featureName={entitlements?.featureCatalog?.compare || 'مقارنة الشركات'}
+    >
     <div>
       {toast && <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 120, boxShadow: '0 8px 24px rgba(15,23,42,.25)' }}>{toast}</div>}
 
@@ -252,5 +252,6 @@ export default function Compare() {
         </div>
       )}
     </div>
+    </FeatureGate>
   )
 }

@@ -41,8 +41,23 @@ check('قراءة plans', !plans.error, plans.error?.message || `${plans.data?.l
 const free = (plans.data || []).find((p) => p.code === 'free')
 check('باقة free موجودة ومفعّلة', !!free?.active)
 check('free تحمل Give-to-Get', free?.give_to_get_enabled === true)
-check('free لها حدود مضبوطة', Number(free?.limits?.searches_per_month) === 10, `searches=${free?.limits?.searches_per_month}`)
-check('الباقات المدفوعة موقوفة', (plans.data || []).filter((p) => p.code !== 'free').every((p) => !p.active))
+// The value, not a value. This asserted searches_per_month === 10 and started
+// failing the moment an operator changed it in the admin panel — which is what
+// the panel is for. A check that breaks when the product is used as designed
+// trains people to ignore the checks. What matters is that the key exists and
+// is a sane number; verify-plan-matrix.mjs is where the agreed figures live.
+const freeSearches = Number(free?.limits?.searches_per_month)
+check('free لها حد بحث معرّف', Number.isFinite(freeSearches) && freeSearches !== 0,
+  `searches=${free?.limits?.searches_per_month}`)
+
+// This asserted that every paid plan was switched off. That was true while they
+// were seeded and dormant; 037 gave companies a way to buy one, so a paid plan
+// being active is now the normal state. What still matters is that whatever is
+// offered is priced.
+const paid = (plans.data || []).filter((p) => p.code !== 'free')
+check('الباقات المعروضة مُسعّرة',
+  paid.filter((p) => p.active).every((p) => Number(p.price_monthly) > 0),
+  `${paid.filter((p) => p.active).length} معروضة من ${paid.length}`)
 // Which feature belongs to which plan is asserted cell by cell in
 // verify-plan-matrix.mjs. Here the point is only that the paid plans were
 // seeded complete rather than switched off and left empty — this check named
@@ -50,15 +65,25 @@ check('الباقات المدفوعة موقوفة', (plans.data || []).filter(
 // a correct database look broken.
 check('المدفوعة مبذورة بميزاتها', (plans.data || []).filter((p) => p.code !== 'free').every((p) => (p.features || []).length > 0))
 
-// 2) The embed the entitlement resolver depends on. This is the shape that was
-//    broken: a bad column here nulls the whole row rather than erroring loudly.
-const sub = await supabase
-  .from('subscriptions')
-  .select('status, current_period_end, plans(id, code, name, description, price_monthly, limits, features, active, give_to_get_enabled)')
-  .limit(1)
-  .maybeSingle()
-check('embed subscriptions→plans', !sub.error, sub.error?.message || '')
-check('الـ embed يعيد باقة فعلية', !!sub.data?.plans?.code, sub.data?.plans?.code || 'null')
+// 2) The resolver's own path.
+//
+// This used to test the subscriptions→plans embed the resolver was built on,
+// and asserted that a row came back. It ran with the anon key, which has no
+// session — so RLS correctly returned nothing and the check read that as a
+// broken embed. It was asserting that an unauthenticated caller could read a
+// subscription, which is the opposite of what should be true.
+//
+// 038 replaced the embed with my_entitlements(), so that is what to check: a
+// caller with no session must be refused, and told why rather than handed an
+// empty object that reads as "no limits".
+const anonEnt = await supabase.rpc('my_entitlements')
+check('my_entitlements موجودة', !anonEnt.error, anonEnt.error?.message || '')
+check('بلا جلسة: تُرفض بسبب مذكور',
+  anonEnt.data?.degraded === true && !!anonEnt.data?.reason,
+  anonEnt.data?.reason || JSON.stringify(anonEnt.data))
+check('بلا جلسة: لا تُسرّب حدوداً',
+  !anonEnt.data?.limits && !anonEnt.data?.features,
+  anonEnt.data?.limits ? 'سرّبت حدوداً!' : 'لا شيء')
 
 // 3) Settings the resolver reads.
 const settings = await supabase

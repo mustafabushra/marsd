@@ -108,63 +108,30 @@ export async function loadEntitlements(tenantId) {
     reason,
   })
 
-  if (!tenantId) return degraded('لا يوجد كيان مرتبط بالحساب')
-
   try {
-    const supabase = getSupabase()
-
-    const [subRes, settingsRes, creditsRes, quotaRes] = await Promise.all([
-      supabase
-        .from('subscriptions')
-        .select('status, current_period_end, plans(id, code, name, description, price_monthly, limits, features, active, give_to_get_enabled)')
-        .eq('tenant_id', tenantId)
-        .maybeSingle(),
-      supabase
-        .from('system_settings')
-        .select('key, value')
-        .in('key', ['give_to_get_rules', 'entitlements_enforcement', 'feature_catalog']),
-      supabase
-        .from('credits_ledger')
-        .select('amount')
-        .eq('tenant_id', tenantId),
-      // Distinct companies opened this month. Counted from audit_logs, which
-      // records the company id, rather than view_quota_usage, which holds a bare
-      // counter that cannot say whether a company was seen before — and a member
-      // is not charged twice for the same company.
-      supabase
-        .from('audit_logs')
-        .select('entity_id')
-        .eq('tenant_id', tenantId)
-        .eq('action', 'company_report_viewed')
-        .gte('created_at', new Date(new Date().setDate(1)).toISOString().slice(0, 10)),
-    ])
-
-    const plan = subRes.data?.plans || null
-    if (!plan) return degraded('لا توجد باقة مرتبطة بالكيان')
-
-    const settings = Object.fromEntries((settingsRes.data || []).map((r) => [r.key, r.value]))
-    const enforcement = settings.entitlements_enforcement || {}
-
-    // The ledger is append-only and holds both earnings and spends, so the
-    // balance is its sum — never a stored counter that can drift from it.
-    const credits = (creditsRes.data || []).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+    // One round trip. This used to be a query for the caller's tenant_id, a
+    // wait, and then four more queries that could not start until it returned —
+    // so the delay was the sum of two, after Clerk had already taken its turn.
+    // Every gated screen sat behind that, and a member opening comparison saw
+    // the whole table before the plan came back and locked it.
+    //
+    // The tenant lookup now happens inside the database, where it costs nothing.
+    const { data, error } = await getSupabase().rpc('my_entitlements')
+    if (error) throw error
+    if (!data || data.degraded) return degraded(data?.reason || 'تعذّر قراءة بيانات الباقة')
 
     return {
-      tenantId,
-      plan,
-      planCode: plan.code,
-      limits: plan.limits || {},
-      features: plan.features || [],
-      credits,
-      usage: {
-        searches_per_month: new Set((quotaRes.data || []).map((r) => r.entity_id).filter(Boolean)).size,
-      },
-      giveToGetEnabled: !!plan.give_to_get_enabled,
-      giveToGetRules: settings.give_to_get_rules || null,
-      featureCatalog: settings.feature_catalog || {},
-      enforcementDisabled: enforcement.enabled === false,
-      subscriptionStatus: subRes.data?.status || null,
-      periodEnd: subRes.data?.current_period_end || null,
+      tenantId: data.tenantId,
+      plan: data.plan,
+      planCode: data.planCode,
+      limits: data.limits || {},
+      features: data.features || [],
+      credits: Number(data.credits) || 0,
+      usage: data.usage || {},
+      giveToGetEnabled: !!data.giveToGetEnabled,
+      giveToGetRules: data.giveToGetRules || null,
+      featureCatalog: data.featureCatalog || {},
+      enforcementDisabled: !!data.enforcementDisabled,
       degraded: false,
       reason: null,
     }
