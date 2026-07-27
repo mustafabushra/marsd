@@ -66,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeRoute = '/', onNavigate, onLogo
     { label: 'لوحة التحكم', route: '/' },
     { label: 'البحث', route: '/search' },
     { label: 'تقاريري', route: '/my-reports' },
+    { label: 'تقارير عن شركتك', route: '/reports-about-us' },
     { label: 'المراقبة', route: '/watchlist' },
     { label: 'المقارنة', route: '/compare' },
     { label: 'الإشعارات', route: '/notifications' },

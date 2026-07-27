@@ -12,6 +12,7 @@ const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي'
 export default function AdminReports() {
   const { user } = useUser()
   const [reports, setReports] = useState([])
+  const [reporterHistory, setReporterHistory] = useState({})
   const [sel, setSel] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
@@ -30,10 +31,33 @@ export default function AdminReports() {
         .select(`id, target_company_id, reporter_tenant_id, status, submitted_at, dealt_at, deal_end_date,
                  deal_value, currency, deal_amount_range, payment_commitment, delay_days, defaulted,
                  title, category, description, notes, would_recommend,
-                 companies:target_company_id ( name, cr_number )`)
+                 companies:target_company_id ( name, cr_number ),
+                 reporter:reporter_tenant_id ( id, name, cr_number )`)
         .eq('status', 'pending_review')
         .order('submitted_at', { ascending: false })
-      setReports(data || [])
+
+      const rows = data || []
+      setReports(rows)
+
+      // The record of the company that filed each report. A reviewer approving a
+      // claim about a named business without knowing who made it cannot weigh it
+      // at all — and a company whose reports keep being rejected is the single
+      // clearest signal Marsad has that something is wrong with its submissions.
+      const tenantIds = [...new Set(rows.map((r) => r.reporter_tenant_id).filter(Boolean))]
+      if (tenantIds.length) {
+        const { data: filed } = await supabase
+          .from('reports')
+          .select('reporter_tenant_id, status')
+          .in('reporter_tenant_id', tenantIds)
+        const tally = {}
+        ;(filed || []).forEach((r) => {
+          const t = (tally[r.reporter_tenant_id] ||= { total: 0, approved: 0, rejected: 0 })
+          t.total += 1
+          if (r.status === 'approved') t.approved += 1
+          if (r.status === 'rejected') t.rejected += 1
+        })
+        setReporterHistory(tally)
+      }
       setSel(0)
     } catch (err) {
       console.error('Error fetching reports:', err)
@@ -194,6 +218,37 @@ export default function AdminReports() {
                 </div>
                 <span style={{ background: '#FFFBEB', color: '#B45309', borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>قيد المراجعة</span>
               </div>
+
+              {/* Who is making the claim, and what their submissions have been
+                  worth so far. A reviewer weighing an accusation against a named
+                  business needs both: the identity, and whether this source has a
+                  history of claims that did not hold up. */}
+              {(() => {
+                const h = reporterHistory[current.reporter_tenant_id] || { total: 0, approved: 0, rejected: 0 }
+                const rejectRate = h.total ? Math.round((h.rejected / h.total) * 100) : 0
+                const suspect = h.total >= 3 && rejectRate >= 40
+                return (
+                  <div style={{ background: suspect ? '#FFFBEB' : '#F8FAFC', border: `1px solid ${suspect ? '#FDE68A' : '#E2E8F0'}`, borderRadius: '12px', padding: '15px 17px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلِّغة</div>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A' }}>{current.reporter?.name || '—'}</div>
+                        {current.reporter?.cr_number && (
+                          <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>سجل {current.reporter.cr_number}</div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'left', fontSize: '12.5px', fontWeight: 700, color: '#52514e', lineHeight: 1.9 }}>
+                        <div>{h.total} تقريراً مُقدَّماً · {h.approved} معتمد · {h.rejected} مرفوض</div>
+                        {suspect && (
+                          <div style={{ color: '#B45309', fontWeight: 800 }}>
+                            ⚠ {rejectRate}% من تقاريرها مرفوضة — راجع بتدقيق
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', marginBottom: '20px' }}>
                 {[

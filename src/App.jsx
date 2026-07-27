@@ -35,6 +35,7 @@ import CompanyUsers from './pages/CompanyUsers'
 import Subscription from './pages/Subscription'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
+import ReportsAboutUs from './pages/ReportsAboutUs'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminRequests from './pages/AdminRequests'
 import AdminReports from './pages/AdminReports'
@@ -58,7 +59,6 @@ import AdminFraudDetection from './pages/AdminFraudDetection'
 import AdminIntegrations from './pages/AdminIntegrations'
 import AdminTenantAnalytics from './pages/AdminTenantAnalytics'
 import AdminCompanyVerification from './pages/AdminCompanyVerification'
-import AdminBackup from './pages/AdminBackup'
 import AdminCompanyApproval from './pages/AdminCompanyApproval'
 import AccountPendingApproval from './pages/AccountPendingApproval'
 import AccountRejected from './pages/AccountRejected'
@@ -164,6 +164,7 @@ function AppContent() {
           <Route path="/subscription" element={<CompanyRoute><Subscription /></CompanyRoute>} />
           <Route path="/profile" element={<CompanyRoute><Profile /></CompanyRoute>} />
           <Route path="/notifications" element={<CompanyRoute><Notifications /></CompanyRoute>} />
+          <Route path="/reports-about-us" element={<CompanyRoute><ReportsAboutUs /></CompanyRoute>} />
         </Route>
 
         {/* Admin Routes - Protected */}
@@ -193,7 +194,6 @@ function AppContent() {
           <Route path="/admin/company-verification" element={<AdminRoute><AdminCompanyVerification /></AdminRoute>} />
           <Route path="/admin/company-approval" element={<AdminRoute><AdminCompanyApproval /></AdminRoute>} />
           <Route path="/admin/claim-requests" element={<AdminRoute><AdminClaimRequests /></AdminRoute>} />
-          <Route path="/admin/backup" element={<AdminRoute><AdminBackup /></AdminRoute>} />
           {/* Knowledge Base Management - Central Repositories */}
           <Route path="/admin/knowledge-base/companies" element={<AdminRoute><CompanyKnowledgeBase /></AdminRoute>} />
           <Route path="/admin/knowledge-base/reports" element={<AdminRoute><ReportKnowledgeBase /></AdminRoute>} />

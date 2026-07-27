@@ -37,22 +37,50 @@ export default function AdminRequests() {
           .select('id, name, cr_number, unified_number, sector, city, region, entity_type, source, cr_file_url, created_at')
           .eq('approved', false).order('created_at', { ascending: false }),
         supabase.from('company_data_requests')
-          .select('id, company_id, request_type, payload, note, created_at, companies:company_id ( name, cr_number, sector, city )')
+          .select('id, company_id, requested_by_tenant_id, requested_by_user_id, request_type, payload, note, created_at, companies:company_id ( name, cr_number, sector, city ), tenants:requested_by_tenant_id ( id, name )')
           .eq('status', 'pending').order('created_at', { ascending: false }),
       ])
 
+      // Who added each company. The screen said "عضو المجتمع" — a category, not a
+      // contributor — so a reviewer could approve a record into the national
+      // registry without knowing which company put it there, and a bad entry
+      // could not be traced back to its source. companies carries no submitter,
+      // so the trail is the audit row written when it was filed; the same row the
+      // credit is paid against.
+      const companyIds = (pendingCompanies || []).map((c) => c.id)
+      const submitters = {}
+      if (companyIds.length) {
+        const { data: origins } = await supabase
+          .from('audit_logs')
+          .select('entity_id, tenant_id, actor_id, created_at, tenants:tenant_id ( id, name )')
+          .eq('action', 'company_add_requested')
+          .in('entity_id', companyIds)
+          .order('created_at', { ascending: true })
+        // First entry wins: a company is added once, and a later touch on the
+        // same row is not the contribution being credited or traced.
+        ;(origins || []).forEach((o) => { if (!submitters[o.entity_id]) submitters[o.entity_id] = o })
+      }
+
       const list = [
-        ...(pendingCompanies || []).map((c) => ({
-          kind: 'add_company', key: 'co-' + c.id, companyId: c.id, requestId: null,
-          name: c.name, cr: c.cr_number, unified: c.unified_number, sector: c.sector, city: c.city,
-          crFileUrl: c.cr_file_url,
-          by: c.source === 'community' ? 'عضو المجتمع' : 'تسجيل ذاتي',
-          date: c.created_at, payload: null, note: null,
-        })),
+        ...(pendingCompanies || []).map((c) => {
+          const origin = submitters[c.id]
+          return {
+            kind: 'add_company', key: 'co-' + c.id, companyId: c.id, requestId: null,
+            name: c.name, cr: c.cr_number, unified: c.unified_number, sector: c.sector, city: c.city,
+            crFileUrl: c.cr_file_url,
+            by: origin?.tenants?.name || (c.source === 'community' ? 'مصدر غير مُتتبَّع' : 'تسجيل ذاتي'),
+            byTenantId: origin?.tenant_id || null,
+            byUserId: origin?.actor_id || null,
+            date: c.created_at, payload: null, note: null,
+          }
+        }),
         ...(dataRequests || []).map((r) => ({
           kind: r.request_type, key: 'req-' + r.id, companyId: r.company_id, requestId: r.id,
           name: r.companies?.name || 'شركة', cr: r.companies?.cr_number, sector: r.companies?.sector, city: r.companies?.city,
-          by: 'عضو', date: r.created_at, payload: r.payload, note: r.note,
+          by: r.tenants?.name || 'مصدر غير مُتتبَّع',
+          byTenantId: r.requested_by_tenant_id || null,
+          byUserId: r.requested_by_user_id || null,
+          date: r.created_at, payload: r.payload, note: r.note,
         })),
       ]
       setItems(list)
