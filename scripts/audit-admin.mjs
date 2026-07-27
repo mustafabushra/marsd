@@ -42,10 +42,17 @@ const files = readdirSync(PAGES)
   .sort()
 
 const rows = []
+const locked = []
 
 for (const f of files) {
   const src = readFileSync(join(PAGES, f), 'utf8')
   const name = f.replace('.jsx', '')
+
+  // A ComingSoon page reaches no database on purpose and shows no numbers at
+  // all — that is the whole point of it. Counting it as invented data would put
+  // the screens that honestly say "not built yet" in the same list as the ones
+  // that lie, which is the distinction this tool exists to draw.
+  if (/components\/ComingSoon/.test(src)) { locked.push(name); continue }
 
   const reachesDb = /getSupabase|\.from\(['"]|from '\.\.\/lib\/api'|api\.\w+\(|\.rpc\(/.test(src)
 
@@ -129,7 +136,12 @@ const unverified = rows.filter((r) => r.unverified.length)
 const silent = rows.filter((r) => r.shouldNotify && !r.notifies)
 
 console.log('\n  ' + '─'.repeat(66))
-console.log(`  ${rows.length} شاشة`)
+
+if (locked.length) {
+  console.log(`  🔒 قيد التطوير — تقول ذلك صراحةً ولا تعرض رقماً واحداً: ${locked.join('، ')}`)
+}
+
+console.log(`  ${rows.length + locked.length} شاشة`)
 console.log(`  ${fake.length} بيانات مُختلقة${fake.length ? ': ' + fake.map((r) => r.name).join('، ') : ''}`)
 console.log(`  ${deadButtons.length} فيها أزرار بلا onClick${deadButtons.length ? ': ' + deadButtons.map((r) => r.name).join('، ') : ''}`)
 console.log(`  ${unverified.length} تكتب بلا قراءة بعدها${unverified.length ? ': ' + unverified.map((r) => r.name).join('، ') : ''}`)

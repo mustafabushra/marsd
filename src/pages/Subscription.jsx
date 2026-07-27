@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
+import { useUserRole } from '../hooks/useUserRole'
+import { canPerform } from '../utils/roles'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { formatLimit, limitOf, UNLIMITED } from '../lib/entitlements'
@@ -34,6 +36,19 @@ const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '1
 
 export default function Subscription() {
   const { user } = useUser()
+  const { role } = useUserRole()
+  const [tenantId, setTenantId] = useState(null)
+  const [pendingRequest, setPendingRequest] = useState(null)
+  const [billing, setBilling] = useState({ vat_percent: 15 })
+  const [upgradeTo, setUpgradeTo] = useState(null)
+  const [upgradeNote, setUpgradeNote] = useState('')
+  const [upgrading, setUpgrading] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  // The same bar RLS applies: only a company administrator commits the company
+  // to paying for something.
+  const canUpgrade = canPerform(role, 'canChangeSubscription')
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 6000) }
   const { entitlements, loading: entLoading, credits, giveToGetEnabled, degraded } = useEntitlements()
   const [invoices, setInvoices] = useState([])
   const [allPlans, setAllPlans] = useState([])
@@ -47,6 +62,21 @@ export default function Subscription() {
 
         const { data: userData } = await supabase
           .from('users').select('tenant_id').eq('id', user.id).maybeSingle()
+        setTenantId(userData?.tenant_id || null)
+
+        const { data: billingSettings } = await supabase
+          .from('system_settings').select('value').eq('key', 'billing_settings').maybeSingle()
+        setBilling(billingSettings?.value || { vat_percent: 15 })
+
+        if (userData?.tenant_id) {
+          const { data: req } = await supabase
+            .from('plan_change_requests')
+            .select('id, status, created_at, admin_note, requested:requested_plan_id ( name, price_monthly )')
+            .eq('tenant_id', userData.tenant_id)
+            .eq('status', 'pending')
+            .maybeSingle()
+          setPendingRequest(req || null)
+        }
 
         // Only the plans an operator has switched on are offered. Seeded but
         // inactive plans stay invisible until that flag flips in the panel.
@@ -57,22 +87,19 @@ export default function Subscription() {
           .order('sort_order', { ascending: true })
         setAllPlans(plansData || [])
 
-        if (userData?.tenant_id) {
-          const { data: invoicesData } = await supabase
-            .from('invoices')
-            .select('id, amount, status, created_at')
-            .eq('tenant_id', userData.tenant_id)
-            .order('created_at', { ascending: false })
-            .limit(10)
-
-          setInvoices((invoicesData || []).map((inv, idx) => ({
-            id: inv.id,
-            no: `INV-${new Date(inv.created_at).getFullYear()}-${String(idx + 1).padStart(3, '0')}`,
-            date: new Date(inv.created_at).toLocaleDateString('en-GB'),
-            amount: `${Number(inv.amount || 0).toLocaleString('en-US')} ر.س`,
-            status: inv.status === 'paid' ? 'مدفوعة' : 'معلقة',
-          })))
-        }
+        // invoices is keyed on subscription_id and has no tenant_id column at
+        // all, so the previous .eq('tenant_id', …) filtered on something that
+        // does not exist — PostgREST rejected it and no company has ever seen an
+        // invoice here. tenant_invoices joins through the subscription and
+        // returns only rows the caller is entitled to.
+        const { data: invoicesData } = await supabase.rpc('tenant_invoices')
+        setInvoices((invoicesData || []).slice(0, 10).map((inv, idx) => ({
+          id: inv.id,
+          no: `INV-${new Date(inv.issued_at || Date.now()).getFullYear()}-${String(idx + 1).padStart(3, '0')}`,
+          date: inv.issued_at ? new Date(inv.issued_at).toLocaleDateString('en-GB') : '—',
+          amount: `${Number(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س`,
+          status: inv.status === 'paid' ? 'مدفوعة' : 'معلقة',
+        })))
 
         setError(null)
       } catch (err) {
@@ -84,6 +111,57 @@ export default function Subscription() {
   }, [user?.id])
 
   useEffect(() => { load() }, [load])
+
+  // Requesting a plan is not paying for it. The request is recorded, Marsad
+  // confirms the transfer, and the plan changes then — so this button promises
+  // exactly what happens and nothing more.
+  const requestUpgrade = async (targetPlan) => {
+    if (!tenantId || !canUpgrade) return
+    try {
+      setUpgrading(true)
+      const { data, error } = await getSupabase()
+        .from('plan_change_requests')
+        .insert({
+          tenant_id: tenantId,
+          requested_by: user.id,
+          requested_plan_id: targetPlan.id,
+          note: upgradeNote.trim() || null,
+        })
+        .select('id')
+      if (error) {
+        if (error.code === '23505') throw new Error('لديك طلب قيد المعالجة بالفعل')
+        throw error
+      }
+      if (!data?.length) throw new Error('لم يُسجَّل الطلب — تغيير الباقة من صلاحيات مدير الشركة')
+      setUpgradeTo(null); setUpgradeNote('')
+      await load()
+      flash('✅ سُجّل طلبك — ستتواصل معك إدارة مرصد لتأكيد السداد')
+    } catch (err) {
+      flash(`❌ ${err.message}`)
+    } finally {
+      setUpgrading(false)
+    }
+  }
+
+  const cancelRequest = async () => {
+    if (!pendingRequest) return
+    try {
+      setUpgrading(true)
+      const { data, error } = await getSupabase()
+        .from('plan_change_requests')
+        .update({ status: 'cancelled' })
+        .eq('id', pendingRequest.id)
+        .select('id')
+      if (error) throw error
+      if (!data?.length) throw new Error('لم يُلغَ الطلب')
+      await load()
+      flash('أُلغي الطلب')
+    } catch (err) {
+      flash(`❌ ${err.message}`)
+    } finally {
+      setUpgrading(false)
+    }
+  }
 
   // The plans themselves are live: an operator raising a limit or switching a
   // plan on in the admin panel changes what this screen offers, without anyone
@@ -103,8 +181,91 @@ export default function Subscription() {
   const rules = entitlements?.giveToGetRules
   const catalog = entitlements?.featureCatalog || {}
 
+  const vatPct = Number(billing?.vat_percent ?? 15)
+  const withVat = (n) => Number(n || 0) * (1 + vatPct / 100)
+  const money = (n) => `${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س`
+
   return (
     <div>
+      {msg && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '440px', lineHeight: 1.8 }}>{msg}</div>
+      )}
+
+      {/* A request already in flight. Without this the plan cards would keep
+          offering a button that the unique index refuses, and the company would
+          have no idea it had already asked. */}
+      {pendingRequest && (
+        <div style={{ ...card, padding: '18px 22px', marginBottom: '18px', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px', flexWrap: 'wrap', textAlign: 'right' }}>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: '#92400E' }}>
+                ⏳ طلبك لباقة «{pendingRequest.requested?.name}» قيد المعالجة
+              </div>
+              <p style={{ fontSize: '13px', color: '#78350F', margin: '5px 0 0', fontWeight: 600, lineHeight: 1.9 }}>
+                قُدّم في {new Date(pendingRequest.created_at).toLocaleDateString('en-GB')} — ستُفعَّل الباقة بعد تأكيد إدارة مرصد للسداد.
+              </p>
+            </div>
+            {canUpgrade && (
+              <button onClick={cancelRequest} disabled={upgrading} style={{ background: '#fff', color: '#92400E', border: '1.5px solid #FDE68A', borderRadius: '9px', padding: '9px 18px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                إلغاء الطلب
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* The price, the VAT and the payment instructions are shown before the
+          company commits, not after. */}
+      {upgradeTo && (
+        <div style={{ ...card, padding: '24px', marginBottom: '18px', border: '1.5px solid #1E2A52' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>
+            طلب باقة «{upgradeTo.name}»
+          </h3>
+          <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
+            تسجيل الطلب لا يخصم شيئاً. تتواصل معك إدارة مرصد لتأكيد السداد، وتُفعَّل الباقة عندها.
+          </p>
+
+          <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px 18px', marginBottom: '16px', textAlign: 'right' }}>
+            <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 700, lineHeight: 2 }}>
+              {money(upgradeTo.price_monthly)} شهرياً + ضريبة {vatPct}%
+              <div style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', marginTop: '4px' }}>
+                {money(withVat(upgradeTo.price_monthly))} شهرياً شاملة الضريبة
+              </div>
+            </div>
+          </div>
+
+          {(billing?.iban || billing?.bank_name) && (
+            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '15px 18px', marginBottom: '16px', textAlign: 'right' }}>
+              <div style={{ fontSize: '13px', fontWeight: 900, color: '#15803D', marginBottom: '7px' }}>بيانات التحويل</div>
+              <div style={{ fontSize: '13.5px', color: '#14532D', fontWeight: 600, lineHeight: 2 }}>
+                {billing.bank_name && <div>{billing.bank_name}</div>}
+                {billing.account_name && <div>{billing.account_name}</div>}
+                {billing.iban && <div style={{ direction: 'ltr', textAlign: 'right', fontFamily: 'monospace' }}>{billing.iban}</div>}
+              </div>
+            </div>
+          )}
+          {billing?.instructions && (
+            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>{billing.instructions}</p>
+          )}
+
+          <textarea
+            value={upgradeNote}
+            onChange={(e) => setUpgradeNote(e.target.value)}
+            placeholder="ملاحظة لإدارة مرصد (اختياري) — مرجع التحويل، أو المدة التي تريدها"
+            style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', minHeight: '76px', resize: 'vertical', marginBottom: '16px' }}
+          />
+
+          <div style={{ display: 'flex', gap: '10px', flexDirection: 'row-reverse' }}>
+            <button onClick={() => requestUpgrade(upgradeTo)} disabled={upgrading} style={{ flex: 1, padding: '13px', background: upgrading ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14.5px', fontWeight: 800, cursor: upgrading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              {upgrading ? 'جاري الإرسال...' : 'إرسال الطلب'}
+            </button>
+            <button onClick={() => { setUpgradeTo(null); setUpgradeNote('') }} style={{ padding: '13px 26px', background: '#F1F5F9', color: '#334155', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div style={{ marginBottom: '18px', padding: '13px 16px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '12px', color: '#991B1B', fontSize: '14px', fontWeight: 700 }}>
           {error}
@@ -243,6 +404,20 @@ export default function Subscription() {
                         <li key={f} style={{ fontSize: '12.5px', color: '#334155', fontWeight: 600 }}>✓ {catalog[f] || f}</li>
                       ))}
                     </ul>
+                  )}
+
+                  {!current && !pendingRequest && canUpgrade && Number(p.price_monthly) > 0 && (
+                    <button
+                      onClick={() => { setUpgradeTo(p); setUpgradeNote('') }}
+                      style={{ width: '100%', marginTop: '14px', padding: '11px', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      اطلب هذه الباقة
+                    </button>
+                  )}
+                  {!current && !canUpgrade && Number(p.price_monthly) > 0 && (
+                    <div style={{ marginTop: '14px', fontSize: '12px', color: '#94A3B8', fontWeight: 700, textAlign: 'center' }}>
+                      🔒 تغيير الباقة من صلاحيات مدير الشركة
+                    </div>
                   )}
                 </div>
               )

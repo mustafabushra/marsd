@@ -27,6 +27,7 @@ const GROUPS = [
   { key: 'admin', title: 'الإدارة', items: [
     { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
     { label: 'الباقات', path: '/admin/plans' },
+    { label: 'المدفوعات والاشتراكات', path: '/admin/payments' },
     { label: 'الإعدادات', path: '/admin/settings' },
   ] },
   { key: 'analytics', title: 'التحليلات', items: [
@@ -37,6 +38,7 @@ const GROUPS = [
   { key: 'advanced', title: 'الإدارة المتقدمة', items: [
     { label: 'الاعتراضات', path: '/admin/disputes' },
     { label: 'تصدير البيانات', path: '/admin/data-export' },
+    { label: '🔒 نماذج البريد', path: '/admin/email-templates' },
     { header: 'مراجعات' },
     { label: 'مراجعة التسجيل', path: '/admin/company-approval', indent: true },
     { label: 'طلبات الملكية', path: '/admin/claim-requests', indent: true },
@@ -48,6 +50,8 @@ const GROUPS = [
   ] },
   { key: 'monitoring', title: 'المراقبة', items: [
     { label: 'حالة النظام', path: '/admin/system-health' },
+    { label: '🔒 كشف الاحتيال', path: '/admin/fraud-detection' },
+    { label: '🔒 التكاملات', path: '/admin/integrations' },
   ] },
 ]
 
@@ -61,6 +65,7 @@ const SCREEN_LABELS = {
   '/admin/logs': 'سجل العمليات',
   '/admin/admin-users': 'مسؤولو المنصة',
   '/admin/plans': 'إدارة الباقات',
+  '/admin/payments': 'المدفوعات والاشتراكات',
   '/admin/settings': 'الإعدادات',
   '/admin/report-analytics': 'تحليلات التقارير',
   '/admin/tenant-analytics': 'تحليلات الشركات',
@@ -72,6 +77,9 @@ const SCREEN_LABELS = {
   '/admin/company-verification': 'التحقق من الشركات',
   '/admin/knowledge-base/companies': 'مستودع الشركات',
   '/admin/knowledge-base/reports': 'مستودع التقارير',
+  '/admin/fraud-detection': 'كشف الاحتيال (قيد التطوير)',
+  '/admin/integrations': 'التكاملات (قيد التطوير)',
+  '/admin/email-templates': 'نماذج البريد (قيد التطوير)',
   '/admin/system-health': 'حالة النظام',
 }
 
