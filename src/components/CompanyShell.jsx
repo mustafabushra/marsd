@@ -2,6 +2,7 @@ import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
+import { useUserRole } from '../hooks/useUserRole'
 import {
   DashboardIcon,
   SearchIcon,
@@ -21,12 +22,24 @@ export default function CompanyShell({ user }) {
   const location = useLocation()
   const { organizationName, userRole } = useClerkOrganization()
   const { needsOnboarding, loading } = useCompanyOnboarding()
+  const { isPlatformAdmin, role, loading: roleLoading } = useUserRole()
+
+  // Marsad staff have no tenant, and that is not an unfinished sign-up. This was
+  // the last of four places reading the same absence the same way.
+  const isStaff = isPlatformAdmin || role === 'reviewer'
 
   // This used to render a loading message and stop there — no navigation ever
   // followed, so a user who reached it sat on "جاري التحميل..." forever. Do the
   // redirect the comment always promised.
-  if (!loading && needsOnboarding && location.pathname.startsWith('/dashboard')) {
+  if (!loading && !roleLoading && !isStaff && needsOnboarding && location.pathname.startsWith('/dashboard')) {
     return <Navigate to="/company-onboarding" replace />
+  }
+
+  // A company dashboard belonging to no company is an empty screen. Staff land
+  // on the panel that is theirs; every other company route stays open to them,
+  // because reading a trust report is the job.
+  if (!roleLoading && isStaff && location.pathname.startsWith('/dashboard')) {
+    return <Navigate to="/admin" replace />
   }
 
   const screenLabels = {

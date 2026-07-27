@@ -95,7 +95,7 @@ export default function AuthCallback() {
             status: 'active',
             tenant_id: invite?.tenant_id || null,
           }])
-          .select('id, email, tenant_id')
+          .select('id, email, tenant_id, role')
           .single()
 
         if (createError || !newUser) {
@@ -116,7 +116,17 @@ export default function AuthCallback() {
         throw new Error('فشل البحث عن المستخدم')
       }
 
-      // 2. If no tenant, go to onboarding
+      // 2. Marsad's own staff have no tenant and never will, so the absence of
+      //    one is not an unfinished sign-up. Sending an administrator to a
+      //    company sign-up form at every sign-in was the last of four places
+      //    reading that absence the same way — and the earliest, so it fired
+      //    before any of the others could.
+      if (userData.role === 'platform_admin' || userData.role === 'reviewer') {
+        navigate('/admin')
+        return
+      }
+
+      // 3. A company user with no tenant has not finished signing up.
       if (!userData.tenant_id) {
         navigate('/company-onboarding')
         return
