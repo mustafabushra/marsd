@@ -124,6 +124,7 @@ export async function loadEntitlements(tenantId) {
       tenantId: data.tenantId,
       plan: data.plan,
       planCode: data.planCode,
+      isPlatform: !!data.isPlatform,
       limits: data.limits || {},
       features: data.features || [],
       credits: Number(data.credits) || 0,

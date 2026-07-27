@@ -51,6 +51,10 @@ export function useEntitlements() {
     plan: entitlements?.plan || null,
     credits: entitlements?.credits || 0,
     giveToGetEnabled: !!entitlements?.giveToGetEnabled,
+    // Marsad's own staff, decided by my_entitlements from the session rather
+    // than by anything the browser could set. Screens that price or limit a
+    // customer's usage read this to know the viewer is not one.
+    isPlatform: !!entitlements?.isPlatform,
     degraded: !!entitlements?.degraded,
   }
 }
