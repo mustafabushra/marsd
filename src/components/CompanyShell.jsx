@@ -65,6 +65,8 @@ export default function CompanyShell({ user }) {
     '/users': 'إدارة المستخدمين',
     '/subscription': 'إدارة الاشتراك',
     '/profile': 'ملف الشركة',
+    '/reports-about-us': 'تقارير عن شركتك',
+    '/notifications': 'الإشعارات',
   }
 
   const matchedLabelKey = Object.keys(screenLabels).find(
@@ -107,21 +109,30 @@ export default function CompanyShell({ user }) {
           <span style={{ fontWeight: 900, fontSize: '22px', color: '#fff' }}>مرصد</span>
         </div>
 
-        {/* Nav Items */}
+        {/* Nav Items.
+            Two thirds of these are about a company the viewer belongs to — its
+            reports, its watchlist, its users, its plan. A staff member with no
+            company reaches "لا توجد شركة مرتبطة بحسابك" on every one, so they
+            are not offered: a menu entry is a promise, and six of them leading
+            nowhere is the same defect as a button with no handler. What is left
+            is what works without a company, which is also what staff come here
+            for. */}
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           {[
-            { label: 'لوحة التحكم', icon: DashboardIcon, path: '/dashboard' },
+            { label: 'لوحة التحكم', icon: DashboardIcon, path: '/dashboard', needsCompany: true },
             { label: 'البحث عن الشركات', icon: SearchIcon, path: '/search' },
             { label: 'إضافة شركة للسجل', icon: BuildingIcon, path: '/add-company' },
-            { label: 'إضافة تقرير', icon: DocumentIcon, path: '/add-report' },
-            { label: 'تقاريري المرسلة', icon: ListIcon, path: '/my-reports' },
-            { label: 'الشركات المُرسلة', icon: BuildingIcon, path: '/my-companies' },
-            { label: 'قوائم المراقبة', icon: EyeIcon, path: '/watchlist' },
+            { label: 'إضافة تقرير', icon: DocumentIcon, path: '/add-report', needsCompany: true },
+            { label: 'تقاريري المرسلة', icon: ListIcon, path: '/my-reports', needsCompany: true },
+            { label: 'الشركات المُرسلة', icon: BuildingIcon, path: '/my-companies', needsCompany: true },
+            { label: 'تقارير عن شركتك', icon: DocumentIcon, path: '/reports-about-us', needsCompany: true },
+            { label: 'قوائم المراقبة', icon: EyeIcon, path: '/watchlist', needsCompany: true },
             { label: 'مقارنة الشركات', icon: CompareIcon, path: '/compare' },
-            { label: 'إدارة المستخدمين', icon: UsersIcon, path: '/users' },
-            { label: 'إدارة الاشتراك', icon: CreditCardIcon, path: '/subscription' },
-            { label: 'ملف الشركة', icon: SettingsIcon, path: '/profile' },
-          ].map(item => {
+            { label: 'الإشعارات', icon: BellIcon, path: '/notifications' },
+            { label: 'إدارة المستخدمين', icon: UsersIcon, path: '/users', needsCompany: true },
+            { label: 'إدارة الاشتراك', icon: CreditCardIcon, path: '/subscription', needsCompany: true },
+            { label: 'ملف الشركة', icon: SettingsIcon, path: '/profile', needsCompany: true },
+          ].filter(item => !item.needsCompany || hasCompany || !isStaff).map(item => {
             const IconComponent = item.icon
             const isActive =
               location.pathname === item.path || location.pathname.startsWith(item.path + '/')
@@ -165,16 +176,38 @@ export default function CompanyShell({ user }) {
           })}
         </nav>
 
-        {/* Subscription Box */}
-        <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: '14px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>
-            {organizationName || 'الشركة'}
+        {/* The box at the foot of the sidebar.
+            For a company it is the plan; for Marsad staff neither the company
+            name nor the plan exists, and the way back to the panel did not
+            either — the admin sidebar sends staff here and nothing sent them
+            back, so reading one trust report meant being stranded in the
+            company interface. */}
+        {isStaff ? (
+          <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: '14px' }}>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
+              إدارة مرصد
+            </div>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.8 }}>
+              تتصفّح واجهة الشركات — بلا حدود ولا خصم
+            </div>
+            <button
+              onClick={() => navigate('/admin')}
+              style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              ↩ العودة للوحة الإدارة
+            </button>
           </div>
-          <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>
-            دور: {userRole || 'عضو'}
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: '14px', padding: '16px', marginTop: '14px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>
+              {organizationName || 'الشركة'}
+            </div>
+            <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>
+              دور: {userRole || 'عضو'}
+            </div>
+            <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إدارة الباقة</button>
           </div>
-          <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>إدارة الباقة</button>
-        </div>
+        )}
       </aside>
 
       {/* Main */}
