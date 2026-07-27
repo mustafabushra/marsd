@@ -100,7 +100,7 @@ export default function About() {
             marginBottom: '18px',
             color: '#16A34A'
           }}>
-            <CheckIcon />
+            <CheckIcon size={34} />
           </div>
           <h3 style={{
             fontSize: '22px',
