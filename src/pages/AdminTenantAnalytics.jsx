@@ -1,156 +1,211 @@
-import { useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+import { StatTile, BarList, TrendLine, StatusBar, STATUS_COLOR, SERIES } from '../components/Charts'
+
+/**
+ * /admin/tenant-analytics — the companies on Marsad, in aggregate.
+ *
+ * The screen listed invented tenants — "شركة الراجحي التجارية، 45 تقريراً، إيراد
+ * 4500" — against a date range fixed in the source. The revenue column was the
+ * most misleading part of it: Marsad has no payment gateway, every company is on
+ * the free plan, and the platform has taken nothing. A number in a revenue column
+ * is read as money received.
+ *
+ * What is real and worth an operator's attention is who contributes. Marsad's
+ * data comes from its customers, so the health of the registry is the health of
+ * a handful of companies that file reports — and that is measurable today.
+ */
+
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+const COLS = '1.7fr 1fr 0.9fr 0.9fr 1fr 1fr'
 
 export default function AdminTenantAnalytics() {
-  const [dateRange, setDateRange] = useState({ from: '2026-07-01', to: '2026-07-15' })
-  const [topTenants] = useState([
-    { rank: 1, name: 'شركة الراجحي التجارية', reports: 45, users: 12, revenue: 4500 },
-    { rank: 2, name: 'مجموعة النور للاستثمار', reports: 38, users: 9, revenue: 3800 },
-    { rank: 3, name: 'الشركة العربية للتوريد', reports: 32, users: 8, revenue: 3200 },
-    { rank: 4, name: 'شركة النمو السريع', reports: 28, users: 7, revenue: 2800 },
-    { rank: 5, name: 'الشركة الدولية', reports: 24, users: 6, revenue: 2400 },
-  ])
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const [metrics] = useState({
-    totalTenants: 1247,
-    activeTenantsThisMonth: 892,
-    newTenants: 45,
-    churnRate: 3.2,
-    avgReportsPerTenant: 2.8,
-    totalRevenue: '45,230,000 ر.س',
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const supabase = getSupabase()
+
+      const [tenants, users, reports, watch, subs, plans, credits] = await Promise.all([
+        supabase.from('tenants').select('id, name, status, created_at, company_id'),
+        supabase.from('users').select('id, tenant_id, status, last_login_at'),
+        supabase.from('reports').select('id, reporter_tenant_id, status, created_at'),
+        supabase.from('watchlist_items').select('id, tenant_id'),
+        supabase.from('subscriptions').select('tenant_id, plan_id, status'),
+        supabase.from('plans').select('id, code, name'),
+        supabase.from('credits_ledger').select('tenant_id, amount'),
+      ])
+
+      const firstError = [tenants, users, reports, watch, subs, plans, credits].find((r) => r.error)
+      if (firstError) throw firstError.error
+
+      const planById = Object.fromEntries((plans.data || []).map((p) => [p.id, p]))
+      const planOf = {}
+      ;(subs.data || []).forEach((s) => { if (s.status === 'active') planOf[s.tenant_id] = planById[s.plan_id] })
+
+      const count = (list, key, tid, extra = () => true) =>
+        list.filter((x) => x[key] === tid && extra(x)).length
+
+      setRows((tenants.data || []).map((t) => {
+        const members = (users.data || []).filter((u) => u.tenant_id === t.id)
+        const filed = (reports.data || []).filter((r) => r.reporter_tenant_id === t.id)
+        const lastLogin = members
+          .map((u) => u.last_login_at)
+          .filter(Boolean)
+          .sort()
+          .pop()
+        return {
+          id: t.id,
+          name: t.name,
+          status: t.status,
+          createdAt: t.created_at,
+          claimed: !!t.company_id,
+          plan: planOf[t.id]?.name || 'مجاني',
+          planCode: planOf[t.id]?.code || 'free',
+          users: members.filter((u) => u.status === 'active').length,
+          reports: filed.length,
+          approved: filed.filter((r) => r.status === 'approved').length,
+          watchlist: count(watch.data || [], 'tenant_id', t.id),
+          credits: (credits.data || [])
+            .filter((c) => c.tenant_id === t.id)
+            .reduce((s, c) => s + Number(c.amount || 0), 0),
+          lastLogin,
+        }
+      }))
+    } catch (err) {
+      setError(err.message || 'تعذّر تحميل التحليلات')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const { connected, liveAt } = useLiveData(load, {
+    tables: ['tenants', 'users', 'reports', 'subscriptions', 'credits_ledger', 'watchlist_items'],
   })
 
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+  }
+
+  const active = rows.filter((r) => r.status === 'active')
+  const contributors = rows.filter((r) => r.reports > 0)
+  const dormant = active.filter((r) => r.reports === 0)
+
+  // A month has passed since anyone on the account signed in.
+  const stale = active.filter((r) => !r.lastLogin || (Date.now() - new Date(r.lastLogin)) > 30 * 86400000)
+
+  const byPlan = (() => {
+    const counts = {}
+    rows.forEach((r) => { counts[r.plan] = (counts[r.plan] || 0) + 1 })
+    return Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+  })()
+
+  const trend = (() => {
+    const dated = rows.filter((r) => r.createdAt).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    if (dated.length < 2) return []
+    const counts = {}
+    dated.forEach((r) => { const k = monthKey(new Date(r.createdAt)); counts[k] = (counts[k] || 0) + 1 })
+    const cursor = new Date(new Date(dated[0].createdAt).getFullYear(), new Date(dated[0].createdAt).getMonth(), 1)
+    const end = new Date()
+    const out = []
+    let running = 0
+    while (cursor <= end && out.length < 24) {
+      running += counts[monthKey(cursor)] || 0
+      out.push({ label: MONTHS_AR[cursor.getMonth()], value: running })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+    return out
+  })()
+
+  const top = (key) => [...rows]
+    .filter((r) => r[key] > 0)
+    .sort((a, b) => b[key] - a[key])
+    .slice(0, 6)
+    .map((r) => ({ label: r.name, value: r[key] }))
+
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-          تحليلات الشركات
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          تحليل شامل لأداء المشتركين
-        </p>
+    <div>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px', textAlign: 'right' }}>تحليلات الشركات</h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>{rows.length} شركة مسجّلة · بيانات مرصد تأتي منها</p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
 
-      {/* Date Range Filter */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexDirection: 'row-reverse' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: '13px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px', textAlign: 'right' }}>من</label>
-          <input
-            type="date"
-            value={dateRange.from}
-            onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid #E2E8F0',
-              borderRadius: '6px',
-              fontSize: '13px',
-            }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: '13px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px', textAlign: 'right' }}>إلى</label>
-          <input
-            type="date"
-            value={dateRange.to}
-            onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid #E2E8F0',
-              borderRadius: '6px',
-              fontSize: '13px',
-            }}
-          />
-        </div>
-        <button style={{
-          padding: '8px 16px',
-          background: '#16A34A',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '13px',
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}>
-          تطبيق
-        </button>
+      {error && (
+        <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>⚠️ {error}</div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '14px', marginBottom: '18px' }}>
+        <StatTile label="شركات نشطة" value={active.length} sub={`من ${rows.length} مسجّلة`} />
+        <StatTile
+          label="شركات تُساهم"
+          value={contributors.length}
+          sub={active.length ? `${Math.round((contributors.length / active.length) * 100)}% من النشطة` : ''}
+          tone={contributors.length ? STATUS_COLOR.good : STATUS_COLOR.warning}
+        />
+        <StatTile label="شركات لم تُساهم بعد" value={dormant.length} sub="لم ترسل تقريراً واحداً" tone={dormant.length ? STATUS_COLOR.warning : undefined} />
+        <StatTile label="بلا دخول منذ ٣٠ يوماً" value={stale.length} sub="حسابات ساكنة" tone={stale.length ? STATUS_COLOR.serious : undefined} />
+        <StatTile label="مستخدمون نشطون" value={rows.reduce((s, r) => s + r.users, 0)} sub="عبر كل الشركات" />
+        <StatTile label="نقاط متداولة" value={rows.reduce((s, r) => s + r.credits, 0).toLocaleString('en-US')} sub="رصيد Give-to-Get" />
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>إجمالي الشركات</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#1E2A52', margin: 0, textAlign: 'right' }}>{metrics.totalTenants}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>النشطة هذا الشهر</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#16A34A', margin: 0, textAlign: 'right' }}>{metrics.activeTenantsThisMonth}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>شركات جديدة</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#0369A1', margin: 0, textAlign: 'right' }}>{metrics.newTenants}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>معدل الخروج</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#F59E0B', margin: 0, textAlign: 'right' }}>{metrics.churnRate}%</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>متوسط التقارير</p>
-          <p style={{ fontSize: '28px', fontWeight: 900, color: '#7C3AED', margin: 0, textAlign: 'right' }}>{metrics.avgReportsPerTenant}</p>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'right' }}>إجمالي الإيرادات</p>
-          <p style={{ fontSize: '20px', fontWeight: 900, color: '#059669', margin: 0, textAlign: 'right' }}>
-            {metrics.totalRevenue}
-          </p>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(330px,1fr))', gap: '16px', marginBottom: '16px' }}>
+        <StatusBar
+          title="مشاركة الشركات"
+          segments={[
+            { label: 'تُساهم بتقارير', value: contributors.length, color: STATUS_COLOR.good, icon: '✓' },
+            { label: 'نشطة بلا مساهمة', value: dormant.length, color: STATUS_COLOR.warning, icon: '⏳' },
+            { label: 'غير نشطة', value: rows.length - active.length, color: STATUS_COLOR.neutral, icon: '—' },
+          ]}
+        />
+        <TrendLine title="نمو عدد الشركات (تراكمي)" points={trend} />
       </div>
 
-      {/* Top Tenants Table */}
-      <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>#</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>اسم الشركة</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>التقارير</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569', borderLeft: '1px solid #E2E8F0' }}>المستخدمون</th>
-              <th style={{ padding: '16px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#475569' }}>الإيرادات (ر.س)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topTenants.map(tenant => (
-              <tr key={tenant.rank} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 700, borderLeft: '1px solid #E2E8F0' }}>
-                  {tenant.rank}
-                </td>
-                <td style={{ padding: '16px', fontSize: '14px', color: '#0F172A', fontWeight: 600, borderLeft: '1px solid #E2E8F0' }}>
-                  {tenant.name}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#64748B', borderLeft: '1px solid #E2E8F0' }}>
-                  {tenant.reports}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#64748B', borderLeft: '1px solid #E2E8F0' }}>
-                  {tenant.users}
-                </td>
-                <td style={{ padding: '16px', fontSize: '13px', color: '#0F172A', fontWeight: 600 }}>
-                  {tenant.revenue.toLocaleString('en-US')} ر.س
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(330px,1fr))', gap: '16px', marginBottom: '16px' }}>
+        <BarList title="أكثر الشركات مساهمةً بالتقارير" rows={top('reports')} color={SERIES[0]} empty="لا توجد مساهمات بعد" />
+        <BarList title="الشركات حسب الباقة" rows={byPlan} color={SERIES[1]} />
+        <BarList title="الأكثر رصيداً من النقاط" rows={top('credits')} color={SERIES[2]} empty="لا توجد نقاط بعد" />
+        <BarList title="الأكثر متابعةً لقوائم المراقبة" rows={top('watchlist')} color={SERIES[0]} empty="لا توجد قوائم مراقبة" />
       </div>
 
-      {/* Insights */}
-      <div style={{ background: '#E0F2FE', border: '1px solid #BAE6FD', borderRadius: '12px', padding: '16px', marginTop: '24px' }}>
-        <p style={{ fontSize: '13px', color: '#0369A1', fontWeight: 600, margin: '0 0 8px 0', textAlign: 'right' }}>💡 الرؤى:</p>
-        <ul style={{ fontSize: '12px', color: '#0369A1', margin: 0, paddingRight: '20px', textAlign: 'right', lineHeight: 1.6 }}>
-          <li>أعلى أداء: شركة الراجحي بـ 45 تقريراً في هذا الشهر</li>
-          <li>معدل النمو: إضافة 45 شركة جديدة هذا الشهر (زيادة 4.8%)</li>
-          <li>متوسط الاستخدام: المستخدمون يقومون بـ 2.8 تقرير للشركة الواحدة</li>
-        </ul>
+      {/* The table view. It is also the relief the palette requires: every number
+          above is legible here without depending on a colour being told apart. */}
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
+          <span>الشركة</span><span>الباقة</span><span>المستخدمون</span><span>التقارير</span><span>النقاط</span><span>آخر دخول</span>
+        </div>
+        {rows.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px', fontWeight: 600 }}>لا توجد شركات</div>
+        ) : [...rows].sort((a, b) => b.reports - a.reports).map((r) => (
+          <div key={r.id} style={{ display: 'grid', gridTemplateColumns: COLS, padding: '13px 18px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', textAlign: 'right' }}>
+            <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+              {r.name}
+              {r.status !== 'active' && <span style={{ fontSize: '11.5px', color: STATUS_COLOR.critical, fontWeight: 800 }}> · موقوفة</span>}
+            </span>
+            <span style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>{r.plan}</span>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{r.users}</span>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>
+              {r.reports}
+              {r.reports > 0 && <span style={{ color: '#94A3B8' }}> ({r.approved} معتمد)</span>}
+            </span>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{r.credits.toLocaleString('en-US')}</span>
+            <span style={{ fontSize: '12.5px', color: r.lastLogin ? '#64748B' : '#CBD5E1', fontWeight: 600 }}>
+              {r.lastLogin ? new Date(r.lastLogin).toLocaleDateString('en-GB') : 'لم يسجّل دخول'}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   )

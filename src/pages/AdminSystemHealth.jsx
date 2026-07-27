@@ -1,215 +1,206 @@
-import { useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { getSupabase } from '../lib/api'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
+import { StatTile, STATUS_COLOR } from '../components/Charts'
+
+/**
+ * /admin/system-health — what is actually true about the platform right now.
+ *
+ * The screen reported a cache hit rate of 94.2%, a queue of 1,247 jobs and
+ * 542GB of 1TB storage used. Marsad has no cache, no job queue and no storage it
+ * manages: three systems that do not exist, all reported healthy, on the one
+ * page an operator would open to find out whether something is wrong. Watching
+ * it was watching nothing, and felt like watching something.
+ *
+ * What can be measured is whether the data is internally consistent — a company
+ * carrying a score with no reports behind it, a tenant with no administrator, a
+ * company over the limit its plan allows. Each is a real fault with a real fix,
+ * and none of them is visible from any single screen.
+ *
+ * Every number here comes from platform_health(), which reads pg_catalog and is
+ * restricted to platform admins.
+ */
+
+const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
+
+// Each fault names what is wrong and what to do, because a count on its own
+// tells an operator there is a problem and not what kind.
+const FAULTS = [
+  { key: 'scored_high_risk_without_evidence', label: 'شركات مصنّفة «مخاطر مرتفعة» بلا تقارير', severity: 'critical',
+    fix: 'تصنيف شركة بلا دليل مخاطرة قانونية — أعد احتساب الدرجات من صفحة درجة الثقة.' },
+  { key: 'scores_without_reports', label: 'درجات ثقة بلا تقارير معتمدة', severity: 'serious',
+    fix: 'أعد احتساب الدرجات من صفحة درجة الثقة.' },
+  { key: 'stale_scores', label: 'درجات لا تطابق عدد تقاريرها', severity: 'serious',
+    fix: 'أعد احتساب الدرجات — التقارير تغيّرت بعد آخر احتساب.' },
+  { key: 'over_watchlist_limit', label: 'شركات تجاوزت حد قوائم المراقبة', severity: 'warning',
+    fix: 'سابقة لتفعيل الحد — احذف الزائد أو ارفع الباقة.' },
+  { key: 'tenants_without_admin', label: 'شركات بلا مدير نشط', severity: 'serious',
+    fix: 'لا أحد يستطيع إدارة المستخدمين فيها — عيّن مديراً من إدارة المستخدمين.' },
+  { key: 'tenants_without_subscription', label: 'شركات نشطة بلا اشتراك', severity: 'warning',
+    fix: 'تُعامَل بالباقة الافتراضية — أنشئ لها اشتراكاً من صفحة الاشتراكات.' },
+  { key: 'users_without_tenant', label: 'مستخدمون بلا شركة', severity: 'warning',
+    fix: 'حساب لا يصل شيئاً — اربطه بشركة أو أوقفه.' },
+  { key: 'orphan_reports', label: 'تقارير عن شركات محذوفة', severity: 'critical',
+    fix: 'تقرير بلا هدف — يجب حذفه أو إعادة ربطه.' },
+]
+
+const SEVERITY = {
+  critical: { color: STATUS_COLOR.critical, bg: '#FEF2F2', border: '#FECACA', icon: '✕' },
+  serious:  { color: STATUS_COLOR.serious,  bg: '#FFF7ED', border: '#FED7AA', icon: '!' },
+  warning:  { color: '#B45309',             bg: '#FFFBEB', border: '#FDE68A', icon: '⚠' },
+}
+
+const ago = (iso) => {
+  if (!iso) return null
+  const mins = Math.floor((Date.now() - new Date(iso)) / 60000)
+  if (mins < 1) return 'الآن'
+  if (mins < 60) return `قبل ${mins} دقيقة`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `قبل ${hrs} ساعة`
+  return `قبل ${Math.floor(hrs / 24)} يوماً`
+}
 
 export default function AdminSystemHealth() {
-  const [metrics] = useState({
-    database: { status: 'healthy', cpu: 34, memory: 62, uptime: '45d 12h' },
-    api: { status: 'healthy', latency: 142, errorRate: 0.02, requests: '12.5K/min' },
-    cache: { status: 'healthy', hitRate: 94.2, size: '2.8GB', evictions: 142 },
-    queue: { status: 'warning', jobs: 1247, pending: 89, avgTime: '2.3s' },
-    storage: { status: 'healthy', used: '542GB', total: '1TB', usage: 54.2 },
-    backup: { status: 'healthy', lastBackup: '2026-07-15 02:30', frequency: 'daily', retention: '30d' },
+  const [health, setHealth] = useState(null)
+  const [latency, setLatency] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const t0 = performance.now()
+      const { data, error: e } = await getSupabase().rpc('platform_health')
+      setLatency(Math.round(performance.now() - t0))
+      if (e) throw e
+      setHealth(data)
+    } catch (err) {
+      setError(err.message || 'تعذّر قراءة حالة النظام')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Subscribed to the tables whose contents these checks are about, so a fault
+  // appearing shows up without anyone reloading.
+  const { connected, liveAt } = useLiveData(load, {
+    tables: ['reports', 'trust_scores', 'users', 'tenants', 'subscriptions'],
   })
 
-  const getStatusColor = (status) => {
-    if (status === 'healthy') return { bg: '#DCFCE7', color: '#15803D' }
-    if (status === 'warning') return { bg: '#FEF3C7', color: '#B45309' }
-    return { bg: '#FEE2E2', color: '#DC2626' }
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري فحص النظام...</div>
   }
 
-  return (
-    <div style={{ padding: '24px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>
-          حالة النظام
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
-          مراقبة الأداء والموارد الحية
-        </p>
-      </div>
-
-      {/* Services Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-        {Object.entries(metrics).map(([service, data]) => {
-          const statusColor = getStatusColor(data.status)
-          return (
-            <div key={service} style={{
-              background: '#fff',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '20px',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexDirection: 'row-reverse' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0, textTransform: 'capitalize' }}>
-                  {service === 'database' && 'قاعدة البيانات'}
-                  {service === 'api' && 'واجهة البرمجة'}
-                  {service === 'cache' && 'الذاكرة المؤقتة'}
-                  {service === 'queue' && 'طابور المهام'}
-                  {service === 'storage' && 'التخزين'}
-                  {service === 'backup' && 'النسخ الاحتياطية'}
-                </h3>
-                <span style={{
-                  padding: '4px 12px',
-                  background: statusColor.bg,
-                  color: statusColor.color,
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                }}>
-                  {data.status === 'healthy' && '✓ سليم'}
-                  {data.status === 'warning' && '⚠ تحذير'}
-                  {data.status === 'error' && '✕ خطأ'}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {service === 'database' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.cpu}%</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>CPU</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.memory}%</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>الذاكرة</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.uptime}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>وقت التشغيل</span>
-                    </div>
-                  </>
-                )}
-                {service === 'api' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.latency}ms</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>التأخير</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{(data.errorRate * 100).toFixed(2)}%</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>معدل الأخطاء</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.requests}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>الطلبات</span>
-                    </div>
-                  </>
-                )}
-                {service === 'cache' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.hitRate}%</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>معدل الإصابة</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.size}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>الحجم المستخدم</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.evictions}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>الإزالات</span>
-                    </div>
-                  </>
-                )}
-                {service === 'queue' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.jobs}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>المهام الكلية</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.pending}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>قيد الانتظار</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.avgTime}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>متوسط الوقت</span>
-                    </div>
-                  </>
-                )}
-                {service === 'storage' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.used} / {data.total}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>المساحة</span>
-                    </div>
-                    <div style={{ height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        background: '#F59E0B',
-                        width: `${data.usage}%`,
-                      }} />
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
-                      {data.usage}% مستخدم
-                    </div>
-                  </>
-                )}
-                {service === 'backup' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.lastBackup}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>آخر نسخة</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.frequency}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>التكرار</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: '#94A3B8' }}>{data.retention}</span>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>فترة الاحتفاظ</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Actions */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', marginTop: '24px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>
-          الإجراءات
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-          <button style={{
-            padding: '10px 16px',
-            background: '#E0F2FE',
-            color: '#0369A1',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            مسح الذاكرة
-          </button>
-          <button style={{
-            padding: '10px 16px',
-            background: '#F0E5FF',
-            color: '#7C3AED',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            مراجعة السجلات
-          </button>
-          <button style={{
-            padding: '10px 16px',
-            background: '#FEE2E2',
-            color: '#DC2626',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            إعادة تشغيل الخدمة
-          </button>
+  if (error || !health) {
+    return (
+      <div style={{ ...card, padding: '30px', textAlign: 'right' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>حالة النظام</h1>
+        <div style={{ padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>
+          ⚠️ {error || 'لا توجد بيانات'}
         </div>
+      </div>
+    )
+  }
+
+  const { access, schema, volume, activity, faults } = health
+  const found = FAULTS.map((f) => ({ ...f, count: Number(faults?.[f.key] || 0) })).filter((f) => f.count > 0)
+  const worst = found.some((f) => f.severity === 'critical') ? 'critical'
+    : found.some((f) => f.severity === 'serious') ? 'serious'
+    : found.length ? 'warning' : 'good'
+
+  const openTables = access?.without_rls || []
+
+  return (
+    <div>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px', textAlign: 'right' }}>حالة النظام</h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, textAlign: 'right' }}>
+            فُحص {ago(health.checked_at)} · زمن الاستجابة {latency} م.ث
+          </p>
+        </div>
+        <LiveBadge connected={connected} liveAt={liveAt} />
+      </div>
+
+      {/* The headline. Icon and words, never colour alone. */}
+      <div style={{
+        ...card,
+        padding: '20px 24px',
+        marginBottom: '18px',
+        background: worst === 'good' ? '#F0FDF4' : SEVERITY[worst].bg,
+        border: `1px solid ${worst === 'good' ? '#BBF7D0' : SEVERITY[worst].border}`,
+        display: 'flex', alignItems: 'center', gap: '14px', flexDirection: 'row-reverse', textAlign: 'right',
+      }}>
+        <span style={{ fontSize: '26px' }}>{worst === 'good' ? '✓' : SEVERITY[worst].icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '16px', fontWeight: 900, color: worst === 'good' ? STATUS_COLOR.good : SEVERITY[worst].color }}>
+            {worst === 'good' ? 'البيانات متّسقة — لا أعطال' : `${found.length} عطل يحتاج انتباهاً`}
+          </div>
+          <div style={{ fontSize: '13px', color: '#52514e', fontWeight: 600, marginTop: '3px' }}>
+            {found.length ? found.map((f) => f.label).join(' · ') : 'كل فحوص الاتساق تمرّ'}
+          </div>
+        </div>
+      </div>
+
+      {found.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '11px', marginBottom: '18px' }}>
+          {found.map((f) => {
+            const s = SEVERITY[f.severity]
+            return (
+              <div key={f.key} style={{ ...card, padding: '15px 18px', borderRight: `4px solid ${s.color}`, textAlign: 'right' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                    <span aria-hidden style={{ color: s.color }}>{s.icon}</span> {f.label}
+                  </span>
+                  <span style={{ fontSize: '15px', fontWeight: 900, color: s.color }}>{f.count}</span>
+                </div>
+                <p style={{ fontSize: '13px', color: '#52514e', margin: '6px 0 0', fontWeight: 600, lineHeight: 1.8 }}>{f.fix}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>الحماية والبنية</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '14px', marginBottom: '18px' }}>
+        <StatTile
+          label="جداول محميّة بـ RLS"
+          value={`${access.rls_enabled} / ${access.tables}`}
+          sub={openTables.length ? `مكشوف: ${openTables.join('، ')}` : 'كل الجداول مغلقة'}
+          tone={openTables.length ? STATUS_COLOR.critical : STATUS_COLOR.good}
+        />
+        <StatTile label="جداول البث اللحظي" value={access.realtime_tables} sub="تُحدِّث الشاشات بلا تحديث صفحة" />
+        <StatTile label="ترحيلات مُطبَّقة" value={schema.migrations_applied} sub={schema.last_migration} />
+        <StatTile label="تقارير بانتظار المراجعة" value={activity.pending_review} sub={`${activity.reports_last_7d} تقريراً في ٧ أيام`} tone={activity.pending_review > 20 ? STATUS_COLOR.warning : undefined} />
+      </div>
+
+      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>حجم البيانات</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '14px', marginBottom: '18px' }}>
+        {[
+          ['شركات', volume.companies], ['حسابات شركات', volume.tenants], ['مستخدمون', volume.users],
+          ['تقارير', volume.reports], ['درجات ثقة', volume.trust_scores], ['إشعارات', volume.notifications],
+          ['سجلات تدقيق', volume.audit_logs],
+        ].map(([label, value]) => <StatTile key={label} label={label} value={Number(value).toLocaleString('en-US')} />)}
+      </div>
+
+      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>آخر نشاط</h3>
+      <div style={{ ...card, overflow: 'hidden' }}>
+        {[
+          ['آخر تقرير', activity.last_report],
+          ['آخر تسجيل دخول', activity.last_login],
+          ['آخر إجراء إداري', activity.last_audit],
+          ['آخر احتساب لدرجات الثقة', activity.last_score_computed],
+        ].map(([label, iso], i, arr) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: i < arr.length - 1 ? '1px solid #F1F5F9' : 'none', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>{label}</span>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: iso ? '#52514e' : '#CBD5E1' }}>
+              {iso ? `${new Date(iso).toLocaleString('en-GB')} — ${ago(iso)}` : 'لم يُسجَّل قط'}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   )
