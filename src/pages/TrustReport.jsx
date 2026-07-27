@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCompanyKnowledgeBase, getCompanyReportsTimeline, getCompanyTrends, getCompanyReportsSummary } from '../lib/api'
 import { DocumentIcon } from '../components/icons'
@@ -9,6 +9,8 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { isPaidWithCredits, spendCredits, UNLIMITED } from '../lib/entitlements'
 import { hasViewedCompany, recordCompanyView } from '../lib/companyViews'
 import { LimitReached } from '../components/LimitGate'
+import { useLiveData } from '../hooks/useLiveData'
+import { LiveBadge } from '../components/LiveBadge'
 
 export default function TrustReport() {
   const { id } = useParams()
@@ -135,6 +137,49 @@ export default function TrustReport() {
     if (!entLoading) loadReport()
   }, [id, entLoading])
 
+  /**
+   * Re-read only what can move while the page is open: the score and the
+   * evidence under it.
+   *
+   * Deliberately not the whole loadReport. That path meters the lookup against
+   * the plan, and re-running it on every change event would put a metered read
+   * on a timer — harmless today because a company already opened this month is
+   * free to open again, but one edit to that rule away from charging a reader
+   * for standing still.
+   *
+   * This is the page the product exists for. A report approved while someone is
+   * reading it changes the number they are deciding on, and the old behaviour
+   * was that they would never know.
+   */
+  const refreshScore = useCallback(async () => {
+    if (!id) return
+    try {
+      const kb = await getCompanyKnowledgeBase(id)
+      if (!kb) return
+      setReport((prev) => (prev ? { ...prev, ...kb, score: kb.trust_score || 0, approvedReports: kb.approved_reports_count || 0 } : prev))
+
+      const [timelineData, trendsData, summaryData] = await Promise.all([
+        getCompanyReportsTimeline(id, 8),
+        getCompanyTrends(id),
+        getCompanyReportsSummary(id),
+      ])
+      setTimeline(timelineData.data || [])
+      setTrends(trendsData.data || [])
+      setSummary(summaryData.data || [])
+    } catch (err) {
+      console.error('Score refresh failed:', err)
+    }
+  }, [id])
+
+  // Filtered to this company: a score moving somewhere else is not news to this
+  // page, and an unfiltered subscription would re-read on every approval on the
+  // platform.
+  const { connected, liveAt } = useLiveData(refreshScore, {
+    tables: ['trust_scores', 'reports', 'disputes'],
+    filter: `company_id=eq.${id}`,
+    enabled: !!id && !loading,
+  })
+
   if (quotaBlocked) {
     const ceiling = limitOf('searches_per_month')
     return (
@@ -217,6 +262,7 @@ export default function TrustReport() {
                 <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>✔ موثّقة</span>
               )}
               <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>● سجل نشط</span>
+              <LiveBadge connected={connected} liveAt={liveAt} />
             </div>
             {company?.name_en && (
               <div style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 600, marginBottom: '8px', textAlign: 'right' }}>{company.name_en}</div>

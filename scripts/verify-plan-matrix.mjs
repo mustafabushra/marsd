@@ -54,7 +54,13 @@ for (const [code, want] of Object.entries(EXPECTED)) {
 
 console.log('')
 const free = plans.find((p) => p.code === 'free')
-check('free وحدها مفعّلة',   plans.filter((p) => p.active).map((p) => p.code).join(',') === 'free')
+// This asserted that only the free plan was active. That was true while the
+// paid tiers were seeded and dormant; 037 gave companies a way to buy one, so
+// an active paid plan is now the normal state. What still matters is that
+// nothing is offered for sale without a price on it.
+const offered = (plans || []).filter((p) => p.active && p.code !== 'free')
+check('كل باقة معروضة مُسعّرة', offered.every((p) => Number(p.price_monthly) > 0),
+  `${offered.length} معروضة: ${offered.map((p) => p.code).join('، ') || 'لا شيء'}`)
 check('free وحدها افتراضية', plans.filter((p) => p.is_default).length === 1 && free?.is_default)
 check('free وحدها Give-to-Get', plans.filter((p) => p.give_to_get_enabled).map((p) => p.code).join(',') === 'free')
 
