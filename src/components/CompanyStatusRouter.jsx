@@ -1,66 +1,63 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCompanyStatus } from '../hooks/useCompanyStatus'
+import { useUserRole } from '../hooks/useUserRole'
 import { COMPANY_STATUS } from '../lib/constants'
 
 /**
- * CompanyStatusRouter: Route based on company.status (database source of truth)
+ * Routes a company user according to their company's status.
  *
- * Sequence:
- * 1. Get Clerk user ID
- * 2. Query users → tenant_id
- * 3. Query tenants → company_id
- * 4. Query companies → status (SOURCE OF TRUTH)
- * 5. Route based on status
+ * It also routed Marsad's own staff, who have no company and never will. A
+ * platform administrator resolves to status null, which this read as "new user
+ * with no company yet" and answered by redirecting to company onboarding — so
+ * opening a trust report as an administrator landed on a sign-up form for a
+ * company account. The page an operator most needs to see whole was the one
+ * they could not reach at all.
+ *
+ * The absence of a company means two different things and only one of them is a
+ * new customer. Marsad staff pass through: there is no onboarding for them to
+ * do, and no company status to be blocked by.
  */
 export default function CompanyStatusRouter({ children }) {
   const navigate = useNavigate()
   const { status, loading, error } = useCompanyStatus()
+  const { isPlatformAdmin, role, loading: roleLoading } = useUserRole()
+
+  // A reviewer works for Marsad too and has no company either.
+  const isStaff = isPlatformAdmin || role === 'reviewer'
 
   useEffect(() => {
-    if (loading) return // Still checking database
+    if (loading || roleLoading) return
+    if (isStaff) return
 
-    // Route based on company.status from database
     if (status === null) {
-      // No company exists → User is new
       navigate('/company-onboarding', { replace: true })
     } else if (status === COMPANY_STATUS.PENDING) {
-      // Company pending admin approval
       navigate('/account-pending', { replace: true })
     } else if (status === COMPANY_STATUS.REJECTED) {
-      // Company was rejected by admin
       navigate('/account-rejected', { replace: true })
     } else if (status === COMPANY_STATUS.SUSPENDED) {
-      // Company account was suspended
       navigate('/account-suspended', { replace: true })
     } else if (status === COMPANY_STATUS.APPROVED || status === COMPANY_STATUS.ACTIVE) {
-      // Company is approved or active → Allow access
-      return // Render children (dashboard access)
+      return
     } else {
-      // Unknown status → Safety redirect
       console.warn(`⚠️ Unknown company status: ${status}`)
       navigate('/account-pending', { replace: true })
     }
-  }, [status, loading, navigate])
+  }, [status, loading, roleLoading, isStaff, navigate])
 
-  if (loading) {
+  // Waiting on the role as well as the status: deciding on the status alone
+  // redirects staff for the moment before the role arrives, and a replace()
+  // cannot be taken back.
+  if (loading || roleLoading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          fontSize: '16px',
-          color: '#64748B',
-          background: '#F8FAFC'
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px', color: '#64748B', background: '#F8FAFC' }}>
         🔍 جاري التحقق من حالة الشركة...
       </div>
     )
   }
 
-  // Render children if company is approved OR active (matches the effect logic above)
+  if (isStaff) return children
+
   return (status === COMPANY_STATUS.APPROVED || status === COMPANY_STATUS.ACTIVE) ? children : null
 }

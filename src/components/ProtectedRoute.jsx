@@ -36,8 +36,15 @@ export function AdminRoute({ children }) {
 export function CompanyRoute({ children }) {
   const { isLoaded, user } = useUser()
   const { needsOnboarding, loading: onboardingLoading } = useCompanyOnboarding()
+  const { isPlatformAdmin, role, loading: roleLoading } = useUserRole()
 
-  if (!isLoaded || onboardingLoading) {
+  // Marsad staff have no company and never will, so "no tenant" means something
+  // different for them than for a customer who has not finished signing up.
+  // Reading it the same way sent an administrator opening a trust report to a
+  // company sign-up form.
+  const isStaff = isPlatformAdmin || role === 'reviewer'
+
+  if (!isLoaded || onboardingLoading || roleLoading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px' }}>جاري التحميل...</div>
   }
 
@@ -46,7 +53,7 @@ export function CompanyRoute({ children }) {
   }
 
   // Check if user needs to complete onboarding (old users without tenant)
-  if (needsOnboarding) {
+  if (needsOnboarding && !isStaff) {
     return <Navigate to="/company-onboarding" replace />
   }
 
