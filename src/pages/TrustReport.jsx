@@ -234,14 +234,23 @@ export default function TrustReport() {
     )
   }
 
-  const tier = report.status === 'full' ? 'full' : report.status === 'limited' ? 'locked' : report.tier === 'preliminary' ? 'prelim' : 'none'
+  // 'thin' rather than 'locked'. The state means this company has fewer than two
+  // approved reports, which is a fact about the evidence and nothing to do with
+  // anyone's plan — but it was labelled "🔒 متاح في الباقة الأساسية", so a reader
+  // was told to buy something that would not have changed what they saw. The
+  // same badge appeared to Marsad's own staff, who have every feature there is.
+  const tier = report.status === 'full' ? 'full'
+    : report.status === 'limited' ? 'thin'
+    : report.tier === 'preliminary' ? 'prelim'
+    : 'none'
 
   // Two different questions, deliberately kept apart. `tier` asks whether this
   // company has enough approved reports to support a full score — a property of
   // the data. This asks whether the viewer's plan includes seeing how that score
   // was reached. Conflating them would tell a free member that a well-covered
   // company has thin data, which is false and discourages the contribution that
-  // would deepen it.
+  // would deepen it — and the badge below was that exact conflation, running the
+  // other way.
   const canSeeFull = can('full_trust_report')
   const score = report.score || 0
 
@@ -317,13 +326,22 @@ export default function TrustReport() {
             </div>
           )}
 
-          {tier === 'locked' && (
-            <div style={{ textAlign: 'center', flex: 'none', position: 'relative' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% 50%,#E2E8F0 50% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(7px)' }}>
-                <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff' }}></div>
+          {/* Not blurred and not locked: there is no hidden number here. The
+              company has too few approved reports for a score to mean anything,
+              and saying so invites the contribution that would fix it — which
+              blurring a number nobody has computed does not. */}
+          {tier === 'thin' && (
+            <div style={{ textAlign: 'center', flex: 'none' }}>
+              <div style={{ width: '140px', height: '140px', borderRadius: '50%', border: '3px dashed #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '30px', color: '#CBD5E1' }}>—</span>
+                <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>لا توجد درجة</span>
               </div>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>🔒</div>
-              <div style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 800, marginTop: '12px' }}>متاح في الباقة الأساسية</div>
+              <div style={{ background: '#F1F5F9', color: '#475569', borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 800, marginTop: '12px' }}>
+                بيانات غير كافية
+              </div>
+              <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px', maxWidth: '170px', lineHeight: 1.8 }}>
+                تحتاج تقريرين معتمدين على الأقل — أضِف تقريرك عن تعاملك معها
+              </div>
             </div>
           )}
         </div>
