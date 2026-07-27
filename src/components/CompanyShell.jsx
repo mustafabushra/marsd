@@ -3,6 +3,7 @@ import { UserButton } from '@clerk/react'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import { useUserRole } from '../hooks/useUserRole'
+import { useEntitlements } from '../hooks/useEntitlements'
 import {
   DashboardIcon,
   SearchIcon,
@@ -23,23 +24,32 @@ export default function CompanyShell({ user }) {
   const { organizationName, userRole } = useClerkOrganization()
   const { needsOnboarding, loading } = useCompanyOnboarding()
   const { isPlatformAdmin, role, loading: roleLoading } = useUserRole()
+  const { entitlements, loading: entLoading } = useEntitlements()
 
   // Marsad staff have no tenant, and that is not an unfinished sign-up. This was
   // the last of four places reading the same absence the same way.
   const isStaff = isPlatformAdmin || role === 'reviewer'
 
+  // Whether this account belongs to a company is a different question from what
+  // it is allowed to see. One account may hold both jobs.
+  const hasCompany = !!entitlements?.tenantId
+
+  const onDashboard = location.pathname.startsWith('/dashboard')
+
   // This used to render a loading message and stop there — no navigation ever
   // followed, so a user who reached it sat on "جاري التحميل..." forever. Do the
   // redirect the comment always promised.
-  if (!loading && !roleLoading && !isStaff && needsOnboarding && location.pathname.startsWith('/dashboard')) {
+  if (!loading && !roleLoading && !isStaff && needsOnboarding && onDashboard) {
     return <Navigate to="/company-onboarding" replace />
   }
 
-  // A company dashboard belonging to no company is an empty screen. Staff land
-  // on the panel that is theirs; every other company route stays open to them,
-  // because reading a trust report is the job.
-  if (!roleLoading && isStaff && location.pathname.startsWith('/dashboard')) {
-    return <Navigate to="/admin" replace />
+  // Only when there is genuinely no company behind it. Redirecting every staff
+  // member off /dashboard made "العودة لواجهة الشركة" bounce straight back to
+  // the panel it came from — the button navigates here, and this sent it back.
+  // An administrator who also belongs to a company has a real dashboard, and
+  // gets it.
+  if (!roleLoading && !entLoading && isStaff && !hasCompany && onDashboard) {
+    return <Navigate to="/search" replace />
   }
 
   const screenLabels = {

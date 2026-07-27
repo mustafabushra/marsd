@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useEntitlements } from '../hooks/useEntitlements'
 import {
   DashboardIcon,
   DocumentIcon,
@@ -85,6 +86,10 @@ const SCREEN_LABELS = {
 
 export default function AdminShell({ user }) {
   const navigate = useNavigate()
+  const { entitlements } = useEntitlements()
+
+  // Whether this administrator also belongs to a company. Most do not.
+  const hasCompany = !!entitlements?.tenantId
   const location = useLocation()
   const path = location.pathname
 
@@ -211,12 +216,18 @@ export default function AdminShell({ user }) {
           })}
         </nav>
 
-        {/* Back to company app */}
+        {/* Back to the company app.
+            It always went to /dashboard, which needs a company — so for an
+            administrator who has none it was a button leading to an empty
+            screen, and once /dashboard started redirecting them it led straight
+            back here. It now goes where there is something to see: the
+            administrator's own dashboard if they have a company, and the search
+            that opens every trust report if they do not. The label says which. */}
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(hasCompany ? '/dashboard' : '/search')}
           style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '11px', padding: '11px 14px', color: '#CBD5E1', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer', marginTop: '14px', fontFamily: 'inherit' }}
         >
-          ↩ العودة لواجهة الشركة
+          ↩ {hasCompany ? 'العودة لواجهة الشركة' : 'الانتقال للبحث وتقارير الثقة'}
         </button>
       </aside>
 
