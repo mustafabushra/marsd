@@ -73,7 +73,7 @@ export default function TrustReport() {
           const { getSupabase } = await import('../lib/api')
           const { data: c } = await getSupabase()
             .from('companies')
-            .select('name_en, entity_type, cr_status, cr_expiry_date, founding_date, founded_year, main_activity, sub_activities, region, national_address, website, official_email, phone, unified_number, verified')
+            .select('name_en, entity_type, cr_status, cr_expiry_date, founding_date, founded_year, main_activity, sub_activities, region, national_address, website, official_email, phone, unified_number, verified, verified_at, verification_source')
             .eq('id', id)
             .single()
           identity = c || {}
@@ -254,8 +254,49 @@ export default function TrustReport() {
   const canSeeFull = can('full_trust_report')
   const score = report.score || 0
 
+  // A trust score is a statement about a company at a moment. It moves with
+  // every report approved or withdrawn, so one printed without a date says
+  // nothing a reader can rely on — and this page had no date anywhere on it.
+  const issuedAt = new Date()
+  const issuedLabel = issuedAt.toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
   return (
     <div>
+      <style>{`
+        /* What belongs on a printed trust report and what does not. Printing the
+           interface — sidebar, buttons, the badge that says the page is live —
+           produces a document that looks like a screenshot rather than a
+           statement, and the reader cannot tell when it was true. */
+        @media print {
+          aside, header, nav, button, .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          body { background: #fff !important; }
+          main, div { box-shadow: none !important; }
+          a[href]::after { content: none !important; }
+          @page { margin: 14mm; }
+        }
+        .print-only { display: none; }
+      `}</style>
+
+      {/* Only on paper: what the screen shows in its chrome. */}
+      <div className="print-only" style={{ marginBottom: '18px', paddingBottom: '12px', borderBottom: '2px solid #1E2A52' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: '#1E2A52' }}>مرصد — تقرير الثقة</div>
+            <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginTop: '3px' }}>
+              {company?.name} · سجل {company?.cr_number || '—'}
+            </div>
+          </div>
+          <div style={{ fontSize: '12px', color: '#334155', fontWeight: 700, textAlign: 'left' }}>
+            صدر في {issuedLabel}
+          </div>
+        </div>
+        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '9px 0 0', lineHeight: 1.8 }}>
+          الدرجة تعبّر عن التقارير المعتمدة حتى تاريخ الإصدار أعلاه، وتتغيّر باعتماد تقرير جديد أو سحب تقرير قائم.
+        </p>
+      </div>
       <div style={{
         background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '30px',
         marginBottom: '18px'
@@ -267,8 +308,21 @@ export default function TrustReport() {
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
               <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>{company?.name}</h1>
+              {/* The badge is the strongest claim on the page: it says someone
+                  at Marsad checked this record. A claim like that without a date
+                  is worth less than none — a company verified two years ago and
+                  a company verified this morning are not the same thing, and the
+                  reader could not tell them apart. */}
               {company?.verified && (
-                <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>✔ موثّقة</span>
+                <span
+                  title={company.verified_at ? `وُثّقت في ${new Date(company.verified_at).toLocaleDateString('en-GB')}` : 'بلا تاريخ توثيق مسجَّل'}
+                  style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}
+                >
+                  ✔ موثّقة
+                  {company.verified_at && (
+                    <span style={{ fontWeight: 600, opacity: 0.75 }}> · {new Date(company.verified_at).toLocaleDateString('en-GB')}</span>
+                  )}
+                </span>
               )}
               <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>● سجل نشط</span>
               <LiveBadge connected={connected} liveAt={liveAt} />
@@ -357,10 +411,18 @@ export default function TrustReport() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button style={{
-              background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 18px',
-              fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
-            }}>
+            {/* The browser's own print-to-PDF rather than a PDF library.
+                Arabic in jsPDF means embedding a font and hand-shaping the text,
+                and it still breaks on ligatures; the browser already renders
+                this page correctly in RTL and every browser can save the result
+                as PDF. What was here before had no onClick at all. */}
+            <button
+              onClick={() => window.print()}
+              style={{
+                background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 18px',
+                fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
+              }}
+            >
               ⬇ تحميل PDF
             </button>
             <button

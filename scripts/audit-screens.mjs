@@ -28,6 +28,7 @@ const COMPANY_SCREENS = {
   'AddReport.jsx': 'إضافة تقرير',
   'MyReports.jsx': 'تقاريري',
   'MyCompanies.jsx': 'الشركات المُرسلة',
+  'ReportsAboutUs.jsx': 'تقارير عن شركتك',
   'TrustReport.jsx': 'تقرير الشركة',
   'Watchlist.jsx': 'قوائم المراقبة',
   'Compare.jsx': 'المقارنة',
@@ -47,9 +48,18 @@ for (const [file, label] of Object.entries(COMPANY_SCREENS)) {
     .map((m) => `${m[2]} ${m[1]}`)
   const uniqueWrites = [...new Set(writes)]
 
+  // A <button> with no onClick and no type="submit" does nothing when pressed.
+  // This check existed for the admin panel and not here, which is how "⬇ تحميل
+  // PDF" on the trust report — the page the product is built around — stayed
+  // dead without anyone noticing.
+  const buttons = [...src.matchAll(/<button[^>]*?>/gs)]
+  const inert = buttons.filter((b) => !/onClick|type=["']submit["']/.test(b[0])).length
+
   rows.push({
     label,
     file,
+    inert,
+    buttons: buttons.length,
     writes: uniqueWrites,
     // Does the screen consult the plan at all?
     entitlements: /useEntitlements/.test(src),
@@ -64,12 +74,13 @@ for (const [file, label] of Object.entries(COMPANY_SCREENS)) {
 const mark = (b) => (b ? '✅' : '—')
 
 console.log('\n  شاشات لوحة الشركة:\n')
-console.log('  بيانات  حدود  ميزة  لحظي  الشاشة')
-console.log('  ' + '─'.repeat(58))
+console.log('  بيانات  أزرار  حدود  ميزة  لحظي  الشاشة')
+console.log('  ' + '─'.repeat(62))
 
 for (const r of rows) {
-  if (r.missing) { console.log(`  ${'❌'.padEnd(6)}                   ${r.label}  (الملف مفقود)`); continue }
-  console.log(`  ${mark(r.real).padEnd(6)} ${mark(r.limitCheck).padEnd(5)} ${mark(r.featureGate).padEnd(5)} ${mark(r.live).padEnd(5)} ${r.label}`)
+  if (r.missing) { console.log(`  ${'❌'.padEnd(6)}                         ${r.label}  (الملف مفقود)`); continue }
+  console.log(`  ${mark(r.real).padEnd(6)} ${mark(r.inert === 0).padEnd(5)} ${mark(r.limitCheck).padEnd(5)} ${mark(r.featureGate).padEnd(5)} ${mark(r.live).padEnd(5)} ${r.label}`)
+  if (r.inert) console.log(`         ⚠️  ${r.inert} من ${r.buttons} زراً بلا onClick`)
   if (r.writes.length) console.log(`         يكتب: ${r.writes.join(' · ')}`)
 }
 
