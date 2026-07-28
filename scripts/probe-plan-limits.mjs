@@ -135,7 +135,19 @@ await c.query('set local role authenticated')
 await c.query('select set_config($1, $2, true)',
   ['request.jwt.claims', JSON.stringify({ sub: actor.id, role: 'authenticated' })])
 
+// Read the ceiling as the owner, not as the tenant.
+//
+// tenant_limit is a server-side helper — triggers and other SECURITY DEFINER
+// functions call it, and 060 revoked the browser's grant because nothing in the
+// application ever called it and an anonymous caller could read any tenant's
+// plan ceiling with it. This probe was reading it while impersonating the
+// tenant, which is not how the platform uses it and is exactly what was closed.
+//
+// The role is restored immediately after: the insert below must be attempted as
+// the tenant, because the ceiling is enforced against that tenant.
+await c.query('set local role postgres')
 const raised = (await c.query('select public.tenant_limit($1, $2) as v', [actor.tenant_id, 'watchlist_items'])).rows[0].v
+await c.query('set local role authenticated')
 const spare = companies[companies.length - 1]
 let raisedOk = false
 try {

@@ -45,13 +45,17 @@ const c = new pg.Client({
 })
 await c.connect()
 
-// Every function a browser can reach: granted to anon or authenticated, and
-// callable with no required arguments (PostgREST needs a body we can guess).
+// Every function a browser can reach.
+//
+// provolatile matters: 'v' means the function may write. Those are called with
+// ids that do not exist, so a missing guard shows up in the reply without the
+// probe mutating anything. Anything else gets real ids, because a read function
+// handed a random uuid returns nothing and would score as safe when it is not.
 const { rows: fns } = await c.query(`
   select p.proname,
-         p.pronargs,
          pg_get_function_identity_arguments(p.oid) as args,
-         p.prosecdef
+         p.prosecdef,
+         p.provolatile
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
@@ -61,7 +65,20 @@ const { rows: fns } = await c.query(`
         where g.specific_name = p.proname || '_' || p.oid
           and g.grantee in ('anon', 'authenticated', 'PUBLIC'))
    order by p.proname`)
+
+// Real ids, so a read function actually has something to disclose.
+const one = async (sql) => (await c.query(sql)).rows[0]?.id || null
+const REAL = {
+  tenant: await one('select id from tenants limit 1'),
+  company: await one('select id from companies limit 1'),
+  report: await one('select id from reports limit 1'),
+  user: await one("select id from users where role = 'platform_admin' limit 1"),
+  dispute: await one('select id from disputes limit 1'),
+  request: await one('select id from plan_change_requests limit 1'),
+}
 await c.end()
+
+const NOWHERE = '00000000-0000-0000-0000-000000000000'
 
 if (!fns.length) {
   console.error('\n  ❌ لم يُعثر على أي دالة قابلة للنداء — الفحص لا يرى شيئاً، والنتيجة بلا قيمة\n')
@@ -70,15 +87,51 @@ if (!fns.length) {
 
 console.log(`\n  ${fns.length} دالة قابلة للنداء من المتصفح · تُستدعى بلا أي جلسة\n`)
 
-// Arguments a probe can supply blind. Anything else is called with an empty body
-// and reported as "not exercised" rather than counted as safe.
-const GUESS = {
-  p_days: 0,
-  p_source_table: 'reports',
-  p_source_id: '00000000-0000-0000-0000-000000000000',
-  p_reason: 'report_approved',
-  p_company_id: '00000000-0000-0000-0000-000000000000',
-  p_action: 'search_unlock',
+/**
+ * A value for every argument name the platform's functions take.
+ *
+ * `writes` decides which id is used: a volatile function gets an id that matches
+ * nothing, so an absent guard is visible in the reply without this probe
+ * changing production data. approve_report_and_award_credits takes a credit
+ * amount as a parameter and resolve_dispute settles a dispute — those must be
+ * exercised, and must not actually run.
+ *
+ * A name missing from here is reported as untested rather than counted as safe.
+ * That distinction is the whole point: the last three holes came out of the
+ * untested pile.
+ */
+const valueFor = (name, writes) => {
+  const id = (real) => (writes ? NOWHERE : real || NOWHERE)
+  const map = {
+    p_tenant_id: id(REAL.tenant),
+    p_company_id: id(REAL.company),
+    company_id: id(REAL.company),
+    p_target_company_id: id(REAL.company),
+    p_reporter_tenant_id: id(REAL.tenant),
+    p_report_id: id(REAL.report),
+    p_dispute_id: id(REAL.dispute),
+    p_request_id: id(REAL.request),
+    p_reviewer_id: writes ? NOWHERE : REAL.user,
+    p_source_id: id(REAL.report),
+    p_source_table: 'reports',
+    p_reason: 'report_approved',
+    p_action: 'search_unlock',
+    p_days: 0,
+    p_months: 1,
+    p_credit_amount: 0,
+    p_upheld: false,
+    p_note: 'probe',
+    p_key: 'searches_per_month',
+    p_status: null,
+    p_source: null,
+    p_query: 'a',
+    search_query: 'a',
+    p_limit: 5,
+    limit_val: 5,
+    p_offset: 0,
+    offset_val: 0,
+  }
+  return name in map ? map[name] : undefined
 }
 
 /**
@@ -146,15 +199,16 @@ for (const fn of fns) {
     skipped++
     continue
   }
+  const writes = fn.provolatile === 'v'
   const argNames = fn.args ? fn.args.split(',').map((a) => a.trim().split(' ')[0]) : []
-  const unknown = argNames.filter((a) => a && !(a in GUESS))
+  const unknown = argNames.filter((a) => a && valueFor(a, writes) === undefined)
   if (unknown.length) {
     console.log(`  ⏭  ${fn.proname}  — لم تُختبر (وسائط مجهولة: ${unknown.join(', ')})`)
     skipped++
     continue
   }
 
-  const body = Object.fromEntries(argNames.filter(Boolean).map((a) => [a, GUESS[a]]))
+  const body = Object.fromEntries(argNames.filter(Boolean).map((a) => [a, valueFor(a, writes)]))
 
   let parsed = null
   let status = 0
