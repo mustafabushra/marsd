@@ -109,7 +109,7 @@ export default function CompanyRegister() {
     if (!companyData.email.trim()) return 'البريد الإلكتروني مطلوب'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyData.email)) return 'البريد الإلكتروني غير صحيح'
 
-    if (companyData.phone.trim() && !/^[\d\s\+\-\(\)]{7,}$/.test(companyData.phone))
+    if (companyData.phone.trim() && !/^[\d\s+()-]{7,}$/.test(companyData.phone))
       return 'رقم الهاتف غير صحيح'
 
     return ''

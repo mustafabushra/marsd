@@ -18,6 +18,17 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+// A checker that matches nothing reports a clean result. Prove the pattern still
+// sees a button before trusting any count derived from it.
+{
+  const canary = [...'<button onClick={x}>go</button>'.matchAll(/<button\b[^>]*?>/gs)]
+  if (canary.length !== 1) {
+    console.error('\n  ❌ الفحص لا يرى نمطه الخاص — النتيجة أدناه بلا قيمة\n')
+    process.exit(2)
+  }
+}
+
+
 const PAGES = 'src/pages'
 
 // Screens a company user reaches, and what each is for.
@@ -52,7 +63,11 @@ for (const [file, label] of Object.entries(COMPANY_SCREENS)) {
   // This check existed for the admin panel and not here, which is how "⬇ تحميل
   // PDF" on the trust report — the page the product is built around — stayed
   // dead without anyone noticing.
-  const buttons = [...src.matchAll(/<button[^>]*?>/gs)]
+  // , a word boundary — not the backspace byte this held for months. The
+  // pattern demanded a literal control character after "<button", matched
+  // nothing in any file, and reported zero inert buttons on every run: the same
+  // silent pass verify-literals had, in a second checker written the same way.
+  const buttons = [...src.matchAll(/<button\b[^>]*?>/gs)]
   const inert = buttons.filter((b) => !/onClick|type=["']submit["']/.test(b[0])).length
 
   rows.push({

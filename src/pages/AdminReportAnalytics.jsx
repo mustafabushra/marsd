@@ -35,13 +35,11 @@ const PAYMENT_LABEL = {
   default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق',
 }
 
-const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 export default function AdminReportAnalytics() {
   const [days, setDays] = useState(90)
-  const [reports, setReports] = useState([])
-  const [names, setNames] = useState({ companies: {}, tenants: {} })
+  const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -50,31 +48,17 @@ export default function AdminReportAnalytics() {
       setError('')
       const supabase = getSupabase()
 
-      let q = supabase
-        .from('reports')
-        .select('id, status, category, payment_commitment, delay_days, defaulted, deal_value, created_at, approved_at, reporter_tenant_id, target_company_id')
-      if (days > 0) {
-        q = q.gte('created_at', new Date(Date.now() - days * 86400000).toISOString())
-      }
-      const { data, error: e } = await q.order('created_at', { ascending: true })
+      // Every figure on this card is computed by the database now.
+      //
+      // It used to fetch each report in the window and derive the totals, the
+      // median review time, both breakdowns, the monthly trend and the two "top"
+      // lists from the array. PostgREST caps a request at 1000 rows and returns
+      // 200 without saying it truncated, so past that point this page would have
+      // reported the shape of the most recent thousand reports as the shape of
+      // all of them — with nothing on screen to suggest it.
+      const { data, error: e } = await supabase.rpc('report_analytics', { p_days: days })
       if (e) throw e
-
-      const rows = data || []
-      setReports(rows)
-
-      // Names for the two "top" lists, fetched only for the ids in view.
-      const companyIds = [...new Set(rows.map((r) => r.target_company_id).filter(Boolean))]
-      const tenantIds = [...new Set(rows.map((r) => r.reporter_tenant_id).filter(Boolean))]
-
-      const [{ data: cos }, { data: tens }] = await Promise.all([
-        companyIds.length ? supabase.from('companies').select('id, name').in('id', companyIds) : { data: [] },
-        tenantIds.length ? supabase.from('tenants').select('id, name').in('id', tenantIds) : { data: [] },
-      ])
-
-      setNames({
-        companies: Object.fromEntries((cos || []).map((c) => [c.id, c.name])),
-        tenants: Object.fromEntries((tens || []).map((t) => [t.id, t.name])),
-      })
+      setStats(data || {})
     } catch (err) {
       setError(err.message || 'تعذّر تحميل التحليلات')
     } finally {
@@ -90,66 +74,54 @@ export default function AdminReportAnalytics() {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
   }
 
-  const total = reports.length
-  const by = (s) => reports.filter((r) => r.status === s).length
-  const approved = by('approved')
-  const pending = by('pending_review')
-  const rejected = by('rejected')
-  const info = by('request_info')
+  const n = (k) => Number(stats[k]) || 0
+  const total = n('total')
+  const approved = n('approved')
+  const pending = n('pending')
+  const rejected = n('rejected')
+  const info = n('request_info')
 
   // Of the reports that were actually decided. Counting the queue as failures
   // would make the rate fall every time submissions rise.
   const decided = approved + rejected
   const approvalRate = decided ? Math.round((approved / decided) * 100) : null
 
-  const reviewTimes = reports
-    .filter((r) => r.approved_at && r.created_at)
-    .map((r) => (new Date(r.approved_at) - new Date(r.created_at)) / 86400000)
-  const medianReview = reviewTimes.length
-    ? reviewTimes.sort((a, b) => a - b)[Math.floor(reviewTimes.length / 2)]
+  // Returned in hours because a review that takes an afternoon should not read
+  // as "0 days"; shown in days, which is the unit the card is labelled in.
+  const medianReview = stats.median_review_hours != null && approved
+    ? Number(stats.median_review_hours) / 24
     : null
 
-  const tally = (key, labels) => {
-    const counts = {}
-    reports.forEach((r) => { if (r[key]) counts[r[key]] = (counts[r[key]] || 0) + 1 })
-    return Object.entries(counts)
-      .map(([k, v]) => ({ label: labels[k] || k, value: v }))
+  const tally = (key, labels) =>
+    Object.entries(stats[key] || {})
+      .map(([k, v]) => ({ label: labels[k] || k, value: Number(v) }))
       .sort((a, b) => b.value - a.value)
-  }
 
-  const topBy = (key, dict) => {
-    const counts = {}
-    reports.forEach((r) => { if (r[key]) counts[r[key]] = (counts[r[key]] || 0) + 1 })
-    return Object.entries(counts)
-      .map(([id, v]) => ({ label: dict[id] || '—', value: v }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6)
-  }
+  const topList = (key) =>
+    (stats[key] || []).slice(0, 6).map((x) => ({ label: x.name || '—', value: Number(x.count) }))
 
   // One point per month across the window, including months with nothing in
-  // them — dropping empty months would draw a flat line over a gap.
+  // them — dropping empty months would draw a flat line over a gap, and the
+  // database returns only the months that have rows.
   const trend = (() => {
-    if (!reports.length) return []
-    const counts = {}
-    reports.forEach((r) => { const k = monthKey(new Date(r.created_at)); counts[k] = (counts[k] || 0) + 1 })
-    const first = new Date(reports[0].created_at)
-    const cursor = new Date(first.getFullYear(), first.getMonth(), 1)
+    const rows = stats.monthly || []
+    if (!rows.length) return []
+    const counts = Object.fromEntries(rows.map((m) => [m.month, Number(m.count)]))
+    const [y0, m0] = rows[0].month.split('-').map(Number)
+    const cursor = new Date(y0, m0 - 1, 1)
     const end = new Date()
     const out = []
     while (cursor <= end && out.length < 24) {
-      const k = monthKey(cursor)
+      const k = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
       out.push({ label: MONTHS_AR[cursor.getMonth()], value: counts[k] || 0 })
       cursor.setMonth(cursor.getMonth() + 1)
     }
     return out
   })()
 
-  const defaults = reports.filter((r) => r.defaulted).length
-  const withDelay = reports.filter((r) => r.delay_days != null && r.delay_days > 0)
-  const avgDelay = withDelay.length
-    ? Math.round(withDelay.reduce((s, r) => s + r.delay_days, 0) / withDelay.length)
-    : 0
-  const totalValue = reports.reduce((s, r) => s + Number(r.deal_value || 0), 0)
+  const defaults = n('defaults')
+  const avgDelay = n('avg_delay')
+  const totalValue = n('total_value')
 
   return (
     <div>
@@ -182,9 +154,9 @@ export default function AdminReportAnalytics() {
           sub={approvalRate == null ? 'لم يُبتّ في شيء بعد' : `من ${decided} تقريراً بُتّ فيها`}
           tone={approvalRate == null ? undefined : approvalRate >= 70 ? STATUS_COLOR.good : STATUS_COLOR.warning}
         />
-        <StatTile label="وسيط زمن المراجعة" value={medianReview == null ? '—' : `${medianReview.toFixed(1)} يوم`} sub={`${reviewTimes.length} تقريراً مُعتمداً`} />
+        <StatTile label="وسيط زمن المراجعة" value={medianReview == null ? '—' : `${medianReview.toFixed(1)} يوم`} sub={`${n('reviewed')} تقريراً مُعتمداً`} />
         <StatTile label="حالات عدم السداد" value={defaults.toLocaleString('en-US')} sub={total ? `${Math.round((defaults / total) * 100)}% من التقارير` : ''} tone={defaults ? STATUS_COLOR.critical : undefined} />
-        <StatTile label="متوسط التأخير" value={avgDelay ? `${avgDelay} يوم` : '—'} sub={`${withDelay.length} تقريراً فيه تأخير`} />
+        <StatTile label="متوسط التأخير" value={avgDelay ? `${avgDelay} يوم` : '—'} sub={`${n('with_delay')} تقريراً فيه تأخير`} />
         <StatTile label="قيمة التعاملات" value={totalValue ? `${(totalValue / 1000).toFixed(0)} ألف` : '—'} sub="ريال سعودي" />
       </div>
 
@@ -204,8 +176,8 @@ export default function AdminReportAnalytics() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(330px,1fr))', gap: '16px' }}>
         <BarList title="أسباب التقارير" rows={tally('category', CATEGORY_LABEL)} color={SERIES[0]} />
         <BarList title="سلوك السداد" rows={tally('payment_commitment', PAYMENT_LABEL)} color={SERIES[1]} />
-        <BarList title="أكثر الشركات وروداً في التقارير" rows={topBy('target_company_id', names.companies)} color={SERIES[2]} />
-        <BarList title="أكثر الشركات مساهمةً" rows={topBy('reporter_tenant_id', names.tenants)} color={SERIES[0]} />
+        <BarList title="أكثر الشركات وروداً في التقارير" rows={topList('top_companies')} color={SERIES[2]} />
+        <BarList title="أكثر الشركات مساهمةً" rows={topList('top_reporters')} color={SERIES[0]} />
       </div>
     </div>
   )

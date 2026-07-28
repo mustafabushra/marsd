@@ -34,52 +34,36 @@ export default function AdminTenantAnalytics() {
       setError('')
       const supabase = getSupabase()
 
-      const [tenants, users, reports, watch, subs, plans, credits] = await Promise.all([
-        supabase.from('tenants').select('id, name, status, created_at, company_id'),
-        supabase.from('users').select('id, tenant_id, status, last_login_at'),
-        supabase.from('reports').select('id, reporter_tenant_id, status, created_at'),
-        supabase.from('watchlist_items').select('id, tenant_id'),
-        supabase.from('subscriptions').select('tenant_id, plan_id, status'),
-        supabase.from('plans').select('id, code, name'),
-        supabase.from('credits_ledger').select('tenant_id, amount'),
-      ])
+      // One call, and the counting happens in the database.
+      //
+      // This pulled seven whole tables into the browser — tenants, users,
+      // reports, watchlist_items, subscriptions, plans, credits_ledger — and
+      // joined and counted them here. PostgREST caps a request at 1000 rows and
+      // returns 200 without saying it truncated, so every figure on this screen
+      // was correct only while the tables were small: "نقاط متداولة" would have
+      // become the sum of some credits, and a tenant's report count a count of
+      // its recent reports, with nothing anywhere indicating it.
+      //
+      // A wrong number that still looks like a number is not discovered by
+      // looking at the screen.
+      const { data, error: rpcError } = await supabase.rpc('tenant_analytics')
+      if (rpcError) throw rpcError
 
-      const firstError = [tenants, users, reports, watch, subs, plans, credits].find((r) => r.error)
-      if (firstError) throw firstError.error
-
-      const planById = Object.fromEntries((plans.data || []).map((p) => [p.id, p]))
-      const planOf = {}
-      ;(subs.data || []).forEach((s) => { if (s.status === 'active') planOf[s.tenant_id] = planById[s.plan_id] })
-
-      const count = (list, key, tid, extra = () => true) =>
-        list.filter((x) => x[key] === tid && extra(x)).length
-
-      setRows((tenants.data || []).map((t) => {
-        const members = (users.data || []).filter((u) => u.tenant_id === t.id)
-        const filed = (reports.data || []).filter((r) => r.reporter_tenant_id === t.id)
-        const lastLogin = members
-          .map((u) => u.last_login_at)
-          .filter(Boolean)
-          .sort()
-          .pop()
-        return {
-          id: t.id,
-          name: t.name,
-          status: t.status,
-          createdAt: t.created_at,
-          claimed: !!t.company_id,
-          plan: planOf[t.id]?.name || 'مجاني',
-          planCode: planOf[t.id]?.code || 'free',
-          users: members.filter((u) => u.status === 'active').length,
-          reports: filed.length,
-          approved: filed.filter((r) => r.status === 'approved').length,
-          watchlist: count(watch.data || [], 'tenant_id', t.id),
-          credits: (credits.data || [])
-            .filter((c) => c.tenant_id === t.id)
-            .reduce((s, c) => s + Number(c.amount || 0), 0),
-          lastLogin,
-        }
-      }))
+      setRows((data || []).map((t) => ({
+        id: t.tenant_id,
+        name: t.name,
+        status: t.status,
+        createdAt: t.created_at,
+        claimed: t.claimed,
+        plan: t.plan_name,
+        planCode: t.plan_code,
+        users: Number(t.users_active) || 0,
+        reports: Number(t.reports_total) || 0,
+        approved: Number(t.reports_approved) || 0,
+        watchlist: Number(t.watchlist) || 0,
+        credits: Number(t.credits) || 0,
+        lastLogin: t.last_login,
+      })))
     } catch (err) {
       setError(err.message || 'تعذّر تحميل التحليلات')
     } finally {
