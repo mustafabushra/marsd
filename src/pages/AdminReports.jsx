@@ -9,6 +9,11 @@ import { notifyTenant } from '../lib/notify'
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
 
+// A review queue is worked down, not browsed, so it does not need paging — it
+// needs a ceiling that is stated rather than inherited. PostgREST caps a request
+// at 1000 rows and reports success, which is the failure mode this avoids.
+const QUEUE_LIMIT = 500
+
 export default function AdminReports() {
   const { user } = useUser()
   const [reports, setReports] = useState([])
@@ -35,6 +40,11 @@ export default function AdminReports() {
                  reporter:reporter_tenant_id ( id, name, cr_number )`)
         .eq('status', 'pending_review')
         .order('submitted_at', { ascending: false })
+        // An explicit ceiling. Without one PostgREST applies its own at 1000 rows
+        // and returns 200 without saying it truncated, so a queue past that point
+        // looks complete and is not. Stated here, the number is visible and can
+        // be raised; left to the server, nobody knows it exists.
+        .limit(QUEUE_LIMIT)
 
       const rows = data || []
       setReports(rows)
@@ -43,18 +53,24 @@ export default function AdminReports() {
       // claim about a named business without knowing who made it cannot weigh it
       // at all — and a company whose reports keep being rejected is the single
       // clearest signal Marsad has that something is wrong with its submissions.
+      //
+      // Counted by the database. This used to fetch every report those tenants
+      // had ever filed and tally them here, which PostgREST silently truncates at
+      // 1000 rows — so the reject rate shown beside a reviewer's approve button
+      // would quietly become a rate over the most recent thousand, and this
+      // number is what a decision to suspend a contributor rests on. A wrong one
+      // suspends the wrong company.
       const tenantIds = [...new Set(rows.map((r) => r.reporter_tenant_id).filter(Boolean))]
       if (tenantIds.length) {
-        const { data: filed } = await supabase
-          .from('reports')
-          .select('reporter_tenant_id, status')
-          .in('reporter_tenant_id', tenantIds)
+        const { data: overview } = await supabase.rpc('contributors_overview')
         const tally = {}
-        ;(filed || []).forEach((r) => {
-          const t = (tally[r.reporter_tenant_id] ||= { total: 0, approved: 0, rejected: 0 })
-          t.total += 1
-          if (r.status === 'approved') t.approved += 1
-          if (r.status === 'rejected') t.rejected += 1
+        ;(overview || []).forEach((t) => {
+          if (!tenantIds.includes(t.tenant_id)) return
+          tally[t.tenant_id] = {
+            total: Number(t.reports_total) || 0,
+            approved: Number(t.reports_approved) || 0,
+            rejected: Number(t.reports_rejected) || 0,
+          }
         })
         setReporterHistory(tally)
       }

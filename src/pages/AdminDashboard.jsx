@@ -4,6 +4,80 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+
+/**
+ * Companies on the registry over the last six months.
+ *
+ * One series, so no legend — the card's heading names it. The last point is
+ * emphasised and labelled rather than every point, because the reader wants
+ * today's total and the shape of how it got there, not six numbers to compare.
+ * Each point carries a native title, so hovering says which month and how many
+ * arrived in it.
+ *
+ * An empty registry draws no line and says so. A flat line at zero reads as a
+ * measurement; "no companies yet" is the truth.
+ */
+function GrowthChart({ points, loading }) {
+  const W = 460
+  const H = 160
+  const PAD = 14
+
+  if (loading) {
+    return <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#94A3B8', fontSize: '13px', fontWeight: 600 }}>…</div>
+  }
+  if (!points.length || points[points.length - 1].total === 0) {
+    return (
+      <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600 }}>
+        لا توجد شركات مسجّلة بعد
+      </div>
+    )
+  }
+
+  const max = Math.max(...points.map((p) => p.total))
+  const min = Math.min(...points.map((p) => p.total))
+  // A flat series would divide by zero and a one-value series has no slope to
+  // show; give both a band so the line sits mid-card instead of on an edge.
+  const span = max - min || Math.max(max, 1)
+  const x = (i) => (points.length === 1 ? W / 2 : (i / (points.length - 1)) * W)
+  const y = (v) => H - PAD - ((v - min) / span) * (H - PAD * 2)
+
+  const line = points.map((p, i) => `${x(i)},${y(p.total)}`).join(' ')
+  const area = `M${line.split(' ').join(' L')} L${W},${H} L0,${H} Z`
+  const last = points[points.length - 1]
+
+  return (
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '170px', overflow: 'visible' }} role="img"
+           aria-label={`نمو عدد الشركات: ${last.total} شركة في ${last.label}`}>
+        <defs>
+          <linearGradient id="gb" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#1E2A52" stopOpacity=".2" />
+            <stop offset="1" stopColor="#1E2A52" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="40" x2={W} y2="40" stroke="#F1F5F9" />
+        <line x1="0" y1="80" x2={W} y2="80" stroke="#F1F5F9" />
+        <line x1="0" y1="120" x2={W} y2="120" stroke="#F1F5F9" />
+        <path d={area} fill="url(#gb)" />
+        <polyline points={line} fill="none" stroke="#1E2A52" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <circle key={p.label} cx={x(i)} cy={y(p.total)} r={i === points.length - 1 ? 5 : 4}
+                  fill={i === points.length - 1 ? '#1E2A52' : '#fff'} stroke="#1E2A52" strokeWidth="2">
+            <title>{`${p.label}: ${p.total} شركة${p.added ? ` (+${p.added})` : ''}`}</title>
+          </circle>
+        ))}
+        <text x={x(points.length - 1)} y={y(last.total) - 12} textAnchor="end"
+              fill="#1E2A52" fontSize="13" fontWeight="800">{last.total}</text>
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
+        {points.map((p) => <span key={p.label}>{p.label}</span>)}
+      </div>
+    </>
+  )
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -16,6 +90,7 @@ export default function AdminDashboard() {
   })
   const [risk, setRisk] = useState({ low: 0, med: 0, high: 0 })
   const [sectors, setSectors] = useState([])
+  const [growth, setGrowth] = useState([])
 
   // Lifted out of the effect so the realtime subscription can re-run it. What
   // arrives after a change is what a fresh page would have shown, which is the
@@ -52,6 +127,43 @@ export default function AdminDashboard() {
           approvedToday: approvedTodayCount || 0,
           companyRequests: companyReqCount,
         })
+
+        // Company growth, actually measured.
+        //
+        // This card drew a fixed polyline under the labels يناير–يونيو: the same
+        // rising curve on every screen, in every month, for every dataset. It was
+        // the one number on this page an owner would read as evidence, and it
+        // described nothing. Cumulative, because the heading says "نمو عدد
+        // الشركات" — the total on the registry, not how many arrived that month.
+        const monthStart = new Date()
+        monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+        const windowStart = new Date(monthStart)
+        windowStart.setMonth(windowStart.getMonth() - 5)
+
+        const [{ data: created }, { count: priorCount }] = await Promise.all([
+          supabase.from('companies').select('created_at')
+            .gte('created_at', windowStart.toISOString())
+            .order('created_at', { ascending: true }),
+          supabase.from('companies').select('id', { count: 'exact', head: true })
+            .lt('created_at', windowStart.toISOString()),
+        ])
+
+        const months = []
+        for (let i = 0; i < 6; i++) {
+          const d = new Date(windowStart)
+          d.setMonth(d.getMonth() + i)
+          months.push({ date: d, label: MONTHS_AR[d.getMonth()], added: 0 })
+        }
+        ;(created || []).forEach((row) => {
+          const d = new Date(row.created_at)
+          const i = (d.getFullYear() - windowStart.getFullYear()) * 12 + (d.getMonth() - windowStart.getMonth())
+          if (i >= 0 && i < 6) months[i].added++
+        })
+        let running = priorCount || 0
+        setGrowth(months.map((m) => {
+          running += m.added
+          return { label: m.label, total: running, added: m.added }
+        }))
 
         // Risk distribution from trust scores
         const { data: scores } = await supabase.from('trust_scores').select('score')
@@ -133,22 +245,7 @@ export default function AdminDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '18px', marginBottom: '18px' }}>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>نمو عدد الشركات</h3>
-          <svg viewBox="0 0 460 160" style={{ width: '100%', height: '170px' }}>
-            <defs>
-              <linearGradient id="gb" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0" stopColor="#1E2A52" stopOpacity=".2" />
-                <stop offset="1" stopColor="#1E2A52" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <line x1="0" y1="40" x2="460" y2="40" stroke="#F1F5F9" />
-            <line x1="0" y1="80" x2="460" y2="80" stroke="#F1F5F9" />
-            <line x1="0" y1="120" x2="460" y2="120" stroke="#F1F5F9" />
-            <path d="M0,130 L77,118 L154,122 L231,90 L308,78 L385,52 L460,34 L460,160 L0,160 Z" fill="url(#gb)" />
-            <polyline points="0,130 77,118 154,122 231,90 308,78 385,52 460,34" fill="none" stroke="#1E2A52" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
-            <span>يناير</span><span>فبراير</span><span>مارس</span><span>أبريل</span><span>مايو</span><span>يونيو</span>
-          </div>
+          <GrowthChart points={growth} loading={loading} />
         </div>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>توزيع مستويات المخاطر</h3>

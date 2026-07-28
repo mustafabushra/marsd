@@ -55,6 +55,20 @@ export default function AuthCallback() {
     try {
       const supabase = getSupabase()
 
+      // Record the sign-in. last_login_at had never been written for any
+      // account, so the admin panel's "آخر دخول" column was blank for everyone
+      // and an abandoned seat looked exactly like an active one.
+      //
+      // Through an RPC rather than an update from here: a policy permissive
+      // enough to let a member set a timestamp on their own row lets them set
+      // anything on it, and role, tenant_id and status live on that row too.
+      // touch_last_login() takes no arguments, so the only row it can reach is
+      // the caller's. Failure is logged and ignored — a login must not be
+      // blocked by bookkeeping about the login.
+      supabase.rpc('touch_last_login').then(({ error }) => {
+        if (error) console.error('Failed to record sign-in time:', error)
+      })
+
       // 1. Query users table
       let { data: userData, error: userError } = await supabase
         .from('users')
