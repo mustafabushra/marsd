@@ -27,6 +27,10 @@ await c.connect()
 
 let failures = 0
 const ok = (m) => console.log(`  ✅ ${m}`)
+const asService = async () => {
+  await c.query('set local role postgres')
+  await c.query("select set_config('request.jwt.claims', '', true)")
+}
 const bad = (m) => { console.log(`  ❌ ${m}`); failures++ }
 
 const { rows: [admin] } = await c.query(
@@ -105,6 +109,36 @@ if (inbox.length) {
     'update public.notifications set read_at = now() where id = $1', [inbox[0].id])
   marked > 0 ? ok('العضو يعلّمه مقروءاً') : bad('العضو لا يستطيع تعليمه مقروءاً')
 }
+
+// ── every type the application sends, not just the convenient one ───────────
+//
+// This probe passed for weeks while nine of ten notification paths were dead.
+// It wrote report_approved — the single type the CHECK constraint allowed — so
+// it proved the column accepts that value and nothing about the rest. A test
+// that only exercises the happy value is a test of the happy value.
+console.log('')
+await asService()
+const SENT_TYPES = [
+  'report_approved', 'report_rejected', 'report_request_info',
+  'company_approved', 'company_rejected', 'company_data_updated',
+  'claim_approved', 'claim_rejected',
+  'subscription_changed', 'tenant_status_changed', 'credits_awarded', 'welcome',
+]
+const refusedTypes = []
+for (const t of SENT_TYPES) {
+  await c.query('savepoint t')
+  try {
+    await c.query(
+      'insert into public.notifications (user_id, tenant_id, type, payload) values ($1, $2, $3, $4)',
+      [reader.id, target.tenant_id, t, {}])
+  } catch (e) {
+    refusedTypes.push(`${t} (${e.message.split('\n')[0].slice(0, 40)})`)
+  }
+  await c.query('rollback to savepoint t')
+}
+refusedTypes.length === 0
+  ? ok(`كل الأنواع التي يرسلها التطبيق مقبولة (${SENT_TYPES.length})`)
+  : bad(`أنواع مرفوضة: ${refusedTypes.join(' · ')}`)
 
 // ── nobody else's inbox ─────────────────────────────────────────────────────
 // Back to postgres to find them: asking while still impersonating the reader

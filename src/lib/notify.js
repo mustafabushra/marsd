@@ -104,6 +104,51 @@ export async function notifyUser(userId, tenantId, type, { title, message, meta 
   }
 }
 
+/**
+ * Tell Marsad that something arrived in a queue.
+ *
+ * CompanyOnboarding wrote these by hand and every one failed: a type the CHECK
+ * did not allow, no user_id and no tenant_id when both were NOT NULL, and a
+ * JSON.stringify'd payload in a jsonb column. Three faults in one insert, all
+ * silent. No administrator has ever been told that a company registered or that
+ * an ownership claim was filed — the queues are found by opening the screen.
+ *
+ * Addressed to every active member of Marsad's own staff. tenant_id is the
+ * subject when there is one: a claim on a company nobody owns has no tenant to
+ * name, which is why 047 made that column nullable.
+ */
+export async function notifyAdmins(type, { title, message, meta = {}, tenantId = null } = {}) {
+  if (!type) return 0
+  try {
+    const supabase = getSupabase()
+
+    const { data: staff, error: staffErr } = await supabase
+      .from('users')
+      .select('id')
+      .in('role', ['platform_admin', 'reviewer'])
+      .eq('status', 'active')
+    if (staffErr) throw staffErr
+    if (!staff?.length) {
+      console.warn('No active Marsad staff to notify')
+      return 0
+    }
+
+    const { error } = await supabase.from('notifications').insert(
+      staff.map((s) => ({
+        user_id: s.id,
+        tenant_id: tenantId,
+        type,
+        payload: { title, message, ...meta },
+      })),
+    )
+    if (error) throw error
+    return staff.length
+  } catch (err) {
+    console.error('Failed to notify Marsad:', err)
+    return 0
+  }
+}
+
 /** The title and body of a notification, whatever shape it was stored in. */
 export function notificationText(row) {
   const p = row?.payload || {}

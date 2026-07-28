@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase, smartCompanyDetection, ensureStorageBucket, buildCompanyInsert } from '../lib/api'
 import { COMPANY_STATUS, COMPANY_SOURCE, REQUEST_STATUS, USER_ROLE, USER_STATUS, TENANT_STATUS } from '../lib/enums'
+import { notifyAdmins } from '../lib/notify'
 
 const SAUDI_CITIES = [
   'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام',
@@ -266,34 +267,21 @@ export default function CompanyOnboarding() {
         userTimer.log('User upsert')
         console.log(`✅ User updated: ${upsertedUser?.id}`)
 
-        // ===== STEP 4: Send Admin Notification =====
-        console.log('🔔 [4/5] Sending admin notification...')
-        const notifTimer = createTimer()
-
-        try {
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert([{
-              type: 'claim_request_submitted',
-              payload: JSON.stringify({
-                company_id: existingCompany.id,
-                company_name: existingCompany.name,
-                user_email: userEmail,
-                claim_request_id: claimRequest.id
-              })
-            }])
-            .select('id')
-            .single()
-
-          if (notifError) {
-            console.warn('⚠️ Notification failed (non-blocking):', notifError.message)
-          } else {
-            notifTimer.log('Admin notification')
-            console.log('✅ Admin notified')
-          }
-        } catch (notifErr) {
-          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
-        }
+        // ===== STEP 4: Tell Marsad a claim is waiting =====
+        // This was written by hand and failed three ways at once: a type the
+        // CHECK did not allow, no user_id and no tenant_id when both were NOT
+        // NULL, and a JSON.stringify'd payload in a jsonb column. Every claim
+        // filed since launch went unannounced.
+        await notifyAdmins('claim_request_submitted', {
+          title: 'طلب ملكية جديد',
+          message: `${userEmail} يطالب بملكية «${existingCompany.name}»`,
+          meta: {
+            company_id: existingCompany.id,
+            company_name: existingCompany.name,
+            user_email: userEmail,
+            claim_request_id: claimRequest.id,
+          },
+        })
 
         // ===== STEP 5: Success =====
         console.log('🎉 [5/5] Claim submission complete')
@@ -427,32 +415,17 @@ export default function CompanyOnboarding() {
 
         // ===== STEP 6: Send Admin Notification =====
         console.log('🔔 [6/7] Sending admin notification...')
-        const notifTimer = createTimer()
-
-        try {
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert([{
-              type: 'company_registration_submitted',
-              payload: JSON.stringify({
-                company_id: newCompany.id,
-                company_name: formData.name,
-                cr_number: formData.crNumber,
-                registration_request_id: regRequest?.id
-              })
-            }])
-            .select('id')
-            .single()
-
-          if (notifError) {
-            console.warn('⚠️ Notification failed (non-blocking):', notifError.message)
-          } else {
-            notifTimer.log('Admin notification')
-            console.log('✅ Admin notified')
-          }
-        } catch (notifErr) {
-          console.warn('⚠️ Notification error (non-blocking):', notifErr.message)
-        }
+        await notifyAdmins('company_registration_submitted', {
+          title: 'طلب تسجيل شركة جديد',
+          message: `${formData.name} — سجل ${formData.crNumber}`,
+          tenantId: tenantData?.id || null,
+          meta: {
+            company_id: newCompany.id,
+            company_name: formData.name,
+            cr_number: formData.crNumber,
+            registration_request_id: regRequest?.id,
+          },
+        })
 
         // ===== STEP 7: Success =====
         console.log('🎉 [7/7] Registration complete')

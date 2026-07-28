@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { notifyTenant } from './notify'
 import {
   COMPANY_STATUS,
   COMPANY_STATUS_VALUES,
@@ -708,37 +709,22 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         }])
     }
 
-    // 5. Initialize Credits Ledger (0 initial balance, companies earn credits by submitting approved reports)
-    try {
-      await supabase
-        .from('credits_ledger')
-        .insert([{
-          tenant_id: tenantData.id,
-          amount: 0,
-          reason: 'initial',
-          created_at: new Date().toISOString()
-        }])
-    } catch (err) {
-      console.warn('Credits initialization warning:', err)
-    }
+    // The credits ledger needs no opening row. The balance is the sum of the
+    // ledger, so an empty ledger is already zero — and this insert named a
+    // reason the CHECK does not allow, on a table that accepts service_role
+    // only, so it failed twice over for a row that meant nothing.
 
-    // 6. Send Welcome Notification
-    try {
-      await supabase
-        .from('notifications')
-        .insert([{
-          tenant_id: tenantData.id,
-          type: 'welcome',
-          title: 'أهلاً وسهلاً في مرصد',
-          message: `مرحباً بـ ${companyData.name}! تم تفعيل حسابك بنجاح. ابدأ بإرسال التقارير والبحث عن الشركات.`,
-          is_read: false,
-          created_at: new Date().toISOString()
-        }])
-    } catch (err) {
-      console.warn('Welcome notification warning:', err)
-    }
+    // 6. Welcome the company
+    // This wrote title, message and is_read — none of which the table has — and
+    // omitted user_id, which is NOT NULL. It could not have succeeded once.
+    await notifyTenant(tenantData.id, 'welcome', {
+      title: 'أهلاً وسهلاً في مرصد',
+      message: `مرحباً بـ ${companyData.name}! ابدأ بالبحث عن الشركات وإرسال تقاريرك.`,
+    })
 
     // 7. Log registration in audit logs
+    // resource_type, resource_id and details are not columns on audit_logs —
+    // it has entity, entity_id and meta. A third failed write in one function.
     try {
       await supabase
         .from('audit_logs')
@@ -746,9 +732,9 @@ export async function createTenantAndUser(userId: string, companyData: any) {
           tenant_id: tenantData.id,
           actor_id: userId,
           action: 'company_registered',
-          resource_type: 'company',
-          resource_id: tenantData.id,
-          details: JSON.stringify({
+          entity: 'company',
+          entity_id: tenantData.id,
+          meta: JSON.stringify({
             company_name: companyData.name,
             cr_number: crNumber,
             sector: companyData.sector,
@@ -1095,194 +1081,16 @@ export async function getCompanyReportsSummary(companyId: string) {
 // REPORTS API
 // ============================================================================
 
-export async function submitReport(reportData: any) {
-  const supabase = getSupabase()
-  const user = await supabase.auth.getUser()
-
-  if (!user.data.user) {
-    throw new Error('Unauthorized')
-  }
-
-  // Get user's tenant
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, role')
-    .eq('id', user.data.user.id)
-    .single()
-
-  // BR-06: Check if user role can submit reports (not viewer)
-  if (userData?.role === 'viewer') {
-    throw new Error('لا يمكنك رفع التقارير. اتصل بمدير الشركة.')
-  }
-
-  // Check BR-05: Prevent duplicate reports within 90 days
-  const ninetyDaysAgo = new Date()
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-
-  const { data: existingReport } = await supabase
-    .from('reports')
-    .select('id, created_at')
-    .eq('reporter_tenant_id', userData?.tenant_id)
-    .eq('target_company_id', reportData.targetCompanyId)
-    .eq('status', 'approved')
-    .gte('created_at', ninetyDaysAgo.toISOString())
-    .limit(1)
-
-  if (existingReport && existingReport.length > 0) {
-    const daysSinceLast = Math.floor((Date.now() - new Date(existingReport[0].created_at).getTime()) / (1000 * 60 * 60 * 24))
-    throw new Error(`لقد أرسلت تقريراً عن هذه الشركة قبل ${daysSinceLast} أيام. يرجى الانتظار لمدة 90 يوماً من آخر تقرير معتمد.`)
-  }
-
-  // Check subscription status
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('status, plans(name)')
-    .eq('tenant_id', userData?.tenant_id)
-    .eq('status', 'active')
-    .single()
-
-  if (!subscription) {
-    throw new Error('الاشتراك غير نشط. يرجى تجديد الاشتراك أولاً.')
-  }
-
-  // Check BR-04: Subscription free plan limit
-  if (subscription.plans?.name === 'مجاني') {
-    const { data: monthReports, count } = await supabase
-      .from('reports')
-      .select('id', { count: 'exact' })
-      .eq('reporter_tenant_id', userData?.tenant_id)
-      .gte('created_at', new Date(Date.now() - 30*24*60*60*1000).toISOString())
-
-    if ((count || 0) >= 5) {
-      throw new Error('لقد وصلت لحد التقارير الشهري (5 تقارير). يرجى الترقية للخطة المدفوعة.')
-    }
-  }
-
-  // BR-07: Content validation
-  if (!reportData.description || reportData.description.trim().length < 20) {
-    throw new Error('وصف التقرير يجب أن يكون 20 حرفاً على الأقل.')
-  }
-
-  // Check/create company if not exists
-  let targetCompanyId = reportData.targetCompanyId
-  if (!targetCompanyId && reportData.companyName) {
-    const { data: existingCompany } = await supabase
-      .from('companies')
-      .select('id')
-      .or(`name.ilike.%${reportData.companyName}%,cr_number.eq.${reportData.companyCrNumber}`)
-      .limit(1)
-
-    if (existingCompany && existingCompany.length > 0) {
-      targetCompanyId = existingCompany[0].id
-    } else {
-      // Create company
-      // كان هنا source: 'from_report' وهي قيمة غير مسموحة — تسبب
-      // companies_source_check violation. المصدر الصحيح: community.
-      const { data: newCompany, error: companyError } = await supabase
-        .from('companies')
-        .insert([buildCompanyInsert({
-          name: reportData.companyName,
-          crNumber: reportData.companyCrNumber || null,
-          sector: reportData.companySector || null,
-          city: reportData.companyCity || null,
-          source: COMPANY_SOURCE.COMMUNITY,
-          approved: false,
-        })])
-        .select()
-        .single()
-
-      if (companyError) {
-        throw new Error('فشل إنشاء الشركة: ' + companyError.message)
-      }
-      targetCompanyId = newCompany.id
-    }
-  }
-
-  if (!targetCompanyId) {
-    throw new Error('شركة الهدف مطلوبة')
-  }
-
-  // BR-08: Insert report with audit logging
-  const { data: report, error } = await supabase
-    .from('reports')
-    .insert([
-      {
-        reporter_tenant_id: userData?.tenant_id,
-        target_company_id: targetCompanyId,
-        status: 'pending_review',
-        type: reportData.type,
-        title: reportData.title || reportData.type,
-        description: reportData.description,
-        deal_amount_range: reportData.dealAmountRange,
-        payment_commitment: reportData.paymentCommitment,
-        delay_days: reportData.delayDays || 0,
-        defaulted: reportData.defaulted || false,
-        dealt_at: reportData.dealtAt || new Date().toISOString(),
-        submitted_at: new Date().toISOString(),
-      },
-    ])
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error('Failed to submit report: ' + error.message)
-  }
-
-  // Deduct credits immediately (1 credit per report submission)
-  try {
-    await supabase
-      .from('credits_ledger')
-      .insert([
-        {
-          tenant_id: userData?.tenant_id,
-          report_id: report.id,
-          amount: -1,
-          reason: 'report_submitted',
-          created_at: new Date().toISOString()
-        },
-      ])
-  } catch (err) {
-    console.warn('Credit deduction warning:', err)
-  }
-
-  // BR-09: Log in audit logs
-  try {
-    await supabase
-      .from('audit_logs')
-      .insert([{
-        tenant_id: userData?.tenant_id,
-        actor_id: user.data.user.id,
-        action: 'report_submitted',
-        resource_type: 'report',
-        resource_id: report.id,
-        details: JSON.stringify({
-          target_company_id: targetCompanyId,
-          type: reportData.type,
-          status: 'pending_review'
-        }),
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Audit log warning:', err)
-  }
-
-  // BR-09: Send notification to admins
-  try {
-    await supabase
-      .from('notifications')
-      .insert([{
-        type: 'new_report_pending',
-        title: 'تقرير جديد ينتظر المراجعة',
-        message: `تقرير جديد من شركة ينتظر المراجعة`,
-        is_read: false,
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Notification warning:', err)
-  }
-
-  return report
-}
+// submitReport, approveReport and rejectReport were removed here.
+//
+// Nothing called them. The screens do this work directly, and these copies had
+// drifted: they wrote credits_ledger.reason values the CHECK refuses, notification
+// types it refuses, review_actions.action of 'approved' where the column allows
+// 'approve', and notification columns (title, message, is_read) that do not exist.
+//
+// Dead code is harmless until someone revives it believing it worked once.
+// verify-literals reported them on every run, and a check that is permanently red
+// is a check people learn to skip.
 
 export async function getMyReports(page = 1, limit = 10) {
   const supabase = getSupabase()
@@ -1592,218 +1400,6 @@ export async function listAdminReports(page = 1, limit = 20) {
     pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
   }
 }
-
-export async function approveReport(reportId: string) {
-  const supabase = getSupabase()
-  const user = await supabase.auth.getUser()
-
-  if (!user.data.user) {
-    throw new Error('Unauthorized')
-  }
-
-  // Get report info
-  const { data: report } = await supabase
-    .from('reports')
-    .select('id, target_company_id, reporter_tenant_id')
-    .eq('id', reportId)
-    .single()
-
-  if (!report) {
-    throw new Error('Report not found')
-  }
-
-  // Update report status to approved
-  const { error } = await supabase
-    .from('reports')
-    .update({ status: 'approved', approved_at: new Date().toISOString() })
-    .eq('id', reportId)
-
-  if (error) {
-    throw new Error('Failed to approve: ' + error.message)
-  }
-
-  // Award 10 credits to reporter
-  try {
-    await supabase
-      .from('credits_ledger')
-      .insert([{
-        tenant_id: report.reporter_tenant_id,
-        report_id: reportId,
-        amount: 10,
-        reason: 'report_approved',
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Credit award warning:', err)
-  }
-
-  // Trigger: Recalculate trust score for the company
-  // This would be a trigger in the database, but we can call an RPC
-  try {
-    await supabase
-      .rpc('compute_trust_score', { p_company_id: report.target_company_id })
-  } catch (err) {
-    console.warn('Trust score calculation warning:', err)
-  }
-
-  // Send notification to reporter
-  try {
-    await supabase
-      .from('notifications')
-      .insert([{
-        tenant_id: report.reporter_tenant_id,
-        type: 'report_approved',
-        title: '✅ تم اعتماد تقريرك!',
-        message: 'تقريرك تمت الموافقة عليه بنجاح وحصلت على 10 نقاط ائتمان.',
-        is_read: false,
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Notification warning:', err)
-  }
-
-  // Log review action
-  try {
-    await supabase
-      .from('review_actions')
-      .insert([{
-        report_id: reportId,
-        reviewer_id: user.data.user.id,
-        action: 'approved',
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Review action warning:', err)
-  }
-
-  // Audit log
-  try {
-    await supabase
-      .from('audit_logs')
-      .insert([{
-        actor_id: user.data.user.id,
-        action: 'report_approved',
-        resource_type: 'report',
-        resource_id: reportId,
-        details: JSON.stringify({
-          reporter_tenant_id: report.reporter_tenant_id,
-          target_company_id: report.target_company_id,
-          credits_awarded: 10
-        }),
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Audit log warning:', err)
-  }
-
-  return { success: true }
-}
-
-export async function rejectReport(reportId: string, reason: string) {
-  const supabase = getSupabase()
-  const user = await supabase.auth.getUser()
-
-  if (!user.data.user) {
-    throw new Error('Unauthorized')
-  }
-
-  // Get report info
-  const { data: report } = await supabase
-    .from('reports')
-    .select('id, reporter_tenant_id')
-    .eq('id', reportId)
-    .single()
-
-  if (!report) {
-    throw new Error('Report not found')
-  }
-
-  // Update report status to rejected with reason
-  const { error } = await supabase
-    .from('reports')
-    .update({
-      status: 'rejected',
-      rejected_at: new Date().toISOString(),
-      rejection_reason: reason
-    })
-    .eq('id', reportId)
-
-  if (error) {
-    throw new Error('Failed to reject: ' + error.message)
-  }
-
-  // Refund the 1 credit deducted during submission
-  try {
-    await supabase
-      .from('credits_ledger')
-      .insert([{
-        tenant_id: report.reporter_tenant_id,
-        report_id: reportId,
-        amount: 1,
-        reason: 'report_rejected_refund',
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Credit refund warning:', err)
-  }
-
-  // Send notification to reporter
-  try {
-    await supabase
-      .from('notifications')
-      .insert([{
-        tenant_id: report.reporter_tenant_id,
-        type: 'report_rejected',
-        title: '❌ تم رفض تقريرك',
-        message: `تقريرك لم يتم قبوله. السبب: ${reason}`,
-        is_read: false,
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Notification warning:', err)
-  }
-
-  // Log review action
-  try {
-    await supabase
-      .from('review_actions')
-      .insert([{
-        report_id: reportId,
-        reviewer_id: user.data.user.id,
-        action: 'rejected',
-        reason,
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Review action warning:', err)
-  }
-
-  // Audit log
-  try {
-    await supabase
-      .from('audit_logs')
-      .insert([{
-        actor_id: user.data.user.id,
-        action: 'report_rejected',
-        resource_type: 'report',
-        resource_id: reportId,
-        details: JSON.stringify({
-          reporter_tenant_id: report.reporter_tenant_id,
-          rejection_reason: reason,
-          credit_refunded: 1
-        }),
-        created_at: new Date().toISOString()
-      }])
-  } catch (err) {
-    console.warn('Audit log warning:', err)
-  }
-
-  return { success: true }
-}
-
-// ============================================================================
-// COMPANY USERS API
-// ============================================================================
 
 export async function listCompanyUsers() {
   const supabase = getSupabase()
