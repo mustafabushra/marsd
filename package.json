@@ -22,12 +22,12 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.5",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.5.2",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.8.0",
+    "globals": "^15.15.0",
     "pg": "^8.22.0",
     "postcss": "^8.5.16",
     "tailwindcss": "^4.3.2",
