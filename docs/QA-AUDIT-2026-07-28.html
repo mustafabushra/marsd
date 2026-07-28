@@ -1,0 +1,884 @@
+<title>مرصد — تقرير التدقيق الفني لفريق QA</title>
+<style>
+  :root {
+    --ground: #F6F7F9;
+    --panel: #FFFFFF;
+    --ink: #141821;
+    --ink-2: #3D4757;
+    --slate: #6B7688;
+    --hair: #DDE1E8;
+    --hair-2: #EAEDF2;
+    --navy: #1E2A52;
+    --crit: #A3182A;
+    --crit-bg: #FBEEF0;
+    --high: #9A5B08;
+    --high-bg: #FCF3E6;
+    --med: #14567F;
+    --med-bg: #EAF2F8;
+    --low: #5A6478;
+    --low-bg: #EFF1F4;
+    --ok: #0D6349;
+    --ok-bg: #E9F4F0;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+    --sans: "Segoe UI", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F1319;
+      --panel: #161B23;
+      --ink: #E8ECF2;
+      --ink-2: #B4BDCB;
+      --slate: #8590A2;
+      --hair: #2A313C;
+      --hair-2: #222833;
+      --navy: #9FB0DC;
+      --crit: #F08A96;
+      --crit-bg: #2B1519;
+      --high: #E5AC5E;
+      --high-bg: #2A2013;
+      --med: #7FB6DC;
+      --med-bg: #131F29;
+      --low: #98A2B3;
+      --low-bg: #1B2028;
+      --ok: #6ECFAC;
+      --ok-bg: #10241D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1319; --panel: #161B23; --ink: #E8ECF2; --ink-2: #B4BDCB;
+    --slate: #8590A2; --hair: #2A313C; --hair-2: #222833; --navy: #9FB0DC;
+    --crit: #F08A96; --crit-bg: #2B1519; --high: #E5AC5E; --high-bg: #2A2013;
+    --med: #7FB6DC; --med-bg: #131F29; --low: #98A2B3; --low-bg: #1B2028;
+    --ok: #6ECFAC; --ok-bg: #10241D;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F7F9; --panel: #FFFFFF; --ink: #141821; --ink-2: #3D4757;
+    --slate: #6B7688; --hair: #DDE1E8; --hair-2: #EAEDF2; --navy: #1E2A52;
+    --crit: #A3182A; --crit-bg: #FBEEF0; --high: #9A5B08; --high-bg: #FCF3E6;
+    --med: #14567F; --med-bg: #EAF2F8; --low: #5A6478; --low-bg: #EFF1F4;
+    --ok: #0D6349; --ok-bg: #E9F4F0;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.75;
+    margin: 0;
+    padding: 0 20px 100px;
+    direction: rtl;
+    text-align: right;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+  .mast { padding: 56px 0 28px; border-bottom: 2px solid var(--ink); }
+  .eyebrow {
+    font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--slate); font-weight: 600; margin: 0 0 14px;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 44px); line-height: 1.2; margin: 0 0 14px;
+    font-weight: 700; letter-spacing: -.02em; text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 18px; color: var(--ink-2); max-width: 62ch; margin: 0;
+    line-height: 1.7;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 26px;
+    font-size: 13px; color: var(--slate); font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---------- tally ---------- */
+  .tally {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px; background: var(--hair); border: 1px solid var(--hair);
+    margin: 34px 0 8px;
+  }
+  .tally div { background: var(--panel); padding: 16px 18px; }
+  .tally .n {
+    font-size: 30px; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums; display: block; margin-bottom: 6px;
+  }
+  .tally .l { font-size: 12.5px; color: var(--slate); letter-spacing: .04em; }
+  .t-crit .n { color: var(--crit); }
+  .t-high .n { color: var(--high); }
+  .t-med  .n { color: var(--med); }
+  .t-low  .n { color: var(--low); }
+  .t-ok   .n { color: var(--ok); }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 56px; }
+  h2 {
+    font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+    font-weight: 700; color: var(--ink); margin: 0 0 4px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--ink);
+  }
+  .sec-note {
+    font-size: 14.5px; color: var(--slate); margin: 12px 0 26px; max-width: 64ch;
+  }
+
+  /* ---------- finding ---------- */
+  .f {
+    background: var(--panel); border: 1px solid var(--hair);
+    border-right-width: 4px; margin-bottom: 18px;
+  }
+  .f-crit { border-right-color: var(--crit); }
+  .f-high { border-right-color: var(--high); }
+  .f-med  { border-right-color: var(--med); }
+  .f-low  { border-right-color: var(--low); }
+  .f-ok   { border-right-color: var(--ok); }
+
+  .f-head { padding: 18px 22px 14px; }
+  .f-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .id {
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    letter-spacing: .06em; color: var(--slate);
+  }
+  .pill {
+    font-size: 11px; font-weight: 700; letter-spacing: .05em;
+    padding: 3px 9px; border-radius: 2px; white-space: nowrap;
+  }
+  .p-crit { background: var(--crit-bg); color: var(--crit); }
+  .p-high { background: var(--high-bg); color: var(--high); }
+  .p-med  { background: var(--med-bg);  color: var(--med); }
+  .p-low  { background: var(--low-bg);  color: var(--low); }
+  .p-ok   { background: var(--ok-bg);   color: var(--ok); }
+  .p-kind { background: transparent; color: var(--slate); border: 1px solid var(--hair); font-weight: 600; }
+
+  .f-title {
+    font-size: 19px; font-weight: 650; line-height: 1.45; margin: 0;
+    text-wrap: balance; letter-spacing: -.01em;
+  }
+
+  .f-body { padding: 0 22px 20px; }
+  dl { margin: 0; display: grid; gap: 0; }
+  dt {
+    font-size: 11px; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--slate); font-weight: 700; padding-top: 16px;
+    border-top: 1px solid var(--hair-2); margin-bottom: 6px;
+  }
+  dd { margin: 0 0 2px; font-size: 15.5px; color: var(--ink-2); line-height: 1.7; }
+  dd strong { color: var(--ink); font-weight: 650; }
+  dd ol, dd ul { margin: 6px 0 0; padding-right: 20px; }
+  dd li { margin-bottom: 4px; }
+
+  code {
+    font-family: var(--mono); font-size: 13.5px; direction: ltr;
+    display: inline-block; background: var(--low-bg); color: var(--ink);
+    padding: 1px 6px; border-radius: 2px; unicode-bidi: embed;
+  }
+  pre {
+    font-family: var(--mono); font-size: 13px; line-height: 1.65;
+    direction: ltr; text-align: left; background: var(--low-bg);
+    color: var(--ink); border: 1px solid var(--hair);
+    padding: 13px 15px; margin: 8px 0 0; overflow-x: auto;
+    white-space: pre; unicode-bidi: embed;
+  }
+  pre .c { color: var(--slate); }
+  pre .bad { color: var(--crit); font-weight: 700; }
+  pre .good { color: var(--ok); font-weight: 700; }
+
+  .path {
+    font-family: var(--mono); font-size: 13px; direction: ltr;
+    display: inline-block; unicode-bidi: embed; color: var(--navy);
+    font-weight: 600;
+  }
+
+  /* ---------- table ---------- */
+  .scroll { overflow-x: auto; border: 1px solid var(--hair); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+  th {
+    text-align: right; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--slate); font-weight: 700; padding: 12px 16px;
+    border-bottom: 1px solid var(--hair); white-space: nowrap;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--hair-2); color: var(--ink-2); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  td.ok { color: var(--ok); font-weight: 650; }
+  td.no { color: var(--crit); font-weight: 650; }
+
+  /* ---------- callout ---------- */
+  .call {
+    background: var(--panel); border: 1px solid var(--hair);
+    border-right: 4px solid var(--navy); padding: 20px 22px; margin: 26px 0;
+  }
+  .call h3 {
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--slate); margin: 0 0 10px; font-weight: 700;
+  }
+  .call p { margin: 0 0 10px; font-size: 15.5px; color: var(--ink-2); }
+  .call p:last-child { margin-bottom: 0; }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--hair);
+    font-size: 13.5px; color: var(--slate);
+  }
+  a { color: var(--navy); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--med); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">منصّة مرصد — تدقيق التنفيذ مقابل الوثيقة الوظيفية</p>
+  <h1>تقرير التدقيق الفني</h1>
+  <p class="standfirst">
+    نتيجة مقارنة الشيفرة الفعلية بقاعدة البيانات الحيّة، دون افتراض صحّة الوثيقة الوظيفية.
+    كل بند أدناه أُعيد إنتاجه فعلياً على البيئة المنشورة، ومعه خطوات التحقّق والدليل الخام.
+  </p>
+  <div class="meta">
+    <span><b>التاريخ</b> ٢٨ يوليو ٢٠٢٦</span>
+    <span><b>البيئة</b> marsd-peach.vercel.app</span>
+    <span><b>النطاق</b> 178 ملف مصدر · 47 ترحيلاً · 2 نقطة API</span>
+  </div>
+</header>
+
+<div class="tally">
+  <div class="t-crit"><span class="n">2</span><span class="l">حرِج</span></div>
+  <div class="t-high"><span class="n">6</span><span class="l">عالٍ</span></div>
+  <div class="t-med"><span class="n">10</span><span class="l">متوسط</span></div>
+  <div class="t-low"><span class="n">3</span><span class="l">منخفض</span></div>
+  <div class="t-ok"><span class="n">5</span><span class="l">أُصلح — للتحقّق</span></div>
+</div>
+
+<div class="call">
+  <h3>كيف يُقرأ هذا التقرير</h3>
+  <p>
+    كل بند مفتوح يحمل <strong>الأثر</strong> (ماذا يخسر العميل)، و<strong>إعادة الإنتاج</strong> (أمر
+    يُنفَّذ حرفياً)، و<strong>الدليل</strong> (المخرَج الخام كما ظهر)، و<strong>الإصلاح المقترح</strong>.
+    بنود «أُصلح» تحتاج تحقّقاً مستقلاً من QA — لا تُقبل لأنها مكتوبة هنا.
+  </p>
+  <p>
+    الأرقام أعلاه لا تشمل ما لم يُدقَّق بعد. حدود التغطية مذكورة صراحةً في آخر التقرير.
+  </p>
+</div>
+
+<!-- ================= CRITICAL ================= -->
+<section>
+  <h2>حرِج — يوقف الإطلاق</h2>
+  <p class="sec-note">خسارة مالية مباشرة أو اختراق كامل. لا يُطلَق المنتج قبل إغلاقهما.</p>
+
+  <article class="f f-crit">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">C-01</span>
+        <span class="pill p-crit">حرِج</span>
+        <span class="pill p-kind">منطق أعمال · مالي</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title">سكّ نقاط بلا حدّ عبر <span class="path">/api/award-credits</span> — تجاوز كامل لحدود الباقة المدفوعة</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        نقطة النهاية تمنح النقاط بناءً على <code>body.action</code> وحده، <strong>ولا تتحقّق إطلاقاً أن الفعل
+        وقع</strong>. الفهرس الفريد المانع للتكرار يغطّي <code>report_approved</code> فقط:
+        <pre>CREATE UNIQUE INDEX idx_credits_one_award_per_report
+  ON credits_ledger (report_id, reason)
+  WHERE report_id IS NOT NULL
+    AND reason = 'report_approved'</pre>
+        أي أن <code>company_added</code> و<code>company_completed</code> و<code>documents_uploaded</code>
+        <strong>بلا منع تكرار وبلا تحقّق</strong>. والباقة المجانية هي الوحيدة التي
+        <code>give_to_get_enabled = true</code>، ولها <strong>بحث واحد شهرياً</strong> — بينما النقاط
+        تُصرف على <code>search_unlock</code>. النتيجة: حساب مجاني يصل إلى سقف الكسب الشهري في ثوانٍ
+        ويحوّله بحثاً مجانياً، فتسقط قيمة الباقات المدفوعة.
+      </dd>
+
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+        <ol>
+          <li>سجّل الدخول بحساب على الباقة المجانية والتقط توكن Clerk من <code>window.Clerk.session.getToken()</code>.</li>
+          <li>نفّذ الطلب التالي عشر مرات متتالية — بلا إضافة أي شركة:</li>
+        </ol>
+<pre>curl -X POST https://marsd-peach.vercel.app/api/award-credits \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"company_added"}'</pre>
+        <ol start="3">
+          <li>راقب الرصيد في <span class="path">/credits</span> — يرتفع في كل نداء حتى سقف الشهر.</li>
+        </ol>
+      </dd>
+
+      <dt>الدليل</dt>
+      <dd>
+        سجلّ النقاط الحالي يحوي بالفعل <strong>خمسة صفوف <code>company_added</code> بلا
+        <code>report_id</code></strong> — أي بلا أي ارتباط بكيان يُتحقَّق منه:
+<pre>reason         | report_id | n
+---------------+-----------+---
+company_added  | NULL      | 5
+search_unlock  | NULL      | 1</pre>
+      </dd>
+
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        نقل المنح إلى <strong>مُشغِّل في قاعدة البيانات</strong> على الحدث نفسه (إدراج شركة، اعتماد
+        تقرير) بدل نقطة نهاية تُنادى من المتصفح؛ أو — كحدّ أدنى — ربط كل فعل بمعرّف كيان
+        <code>NOT NULL</code> والتحقّق من ملكيته، مع توسيع الفهرس الفريد ليشمل كل أنواع الكسب.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-crit">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">C-02</span>
+        <span class="pill p-crit">حرِج</span>
+        <span class="pill p-kind">أمني · أسرار</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title"><code>CLERK_SECRET_KEY</code> مكشوف في تاريخ git ولم يُدوَّر بعد</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        المفتاح السرّي لـClerk موجود في تاريخ المستودع منذ الالتزام <code>7cad53ac</code>. من يملك
+        نسخة من التاريخ يستطيع <strong>انتحال أي مستخدم، وإصدار دعوات، وقراءة كل حسابات
+        المنصّة</strong> عبر واجهة Clerk الإدارية. حذف الملف لاحقاً لا يزيله من التاريخ.
+        المنصّة ما زالت على <strong>مفاتيح Clerk التجريبية</strong> (<code>pk_test_</code>).
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd><pre>git log -p --all -S "sk_test_" -- .env* | head -40</pre></dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        تدوير المفتاح من لوحة Clerk فوراً، والانتقال إلى مفاتيح الإنتاج، وتحديث متغيّرات البيئة على
+        Vercel. <strong>لا تُنظَّف الأسرار بالتحرير</strong> — التدوير هو الإصلاح الوحيد.
+      </dd>
+    </dl></div>
+  </article>
+</section>
+
+<!-- ================= HIGH ================= -->
+<section>
+  <h2>عالٍ — يُغلق قبل الإطلاق</h2>
+  <p class="sec-note">تسريب بيانات، أو فساد حساب، أو سلوك يفشل صامتاً تحت الحمل.</p>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-01</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">أمني · تسريب</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title">نموذج تقييم الثقة واقتصاد النقاط وإعدادات الفوترة — مقروءة بالكامل بلا تسجيل دخول</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        سياسة <code>system_settings_select_policy</code> شرطها <code>true</code> ودورها
+        <code>public</code>. والمفتاح العام يُشحن داخل حزمة المتصفح، أي أن <strong>أي شخص على
+        الإنترنت</strong> يقرأ:
+        <ul>
+          <li><code>trust_score_rules</code> — الأوزان والعتبات والحدود الدقيقة. الشركة تحسب تماماً
+          كم تقريراً «في الموعد» تحتاج لتبلغ 98. <strong>هذه هي الملكية الفكرية للمنصّة.</strong></li>
+          <li><code>give_to_get_rules</code> — اقتصاد الكسب والإنفاق كاملاً، وهو ما يجعل اكتشاف
+          الثغرة <span class="path">C-01</span> بديهياً.</li>
+          <li><code>billing_settings</code> — الآيبان واسم الحساب البنكي (فارغان اليوم، ويتسرّبان لحظة تعبئتهما).</li>
+        </ul>
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+        بلا تسجيل دخول، بالمفتاح المنشور في الحزمة:
+<pre>curl "$SUPABASE_URL/rest/v1/system_settings?select=key,value" \
+  -H "apikey: $VITE_SUPABASE_ANON_KEY"</pre>
+      </dd>
+      <dt>الدليل</dt>
+      <dd>
+<pre><span class="c">// مخرَج فعلي، مجهول الهوية:</span>
+{"key":"trust_score_rules","value":{
+  "bands":{"low_min":70,"medium_min":40},
+  "clamp":{"floor":5,"ceiling":98},
+  "weights":{"base":50,"default":40,"on_time":45,
+             "delay_penalty_cap":20,"delay_days_per_point":5},
+  "thresholds":{"full_min_reports":5,"preliminary_min_reports":2}}}
+{"key":"billing_settings","value":{"iban":"","bank_name":"",
+  "account_name":"","vat_percent":15, ...}}</pre>
+        <strong>الكتابة مرفوضة</strong> (<code>HTTP 401</code>) — التسريب قراءة فقط.
+      </dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        تضييق سياسة القراءة إلى المفاتيح غير الحسّاسة فقط
+        (<code>feature_catalog</code>، <code>entitlements_enforcement</code>)، ونقل
+        <code>trust_score_rules</code> و<code>give_to_get_rules</code> و<code>billing_settings</code>
+        خلف <code>is_platform_admin()</code>، وقراءتها في التطبيق عبر دالة
+        <code>SECURITY DEFINER</code> تُرجع ما يحتاجه العميل فقط.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-02</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">أمني · تصعيد صلاحيات</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title">ثلاث دوال <code>SECURITY DEFINER</code> بلا <code>search_path</code> مثبّت</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        <code>get_company_report</code> · <code>is_reviewer</code> · <code>handle_new_user</code> تعمل
+        بصلاحية مالكها دون تثبيت مسار البحث، فتُحَلّ أسماء الجداول والدوال داخلها وفق
+        <code>search_path</code> المستدعي. <code>is_reviewer</code> تحديداً <strong>دالة فحص
+        صلاحية</strong> — إن استُبدل ما تعتمد عليه، أصبح الفحص نفسه تحت سيطرة المهاجم.
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+<pre>select p.proname from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prosecdef
+   and not exists (select 1 from unnest(coalesce(p.proconfig,'{}')) x
+                    where x like 'search_path%');</pre>
+      </dd>
+      <dt>الدليل</dt>
+      <dd><pre>get_company_report
+is_reviewer
+handle_new_user</pre></dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd><code>alter function ... set search_path = public, pg_temp;</code> للثلاث، مع فحص دائم يمنع تكرارها.</dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-03</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">تزامن · مالي</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title">إنفاق الرصيد يقرأ ثم يكتب بلا قفل — الإنفاق المتزامن يتجاوز الرصيد</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        <span class="path">api/award-credits.js:108–125</span> يقرأ السجلّ، يجمعه، يقارن، ثم يُدرج —
+        في أربع خطوات منفصلة بلا معاملة ولا قفل. طلبان متزامنان يقرآن الرصيد نفسه ويصرفان معاً،
+        فيصبح <strong>الرصيد سالباً</strong>. السقف الشهري في السطور 141–152 يحمل العيب نفسه.
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+        بحساب رصيده يكفي لعملية واحدة فقط، أطلق طلبَي <code>search_unlock</code> متوازيين:
+<pre>seq 2 | xargs -P2 -I{} curl -s -X POST \
+  https://marsd-peach.vercel.app/api/award-credits \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"search_unlock"}'</pre>
+        النتيجة المتوقّعة: نجاح واحد وواحد <code>insufficient</code>. النتيجة الفعلية المرجَّحة: نجاحان.
+      </dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        نقل الإنفاق إلى دالة <code>SECURITY DEFINER</code> واحدة تأخذ
+        <code>pg_advisory_xact_lock(tenant_id)</code> ثم تقرأ وتُدرج داخل معاملة واحدة.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-04</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">صحّة بيانات · كامن</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title">الرصيد يُحسب من استعلام مسقوف — يصبح خاطئاً بعد ١٠٠٠ حركة</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        <code>from('credits_ledger').select('amount').eq('tenant_id', …)</code> بلا
+        <code>limit</code> ولا <code>range</code>. PostgREST يقتطع عند سقفه الافتراضي
+        (<strong>١٠٠٠ صف</strong>) <strong>ويعيد 200 بلا تحذير</strong>. بعد ألف حركة يُحسب الرصيد من
+        جزء من السجلّ فقط. والأخطر: استعلام السقف الشهري يعاني الأمر ذاته، فيقرأ كسباً أقلّ من
+        الحقيقي و<strong>يفتح باب الكسب من جديد</strong>.
+      </dd>
+      <dt>الحالة اليوم</dt>
+      <dd>
+        <code>credits_ledger</code> يحوي <strong>٧ صفوف</strong> — العيب <strong>غير مفعَّل بعد</strong>،
+        ويتفعّل صامتاً عند النمو. مُدرَج هنا لأنه لن يظهر في أي اختبار على بيانات صغيرة.
+      </dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        استبدال الجمع في JavaScript بتجميع في قاعدة البيانات
+        (<code>sum(amount)</code> عبر RPC)، فيُحسب الرصيد حيث تعيش البيانات ولا يخضع لسقف صفحات.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-05</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">ترتيب عمليات</span>
+        <span class="pill p-kind">مفتوح</span>
+      </div>
+      <p class="f-title"><span class="path">/api/invite-user</span> يرسل بريد الدعوة قبل تسجيل الصف — دعوة لا يمكن الوفاء بها</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        الترتيب في <span class="path">api/invite-user.js:199–241</span>: إنشاء دعوة Clerk (فيصل البريد)
+        <em>ثم</em> كتابة <code>pending_invites</code>. ومُشغّل حدّ المقاعد (ترحيل 029) يرفض الصف عند
+        بلوغ الحدّ — فتردّ الدالة <strong><code>HTTP 200</code> مع
+        <code>recorded: false</code></strong>. المدعوّ يستلم بريداً حقيقياً، ويسجّل، ولا مقعد له.
+        الباقة المجانية مقعدان فقط، فالحالة واردة في أول أسبوع.
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+        <ol>
+          <li>حساب على الباقة المجانية (<code>users = 2</code>) بمقعدين مشغولين.</li>
+          <li>ادعُ عنواناً ثالثاً من <span class="path">/company-users</span>.</li>
+          <li>راقب الردّ: <code>200</code> مع <code>warning</code> — والبريد وصل فعلاً.</li>
+        </ol>
+      </dd>
+      <dt>الإصلاح المقترح</dt>
+      <dd>
+        عكس الترتيب: كتابة <code>pending_invites</code> أولاً، وإرسال دعوة Clerk بعد نجاحها، مع
+        التراجع عن الصف إن فشل الإرسال. الفحص المسبق للمقاعد لا يكفي وحده — سباق التزامن يعيد المشكلة.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-high">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">H-06</span>
+        <span class="pill p-high">عالٍ</span>
+        <span class="pill p-kind">أمني · كشف بيانات</span>
+        <span class="pill p-kind">مفتوح · للقرار</span>
+      </div>
+      <p class="f-title">سجلّ الشركات كاملاً — بأرقام السجل التجاري — قابل للسحب بلا تسجيل دخول</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>الأثر</dt>
+      <dd>
+        <code>companies_select_all</code> شرطها <code>true</code> ودورها <code>public</code>. أي جهة
+        تسحب قاعدة الشركات كاملة عبر PostgREST بالمفتاح المنشور — وهي القاعدة التي بُنيت المنصّة
+        عليها. حالياً ٢٦ شركة؛ القيمة تنمو مع كل تسجيل.
+      </dd>
+      <dt>إعادة الإنتاج</dt>
+      <dd>
+<pre>curl "$SUPABASE_URL/rest/v1/companies?select=*" \
+  -H "apikey: $VITE_SUPABASE_ANON_KEY"
+
+<span class="c">Content-Range: 0-25/26</span></pre>
+      </dd>
+      <dt>ملاحظة</dt>
+      <dd>
+        قد يكون هذا <strong>قراراً مقصوداً</strong> إن كان البحث متاحاً للزوّار. لكن الوثيقة الوظيفية
+        تصف البحث كميزة مرتبطة بالباقة وبسقف شهري — <strong>والسقف بلا معنى إن كانت البيانات
+        متاحة مباشرةً بلا حساب</strong>. يحتاج قراراً صريحاً من مالك المنتج، لا افتراضاً.
+      </dd>
+    </dl></div>
+  </article>
+</section>
+
+<!-- ================= MEDIUM ================= -->
+<section>
+  <h2>متوسط</h2>
+  <p class="sec-note">لا يمنع الإطلاق، لكنه يظهر للعميل أو يتفاقم مع النمو.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>#</th><th>البند</th><th>الموضع</th><th>الأثر</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">M-01</td>
+          <td>مطابقة البريد بـ<code>ilike</code> تعامل <code>%</code> و<code>_</code> كمحارف بدل، و<code>EMAIL_RE</code> يسمح بهما</td>
+          <td class="num">invite-user.js:188,191</td>
+          <td>رفض <code>409</code> كاذب: «البريد مسجّل» لعنوان غير مسجّل</td>
+        </tr>
+        <tr>
+          <td class="num">M-02</td>
+          <td>الباقة المجانية <code>searches_per_month = 1</code> بينما المتفق عليه ١٠</td>
+          <td class="num">plans.limits</td>
+          <td>تجربة أول استخدام تنتهي بعد بحث واحد — يحتاج قرار المالك</td>
+        </tr>
+        <tr>
+          <td class="num">M-03</td>
+          <td><code>last_login_at</code> لم يُكتب لأي حساب منذ الإطلاق</td>
+          <td class="num">users — 0 من 6</td>
+          <td>«آخر دخول» في لوحة الإدارة فارغ دائماً؛ لا رصد لحساب مهجور</td>
+        </tr>
+        <tr>
+          <td class="num">M-04</td>
+          <td>١٥ شاشة تقرأ بلا <code>limit</code> ولا ترقيم صفحات</td>
+          <td class="num">AdminReports · AdminClaimRequests · MyCompanies …</td>
+          <td>اقتطاع صامت عند ١٠٠٠ صف؛ الشاشة تبدو مكتملة وهي ناقصة</td>
+        </tr>
+        <tr>
+          <td class="num">M-05</td>
+          <td>١٠ مفاتيح أجنبية بلا فهرس</td>
+          <td class="num">disputes.company_id · plan_change_requests …</td>
+          <td>مسح تسلسلي عند كل ربط؛ يتدهور طردياً مع الحجم</td>
+        </tr>
+        <tr>
+          <td class="num">M-06</td>
+          <td>سياسات RLS مكرّرة بالمعنى نفسه</td>
+          <td class="num">companies ×2 · plans ×2 · trust_scores ×2</td>
+          <td>ترحيلات أضافت دون حذف؛ تضييق سياسة واحدة لاحقاً لن يُغيّر شيئاً — والسبب غير ظاهر</td>
+        </tr>
+        <tr>
+          <td class="num">M-07</td>
+          <td>مخطّط النمو في لوحة الإدارة ثابت في الشيفرة (يناير–يونيو)</td>
+          <td class="num">AdminDashboard.jsx</td>
+          <td>رقم معروض لمالك المنصّة لا يعبّر عن بياناته إطلاقاً</td>
+        </tr>
+        <tr>
+          <td class="num">M-08</td>
+          <td>حساب يتيم <code>company@marsad.sa</code> بمعرّف UUID لا معرّف Clerk</td>
+          <td class="num">users</td>
+          <td>لا يمكن الدخول به أبداً؛ يشغل مقعداً ويشوّش الإحصاءات</td>
+        </tr>
+        <tr>
+          <td class="num">M-09</td>
+          <td>لا تحديد معدّل على أي من نقطتَي الـAPI</td>
+          <td class="num">award-credits · invite-user</td>
+          <td>حلقة <code>resend</code> تُطلق بريداً غير محدود عبر Clerk</td>
+        </tr>
+        <tr>
+          <td class="num">M-10</td>
+          <td>ردّ <code>401</code> يُفصح عن مُصدِر Clerk وزمن الانتهاء وانحراف الساعة</td>
+          <td class="num">invite-user.js:162–165</td>
+          <td>كشف بنية تحتية للمهاجم — نافع للتشخيص، مفرط للإنتاج</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= LOW ================= -->
+<section>
+  <h2>منخفض</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>#</th><th>البند</th><th>الأثر</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="num">L-01</td>
+          <td>١٦ استدعاء <code>select('*')</code> يجلب كل الأعمدة</td>
+          <td>نقل بيانات زائد، وكشف أعمدة داخلية للمتصفح دون حاجة</td>
+        </tr>
+        <tr>
+          <td class="num">L-02</td>
+          <td><code>schema_migrations</code> عليه RLS بلا أي سياسة</td>
+          <td>يمنع الكل — سليم عملياً، لكنه يفشل بصمت إن قُرئ يوماً بمفتاح غير الخدمة</td>
+        </tr>
+        <tr>
+          <td class="num">L-03</td>
+          <td><code>reports.dealt_at</code> إلزامي بلا قيمة افتراضية</td>
+          <td>يعتمد كلياً على تحقّق الواجهة؛ أي مسار كتابة آخر يفشل بـ<code>23502</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= FIXED ================= -->
+<section>
+  <h2>أُصلح في هذه الجولة — يحتاج تحقّق QA مستقلاً</h2>
+  <p class="sec-note">
+    منشور على الإنتاج. لا تُقبل هذه البنود لأنها مكتوبة هنا — أعد إنتاج كل واحدة قبل إغلاقها.
+  </p>
+
+  <article class="f f-ok">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">F-01</span><span class="pill p-ok">أُصلح</span>
+        <span class="pill p-kind">ترحيل 046</span>
+      </div>
+      <p class="f-title">قناة الإشعارات كانت ترفض ١١ نوعاً من ١٢ — بصمت</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>ما كان</dt>
+      <dd>
+        <code>notifications_type_check</code> يسمح بأربع قيم، والشيفرة ترسل اثنتي عشرة. النوع الوحيد
+        الذي مرّ هو <code>report_approved</code> — ولهذا كان الجدول يحوي أربعة صفوف فقط، جميعها منه.
+        رفض التقرير، وطلب التوضيح، وقبول الشركة، ورفضها، وقبول المطالبة، ورفضها، وتغيّر الاشتراك،
+        وتغيّر حالة الحساب، وتحديث البيانات، ومنح النقاط، والترحيب — <strong>لم يصل أيٌّ منها قط</strong>.
+      </dd>
+      <dt>تحقّق QA</dt>
+      <dd>
+        نفّذ العمليات الاثنتي عشرة من لوحة الإدارة وتأكّد من ظهور إشعار مقابل لكل واحدة في
+        <span class="path">/notifications</span> لدى الشركة المعنيّة — لا بغياب رسالة خطأ.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-ok">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">F-02</span><span class="pill p-ok">أُصلح</span>
+        <span class="pill p-kind">ترحيل 047 · notifyAdmins</span>
+      </div>
+      <p class="f-title">إدارة مرصد لم تُبلَّغ قط بتسجيل شركة أو مطالبة ملكية</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>ما كان</dt>
+      <dd>
+        الإدراجان في <span class="path">CompanyOnboarding.jsx</span> يفشلان بثلاث طرق معاً: نوع يرفضه
+        القيد، و<code>user_id</code> و<code>tenant_id</code> غائبان وكلاهما <code>NOT NULL</code>،
+        وحمولة مُسلسَلة نصّياً في عمود <code>jsonb</code>. الطوابير كانت تُكتشف بفتح الشاشة والنظر.
+      </dd>
+      <dt>ما تغيّر</dt>
+      <dd>
+        <code>notifications.tenant_id</code> صار اختيارياً — إشعار عن مطالبة على شركة لا يملكها أحد
+        لا كيان له يُسمّى. و<code>user_id</code> بقي إلزامياً — إشعار لا يستقبله أحد ليس إشعاراً.
+        وسياسة إدراج ضيّقة تسمح لمستخدم مسجَّل بالكتابة إلى صندوق الإدارة لأربعة أنواع «وصل شيء
+        للمراجعة» فقط، ولا تسمح بإرسال أي شيء إلى شركة.
+      </dd>
+      <dt>تحقّق QA</dt>
+      <dd>سجّل شركة جديدة بحساب منفصل، ثم افحص إشعارات حساب الإدارة قبل فتح شاشة الطلبات.</dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-ok">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">F-03</span><span class="pill p-ok">أُصلح</span>
+        <span class="pill p-kind">مسار التسجيل الحيّ</span>
+      </div>
+      <p class="f-title">ثلاث كتابات مكسورة داخل <code>createTenantAndUser</code></p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>ما كان</dt>
+      <dd>
+        صفّ رصيد بسبب يرفضه القيد على جدول لا يقبل إلا دور الخدمة — لرصيد افتتاحي بلا معنى أصلاً،
+        لأن الرصيد هو مجموع السجلّ. وإشعار ترحيب بأعمدة <code>title</code> و<code>message</code>
+        و<code>is_read</code> غير موجودة. وصفّ تدقيق بأعمدة <code>resource_type</code>
+        و<code>resource_id</code> و<code>details</code> غير موجودة كذلك.
+      </dd>
+      <dt>تحقّق QA</dt>
+      <dd>سجّل شركة جديدة، ثم تأكّد من وجود صفّ في <code>audit_logs</code> وإشعار ترحيب لدى الحساب.</dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-ok">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">F-04</span><span class="pill p-ok">أُصلح</span>
+        <span class="pill p-kind">شيفرة ميتة</span>
+      </div>
+      <p class="f-title">حذف <code>submitReport</code> · <code>approveReport</code> · <code>rejectReport</code></p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>السبب</dt>
+      <dd>
+        بلا مستدعين، والشاشات تؤدي العمل مباشرة، ونسخها انحرفت إلى قيم ترفضها القيود. الشيفرة
+        الميتة غير ضارّة حتى يُحييها أحد ظنّاً أنها عملت يوماً — وبقاؤها كان يُبقي فحص
+        <code>verify-literals</code> أحمر دائماً، <strong>والفحص الأحمر دائماً يتعلّم الناس تخطّيه</strong>.
+      </dd>
+    </dl></div>
+  </article>
+
+  <article class="f f-ok">
+    <div class="f-head">
+      <div class="f-tags">
+        <span class="id">F-05</span><span class="pill p-ok">أُصلح</span>
+        <span class="pill p-kind">أداة الفحص نفسها</span>
+      </div>
+      <p class="f-title">الفاحص كان مصاباً بالعيب الذي وُجد ليكشفه</p>
+    </div>
+    <div class="f-body"><dl>
+      <dt>ما حدث</dt>
+      <dd>
+        أول نسخة عاملة من <span class="path">verify-literals.mjs</span> حملت <strong>بايت
+        backspace ضالّاً</strong> مكان حدّ الكلمة، فصار التعبير النمطي يطلب حرف تحكّم قبل كل اسم
+        عمود، <strong>لم يطابق شيئاً في ١٧٨ ملفاً، وطبع نجاحاً نظيفاً</strong>.
+      </dd>
+      <dt>الدرس التشغيلي لفريق QA</dt>
+      <dd>
+        <code>probe-notifications</code> كُتب خصّيصاً لالتقاط <span class="path">F-01</span> ونجح
+        طوال الوقت — لأنه كان يكتب النوع الوحيد المسموح. و<code>check-enum-drift</code> قال «لا
+        انحراف» لأنه يقارن قائمتين يدويتين لا تكتب الشيفرة أياً منهما.
+        <strong>الفحص الذي لا يستطيع أن يفشل ليس فحصاً.</strong> كل فاحص جديد يجب أن يُثبت أنه
+        يرى نمطه الخاص قبل أن يُبلّغ نتيجة.
+      </dd>
+    </dl></div>
+  </article>
+</section>
+
+<!-- ================= VERIFIED OK ================= -->
+<section>
+  <h2>ما تحقّقتُ منه ووجدته سليماً</h2>
+  <p class="sec-note">مذكور صراحةً حتى لا يُعاد فحصه، وحتى يُعرف ما شملته هذه الجولة فعلاً.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>المجال</th><th>النتيجة</th><th>كيف تُحقَّق</th></tr></thead>
+      <tbody>
+        <tr><td>تفعيل RLS</td><td class="ok">سليم</td><td>لا جدول واحد في <code>public</code> بلا RLS</td></tr>
+        <tr><td>القيم مقابل القيود</td><td class="ok">سليم</td><td><code>verify-literals</code> — كل قيمة يكتبها الكود مقبولة</td></tr>
+        <tr><td>الكتابة في الإعدادات من مجهول</td><td class="ok">مرفوضة</td><td><code>POST</code> بمفتاح المتصفح ⇦ <code>401</code></td>
+        </tr>
+        <tr><td>نَسَب التقارير</td><td class="ok">سليم</td><td>صفر تقرير بلا <code>reporter_tenant_id</code> من ٥١</td></tr>
+        <tr><td>نَسَب الشركات ومستودع المعرفة</td><td class="ok">يعمل</td><td><code>kb_companies()</code> و<code>kb_reports()</code> و<code>contributors_overview()</code> تُرجع المُسجِّل والمُبلِّغ</td></tr>
+        <tr><td>تفويض <span class="path">/api/invite-user</span></td><td class="ok">سليم</td><td>الدور يُقرأ من القاعدة لا من الطلب؛ الدعوة داخل كيان المستدعي حصراً</td></tr>
+        <tr><td>قيمة النقاط في <span class="path">/api/award-credits</span></td><td class="ok">سليم</td><td>تُقرأ من الإعدادات لا من الطلب — <code>body.points</code> غير مقروء</td></tr>
+        <tr><td>منح النقاط لكيان آخر</td><td class="ok">محمي</td><td>مقصور على <code>platform_admin</code> بفحص من القاعدة</td></tr>
+        <tr><td>أعمدة <code>jsonb</code> الإلزامية</td><td class="ok">سليم</td><td>لا عمود إلزامي بلا قيمة افتراضية</td></tr>
+        <tr><td>الاستيرادات والأيقونات</td><td class="ok">سليم</td><td><code>verify-imports</code> · <code>verify-icons</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= SCOPE ================= -->
+<section>
+  <h2>حدود هذه الجولة — ما لم يُدقَّق بعد</h2>
+  <div class="call">
+    <h3>لم يُغطَّ</h3>
+    <p>
+      <strong>تحقّق الاستمارات صفحةً صفحة.</strong> لم أفحص كل حقل إدخال في كل شاشة مقابل قيود
+      عموده — الأرقام السالبة، والتواريخ المستقبلية، والنصوص الطويلة، والحقول المطلوبة.
+    </p>
+    <p>
+      <strong>مسارات Clerk الكاملة.</strong> قبول الدعوة، وانتهاء صلاحيتها، والتسجيل ببريد مدعوّ
+      مسبقاً، وحالة المستخدم الموجود في Clerk وغير الموجود في Supabase — كلها لم تُختبر طرفاً لطرف.
+    </p>
+    <p>
+      <strong>الأداء تحت حمل حقيقي.</strong> كل الأرقام أعلاه من قاعدة تحوي ٢٦ شركة و٥١ تقريراً.
+      <span class="path">H-04</span> و<span class="path">M-04</span> و<span class="path">M-05</span>
+      كامنة تحديداً لأن البيانات صغيرة جداً لإظهارها.
+    </p>
+    <p>
+      <strong>مصفوفة الصلاحيات الكاملة</strong> (٣٣ صفاً × ٥ أدوار) اختُبرت جزئياً عبر
+      <code>verify-rls</code> و<code>verify-roles</code>، لا صفاً صفاً بحسابات حقيقية لكل دور.
+    </p>
+  </div>
+
+  <div class="call">
+    <h3>الترتيب المقترح للتنفيذ</h3>
+    <p>
+      <strong>١.</strong> تدوير مفتاح Clerk (<span class="path">C-02</span>) — الأسرع، ويحمي كل شيء آخر.<br>
+      <strong>٢.</strong> إغلاق سكّ النقاط (<span class="path">C-01</span>) — خسارة مالية مباشرة ومستمرة.<br>
+      <strong>٣.</strong> تضييق <code>system_settings</code> (<span class="path">H-01</span>) — سطر واحد في ترحيل، ويوقف تسريب نموذج التقييم.<br>
+      <strong>٤.</strong> <code>search_path</code> للدوال الثلاث (<span class="path">H-02</span>) — أمر واحد لكل دالة.<br>
+      <strong>٥.</strong> قفل الإنفاق وتجميع الرصيد في القاعدة (<span class="path">H-03</span> + <span class="path">H-04</span>) — يُعالجان معاً في دالة واحدة.<br>
+      <strong>٦.</strong> عكس ترتيب الدعوة (<span class="path">H-05</span>).<br>
+      <strong>٧.</strong> قرار مالك المنتج على <span class="path">H-06</span> و<span class="path">M-02</span> قبل البرمجة.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    كل بند في هذا التقرير أُعيد إنتاجه على البيئة المنشورة قبل كتابته. البنود التي لم أتمكّن من
+    تأكيدها بالتنفيذ الفعلي مُعلَّمة صراحةً بـ«كامن» أو «المرجَّح»، ولم أُدرج أي نتيجة استنتجتها من
+    قراءة الشيفرة وحدها.
+  </p>
+</footer>
+
+</div>

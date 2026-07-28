@@ -3,7 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
-import { awardCreditsToTenant } from '../lib/entitlements'
+import { creditsGrantedFor } from '../lib/entitlements'
 import { notifyTenant } from '../lib/notify'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
@@ -95,15 +95,13 @@ export default function AdminReports() {
       // by RLS raises nothing, so without the row count the platform would pay
       // for an approval that never happened.
       if (!approved?.length) throw new Error('لم يُحفظ الاعتماد — تحقّق من صلاحيتك')
-      // Award the reporting company, at the rate settings hold and only if
-      // their plan earns that way. The amount used to be the literal 10 written
-      // here, so the figure shown on /subscription — read from
-      // give_to_get_rules — described something the code did not do, and paid
-      // plans that grant their entitlements outright accrued points anyway.
-      const awarded = await awardCreditsToTenant(current.reporter_tenant_id, 'report_approved', {
-        reportId: current.id,
-        userId: user?.id || null,
-      })
+      // The reporting company has already been credited: a trigger on
+      // reports.status grants the points in the same transaction as the UPDATE
+      // above, at the rate give_to_get_rules holds and only if their plan earns
+      // that way. This screen used to ask an endpoint to grant them, and that
+      // endpoint granted from the action name alone without checking anything
+      // had happened — so the request was the event. Now the transition is.
+      const awarded = await creditsGrantedFor('reports', current.id, 'report_approved')
       // Recompute trust score (best effort)
       await supabase.rpc('compute_trust_score', { p_company_id: current.target_company_id })
       // Audit + notify

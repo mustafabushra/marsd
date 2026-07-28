@@ -85,16 +85,30 @@ check('بلا جلسة: لا تُسرّب حدوداً',
   !anonEnt.data?.limits && !anonEnt.data?.features,
   anonEnt.data?.limits ? 'سرّبت حدوداً!' : 'لا شيء')
 
-// 3) Settings the resolver reads.
+// 3) Settings, from the outside.
+//
+// This block used to assert that all three keys came back to this client — and
+// it passed, because system_settings was readable by anyone holding the anon key
+// that ships inside the browser bundle. It was checking that a leak was intact.
+//
+// The keys are not equal. billing_settings, feature_catalog and
+// entitlements_enforcement are things a signed-in customer needs. trust_score_rules
+// and give_to_get_rules are the scoring model and the credit economy: publishing
+// them tells a company exactly how to move its own score. So the assertion is
+// inverted — an unauthenticated read must come back empty.
 const settings = await supabase
   .from('system_settings')
   .select('key, value')
-  .in('key', ['give_to_get_rules', 'entitlements_enforcement', 'feature_catalog'])
-check('قراءة system_settings', !settings.error, settings.error?.message || `${settings.data?.length}/3 مفاتيح`)
-check('المفاتيح الثلاثة كاملة', (settings.data || []).length === 3)
+  .in('key', ['give_to_get_rules', 'trust_score_rules', 'feature_catalog', 'billing_settings'])
 
-const rules = (settings.data || []).find((s) => s.key === 'give_to_get_rules')?.value
-check('قواعد الكسب موجودة', Number(rules?.earn?.report_approved?.points) > 0, `report_approved=${rules?.earn?.report_approved?.points}`)
+check('قراءة الإعدادات بلا جلسة لا تُخطئ', !settings.error, settings.error?.message || 'لا خطأ')
+check('بلا جلسة: لا يُقرأ أي إعداد',
+  (settings.data || []).length === 0,
+  (settings.data || []).length ? `سرّبت: ${settings.data.map((s) => s.key).join(' · ')}` : 'صفر مفتاح')
+
+const leaked = (settings.data || []).map((s) => s.key)
+check('نموذج التقييم غير مكشوف', !leaked.includes('trust_score_rules'))
+check('اقتصاد النقاط غير مكشوف', !leaked.includes('give_to_get_rules'))
 
 // 4) Ledger and quota, read the way the resolver reads them.
 const credits = await supabase.from('credits_ledger').select('amount').limit(5)

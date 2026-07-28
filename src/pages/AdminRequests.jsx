@@ -3,7 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
-import { awardCreditsToTenant } from '../lib/entitlements'
+import { creditsGrantedFor } from '../lib/entitlements'
 import { notifyTenant } from '../lib/notify'
 
 const FIELD_LABELS = {
@@ -123,23 +123,15 @@ export default function AdminRequests() {
   const audit = async (supabase, action, entityId, meta) => {
     await supabase.from('audit_logs').insert([{ actor_id: user?.id || null, action, entity: 'company', entity_id: entityId, meta: meta ? JSON.stringify(meta) : null, created_at: new Date().toISOString() }])  }
 
-  // Completing a company's data is a contribution and earns on approval, like
-  // adding one. The contributing tenant is recorded on the request itself.
-  const awardForDataRequest = async (supabase, requestId) => {
-    if (!requestId) return 0
-    const { data: req } = await supabase
-      .from('company_data_requests')
-      .select('requested_by_tenant_id')
-      .eq('id', requestId)
-      .maybeSingle()
-    return req?.requested_by_tenant_id
-      ? awardCreditsToTenant(req.requested_by_tenant_id, 'company_completed')
-      : 0
-  }
-
   // Who filed this, so the decision can be told to them. companies carries no
   // submitter, so for an added company the contributor is read from the audit
   // entry written when it was filed; a data request names its own tenant.
+  //
+  // The data-request branch used to select `tenant_id`, which is not a column on
+  // company_data_requests — the request errored, the contributor resolved to
+  // null, and the "your contribution was accepted" notification was never sent
+  // for a data request. The column holding that value is requested_by_tenant_id,
+  // which the award path beside this one was already reading correctly.
   const contributorOf = async (supabase, item) => {
     if (item.kind === 'add_company') {
       const { data } = await supabase
@@ -154,10 +146,10 @@ export default function AdminRequests() {
     }
     const { data } = await supabase
       .from('company_data_requests')
-      .select('tenant_id')
+      .select('requested_by_tenant_id')
       .eq('id', item.requestId)
       .maybeSingle()
-    return data?.tenant_id || null
+    return data?.requested_by_tenant_id || null
   }
 
   // Every write here is read back. A row RLS filters out of an UPDATE matches
@@ -184,7 +176,11 @@ export default function AdminRequests() {
           'لم تُحفظ الموافقة على الشركة — تحقّق من صلاحيتك')
         await audit(supabase, 'company_approved', current.companyId)
 
-        if (contributor) awarded = await awardCreditsToTenant(contributor, 'company_added')
+        // A trigger on companies.approved granted the points inside the UPDATE
+        // above. This reads the result rather than asking for it: the endpoint
+        // it replaced granted from the action name alone, so anyone could claim
+        // a contribution they had not made.
+        awarded = await creditsGrantedFor('companies', current.companyId, 'company_added')
       } else if (current.kind === 'add_data') {
         const p = current.payload || {}
         const update = {}
@@ -198,7 +194,7 @@ export default function AdminRequests() {
           supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId),
           'لم تُحفظ حالة الطلب')
         await audit(supabase, 'company_data_added', current.companyId, update)
-        awarded = await awardForDataRequest(supabase, current.requestId)
+        awarded = await creditsGrantedFor('company_data_requests', current.requestId, 'company_completed')
       } else if (current.kind === 'edit_data') {
         const p = current.payload || {}
         if (p.field && p.correct_value != null) {
@@ -210,7 +206,7 @@ export default function AdminRequests() {
           supabase.from('company_data_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', current.requestId),
           'لم تُحفظ حالة الطلب')
         await audit(supabase, 'company_data_edited', current.companyId, p)
-        awarded = await awardForDataRequest(supabase, current.requestId)
+        awarded = await creditsGrantedFor('company_data_requests', current.requestId, 'company_completed')
       }
 
       if (contributor) {

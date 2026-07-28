@@ -116,6 +116,16 @@ async function revokePendingClerkInvitations(email) {
   }
 }
 
+// The seat-limit trigger raises a plain exception, which reaches here as a
+// message a company admin cannot act on. Name the actual constraint.
+function seatMessage(err) {
+  const raw = String(err?.message || '')
+  if (/seat|مقعد|user limit|حدّ المستخدمين/i.test(raw)) {
+    return 'بلغت شركتك حدّ المستخدمين في باقتها — رقّ الباقة أو أزل مستخدماً قبل الدعوة'
+  }
+  return raw || 'تعذّر تسجيل الدعوة'
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -159,10 +169,14 @@ export default async function handler(req, res) {
       if (typeof t.expiredSecondsAgo === 'number' && t.expiredSecondsAgo > 0) {
         parts.push(`منتهٍ منذ ${t.expiredSecondsAgo} ثانية`)
       }
-      return res.status(401).json({
-        error: `جلسة غير صالحة — ${parts.join(' · ')}`,
-        detail: { reason: err?.reason || null, message: err?.message || null, token: t, expectedIssuer: expected },
+      // The diagnostic goes to the server log, not the response. It named the
+      // Clerk instance host, the token's issuer and the server's clock skew —
+      // useful while wiring this up, and infrastructure detail handed to anyone
+      // who sends a bad token once it is live.
+      console.error('Invite rejected — token verification failed:', {
+        reason: err?.reason || null, message: err?.message || null, token: t, expectedIssuer: expected,
       })
+      return res.status(401).json({ error: `جلسة غير صالحة — ${parts.join(' · ')}` })
     }
 
     // 2) Validate input.
@@ -184,11 +198,23 @@ export default async function handler(req, res) {
 
     // 4) An address that already belongs to a member is always a conflict. An
     //    outstanding invite is a conflict only when this is not a resend.
-    const { data: existingUser } = await supabase
-      .from('users').select('id').eq('tenant_id', tenantId).ilike('email', email).maybeSingle()
-    if (existingUser) return res.status(409).json({ error: 'هذا البريد مسجّل بالفعل ضمن مستخدمي الشركة' })
-    const { data: existingInvite } = await supabase
-      .from('pending_invites').select('id').eq('tenant_id', tenantId).ilike('email', email).eq('status', 'pending').maybeSingle()
+    //
+    //    Matched in JavaScript rather than with .ilike(). PostgREST passes the
+    //    pattern to SQL ILIKE, where % and _ are wildcards — and EMAIL_RE admits
+    //    both, since [^\s@]+ does. An address of "%@example.com" matched every
+    //    member at that domain and came back as "this email is already
+    //    registered" for one that was not. A seat list is at most a plan's user
+    //    limit, so comparing exactly costs nothing.
+    const [{ data: members }, { data: invites }] = await Promise.all([
+      supabase.from('users').select('id, email').eq('tenant_id', tenantId),
+      supabase.from('pending_invites').select('id, email').eq('tenant_id', tenantId).eq('status', 'pending'),
+    ])
+    const sameAddress = (row) => String(row?.email || '').trim().toLowerCase() === email
+
+    if ((members || []).some(sameAddress)) {
+      return res.status(409).json({ error: 'هذا البريد مسجّل بالفعل ضمن مستخدمي الشركة' })
+    }
+    const existingInvite = (invites || []).find(sameAddress) || null
     if (existingInvite && !resend) {
       return res.status(409).json({ error: 'توجد دعوة معلّقة لهذا البريد بالفعل' })
     }
@@ -196,7 +222,49 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'لا توجد دعوة معلّقة لإعادة إرسالها' })
     }
 
-    // 5) Create the Clerk invitation — Clerk sends the email.
+    // 5) Record the invite BEFORE Clerk sends anything.
+    //
+    //    The order used to be the other way round, and the seat-limit trigger
+    //    added in 029 refuses this row once a plan's user limit is reached. So a
+    //    company on the free plan — two seats — inviting a third person got the
+    //    Clerk email sent, the row refused, and HTTP 200 with recorded:false.
+    //    Someone received a real invitation to a company that had no room for
+    //    them, and found out at sign-up.
+    //
+    //    Writing first means the trigger decides before anyone is told. The row
+    //    is the reservation; the email is the notification of one that exists.
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString()
+    let inviteId = existingInvite?.id || null
+
+    if (existingInvite) {
+      const { error: updErr } = await supabase
+        .from('pending_invites')
+        .update({ role, invited_by: callerId, expires_at: expiresAt })
+        .eq('id', existingInvite.id)
+      if (updErr) return res.status(409).json({ error: seatMessage(updErr) })
+    } else {
+      const { data: created, error: insErr } = await supabase
+        .from('pending_invites')
+        .insert([{
+          tenant_id: tenantId,
+          email,
+          role,
+          invited_by: callerId,
+          status: 'pending',
+          expires_at: expiresAt,
+        }])
+        .select('id')
+      if (insErr) return res.status(409).json({ error: seatMessage(insErr) })
+      // A row filtered out by RLS raises nothing and returns nothing. Without
+      // this the email would go out for an invitation that was never recorded —
+      // the same failure the reordering exists to prevent.
+      if (!created?.length) {
+        return res.status(403).json({ error: 'لم تُسجَّل الدعوة — تحقّق من صلاحيتك' })
+      }
+      inviteId = created[0].id
+    }
+
+    // 6) Now Clerk sends the email.
     if (resend) await revokePendingClerkInvitations(email)
     const origin = process.env.APP_URL || `https://${req.headers.host}`
     const clerkResp = await clerkApi('/invitations', {
@@ -215,29 +283,14 @@ export default async function handler(req, res) {
     })
     const clerkData = await clerkResp.json().catch(() => ({}))
     if (!clerkResp.ok) {
+      // Release the seat this reserved. A first-time invite that never reached
+      // anyone must not sit in the list holding a place; a resend keeps its row,
+      // because that invitation is still outstanding from the earlier send.
+      if (!existingInvite && inviteId) {
+        await supabase.from('pending_invites').delete().eq('id', inviteId)
+      }
       const msg = clerkData?.errors?.[0]?.long_message || clerkData?.errors?.[0]?.message || 'تعذّر إرسال دعوة Clerk'
       return res.status(502).json({ error: msg })
-    }
-
-    // 6) Record the invite (source of truth for the UI list). A resend refreshes
-    //    the existing row — role and expiry — instead of adding a second one.
-    const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString()
-    const { error: writeErr } = existingInvite
-      ? await supabase
-          .from('pending_invites')
-          .update({ role, invited_by: callerId, expires_at: expiresAt })
-          .eq('id', existingInvite.id)
-      : await supabase.from('pending_invites').insert([{
-          tenant_id: tenantId,
-          email,
-          role,
-          invited_by: callerId,
-          status: 'pending',
-          expires_at: expiresAt,
-        }])
-    if (writeErr) {
-      // Email already went out; surface a soft warning rather than a hard fail.
-      return res.status(200).json({ emailSent: true, recorded: false, resent: resend, warning: writeErr.message })
     }
 
     return res.status(200).json({ emailSent: true, recorded: true, resent: resend, clerkInvitationId: clerkData.id })

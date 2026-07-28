@@ -166,38 +166,36 @@ export async function loadEntitlements(tenantId) {
  * the contribution: the work the member did is what matters, and the ledger can
  * be reconciled.
  */
-async function callAwardEndpoint(payload) {
+/**
+ * How many points an approval granted — read back, never requested.
+ *
+ * Nothing here asks for credits. POST /api/award-credits used to grant them
+ * from `body.action` alone, without ever checking that the action happened, so
+ * a signed-in user could loop it and mint the monthly cap having done nothing.
+ * Granting now lives in database triggers on the three transitions that are the
+ * events — a report approved, a registration approved, a data request approved
+ * — and they have already run by the time the UPDATE returns.
+ *
+ * So the screen's job is no longer to cause the award. It is to report one that
+ * the database has already decided, which is why this reads rather than writes.
+ * Returns 0 when nothing was granted: the plan does not earn, the month's
+ * ceiling is reached, or these points were granted on an earlier approval of
+ * the same thing.
+ */
+export async function creditsGrantedFor(sourceTable, sourceId, reason) {
+  if (!sourceTable || !sourceId || !reason) return 0
   try {
-    const clerk = globalThis.Clerk
-    const token = clerk?.session ? await clerk.session.getToken() : null
-    if (!token) return 0
-
-    const resp = await fetch('/api/award-credits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(payload),
+    const { data, error } = await getSupabase().rpc('credits_granted_for', {
+      p_source_table: sourceTable,
+      p_source_id: sourceId,
+      p_reason: reason,
     })
-
-    // Not our JSON: the endpoint is not deployed and the SPA fallback served
-    // index.html. Nothing was awarded, and nothing is broken by saying so.
-    if (!(resp.headers.get('content-type') || '').includes('application/json')) return 0
-
-    const data = await resp.json().catch(() => null)
-    if (!resp.ok) {
-      console.error('Award refused:', data?.error)
-      return 0
-    }
-    return Number(data?.awarded) || 0
+    if (error) throw error
+    return Number(data) || 0
   } catch (err) {
-    console.error('Failed to award credits:', err)
+    console.error('Failed to read granted credits:', err)
     return 0
   }
-}
-
-/** Credit the signed-in user's own company. */
-export async function awardCredits(entitlements, action, { reportId = null } = {}) {
-  if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return 0
-  return callAwardEndpoint({ action, reportId })
 }
 
 /**
@@ -212,45 +210,30 @@ export async function spendCredits(entitlements, action) {
   if (!entitlements?.giveToGetEnabled || !entitlements.tenantId) return true
 
   try {
-    const clerk = globalThis.Clerk
-    const token = clerk?.session ? await clerk.session.getToken() : null
-    if (!token) return false
+    // One database call: the lock, the balance and the debit happen together.
+    // The endpoint this replaced read the ledger, summed it in JavaScript,
+    // compared, then inserted — four steps with no transaction, so two clicks
+    // at once both read the same balance and both spent it. And the read was
+    // capped at 1000 rows by PostgREST, which returns 200 without saying it
+    // truncated, so past that the balance being checked was simply wrong.
+    const { data, error } = await getSupabase().rpc('spend_credits', { p_action: action })
+    if (error) throw error
 
-    const resp = await fetch('/api/award-credits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action }),
-    })
-    if (!(resp.headers.get('content-type') || '').includes('application/json')) return false
-
-    const data = await resp.json().catch(() => null)
-    return !!data && Number(data.spent) > 0
+    // `proceed` means there was nothing to spend — a paid plan, or an action
+    // with no price. The caller should carry on, not be blocked.
+    if (data?.proceed) return true
+    return Number(data?.spent) > 0
   } catch (err) {
     console.error('Failed to spend credits:', err)
     return false
   }
 }
 
-/**
- * Credit a company other than the caller's — the approval case, where an
- * administrator approves a report and the points go to the company that filed
- * it. The server requires platform_admin for this, so the check is not one a
- * modified client can skip.
- */
-export async function awardCreditsToTenant(tenantId, action, { reportId = null } = {}) {
-  if (!tenantId) return 0
-  return callAwardEndpoint({ action, reportId, tenantId })
-}
-
-// spendCredits lived here and was never called. Credits currently widen a
-// ceiling rather than being drawn down — remaining() adds the balance to the
-// plan's allowance — so nothing in the product deducts them, and the settings'
-// `spend` rates describe an arrangement that does not exist yet. Written
-// speculatively, kept as dead weight, and now it would fail silently against
-// RLS as well: the ledger takes writes only from the server. If drawing down is
-// ever wanted, it belongs in api/award-credits.js alongside the granting, where
-// the balance can be checked and debited in one place that the browser cannot
-// reach around.
+// This comment described spendCredits as dead and pointed at an endpoint that
+// no longer exists. TrustReport calls it, and the balance now lives entirely in
+// the database: spend_credits() takes an advisory lock on the tenant, sums the
+// ledger in SQL and writes the debit, all in one transaction the browser cannot
+// interleave with itself.
 
 /**
  * Is there room for another company on the watchlist?

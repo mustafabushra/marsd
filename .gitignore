@@ -1,14 +1,28 @@
 dist/
 node_modules/
 .next/
-.env
-.env.local
-# Holds a real CLERK_SECRET_KEY — never commit. Template: .env.clerk.example
-.env.clerk
 .vercel
 marsad-staging.bundle
-# Allow production env vars for Vercel
-!.env.production
 
-# Database credentials for scripts/run-migration.mjs — never commit
-.env.migrations
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment files
+#
+# Everything matching .env* is ignored, then the templates are allowed back by
+# name. The order matters: a later rule wins, so the exceptions must follow the
+# blanket rule.
+#
+# This file used to carry `!.env.production` under the comment "Allow production
+# env vars for Vercel". Vercel does not read a committed .env file — only the
+# environment variables set in its own dashboard — so the exception bought
+# nothing and cost a real CLERK_SECRET_KEY, committed in plaintext in 7cad53ac
+# and still present in HEAD until it was untracked.
+#
+# A new .env file is ignored by default. Add an exception only for a file that
+# holds placeholders, never a value.
+# ─────────────────────────────────────────────────────────────────────────────
+.env*
+
+# Templates — placeholders only, no real values
+!.env.clerk.example
+!.env.docker.dev
+!.env.docker.prod
