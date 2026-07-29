@@ -12,6 +12,132 @@ import { LimitReached } from '../components/LimitGate'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 
+/**
+ * The risk band, read from the database rather than decided here.
+ *
+ * The page used to print "● مخاطر منخفضة" for every full-tier company, in green,
+ * whatever the number was — a company scoring 30 was labelled low risk beside
+ * its own 30. The band is computed by compute_trust_score against thresholds an
+ * operator can move from the admin panel, so deriving it again in the browser
+ * would make this screen disagree with the database the moment they did.
+ */
+const BAND = {
+  low:    { label: 'مخاطر منخفضة', bg: '#ECFDF5', fg: '#15803D', ring: '#16A34A' },
+  medium: { label: 'مخاطر متوسطة', bg: '#FFFBEB', fg: '#B45309', ring: '#F59E0B' },
+  high:   { label: 'مخاطر مرتفعة', bg: '#FEF2F2', fg: '#B91C1C', ring: '#DC2626' },
+  none:   { label: 'بيانات غير كافية', bg: '#F1F5F9', fg: '#475569', ring: '#94A3B8' },
+}
+
+function RiskPill({ band, prelim = false }) {
+  const b = BAND[band] || BAND.none
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <div style={{ background: b.bg, color: b.fg, borderRadius: '999px', padding: '6px 16px', fontSize: '13.5px', fontWeight: 800, display: 'inline-block' }}>
+        ● {b.label}
+      </div>
+      {prelim && (
+        <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700, marginTop: '7px' }}>
+          تقييم أوّلي — يكتمل عند ٥ تقارير
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Where the number came from.
+ *
+ * /faq has described a three-layer model since before one existed. It exists
+ * now, and the weights and each layer's score are stored on the score row — so
+ * this shows the same arithmetic the database performed instead of asking the
+ * reader to take 86 on trust. A percentage nobody can check is a claim, not a
+ * disclosure.
+ */
+function ScoreLayers({ layers, score }) {
+  if (!layers) return null
+
+  const rows = [
+    { key: 'official',  label: 'البيانات الرسمية', hint: 'حالة السجل التجاري وتوثيق مرصد' },
+    { key: 'community', label: 'تجربة المجتمع',    hint: 'التقارير المعتمَدة: السداد والتأخير والتعثّر' },
+    { key: 'platform',  label: 'تحليل المنصّة',     hint: 'تنوّع المُبلِّغين وحداثة التقارير واكتمال السجلّ' },
+  ].map((r) => {
+    const l = layers[r.key] || {}
+    const s = Number(l.score) || 0
+    const w = Number(l.weight) || 0
+    return { ...r, score: s, weight: w, contribution: (s * w) / 100 }
+  })
+
+  const total = rows.reduce((a, r) => a + r.contribution, 0)
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>كيف حُسب هذا المؤشر</h3>
+      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }}>
+        ثلاث طبقات، لكلٍّ وزنها. المجموع أدناه هو الرقم المعروض أعلى الصفحة.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        {rows.map((r) => (
+          <div key={r.key}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '7px', flexWrap: 'wrap' }}>
+              <div>
+                <span style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{r.label}</span>
+                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginRight: '8px' }}>وزنها {r.weight}%</span>
+              </div>
+              <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(r.score)} × {r.weight}% = <span style={{ color: '#1E2A52' }}>{r.contribution.toFixed(1)}</span>
+              </div>
+            </div>
+            <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '5px', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, Math.max(0, r.score))}%`, height: '100%', background: '#1E2A52', borderRadius: '5px' }}></div>
+            </div>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>{r.hint}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid #E2E8F0', marginTop: '20px', paddingTop: '14px' }}>
+        <span style={{ fontSize: '14px', fontWeight: 800, color: '#334155' }}>المجموع</span>
+        <span style={{ fontSize: '20px', fontWeight: 900, color: '#1E2A52', fontVariantNumeric: 'tabular-nums' }}>
+          {total.toFixed(1)} ≈ {Math.round(score)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** The evidence the community layer was built from — counts, not adjectives. */
+function ScoreEvidence({ facts }) {
+  if (!facts) return null
+  const n = Number(facts.approved_reports) || 0
+  if (!n) return null
+
+  const items = [
+    { label: 'تقارير معتمدة', value: n, sub: 'وحدها تدخل الحساب' },
+    { label: 'سُدِّدت كاملةً', value: `${facts.on_time_pct ?? 0}%`, sub: `${facts.on_time ?? 0} من ${n}` },
+    { label: 'حالات عدم سداد', value: facts.defaults ?? 0, sub: n ? `${Math.round(((facts.defaults || 0) / n) * 100)}% من التقارير` : '' },
+    { label: 'متوسط التأخير', value: `${facts.avg_delay_days ?? 0} يوم`, sub: 'نقطة لكل ٥ أيام، بحدّ ٢٠' },
+  ]
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>الأدلّة تحت طبقة المجتمع</h3>
+      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }}>
+        التقرير قيد المراجعة أو المرفوض لا يدخل هذه الأرقام.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '14px' }}>
+        {items.map((it) => (
+          <div key={it.label} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{it.label}</div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{it.value}</div>
+            {it.sub && <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>{it.sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function TrustReport() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -91,12 +217,37 @@ export default function TrustReport() {
           ...identity,
         })
 
-        // Build report object from Knowledge Base data
+        // The knowledge base returns the score but not how it was reached. The
+        // three layers, their weights and their contributions are stored on
+        // trust_scores.breakdown by compute_trust_score, so the reader can be
+        // shown the arithmetic rather than asked to trust a number — which is
+        // what /faq has been promising since before the layers existed.
+        let ts = null
+        try {
+          const { getSupabase } = await import('../lib/api')
+          const { data } = await getSupabase()
+            .from('trust_scores')
+            .select('score, risk_band, tier, approved_reports, breakdown, computed_at')
+            .eq('company_id', id)
+            .maybeSingle()
+          ts = data
+        } catch (e) {
+          console.warn('Trust score fetch warning:', e)
+        }
+
         const reportObj = {
           status: kb.total_reports_count >= 5 ? 'full' : kb.total_reports_count >= 2 ? 'preliminary' : 'limited',
-          tier: kb.trust_tier || 'none',
-          score: kb.trust_score || 0,
-          approvedReports: kb.approved_reports_count || 0
+          tier: ts?.tier || kb.trust_tier || 'none',
+          score: ts?.score ?? kb.trust_score ?? 0,
+          approvedReports: ts?.approved_reports ?? kb.approved_reports_count ?? 0,
+          // Read, never derived from the score here. The bands live in
+          // trust_score_rules and an operator can move them from the admin
+          // panel; recomputing them in the browser would make this screen
+          // disagree with the database the moment they did.
+          riskBand: ts?.risk_band || 'none',
+          layers: ts?.breakdown?.layers || null,
+          facts: ts?.breakdown || null,
+          computedAt: ts?.computed_at || null,
         }
         setReport(reportObj)
 
@@ -358,13 +509,13 @@ export default function TrustReport() {
 
           {tier === 'full' && (
             <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#16A34A 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(${BAND[report.riskBand]?.ring || '#94A3B8'} 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
                   <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
                 </div>
               </div>
-              <div style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '999px', padding: '6px 16px', fontSize: '13.5px', fontWeight: 800, marginTop: '12px' }}>● مخاطر منخفضة</div>
+              <RiskPill band={report.riskBand} />
             </div>
           )}
 
@@ -376,7 +527,7 @@ export default function TrustReport() {
                   <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
                 </div>
               </div>
-              <div style={{ background: '#FFFBEB', color: '#B45309', borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 800, marginTop: '12px' }}>تقييم أولي — ثقة متوسطة</div>
+              <RiskPill band={report.riskBand} prelim />
             </div>
           )}
 
@@ -491,6 +642,8 @@ export default function TrustReport() {
 
       {tier === 'full' && canSeeFull && (
         <>
+          <ScoreLayers layers={report.layers} score={score} />
+          <ScoreEvidence facts={report.facts} />
           <div style={{
             background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
           }}>
