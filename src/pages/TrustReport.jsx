@@ -106,6 +106,103 @@ function ScoreLayers({ layers, score }) {
   )
 }
 
+const CATEGORY_AR = {
+  late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد',
+  quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع',
+  fraud: 'احتيال', other: 'أخرى',
+}
+
+/**
+ * What the number means, which the number alone cannot say.
+ *
+ * A score with no reference point is not information: 74 in construction may be
+ * better than 80 in trade, and until now the reader had no way to know. The
+ * sector average is the first thing here for that reason.
+ *
+ * Reporter diversity answers the question every reader has and could not ask —
+ * one aggrieved counterparty repeating itself, or six separate companies
+ * describing the same behaviour. It already earns points inside the platform
+ * layer; saying it plainly is what makes that layer legible.
+ */
+function ScoreContext({ ctx, score }) {
+  if (!ctx || !Object.keys(ctx).length) return null
+
+  const vs = ctx.vs_sector == null ? null : Number(ctx.vs_sector)
+  const avg = ctx.sector_avg == null ? null : Math.round(Number(ctx.sector_avg))
+  const peers = Number(ctx.sector_count) || 0
+  const n = Number(ctx.approved_reports) || 0
+  const reporters = Number(ctx.distinct_reporters) || 0
+  const cats = ctx.categories || []
+  const d = ctx.disputes || {}
+
+  const card = { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }
+  const label = { fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }
+  const big = { fontSize: '23px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }
+  const sub = { fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>ما يعنيه هذا الرقم</h3>
+      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }}>
+        المؤشر وحده لا يُقارَن. هذه مراجعه.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px', marginBottom: cats.length ? '22px' : 0 }}>
+        {/* Rated peers only. Averaging in the unrated would drag every sector
+            toward zero and make this flattering rather than true. */}
+        {peers > 0 && avg != null && (
+          <div style={card}>
+            <div style={label}>مقارنةً بالقطاع</div>
+            <div style={{ ...big, color: vs > 0 ? '#15803D' : vs < 0 ? '#B91C1C' : '#1E2A52' }}>
+              {vs > 0 ? `أعلى بـ${Math.abs(Math.round(vs))}` : vs < 0 ? `أدنى بـ${Math.abs(Math.round(vs))}` : 'مطابق'}
+            </div>
+            <div style={sub}>متوسط {ctx.sector || 'القطاع'} {avg} · من {peers} شركة مصنّفة</div>
+          </div>
+        )}
+
+        <div style={card}>
+          <div style={label}>مصادر التقارير</div>
+          <div style={big}>{reporters} جهة</div>
+          <div style={sub}>
+            {n} تقريراً معتمداً
+            {reporters === 1 && n > 1 ? ' — من مصدر واحد فقط' : ''}
+          </div>
+        </div>
+
+        {Number(d.total) > 0 && (
+          <div style={card}>
+            <div style={label}>اعتراضات الشركة</div>
+            <div style={big}>{Number(d.upheld) || 0} مقبول</div>
+            <div style={sub}>من {d.total} اعتراضاً · {Number(d.open) || 0} قيد النظر</div>
+          </div>
+        )}
+      </div>
+
+      {cats.length > 0 && (
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>أسباب التقارير</div>
+          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px' }}>
+            نوع المخاطرة، لا حجمها فقط.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+            {cats.map((c) => (
+              <div key={c.category}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                  <span>{CATEGORY_AR[c.category] || c.category}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: '#64748B' }}>{c.count} · {c.pct}%</span>
+                </div>
+                <div style={{ height: '7px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${c.pct}%`, height: '100%', background: '#1E2A52', borderRadius: '4px' }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** The evidence the community layer was built from — counts, not adjectives. */
 function ScoreEvidence({ facts }) {
   if (!facts) return null
@@ -152,6 +249,7 @@ export default function TrustReport() {
   const [timeline, setTimeline] = useState([])
   const [trends, setTrends] = useState([])
   const [summary, setSummary] = useState([])
+  const [scoreCtx, setScoreCtx] = useState(null)
 
   useEffect(() => {
     const loadReport = async () => {
@@ -257,6 +355,17 @@ export default function TrustReport() {
           getCompanyTrends(id),
           getCompanyReportsSummary(id),
         ])
+
+        // The number's references — sector average, why it was reported, how
+        // many separate companies said so. One call, because this is a page
+        // load and four round trips to fill one card is three too many.
+        try {
+          const { getSupabase } = await import('../lib/api')
+          const { data: ctx } = await getSupabase().rpc('company_score_context', { p_company_id: id })
+          setScoreCtx(ctx || null)
+        } catch (e) {
+          console.warn('Score context warning:', e)
+        }
 
         setTimeline(timelineData.data || [])
         setTrends(trendsData.data || [])
@@ -643,6 +752,7 @@ export default function TrustReport() {
       {tier === 'full' && canSeeFull && (
         <>
           <ScoreLayers layers={report.layers} score={score} />
+          <ScoreContext ctx={scoreCtx} score={score} />
           <ScoreEvidence facts={report.facts} />
           <div style={{
             background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
