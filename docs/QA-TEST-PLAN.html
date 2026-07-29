@@ -1,0 +1,508 @@
+<title>مرصد — خطة اختبار QA الشاملة</title>
+<style>
+  :root {
+    --ground: #F4F6F8;
+    --panel: #FFFFFF;
+    --panel-2: #FAFBFC;
+    --ink: #11161F;
+    --ink-2: #3A4453;
+    --slate: #69748A;
+    --hair: #DCE1E8;
+    --hair-2: #EBEEF2;
+    --navy: #1E2A52;
+    --pass: #0C6349;
+    --pass-bg: #E8F4F0;
+    --block: #A0182B;
+    --block-bg: #FBEDEF;
+    --known: #8A6410;
+    --known-bg: #FBF3E3;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --sans: "Segoe UI", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0D1117; --panel: #141A22; --panel-2: #11161D;
+      --ink: #E6EBF2; --ink-2: #B0BAC8; --slate: #838EA0;
+      --hair: #262E3A; --hair-2: #1D242E; --navy: #A3B4E0;
+      --pass: #63CCA8; --pass-bg: #0F231C;
+      --block: #EE8894; --block-bg: #291317;
+      --known: #DCA94F; --known-bg: #241C0E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1117; --panel: #141A22; --panel-2: #11161D;
+    --ink: #E6EBF2; --ink-2: #B0BAC8; --slate: #838EA0;
+    --hair: #262E3A; --hair-2: #1D242E; --navy: #A3B4E0;
+    --pass: #63CCA8; --pass-bg: #0F231C;
+    --block: #EE8894; --block-bg: #291317;
+    --known: #DCA94F; --known-bg: #241C0E;
+  }
+  :root[data-theme="light"] {
+    --ground: #F4F6F8; --panel: #FFFFFF; --panel-2: #FAFBFC;
+    --ink: #11161F; --ink-2: #3A4453; --slate: #69748A;
+    --hair: #DCE1E8; --hair-2: #EBEEF2; --navy: #1E2A52;
+    --pass: #0C6349; --pass-bg: #E8F4F0;
+    --block: #A0182B; --block-bg: #FBEDEF;
+    --known: #8A6410; --known-bg: #FBF3E3;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground); color: var(--ink); font-family: var(--sans);
+    font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 18px 90px;
+    direction: rtl; text-align: right;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  header.mast { padding: 52px 0 26px; border-bottom: 2px solid var(--ink); }
+  .eyebrow {
+    font-size: 11px; letter-spacing: .17em; text-transform: uppercase;
+    color: var(--slate); font-weight: 700; margin: 0 0 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.6vw, 40px); line-height: 1.2; margin: 0 0 12px;
+    font-weight: 700; letter-spacing: -.02em; text-wrap: balance;
+  }
+  .lede { font-size: 17px; color: var(--ink-2); max-width: 62ch; margin: 0; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 22px;
+    font-size: 12.5px; color: var(--slate); font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  section { margin-top: 46px; }
+  h2 {
+    font-size: 12.5px; letter-spacing: .15em; text-transform: uppercase;
+    font-weight: 700; margin: 0; padding-bottom: 11px;
+    border-bottom: 1px solid var(--ink); display: flex;
+    justify-content: space-between; align-items: baseline; gap: 14px;
+  }
+  h2 .n {
+    font-family: var(--mono); color: var(--slate); font-size: 12px;
+    letter-spacing: .04em; font-weight: 600;
+  }
+  .intro { font-size: 14.5px; color: var(--slate); margin: 12px 0 20px; max-width: 66ch; }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--hair); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 640px; }
+  thead th {
+    text-align: right; font-size: 10.5px; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--slate); font-weight: 700; padding: 11px 14px;
+    border-bottom: 1px solid var(--hair); white-space: nowrap;
+    background: var(--panel-2); position: sticky; top: 0;
+  }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--hair-2); color: var(--ink-2); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.id {
+    font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+    color: var(--slate); font-weight: 600; font-size: 13px; width: 1%;
+  }
+  td.q { color: var(--ink); }
+  td.exp { color: var(--ink-2); }
+  td.box { width: 1%; text-align: center; color: var(--slate); font-family: var(--mono); }
+
+  code {
+    font-family: var(--mono); font-size: 13px; direction: ltr;
+    display: inline-block; background: var(--hair-2); color: var(--ink);
+    padding: 1px 6px; border-radius: 2px; unicode-bidi: embed;
+  }
+  .role {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 2px;
+    white-space: nowrap; background: var(--hair-2); color: var(--ink-2);
+  }
+  .must { color: var(--block); font-weight: 700; }
+  .ok { color: var(--pass); font-weight: 700; }
+
+  .note {
+    background: var(--panel); border: 1px solid var(--hair);
+    border-right: 4px solid var(--navy); padding: 18px 20px; margin: 22px 0;
+  }
+  .note.warn { border-right-color: var(--known); background: var(--known-bg); }
+  .note h3 {
+    font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--slate); margin: 0 0 9px; font-weight: 700;
+  }
+  .note p { margin: 0 0 9px; font-size: 15px; color: var(--ink-2); }
+  .note p:last-child { margin-bottom: 0; }
+  .note ul { margin: 8px 0 0; padding-right: 20px; font-size: 14.5px; color: var(--ink-2); }
+  .note li { margin-bottom: 5px; }
+
+  pre {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+    direction: ltr; text-align: left; background: var(--hair-2); color: var(--ink);
+    border: 1px solid var(--hair); padding: 12px 14px; margin: 10px 0 0;
+    overflow-x: auto; white-space: pre; unicode-bidi: embed;
+  }
+  footer {
+    margin-top: 58px; padding-top: 20px; border-top: 1px solid var(--hair);
+    font-size: 13.5px; color: var(--slate);
+  }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">منصّة مرصد — خطة اختبار القبول</p>
+  <h1>أسئلة QA الشاملة</h1>
+  <p class="lede">
+    كل بند سؤال له جواب واحد صحيح. نفّذه على البيئة المنشورة وسجّل النتيجة.
+    البنود المعلّمة <span class="must">حاجزة</span> تمنع الإطلاق إن سقطت؛ وما ورد في
+    «أخطاء معروفة» لا يُبلَّغ عنه — هو مسجّل بالفعل.
+  </p>
+  <div class="meta">
+    <span><b>البيئة</b> marsd-peach.vercel.app</span>
+    <span><b>الحالات</b> 147</span>
+    <span><b>الأدوار</b> 4</span>
+    <span><b>الشاشات</b> 57</span>
+  </div>
+</header>
+
+<div class="note">
+  <h3>ما تحتاجه قبل البدء</h3>
+  <p>أربعة حسابات، ولا يمكن اختبار الصلاحيات بأقلّ منها:</p>
+  <ul>
+    <li><span class="role">platform_admin</span> — إدارة مرصد، وصول كامل</li>
+    <li><span class="role">reviewer</span> — مراجع، يعتمد التقارير ولا يغيّر الإعدادات</li>
+    <li><span class="role">company_admin</span> — مدير شركة على الباقة <b>المجانية</b></li>
+    <li><span class="role">company_member</span> — عضو في نفس الشركة</li>
+  </ul>
+  <p style="margin-top:10px">
+    وحساب <b>company_admin ثانٍ في شركة مختلفة</b> — بدونه لا يمكن إثبات عزل البيانات بين الشركات،
+    وهو أهمّ ما في هذا الاختبار.
+  </p>
+  <p>
+    الباقات الحالية: <code>free</code> ١٠ بحث · ٢ مستخدم · ٣ مراقبة —
+    <code>basic</code> ٢٠٠ · ٣ · ٥٠ — <code>pro</code> ٥٠٠٠ · ١٠ · ٥٠٠ —
+    <code>enterprise</code> بلا حدود.
+  </p>
+</div>
+
+<!-- ═══════════ 1 ═══════════ -->
+<section>
+  <h2>التسجيل والدخول <span class="n">TC-001 … 014</span></h2>
+  <p class="intro">مسار الحساب من أوّله. أعطال هذا القسم تمنع كل ما بعده.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">001</td><td class="q">هل تفتح <code>/</code> و<code>/about</code> و<code>/pricing</code> لزائر غير مسجّل؟</td><td class="exp">نعم، بلا إعادة توجيه لتسجيل الدخول</td><td class="box">☐</td></tr>
+      <tr><td class="id">002</td><td class="q">التسجيل ببريد جديد من <code>/register</code> — هل يصل بريد التفعيل؟</td><td class="exp">يصل خلال دقيقة، ورابطه يفتح المنصّة لا صفحة خطأ</td><td class="box">☐</td></tr>
+      <tr><td class="id">003</td><td class="q">بعد التفعيل، أين يذهب المستخدم الجديد؟</td><td class="exp"><code>/company-onboarding</code> — لا <code>/dashboard</code> فارغة</td><td class="box">☐</td></tr>
+      <tr><td class="id">004</td><td class="q">التسجيل ببريد مسجّل مسبقاً</td><td class="exp">رسالة واضحة بأن البريد مستخدم — لا خطأ تقني</td><td class="box">☐</td></tr>
+      <tr><td class="id">005</td><td class="q">كلمة مرور قصيرة (أقلّ من ٨)</td><td class="exp">تُرفض قبل الإرسال مع سبب مقروء</td><td class="box">☐</td></tr>
+      <tr><td class="id">006</td><td class="q">«نسيت كلمة المرور» من <code>/forgot-password</code></td><td class="exp">يصل بريد إعادة التعيين ويعمل رابطه</td><td class="box">☐</td></tr>
+      <tr><td class="id">007</td><td class="q">تسجيل الدخول ببيانات خاطئة ثلاث مرات</td><td class="exp">رسالة خطأ واضحة كل مرة، بلا تسريب «هل البريد موجود»</td><td class="box">☐</td></tr>
+      <tr><td class="id">008</td><td class="q"><span class="must">حاجز</span> بعد تسجيل الدخول، هل تُحدَّث «آخر دخول» في <code>/admin/users</code>؟</td><td class="exp">نعم — كان فارغاً لكل الحسابات وأُصلح للتوّ</td><td class="box">☐</td></tr>
+      <tr><td class="id">009</td><td class="q">تسجيل الخروج ثم زر «رجوع» في المتصفح</td><td class="exp">لا تظهر بيانات الجلسة السابقة</td><td class="box">☐</td></tr>
+      <tr><td class="id">010</td><td class="q">فتح <code>/dashboard</code> برابط مباشر بلا تسجيل دخول</td><td class="exp">إعادة توجيه لتسجيل الدخول</td><td class="box">☐</td></tr>
+      <tr><td class="id">011</td><td class="q">فتح <code>/admin</code> بحساب <span class="role">company_admin</span></td><td class="exp">منع صريح — لا صفحة إدارة ولو فارغة</td><td class="box">☐</td></tr>
+      <tr><td class="id">012</td><td class="q">حساب مُعلَّق (<code>inactive</code>) يحاول الدخول</td><td class="exp">صفحة <code>/account-suspended</code> برسالة مفهومة</td><td class="box">☐</td></tr>
+      <tr><td class="id">013</td><td class="q">تسجيل الدخول من متصفحين في آن واحد</td><td class="exp">كلاهما يعمل؛ الخروج من أحدهما لا يُخرج الآخر فجأة</td><td class="box">☐</td></tr>
+      <tr><td class="id">014</td><td class="q">هل تعمل المنصّة بعد ترك التبويب ساعة ثم العودة؟</td><td class="exp">الجلسة تُجدَّد أو يُطلب الدخول بوضوح — لا شاشة بيضاء</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 2 ═══════════ -->
+<section>
+  <h2>تسجيل الشركة والمطالبة بالملكية <span class="n">TC-015 … 028</span></h2>
+  <p class="intro">هنا يقرّر النظام هل الشركة جديدة أم موجودة في السجلّ. الخلط بينهما يُنشئ سجلّات مكرّرة.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">015</td><td class="q">إدخال رقم سجل تجاري غير موجود في <code>/company-onboarding</code></td><td class="exp">يُعرض مسار «تسجيل شركة جديدة»</td><td class="box">☐</td></tr>
+      <tr><td class="id">016</td><td class="q">إدخال رقم سجل موجود مسبقاً</td><td class="exp">يُعرض مسار «المطالبة بالملكية» لا إنشاء نسخة ثانية</td><td class="box">☐</td></tr>
+      <tr><td class="id">017</td><td class="q">رقم سجل بأحرف أو بأقلّ من ١٠ أرقام</td><td class="exp">يُرفض بسبب مذكور قبل الإرسال</td><td class="box">☐</td></tr>
+      <tr><td class="id">018</td><td class="q">رفع صورة السجل التجاري بصيغة غير مدعومة</td><td class="exp">رفض واضح يذكر الصيغ المقبولة</td><td class="box">☐</td></tr>
+      <tr><td class="id">019</td><td class="q">رفع ملف كبير جداً (‏١٠ ميجابايت فأكثر)</td><td class="exp">رفض برسالة تذكر الحدّ — لا تعليق الصفحة</td><td class="box">☐</td></tr>
+      <tr><td class="id">020</td><td class="q"><span class="must">حاجز</span> بعد إرسال طلب التسجيل، هل يصل إشعار لإدارة مرصد؟</td><td class="exp">نعم — في <code>/notifications</code> لحساب الإدارة، قبل فتح شاشة الطلبات</td><td class="box">☐</td></tr>
+      <tr><td class="id">021</td><td class="q"><span class="must">حاجز</span> وبعد إرسال مطالبة ملكية؟</td><td class="exp">إشعار مماثل يصل الإدارة</td><td class="box">☐</td></tr>
+      <tr><td class="id">022</td><td class="q">هل تعرف شاشة <code>/admin/requests</code> <b>من</b> قدّم كل طلب؟</td><td class="exp">اسم الشركة المساهِمة ظاهر — لا «عضو المجتمع»</td><td class="box">☐</td></tr>
+      <tr><td class="id">023</td><td class="q">المستخدم في انتظار الموافقة — ماذا يرى؟</td><td class="exp"><code>/registration-pending</code> بحالة مفهومة، لا لوحة فارغة</td><td class="box">☐</td></tr>
+      <tr><td class="id">024</td><td class="q">بعد موافقة الإدارة — هل ينتقل تلقائياً؟</td><td class="exp">تصل الشركة للوحة التحكم بلا إعادة تحميل يدوية</td><td class="box">☐</td></tr>
+      <tr><td class="id">025</td><td class="q">وعند الرفض؟</td><td class="exp"><code>/account-rejected</code> مع سبب الرفض الذي كتبته الإدارة</td><td class="box">☐</td></tr>
+      <tr><td class="id">026</td><td class="q">تقديم نفس الطلب مرتين</td><td class="exp">يُمنع أو يُدمج — لا صفّان في الطابور</td><td class="box">☐</td></tr>
+      <tr><td class="id">027</td><td class="q">مطالبتان بملكية نفس الشركة من شركتين</td><td class="exp">الإدارة ترى الاثنتين وتوافق على واحدة فقط</td><td class="box">☐</td></tr>
+      <tr><td class="id">028</td><td class="q">بعد قبول المطالبة، هل تظهر الشركة في <code>/my-companies</code>؟</td><td class="exp">نعم، فوراً</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 3 ═══════════ -->
+<section>
+  <h2>البحث وتقرير الثقة <span class="n">TC-029 … 046</span></h2>
+  <p class="intro">المنتج نفسه. القسم الأهمّ تجارياً، وفيه أكثر ما تغيّر مؤخّراً.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">029</td><td class="q"><span class="must">حاجز</span> هل يستطيع زائر غير مسجّل رؤية أي شركة؟</td><td class="exp"><b>لا.</b> السجلّ صار يتطلّب حساباً</td><td class="box">☐</td></tr>
+      <tr><td class="id">030</td><td class="q">البحث باسم شركة كامل</td><td class="exp">تظهر النتيجة الصحيحة أولاً</td><td class="box">☐</td></tr>
+      <tr><td class="id">031</td><td class="q">البحث بجزء من الاسم</td><td class="exp">نتائج مطابقة جزئياً — لا قائمة فارغة</td><td class="box">☐</td></tr>
+      <tr><td class="id">032</td><td class="q">البحث برقم السجل التجاري</td><td class="exp">الشركة المطابقة</td><td class="box">☐</td></tr>
+      <tr><td class="id">033</td><td class="q">البحث بنصّ لا يطابق شيئاً</td><td class="exp">رسالة «لا نتائج» — لا شاشة تحميل دائمة</td><td class="box">☐</td></tr>
+      <tr><td class="id">034</td><td class="q">البحث بمسافة واحدة أو حرف واحد</td><td class="exp">لا ينهار؛ إمّا يطلب مزيداً من الحروف أو يعرض نتائج</td><td class="box">☐</td></tr>
+      <tr><td class="id">035</td><td class="q"><span class="must">حاجز</span> الباقة المجانية — كم عملية بحث قبل الإقفال؟</td><td class="exp"><b>١٠</b> في الشهر. كانت ١ وصُحّحت</td><td class="box">☐</td></tr>
+      <tr><td class="id">036</td><td class="q">عند بلوغ السقف، متى يظهر القفل؟</td><td class="exp">قبل عرض النتيجة — لا بعد ثوانٍ من رؤيتها</td><td class="box">☐</td></tr>
+      <tr><td class="id">037</td><td class="q">هل يذكر القفل الباقة المطلوبة وزر ترقية يعمل؟</td><td class="exp">نعم، والزر ينقل لصفحة الترقية فعلاً</td><td class="box">☐</td></tr>
+      <tr><td class="id">038</td><td class="q"><span class="must">حاجز</span> <span class="role">platform_admin</span> يفتح تقرير ثقة</td><td class="exp">التقرير <b>كاملاً</b> — لا «مقفل في الباقة المجانية» ولا تحويل لـ<code>/company-onboarding</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">039</td><td class="q">شركة عليها تقرير واحد فقط</td><td class="exp">«بيانات غير كافية» — لا مؤشر مبني على تقرير واحد</td><td class="box">☐</td></tr>
+      <tr><td class="id">040</td><td class="q">شركة عليها ٥ تقارير معتمدة فأكثر</td><td class="exp">مؤشر كامل برقم ونطاق (منخفض/متوسط/مرتفع)</td><td class="box">☐</td></tr>
+      <tr><td class="id">041</td><td class="q">هل يتغيّر المؤشر بعد اعتماد تقرير جديد؟</td><td class="exp">نعم، بلا إعادة تحميل الصفحة</td><td class="box">☐</td></tr>
+      <tr><td class="id">042</td><td class="q">من أين تظهر علامة «✔ موثّقة»؟</td><td class="exp">من تحقّق الإدارة فقط — وتزول إن عُدِّلت بيانات الهوية</td><td class="box">☐</td></tr>
+      <tr><td class="id">043</td><td class="q">زر «⬇ تحميل PDF»</td><td class="exp">ينزّل ملفاً فعلياً، وفيه <b>تاريخ الإصدار</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">044</td><td class="q">فتح <code>/trust-report/&lt;معرّف غير موجود&gt;</code></td><td class="exp">رسالة «الشركة غير موجودة» — لا شاشة بيضاء</td><td class="box">☐</td></tr>
+      <tr><td class="id">045</td><td class="q">شاشة <code>/compare</code> على الباقة المجانية</td><td class="exp">مقفلة من اللحظة الأولى — لا بعد ١٠ ثوانٍ</td><td class="box">☐</td></tr>
+      <tr><td class="id">046</td><td class="q">إضافة شركة لـ<code>/watchlist</code> فوق حدّ الباقة (٣)</td><td class="exp">رفض برسالة تذكر الحدّ والرقم الحالي</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 4 ═══════════ -->
+<section>
+  <h2>التقارير: الإرسال والمراجعة <span class="n">TC-047 … 068</span></h2>
+  <p class="intro">قلب المنصّة. تقرير خاطئ يُعتمد يضرّ شركة حقيقية، وتقرير صحيح يُرفض يفقد المساهم ثقته.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">047</td><td class="q"><span class="must">حاجز</span> إرسال تقرير كامل من <code>/add-report</code></td><td class="exp">يُحفظ ويظهر في <code>/my-reports</code> بحالة «قيد المراجعة»</td><td class="box">☐</td></tr>
+      <tr><td class="id">048</td><td class="q">إرسال بحقول مطلوبة فارغة</td><td class="exp">كل حقل ناقص يُشار إليه — لا رسالة عامّة واحدة</td><td class="box">☐</td></tr>
+      <tr><td class="id">049</td><td class="q">قيمة تعامل سالبة</td><td class="exp">تُرفض</td><td class="box">☐</td></tr>
+      <tr><td class="id">050</td><td class="q">أيام تأخير سالبة أو عشرية</td><td class="exp">تُرفض</td><td class="box">☐</td></tr>
+      <tr><td class="id">051</td><td class="q">تاريخ التعامل في المستقبل</td><td class="exp">يُرفض — لا يمكن الإبلاغ عن تعامل لم يحدث</td><td class="box">☐</td></tr>
+      <tr><td class="id">052</td><td class="q">وصف بطول ١٠ آلاف حرف</td><td class="exp">إمّا يُقبل كاملاً أو يُرفض بحدّ معلن — لا اقتطاع صامت</td><td class="box">☐</td></tr>
+      <tr><td class="id">053</td><td class="q">إدخال <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> في الوصف</td><td class="exp">يُعرض كنصّ عادي في شاشة المراجعة — لا يُنفَّذ</td><td class="box">☐</td></tr>
+      <tr><td class="id">054</td><td class="q">تقريران عن نفس الشركة من نفس المُبلِّغ</td><td class="exp">الثاني يُمنع أو يُدمج، برسالة تشرح السبب</td><td class="box">☐</td></tr>
+      <tr><td class="id">055</td><td class="q">الإبلاغ عن شركة المُبلِّغ نفسها</td><td class="exp">يُمنع</td><td class="box">☐</td></tr>
+      <tr><td class="id">056</td><td class="q">تجاوز حدّ التقارير المعلّقة للباقة</td><td class="exp">رفض من القاعدة برسالة واضحة</td><td class="box">☐</td></tr>
+      <tr><td class="id">057</td><td class="q"><span class="must">حاجز</span> <span class="role">reviewer</span> يضغط «✓ اعتماد التقرير»</td><td class="exp">يُحفظ فعلاً — لا «❌ لم يُحفظ الطلب — تحقّق من صلاحيتك»</td><td class="box">☐</td></tr>
+      <tr><td class="id">058</td><td class="q">«✕ رفض» مع كتابة سبب</td><td class="exp">يُحفظ، والسبب يظهر للمُبلِّغ</td><td class="box">☐</td></tr>
+      <tr><td class="id">059</td><td class="q">«طلب توضيح»</td><td class="exp">يُحفظ، والتقرير يعود للمُبلِّغ قابلاً للتعديل</td><td class="box">☐</td></tr>
+      <tr><td class="id">060</td><td class="q"><span class="must">حاجز</span> هل يرى المراجع <b>من</b> أرسل التقرير؟</td><td class="exp">اسم الشركة المُبلِّغة، ومعدّل رفض تقاريرها السابق</td><td class="box">☐</td></tr>
+      <tr><td class="id">061</td><td class="q">هل معدّل الرفض المعروض يطابق الحقيقة؟</td><td class="exp">قارنه بـ<code>/admin/tenant-analytics</code> — يجب أن يتطابقا</td><td class="box">☐</td></tr>
+      <tr><td class="id">062</td><td class="q">هل يستطيع المراجع تعديل <b>محتوى</b> التقرير؟</td><td class="exp"><b>لا.</b> المراجعة تغيّر الحالة لا النصّ</td><td class="box">☐</td></tr>
+      <tr><td class="id">063</td><td class="q">اعتماد نفس التقرير مرّتين (ضغط مزدوج)</td><td class="exp">لا يُمنح رصيد مرّتين ولا يُسجَّل حدثان</td><td class="box">☐</td></tr>
+      <tr><td class="id">064</td><td class="q">مراجعان يفتحان نفس التقرير</td><td class="exp">قرار الأول يُزيله من قائمة الثاني بلا إعادة تحميل</td><td class="box">☐</td></tr>
+      <tr><td class="id">065</td><td class="q">هل يُسجَّل من راجع كل تقرير؟</td><td class="exp">نعم، في سجلّ التدقيق <code>/admin/logs</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">066</td><td class="q">شركة <span class="role">company_admin</span> ب — هل ترى تقارير شركة أ؟</td><td class="exp"><b>لا.</b> إلا التقارير المعتمدة عنها في <code>/reports-about-us</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">067</td><td class="q">هل ترى الشركة اسم من أبلغ عنها؟</td><td class="exp">حسب سياسة المنتج — تحقّق أن السلوك واحد في كل الشاشات</td><td class="box">☐</td></tr>
+      <tr><td class="id">068</td><td class="q">تعليق شركة عن الإبلاغ من لوحة الإدارة</td><td class="exp">تفشل محاولتها التالية للإبلاغ، ولا تستطيع رفع التعليق عن نفسها</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 5 ═══════════ -->
+<section>
+  <h2>النقاط — Give&nbsp;to&nbsp;Get <span class="n">TC-069 … 082</span></h2>
+  <p class="intro">أُعيد بناؤه بالكامل: المنح انتقل من نقطة API إلى مشغّلات في القاعدة. هذا القسم يتحقّق من ذلك.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">069</td><td class="q"><span class="must">حاجز</span> اعتماد تقرير — كم نقطة تصل المُبلِّغ؟</td><td class="exp"><b>٢٠</b> — الرقم في <code>/admin/settings</code>، لا رقم مكتوب في الكود</td><td class="box">☐</td></tr>
+      <tr><td class="id">070</td><td class="q">غيّر الرقم من لوحة الإدارة إلى ٣٠، ثم اعتمد تقريراً</td><td class="exp">٣٠ نقطة — بلا نشر جديد</td><td class="box">☐</td></tr>
+      <tr><td class="id">071</td><td class="q">اعتماد شركة أضافها مساهم</td><td class="exp">٥ نقاط للشركة <b>المساهِمة</b> لا لصاحبة الشركة</td><td class="box">☐</td></tr>
+      <tr><td class="id">072</td><td class="q">اعتماد طلب استكمال بيانات</td><td class="exp">١٠ نقاط لمقدّم الطلب</td><td class="box">☐</td></tr>
+      <tr><td class="id">073</td><td class="q">إعادة اعتماد نفس التقرير بعد إرجاعه</td><td class="exp"><b>لا نقاط إضافية</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">074</td><td class="q">هل يظهر الرصيد الصحيح في <code>/subscription</code>؟</td><td class="exp">يطابق مجموع الحركات في سجلّ النقاط</td><td class="box">☐</td></tr>
+      <tr><td class="id">075</td><td class="q">شركة على باقة مدفوعة — هل تكسب نقاطاً؟</td><td class="exp"><b>لا.</b> الكسب مفعّل للمجانية فقط</td><td class="box">☐</td></tr>
+      <tr><td class="id">076</td><td class="q">بلوغ السقف الشهري (٢٠٠)</td><td class="exp">لا مزيد من الكسب حتى الشهر التالي، برسالة تشرح</td><td class="box">☐</td></tr>
+      <tr><td class="id">077</td><td class="q">إنفاق نقاط لفتح بحث إضافي</td><td class="exp">ينقص الرصيد بالتكلفة المعلنة ويُفتح البحث</td><td class="box">☐</td></tr>
+      <tr><td class="id">078</td><td class="q">محاولة إنفاق برصيد غير كافٍ</td><td class="exp">رفض واضح — والرصيد <b>لا يصبح سالباً</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">079</td><td class="q">ضغط زر الإنفاق مرّتين بسرعة</td><td class="exp">خصم واحد فقط</td><td class="box">☐</td></tr>
+      <tr><td class="id">080</td><td class="q"><span class="must">حاجز</span> هل يوجد مسار يزيد الرصيد بلا عمل حقيقي؟</td><td class="exp"><b>لا.</b> جرّب <code>POST /api/award-credits</code> — يجب أن يعيد <code>404</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">081</td><td class="q">منح رصيد يدوياً من لوحة الإدارة</td><td class="exp">يعمل، ويُسجَّل باسم من منحه</td><td class="box">☐</td></tr>
+      <tr><td class="id">082</td><td class="q">هل يظهر سجلّ الحركات للشركة؟</td><td class="exp">كل حركة بتاريخها وسببها</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 6 ═══════════ -->
+<section>
+  <h2>الاشتراكات والترقية <span class="n">TC-083 … 094</span></h2>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">083</td><td class="q">هل تعرض <code>/subscription</code> الباقة الحالية وحدودها بدقّة؟</td><td class="exp">تطابق <code>/admin/plans</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">084</td><td class="q">هل يوجد <b>زر ترقية</b> ظاهر؟</td><td class="exp">نعم، ويعمل</td><td class="box">☐</td></tr>
+      <tr><td class="id">085</td><td class="q">تقديم طلب ترقية</td><td class="exp">يُسجَّل، ويظهر في <code>/admin/subscriptions</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">086</td><td class="q">هل تظهر تفاصيل التحويل البنكي؟</td><td class="exp">الآيبان واسم الحساب من <code>/admin/settings</code> — <span class="known">فارغة حالياً حتى تُعبَّأ</span></td><td class="box">☐</td></tr>
+      <tr><td class="id">087</td><td class="q">اعتماد الإدارة لطلب الترقية</td><td class="exp">الباقة تتغيّر فوراً وترتفع الحدود بلا نشر</td><td class="box">☐</td></tr>
+      <tr><td class="id">088</td><td class="q">بعد الترقية — هل يزيد عدد عمليات البحث؟</td><td class="exp">نعم، في نفس الجلسة</td><td class="box">☐</td></tr>
+      <tr><td class="id">089</td><td class="q">هل يصل إشعار للشركة بتغيّر اشتراكها؟</td><td class="exp">نعم</td><td class="box">☐</td></tr>
+      <tr><td class="id">090</td><td class="q">تغيير حدّ في <code>/admin/plans</code> — هل يسري فوراً؟</td><td class="exp">نعم، على كل الشركات في تلك الباقة</td><td class="box">☐</td></tr>
+      <tr><td class="id">091</td><td class="q">إنشاء باقة جديدة من لوحة الإدارة</td><td class="exp">تظهر في <code>/pricing</code> وتُختار في الترقية</td><td class="box">☐</td></tr>
+      <tr><td class="id">092</td><td class="q">تعطيل باقة</td><td class="exp">تختفي من الاختيار، ولا تتأثّر الشركات المشتركة بها</td><td class="box">☐</td></tr>
+      <tr><td class="id">093</td><td class="q">هل تُصدَر فاتورة للطلب؟</td><td class="exp">تظهر في <code>/subscription</code> برقم وتاريخ ومبلغ وضريبة ١٥٪</td><td class="box">☐</td></tr>
+      <tr><td class="id">094</td><td class="q">التخفيض لباقة أدنى مع تجاوز الحدود الحالية</td><td class="exp">تحذير صريح بما سيُفقد قبل التأكيد</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 7 ═══════════ -->
+<section>
+  <h2>المستخدمون والدعوات <span class="n">TC-095 … 106</span></h2>
+  <p class="intro">أُعيد ترتيب هذا المسار: الصفّ يُسجَّل قبل إرسال البريد، لا بعده.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">095</td><td class="q">دعوة مستخدم جديد من <code>/users</code></td><td class="exp">يصل بريد الدعوة فعلاً</td><td class="box">☐</td></tr>
+      <tr><td class="id">096</td><td class="q">قبول الدعوة — أين يصل المدعوّ؟</td><td class="exp">داخل الشركة الداعية بالدور المحدَّد — لا <code>/company-onboarding</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">097</td><td class="q"><span class="must">حاجز</span> دعوة ثالثة على الباقة المجانية (حدّها ٢)</td><td class="exp">رفض <b>قبل</b> إرسال البريد — لا بريد لدعوة لا مقعد لها</td><td class="box">☐</td></tr>
+      <tr><td class="id">098</td><td class="q">دعوة بريد مدعوّ مسبقاً</td><td class="exp">رسالة «دعوة معلّقة موجودة» مع خيار إعادة الإرسال</td><td class="box">☐</td></tr>
+      <tr><td class="id">099</td><td class="q">دعوة بريد عضو حالي</td><td class="exp">رفض واضح</td><td class="box">☐</td></tr>
+      <tr><td class="id">100</td><td class="q">دعوة بريد يحوي <code>%</code> مثل <code>a%b@x.com</code></td><td class="exp">لا يُرفض خطأً بحجّة أنه «مسجّل بالفعل»</td><td class="box">☐</td></tr>
+      <tr><td class="id">101</td><td class="q">صيغة بريد خاطئة</td><td class="exp">رفض قبل الإرسال</td><td class="box">☐</td></tr>
+      <tr><td class="id">102</td><td class="q">إعادة إرسال دعوة</td><td class="exp">بريد جديد، وصفّ واحد لا صفّان</td><td class="box">☐</td></tr>
+      <tr><td class="id">103</td><td class="q">إلغاء دعوة معلّقة</td><td class="exp">تختفي، والرابط القديم يتوقّف</td><td class="box">☐</td></tr>
+      <tr><td class="id">104</td><td class="q">دعوة منتهية الصلاحية (بعد ٧ أيام)</td><td class="exp">رسالة «انتهت صلاحية الدعوة» — لا خطأ تقني</td><td class="box">☐</td></tr>
+      <tr><td class="id">105</td><td class="q">هل يستطيع <span class="role">company_member</span> دعوة أحد؟</td><td class="exp"><b>لا.</b> الدعوة لمدير الشركة فقط</td><td class="box">☐</td></tr>
+      <tr><td class="id">106</td><td class="q">إزالة مستخدم — هل يُحرَّر مقعده؟</td><td class="exp">نعم، وتصبح دعوة جديدة ممكنة</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 8 ═══════════ -->
+<section>
+  <h2>الإشعارات <span class="n">TC-107 … 116</span></h2>
+  <div class="note warn" style="margin-bottom:18px">
+    <h3>سياق</h3>
+    <p>
+      قيد قاعدة البيانات كان يرفض <b>١١ نوعاً من ١٢</b> بصمت. الجدول كان يحوي أربعة صفوف فقط،
+      كلّها من النوع الوحيد المسموح. اختبر <b>كل نوع</b> — النجاح في واحد لا يعني شيئاً.
+    </p>
+  </div>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>الحدث</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">107</td><td class="q">اعتماد تقرير</td><td class="exp">إشعار يصل الشركة المُبلِّغة</td><td class="box">☐</td></tr>
+      <tr><td class="id">108</td><td class="q">رفض تقرير</td><td class="exp">إشعار بالسبب</td><td class="box">☐</td></tr>
+      <tr><td class="id">109</td><td class="q">طلب توضيح</td><td class="exp">إشعار</td><td class="box">☐</td></tr>
+      <tr><td class="id">110</td><td class="q">قبول / رفض شركة</td><td class="exp">إشعاران منفصلان حسب القرار</td><td class="box">☐</td></tr>
+      <tr><td class="id">111</td><td class="q">قبول / رفض مطالبة ملكية</td><td class="exp">إشعار للمُطالِب</td><td class="box">☐</td></tr>
+      <tr><td class="id">112</td><td class="q">تغيّر الاشتراك · تغيّر حالة الحساب · منح نقاط · ترحيب</td><td class="exp">أربعة إشعارات، كلّ في موضعه</td><td class="box">☐</td></tr>
+      <tr><td class="id">113</td><td class="q">هل يظهر عدّاد غير المقروء ويتناقص عند القراءة؟</td><td class="exp">نعم</td><td class="box">☐</td></tr>
+      <tr><td class="id">114</td><td class="q">إيقاف نوع إشعار من <code>/profile</code></td><td class="exp">يُحفظ ولا يصل ذلك النوع بعدها</td><td class="box">☐</td></tr>
+      <tr><td class="id">115</td><td class="q"><span class="must">حاجز</span> هل يرى مستخدم إشعارات شركة أخرى؟</td><td class="exp"><b>لا</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">116</td><td class="q">هل تصل الإشعارات فوراً بلا إعادة تحميل؟</td><td class="exp">نعم</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 9 ═══════════ -->
+<section>
+  <h2>الاعتراضات ولوحة إدارة مرصد <span class="n">TC-117 … 132</span></h2>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">117</td><td class="q">شركة تعترض على تقرير عنها</td><td class="exp">يُسجَّل ويظهر في <code>/admin/disputes</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">118</td><td class="q">اعتراض على تقرير عن شركة أخرى</td><td class="exp">يُمنع</td><td class="box">☐</td></tr>
+      <tr><td class="id">119</td><td class="q">قبول الاعتراض</td><td class="exp">التقرير يخرج من المؤشر ويُعاد احتسابه</td><td class="box">☐</td></tr>
+      <tr><td class="id">120</td><td class="q">رفض الاعتراض</td><td class="exp">التقرير يبقى، والشركة تُخطَر بالسبب</td><td class="box">☐</td></tr>
+      <tr><td class="id">121</td><td class="q">هل كل زرّ في <code>/admin</code> يفعل شيئاً؟</td><td class="exp">نعم — لا زرّ بلا أثر</td><td class="box">☐</td></tr>
+      <tr><td class="id">122</td><td class="q">هل أرقام <code>/admin</code> حقيقية؟</td><td class="exp">قارنها بالجداول — ولا مخطّط ببيانات ثابتة</td><td class="box">☐</td></tr>
+      <tr><td class="id">123</td><td class="q">مخطّط «نمو عدد الشركات»</td><td class="exp">أشهر حقيقية وأرقام حقيقية — لا يناير–يونيو ثابتة</td><td class="box">☐</td></tr>
+      <tr><td class="id">124</td><td class="q"><code>/admin/tenant-analytics</code> — هل تطابق أرقامها الجداول؟</td><td class="exp">نعم، بما فيها «نقاط متداولة»</td><td class="box">☐</td></tr>
+      <tr><td class="id">125</td><td class="q"><code>/admin/report-analytics</code> مع تغيير النطاق الزمني</td><td class="exp">الأرقام تتغيّر فعلاً مع كل نطاق</td><td class="box">☐</td></tr>
+      <tr><td class="id">126</td><td class="q"><code>/admin/knowledge-base/companies</code></td><td class="exp">تعرض <b>من سجّل</b> كل شركة</td><td class="box">☐</td></tr>
+      <tr><td class="id">127</td><td class="q"><code>/admin/knowledge-base/reports</code></td><td class="exp">تعرض <b>من أبلغ</b> عن كل تقرير</td><td class="box">☐</td></tr>
+      <tr><td class="id">128</td><td class="q">تعديل قواعد مؤشر الثقة من <code>/admin/trust-score</code></td><td class="exp">تسري على الاحتساب التالي بلا نشر</td><td class="box">☐</td></tr>
+      <tr><td class="id">129</td><td class="q">تعليق شركة من <code>/admin/tenants</code></td><td class="exp">تُمنع فوراً، ولا تستطيع رفع التعليق عن نفسها</td><td class="box">☐</td></tr>
+      <tr><td class="id">130</td><td class="q"><code>/admin/logs</code> — هل يُسجَّل كل إجراء إداري بفاعله؟</td><td class="exp">نعم</td><td class="box">☐</td></tr>
+      <tr><td class="id">131</td><td class="q"><code>/admin/system-health</code></td><td class="exp">فحوص حقيقية لا قيم ثابتة</td><td class="box">☐</td></tr>
+      <tr><td class="id">132</td><td class="q">زر «↩ الانتقال للبحث» للأدمن</td><td class="exp">ينقله للمنصّة ولا يُعيده للوحة الإدارة تلقائياً</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 10 ═══════════ -->
+<section>
+  <h2>الصلاحيات وعزل الشركات <span class="n">TC-133 … 140</span></h2>
+  <p class="intro">
+    أخطر قسم. كل بند هنا حاجز، ويُنفَّذ بحسابين من شركتين مختلفتين.
+    ولا يكفي أن تختفي الشاشة من القائمة — <b>جرّب الرابط المباشر</b>.
+  </p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">133</td><td class="q"><span class="role">company_admin</span> أ يفتح <code>/trust-report/&lt;شركة ب&gt;</code></td><td class="exp">حسب باقته — لا وصول لبيانات ب الداخلية</td><td class="box">☐</td></tr>
+      <tr><td class="id">134</td><td class="q">هل يرى مستخدمي شركة ب في <code>/users</code>؟</td><td class="exp"><b>لا</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">135</td><td class="q">هل يرى تقارير ب المعلّقة في <code>/my-reports</code>؟</td><td class="exp"><b>لا</b></td><td class="box">☐</td></tr>
+      <tr><td class="id">136</td><td class="q">هل يرى رصيد نقاط ب؟</td><td class="exp"><b>لا</b> — رصيده هو فقط</td><td class="box">☐</td></tr>
+      <tr><td class="id">137</td><td class="q"><span class="role">company_member</span> يفتح <code>/users</code> و<code>/subscription</code></td><td class="exp">قراءة فقط أو منع — لا تعديل</td><td class="box">☐</td></tr>
+      <tr><td class="id">138</td><td class="q"><span class="role">reviewer</span> يفتح <code>/admin/settings</code> و<code>/admin/plans</code></td><td class="exp">منع — المراجع يراجع ولا يغيّر الإعدادات</td><td class="box">☐</td></tr>
+      <tr><td class="id">139</td><td class="q">هل يستطيع <span class="role">company_admin</span> ترقية باقته بنفسه في القاعدة؟</td><td class="exp"><b>لا.</b> الترقية طلب تعتمده الإدارة</td><td class="box">☐</td></tr>
+      <tr><td class="id">140</td><td class="q">هل يستطيع أحد تغيير دوره لـ<code>platform_admin</code>؟</td><td class="exp"><b>لا</b></td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════ 11 ═══════════ -->
+<section>
+  <h2>الأمن — بلا تسجيل دخول <span class="n">TC-141 … 147</span></h2>
+  <p class="intro">
+    تُنفَّذ من الطرفية بالمفتاح العام المنشور داخل حزمة المتصفح، بلا أي حساب.
+    خذه من أدوات المطوّر ← Network ← أي طلب ← الترويسة <code>apikey</code>.
+  </p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>السؤال</th><th>الجواب الصحيح</th><th>✓</th></tr></thead>
+    <tbody>
+      <tr><td class="id">141</td><td class="q"><span class="must">حاجز</span> سحب جدول الشركات</td><td class="exp"><code>[]</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">142</td><td class="q"><span class="must">حاجز</span> سحب مؤشرات الثقة</td><td class="exp"><code>[]</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">143</td><td class="q"><span class="must">حاجز</span> قراءة <code>system_settings</code></td><td class="exp"><code>[]</code> — نموذج التقييم واقتصاد النقاط والفوترة</td><td class="box">☐</td></tr>
+      <tr><td class="id">144</td><td class="q">قراءة التقارير أو المستخدمين أو الإشعارات</td><td class="exp"><code>[]</code> لكلٍّ منها</td><td class="box">☐</td></tr>
+      <tr><td class="id">145</td><td class="q"><span class="must">حاجز</span> استدعاء <code>recompute_all_trust_scores</code></td><td class="exp">رفض بـ<code>42501</code> — لا تنفيذ</td><td class="box">☐</td></tr>
+      <tr><td class="id">146</td><td class="q">استدعاء دوال مستودع المعرفة</td><td class="exp"><code>401</code></td><td class="box">☐</td></tr>
+      <tr><td class="id">147</td><td class="q">الكتابة في أي جدول</td><td class="exp"><code>401</code> أو <code>403</code> — ولا صفّ يصل</td><td class="box">☐</td></tr>
+    </tbody>
+  </table></div>
+
+<pre>curl "$URL/rest/v1/companies?select=*"        -H "apikey: $ANON"
+curl "$URL/rest/v1/trust_scores?select=*"     -H "apikey: $ANON"
+curl "$URL/rest/v1/system_settings?select=*"  -H "apikey: $ANON"
+curl -X POST "$URL/rest/v1/rpc/recompute_all_trust_scores" \
+     -H "apikey: $ANON" -H "Content-Type: application/json" -d '{}'</pre>
+</section>
+
+<!-- ═══════════ known ═══════════ -->
+<section>
+  <h2>أخطاء معروفة — لا تُبلَّغ</h2>
+  <div class="note warn">
+    <h3>مسجّلة بالفعل</h3>
+    <ul>
+      <li><b>خمس دوال قاعدة بيانات معطوبة منذ البداية</b> — <code>get_company_reports_summary</code> و<code>get_company_reports_timeline</code> تشيران لأعمدة غير موجودة، و<code>get_company_trends</code> فيها التباس، و<code>search_companies_fts</code> شكل إرجاعها لا يطابق تعريفها، و<code>autocomplete_companies</code> فيها <code>ORDER BY</code> غير قانوني. <b>البحث يعمل عبر مسار احتياطي أضعف</b> — إن لاحظت جودة بحث متواضعة فهذا سببها.</li>
+      <li><b>تفاصيل التحويل البنكي فارغة</b> — الآيبان واسم الحساب لم يُعبّآ بعد في <code>/admin/settings</code>.</li>
+      <li><b>مفاتيح Clerk تجريبية</b> — لم يُنتقل لمفاتيح الإنتاج بعد.</li>
+      <li><b>شاشتان مقفولتان عمداً</b> — قوالب البريد والتكاملات، مؤجّلتان لا معطّلتان.</li>
+      <li><b>لا تحديد معدّل على الدعوات</b> — إعادة الإرسال المتكرّرة غير محدودة بعد.</li>
+      <li><b>ترقيم الصفحات ناقص</b> في بعض الشاشات — القوائم الطويلة قد تُقتطع عند ١٠٠٠ صف.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>كيف تُبلّغ عن خطأ</h2>
+  <div class="note">
+    <p>لكل خطأ، اذكر خمسة أشياء فقط:</p>
+    <ul>
+      <li><b>رقم الحالة</b> — مثل TC-057</li>
+      <li><b>الحساب والدور</b> — أي بريد، وأي باقة</li>
+      <li><b>ما فعلتَه</b> — بالضبط، خطوةً خطوة</li>
+      <li><b>ما توقّعتَه وما حدث</b></li>
+      <li><b>لقطة الشاشة ورسالة الخطأ</b> كما ظهرت حرفياً — ومحتوى تبويب Console إن كان فارغاً ظاهرياً</li>
+    </ul>
+    <p style="margin-top:12px">
+      <b>الأهمّ:</b> إن رأيت رسالة نجاح ولم يتغيّر شيء فعلاً — بلّغ عنها. أخطر ما في هذه المنصّة
+      لم يكن رسائل خطأ، بل عمليات قالت «تمّ» ولم تحدث.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    ١٤٧ حالة اختبار · ٢٦ منها حاجزة. البنود المعلّمة «حاجز» تمنع الإطلاق إن سقطت؛ ما عداها
+    يُسجَّل ويُرتَّب. راجع «أخطاء معروفة» قبل فتح أي بلاغ.
+  </p>
+</footer>
+
+</div>
