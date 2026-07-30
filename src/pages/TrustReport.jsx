@@ -85,7 +85,7 @@ function ScoreLayers({ layers, score }) {
                 <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginRight: '8px' }}>وزنها {r.weight}%</span>
               </div>
               <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                {Math.round(r.score)} × {r.weight}% = <span style={{ color: '#1E2A52' }}>{r.contribution.toFixed(1)}</span>
+<span style={{ color: '#1E2A52' }}>{r.contribution.toFixed(1)}</span> / {r.weight}
               </div>
             </div>
             <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '5px', overflow: 'hidden' }}>
@@ -216,6 +216,268 @@ function ScoreHistory({ points }) {
 
 const MONTHS_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+
+const CARD = { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }
+const PANEL = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }
+const LBL = { fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }
+const BIG = { fontSize: '23px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }
+const SUB = { fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }
+const H3 = { fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }
+const LEDE = { fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }
+
+const Grid = ({ children, min = 150 }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit,minmax(${min}px,1fr))`, gap: '14px' }}>{children}</div>
+)
+const Stat = ({ label, value, sub }) => (
+  <div style={CARD}>
+    <div style={LBL}>{label}</div>
+    <div style={BIG}>{value}</div>
+    {sub && <div style={SUB}>{sub}</div>}
+  </div>
+)
+
+const fmtDate = (iso) => {
+  if (!iso) return null
+  const d = new Date(iso)
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
+}
+const sinceDays = (iso) => {
+  if (!iso) return null
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+}
+
+/**
+ * The card a reader takes in before deciding whether to read on.
+ *
+ * Every fact here is shown only when it is known. Tax registration is recorded
+ * on none of the companies and a founding date on ten of twenty-seven, so a
+ * green tick beside either would be a claim rather than a fact — and a reader
+ * cannot tell a verified tick from a decorative one, which makes the decorative
+ * one worse than the missing line.
+ */
+function CompanyCard({ identity, score, band, tier }) {
+  if (!identity) return null
+  const facts = [
+    identity.verified && { icon: '✔', text: 'موثّقة من مرصد' },
+    identity.cr_status === 'active' && { icon: '✔', text: 'سجل تجاري نشط' },
+    identity.cr_status && identity.cr_status !== 'active' && { icon: '✕', text: `السجل التجاري ${identity.cr_status}`, bad: true },
+    identity.has_tax_id && { icon: '✔', text: 'مسجّلة ضريبياً' },
+  ].filter(Boolean)
+
+  const meta = [
+    identity.sector && { k: 'القطاع', v: identity.sector },
+    identity.city && { k: 'المدينة', v: identity.city },
+    identity.entity_type && { k: 'نوع الكيان', v: identity.entity_type },
+    identity.founded && { k: 'تأسست', v: String(identity.founded).slice(0, 4) },
+    identity.age_years != null && { k: 'عمر الشركة', v: `${identity.age_years} سنة` },
+    identity.enterprise_size && { k: 'الحجم', v: identity.enterprise_size },
+    identity.cr_number && { k: 'السجل التجاري', v: identity.cr_number },
+  ].filter(Boolean)
+
+  const b = BAND[band] || BAND.none
+
+  return (
+    <div style={PANEL}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ minWidth: '240px', flex: 1 }}>
+          <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px' }}>{identity.name}</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {facts.map((f) => (
+              <span key={f.text} style={{
+                fontSize: '12.5px', fontWeight: 800, padding: '5px 12px', borderRadius: '999px',
+                background: f.bad ? '#FEF2F2' : '#ECFDF5', color: f.bad ? '#B91C1C' : '#15803D',
+              }}>{f.icon} {f.text}</span>
+            ))}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', flex: 'none' }}>
+          <div style={{ fontSize: '40px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {tier === 'none' ? '—' : Math.round(score)}
+          </div>
+          <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, marginTop: '4px' }}>من 100</div>
+          <div style={{ background: b.bg, color: b.fg, borderRadius: '999px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 800, marginTop: '10px' }}>
+            ● {b.label}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 28px', marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #E2E8F0' }}>
+        {meta.map((m) => (
+          <div key={m.k}>
+            <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>{m.k}</div>
+            <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{m.v}</div>
+          </div>
+        ))}
+        {identity.computed_at && (
+          <div style={{ marginRight: 'auto' }}>
+            <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>آخر تحديث للمؤشر</div>
+            <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{fmtDate(identity.computed_at)}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const PAY_AR = { full: 'سداد كامل', partial: 'سداد جزئي', late: 'سُدِّد متأخراً', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
+
+/** Counts, and the last five outcomes as a reader would scan them. */
+function CommercialBehaviour({ b, recent }) {
+  if (!b) return null
+  return (
+    <div style={PANEL}>
+      <h3 style={H3}>السلوك التجاري</h3>
+      <p style={LEDE}>ما تقوله التقارير المعتمَدة عن سلوك السداد.</p>
+      <Grid>
+        <Stat label="التقارير المعتمدة" value={b.reports_approved ?? 0} sub={`من ${b.reports_total ?? 0} تقريراً`} />
+        <Stat label="نسبة السداد الكامل" value={b.on_time_pct == null ? '—' : `${b.on_time_pct}%`} />
+        <Stat label="متوسط التأخير" value={`${b.avg_delay ?? 0} يوم`} sub={`أعلى تأخير ${b.max_delay ?? 0} يوم`} />
+        <Stat label="حالات عدم السداد" value={b.defaults ?? 0} />
+        <Stat label="أطراف تعاملت معها" value={b.counterparties ?? 0} sub="جهات مُبلِّغة مستقلّة" />
+        <Stat label="قيد المراجعة" value={b.reports_pending ?? 0} sub={`${b.reports_rejected ?? 0} مرفوضاً`} />
+      </Grid>
+
+      {recent?.length > 0 && (
+        <div style={{ marginTop: '22px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>آخر {recent.length} نتائج</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {recent.map((r, i) => {
+              const ok = r.payment === 'full' && !r.defaulted
+              return (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+                  background: ok ? '#F0FDF4' : '#FFFBEB', borderRadius: '9px', padding: '10px 14px',
+                }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: ok ? '#15803D' : '#B45309' }}>
+                    {ok ? '✔' : '!'} {PAY_AR[r.payment] || r.payment || '—'}
+                    {r.delay > 0 ? ` — تأخير ${r.delay} يوم` : ''}
+                    {r.defaulted ? ' — تعثّر' : ''}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{fmtDate(r.at)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Why this report can be relied on — a different question from whether the
+ * company can be, and the one nobody else on this market asks.
+ *
+ * It is also the honest answer to this platform's own weakness: every community
+ * report is written by a counterparty or a competitor. Saying how many separate
+ * ones agreed is what turns that from a hole into a disclosure.
+ */
+function ReportConfidence({ q, market }) {
+  if (!q) return null
+  const sources = Number(q.independent_sources) || 0
+  const days = sinceDays(q.last_report_at)
+  const completeness = Number(q.profile_completeness) || 0
+
+  const checks = [
+    { ok: sources >= 3, text: `${sources} ${sources === 1 ? 'جهة مستقلّة ساهمت' : 'جهات مستقلّة ساهمت'} في البيانات`,
+      bad: sources <= 1 ? 'مصدر واحد — تعامل مع الرقم بحذر' : null },
+    { ok: days != null && days <= 180, text: days == null ? 'لا تقارير معتمدة بعد' : `آخر تقرير قبل ${days} يوماً` },
+    { ok: completeness >= 70, text: `اكتمال سجلّ الشركة ${completeness}%` },
+    { ok: q.all_reviewed, text: q.all_reviewed ? 'كل التقارير المستخدمة معتمدة' : 'توجد تقارير قيد المراجعة لم تدخل الحساب' },
+    { ok: Number(q.disputes_open) === 0, text: Number(q.disputes_open) === 0 ? 'لا اعتراضات قائمة' : `${q.disputes_open} اعتراضاً قيد النظر` },
+    { ok: Number(q.documents) > 0, text: Number(q.documents) > 0 ? `${q.documents} مستنداً رسمياً مرفقاً` : 'لا مستندات رسمية مرفقة' },
+  ]
+
+  const passed = checks.filter((c) => c.ok).length
+  const stars = '★'.repeat(Math.max(1, Math.round((passed / checks.length) * 5))) +
+                '☆'.repeat(5 - Math.max(1, Math.round((passed / checks.length) * 5)))
+
+  return (
+    <div style={PANEL}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+        <h3 style={{ ...H3, margin: 0 }}>لماذا يمكن الوثوق بهذا التقرير</h3>
+        <div style={{ fontSize: '19px', color: '#B45309', letterSpacing: '2px' }} aria-label={`${passed} من ${checks.length}`}>{stars}</div>
+      </div>
+      <p style={{ ...LEDE, marginTop: '6px' }}>
+        سؤالٌ غير «هل أثق بهذه الشركة». هذا عن قوّة الأدلّة نفسها.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+        {checks.map((c) => (
+          <div key={c.text} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ color: c.ok ? '#15803D' : '#94A3B8', fontWeight: 900, fontSize: '14px', flex: 'none' }}>{c.ok ? '✔' : '○'}</span>
+            <div>
+              <span style={{ fontSize: '14px', color: c.ok ? '#334155' : '#94A3B8', fontWeight: 700 }}>{c.text}</span>
+              {c.bad && <div style={{ fontSize: '12px', color: '#B45309', fontWeight: 700, marginTop: '3px' }}>{c.bad}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Shown only when the population makes it mean something. A rank over ten
+          rated companies is not a statistic, and printing one would undermine
+          exactly the credibility this section exists to build. */}
+      {market?.percentile != null && Number(market.rated_total) >= 100 && (
+        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #E2E8F0' }}>
+          <Grid min={160}>
+            <Stat label="أفضل من" value={`${market.percentile}%`} sub="من الشركات المصنّفة" />
+            <Stat label="الترتيب" value={market.rank} sub={`من ${market.rated_total} شركة`} />
+          </Grid>
+        </div>
+      )}
+      {market?.rank != null && Number(market.rated_total) < 100 && (
+        <div style={{ marginTop: '16px', fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, background: '#F8FAFC', borderRadius: '9px', padding: '12px 14px' }}>
+          الترتيب بين الشركات المصنّفة لا يُعرض بعد — {market.rated_total} شركة مصنّفة فقط، وترتيبٌ على هذا العدد لا يحمل دلالة إحصائية.
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Where the evidence came from, by the reporters' own sectors — never by name. */
+function SourceMix({ sources }) {
+  if (!sources?.length) return null
+  const total = sources.reduce((a, s) => a + Number(s.count), 0)
+  return (
+    <div style={PANEL}>
+      <h3 style={H3}>توزيع مصادر البيانات</h3>
+      <p style={LEDE}>قطاعات الجهات التي أبلغت — بلا أسماء. كلّما تنوّعت المصادر قلّ احتمال أن يكون الرقم رأي طرف واحد.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+        {sources.map((s) => (
+          <div key={s.sector}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+              <span>{s.sector}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', color: '#64748B' }}>{s.count} {s.count === 1 ? 'جهة' : 'جهات'}</span>
+            </div>
+            <div style={{ height: '7px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${(Number(s.count) / total) * 100}%`, height: '100%', background: '#1E2A52', borderRadius: '4px' }}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The limits of what this document is.
+ *
+ * A B2B credit platform without one is exposed, and the cost is a paragraph.
+ * Deliberately factual: this reports what was recorded, it does not advise. The
+ * difference is not stylistic — "we recommend dealing with them" moves Marsad
+ * from reporting facts to giving credit advice, and the liability moves with it.
+ */
+function Disclaimer() {
+  return (
+    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '18px 20px', marginBottom: '18px' }}>
+      <div style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', letterSpacing: '.08em', marginBottom: '8px' }}>إخلاء مسؤولية</div>
+      <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
+        يستند هذا التقرير إلى البيانات الرسمية المتاحة والتقارير التجارية المعتمَدة من إدارة مرصد حتى تاريخ إصداره.
+        وهو عرضٌ لما سُجّل، لا ضمانٌ لأداء الشركة مستقبلاً ولا توصية ائتمانية.
+        القرار التجاري مسؤولية متّخذه، ويُنصح بعدم الاعتماد على مؤشر مرصد وحده دون سياسات الائتمان والتحصيل الداخلية لديك.
+      </p>
+    </div>
+  )
+}
 
 const CATEGORY_AR = {
   late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد',
@@ -362,6 +624,7 @@ export default function TrustReport() {
   const [summary, setSummary] = useState([])
   const [scoreCtx, setScoreCtx] = useState(null)
   const [scoreHistory, setScoreHistory] = useState([])
+  const [full, setFull] = useState(null)
 
   useEffect(() => {
     const loadReport = async () => {
@@ -478,6 +741,8 @@ export default function TrustReport() {
             sb.rpc('company_score_context', { p_company_id: id }),
             sb.rpc('company_score_history', { p_company_id: id, p_limit: 24 }),
           ])
+          const { data: fullData } = await sb.rpc('company_report_full', { p_company_id: id })
+          setFull(fullData || null)
           setScoreCtx(ctx || null)
           setScoreHistory(Array.isArray(hist) ? hist : [])
         } catch (e) {
@@ -868,9 +1133,14 @@ export default function TrustReport() {
 
       {tier === 'full' && canSeeFull && (
         <>
+          <CompanyCard identity={full?.identity} score={score} band={report.riskBand} tier={report.tier} />
           <ScoreLayers layers={report.layers} score={score} />
           <ScoreContext ctx={scoreCtx} score={score} />
           <ScoreHistory points={scoreHistory} />
+          <CommercialBehaviour b={full?.behaviour} recent={full?.recent} />
+          <SourceMix sources={full?.sources} />
+          <ReportConfidence q={full?.quality} market={full?.market} />
+          <Disclaimer />
           <ScoreEvidence facts={report.facts} />
           <div style={{
             background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
