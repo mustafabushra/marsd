@@ -38,6 +38,7 @@ const GROUPS = [
   ] },
   { key: 'advanced', title: 'الإدارة المتقدمة', items: [
     { label: 'الاعتراضات', path: '/admin/disputes' },
+    { label: 'المستندات والحالة الرسمية', path: '/admin/documents' },
     { label: 'تصدير البيانات', path: '/admin/data-export' },
     { label: '🔒 نماذج البريد', path: '/admin/email-templates' },
     { header: 'مراجعات' },
@@ -72,6 +73,7 @@ const SCREEN_LABELS = {
   '/admin/tenant-analytics': 'تحليلات الشركات',
   '/admin/trust-score': 'تحليلات مؤشر الثقة',
   '/admin/disputes': 'الاعتراضات على التقارير',
+  '/admin/documents': 'المستندات والحالة الرسمية',
   '/admin/data-export': 'تصدير البيانات',
   '/admin/company-approval': 'مراجعة طلبات التسجيل',
   '/admin/claim-requests': 'طلبات ملكية الشركات',
