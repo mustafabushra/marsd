@@ -8,6 +8,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
+import ProfileCompletion from '../components/ProfileCompletion'
 
 export default function CompanyDashboard() {
   const navigate = useNavigate()
@@ -166,6 +167,7 @@ export default function CompanyDashboard() {
 
   return (
     <div>
+      <ProfileCompletion />
       <div style={{ marginBottom: '22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
