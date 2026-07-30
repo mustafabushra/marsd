@@ -106,6 +106,117 @@ function ScoreLayers({ layers, score }) {
   )
 }
 
+/**
+ * Where the score has been.
+ *
+ * trust_scores keeps one row per company and every recomputation overwrote the
+ * last, so the platform never knew what a company scored yesterday. A company
+ * climbing to 92 is a different counterparty from one falling to it, and they
+ * rendered identically — same number, same pill, nothing to tell them apart.
+ *
+ * One point per actual movement, not per recomputation: the score is recomputed
+ * on every approval and most leave the number where it was. Plotting those would
+ * bury three real changes under three hundred identical ones.
+ *
+ * A single point is not a trend, and drawing a lone dot across an axis would
+ * imply a history that does not exist. It says so instead.
+ */
+function ScoreHistory({ points }) {
+  if (!points || points.length === 0) return null
+
+  const W = 520
+  const H = 150
+  const PAD = 20
+
+  const fmt = (iso) => {
+    const d = new Date(iso)
+    return `${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
+  }
+
+  if (points.length === 1) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>اتجاه المؤشر</h3>
+        <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px' }}>
+          الاتجاه غالباً أهمّ من الرقم — شركة تصعد إلى ٩٢ ليست شركة تهبط إليه.
+        </p>
+        <div style={{ background: '#F8FAFC', border: '1.5px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center' }}>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#64748B' }}>قياس واحد حتى الآن</div>
+          <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>
+            سُجّل في {fmt(points[0].recorded_at)} — يظهر المنحنى عند أول تغيّر في المؤشر
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const vals = points.map((p) => Number(p.score) || 0)
+  const max = Math.max(...vals)
+  const min = Math.min(...vals)
+  const span = max - min || 10
+  const x = (i) => PAD + (i / (points.length - 1)) * (W - PAD * 2)
+  const y = (v) => H - PAD - ((v - min) / span) * (H - PAD * 2)
+
+  const line = points.map((p, i) => `${x(i)},${y(Number(p.score) || 0)}`).join(' ')
+  const first = vals[0]
+  const last = vals[vals.length - 1]
+  const delta = last - first
+  const band = BAND[points[points.length - 1].risk_band] || BAND.none
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '4px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>اتجاه المؤشر</h3>
+        <div style={{
+          fontSize: '13.5px', fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+          color: delta > 0 ? '#15803D' : delta < 0 ? '#B91C1C' : '#64748B',
+        }}>
+          {delta > 0 ? `▲ ارتفع ${delta}` : delta < 0 ? `▼ انخفض ${Math.abs(delta)}` : '— مستقرّ'}
+          <span style={{ color: '#94A3B8', fontWeight: 700, marginRight: '8px' }}>
+            منذ {fmt(points[0].recorded_at)}
+          </span>
+        </div>
+      </div>
+      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 16px' }}>
+        {points.length} قياساً — نقطة عند كل تغيّر فعلي، لا عند كل إعادة احتساب.
+      </p>
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '160px', overflow: 'visible' }} role="img"
+           aria-label={`اتجاه مؤشر الثقة: ${first} إلى ${last}`}>
+        <defs>
+          <linearGradient id="tsh" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor={band.ring} stopOpacity=".18" />
+            <stop offset="1" stopColor={band.ring} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={PAD} y1={PAD} x2={W - PAD} y2={PAD} stroke="#F1F5F9" />
+        <line x1={PAD} y1={H / 2} x2={W - PAD} y2={H / 2} stroke="#F1F5F9" />
+        <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#F1F5F9" />
+        <path d={`M${line.split(' ').join(' L')} L${x(points.length - 1)},${H} L${x(0)},${H} Z`} fill="url(#tsh)" />
+        <polyline points={line} fill="none" stroke={band.ring} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <circle key={p.recorded_at + i} cx={x(i)} cy={y(Number(p.score) || 0)}
+                  r={i === points.length - 1 ? 5 : 4}
+                  fill={i === points.length - 1 ? band.ring : '#fff'}
+                  stroke={band.ring} strokeWidth="2">
+            <title>{`${fmt(p.recorded_at)}: ${p.score} · ${p.approved_reports ?? 0} تقريراً`}</title>
+          </circle>
+        ))}
+        <text x={x(points.length - 1)} y={y(last) - 12} textAnchor="middle"
+              fill="#1E2A52" fontSize="13" fontWeight="800">{last}</text>
+      </svg>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '6px' }}>
+        <span>{fmt(points[0].recorded_at)}</span>
+        <span>{fmt(points[points.length - 1].recorded_at)}</span>
+      </div>
+    </div>
+  )
+}
+
+const MONTHS_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+
 const CATEGORY_AR = {
   late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد',
   quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع',
@@ -250,6 +361,7 @@ export default function TrustReport() {
   const [trends, setTrends] = useState([])
   const [summary, setSummary] = useState([])
   const [scoreCtx, setScoreCtx] = useState(null)
+  const [scoreHistory, setScoreHistory] = useState([])
 
   useEffect(() => {
     const loadReport = async () => {
@@ -361,8 +473,13 @@ export default function TrustReport() {
         // load and four round trips to fill one card is three too many.
         try {
           const { getSupabase } = await import('../lib/api')
-          const { data: ctx } = await getSupabase().rpc('company_score_context', { p_company_id: id })
+          const sb = getSupabase()
+          const [{ data: ctx }, { data: hist }] = await Promise.all([
+            sb.rpc('company_score_context', { p_company_id: id }),
+            sb.rpc('company_score_history', { p_company_id: id, p_limit: 24 }),
+          ])
           setScoreCtx(ctx || null)
+          setScoreHistory(Array.isArray(hist) ? hist : [])
         } catch (e) {
           console.warn('Score context warning:', e)
         }
@@ -753,6 +870,7 @@ export default function TrustReport() {
         <>
           <ScoreLayers layers={report.layers} score={score} />
           <ScoreContext ctx={scoreCtx} score={score} />
+          <ScoreHistory points={scoreHistory} />
           <ScoreEvidence facts={report.facts} />
           <div style={{
             background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
