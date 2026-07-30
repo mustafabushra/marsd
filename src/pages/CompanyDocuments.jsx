@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { notifyAdmins } from '../lib/notify'
 
 /**
  * /documents — the company supplies its own paperwork.
@@ -113,6 +114,16 @@ export default function CompanyDocuments() {
         .select('id')
       if (e) throw e
       if (!data?.length) throw new Error('لم يُحفظ المستند — تحقّق من صلاحيتك')
+
+      // Tell Marsad. Without this the pending queue is found by opening the
+      // admin screen and looking, which is the failure 047 fixed for
+      // registrations and claims and 068 reintroduced for documents.
+      await notifyAdmins('document_submitted', {
+        title: 'مستند جديد بانتظار التوثيق',
+        message: `${DOC_TYPES.find((t) => t.v === form.type)?.t || form.type} — ${file.name}`,
+        tenantId,
+        meta: { company_id: companyId, doc_type: form.type },
+      })
 
       setForm((f) => ({ ...f, note: '' }))
       showToast('✅ أُرسل المستند — ستراجعه إدارة مرصد')

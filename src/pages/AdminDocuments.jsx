@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { notifyTenant } from '../lib/notify'
 
 /**
  * /admin/documents — Marsad verifies what companies supply, and records what
@@ -86,7 +87,26 @@ export default function AdminDocuments() {
       // The function answers with its own refusal rather than throwing, so the
       // reply is read instead of assumed.
       if (!data?.ok) { showToast('❌ ' + (data?.reason || 'تعذّر الحفظ')); return }
-      showToast(approve ? '✅ وُثِّق المستند وأُعيد احتساب المؤشر' : '✅ رُفض المستند وأُبلغت الشركة')
+
+      // Tell the company. Verification raises its official layer by up to twenty
+      // points, and a company not told its paperwork was accepted has no reason
+      // to send the next document.
+      const doc = pending.find((d) => d.id === id)
+      if (doc?.company_id) {
+        const { data: t } = await getSupabase()
+          .from('tenants').select('id').eq('company_id', doc.company_id).maybeSingle()
+        if (t?.id) {
+          await notifyTenant(t.id, approve ? 'document_verified' : 'document_rejected', {
+            title: approve ? 'وُثِّق مستندك' : 'لم يُقبل مستندك',
+            message: approve
+              ? `${DOC_LABEL[doc.doc_type] || doc.doc_type} — وارتفع مؤشر ثقتك`
+              : `${DOC_LABEL[doc.doc_type] || doc.doc_type} — ${reason}`,
+            meta: { document_id: id, doc_type: doc.doc_type },
+          })
+        }
+      }
+
+      showToast(approve ? '✅ وُثِّق المستند وأُبلغت الشركة' : '✅ رُفض المستند وأُبلغت الشركة')
       load()
     } catch (err) {
       showToast('❌ ' + (err?.message || 'خطأ غير معروف'))
@@ -116,7 +136,19 @@ export default function AdminDocuments() {
       if (!data?.length) throw new Error('لم تُحفظ الحالة — تحقّق من صلاحيتك')
 
       await getSupabase().rpc('compute_trust_score', { p_company_id: statusFor.companyId })
-      showToast('✅ سُجّلت الحالة الرسمية وأُعيد احتساب المؤشر')
+
+      const { data: t2 } = await getSupabase()
+        .from('tenants').select('id').eq('company_id', statusFor.companyId).maybeSingle()
+      if (t2?.id) {
+        await notifyTenant(t2.id, 'official_status_recorded', {
+          title: 'سُجّلت حالة رسمية على شركتك',
+          message: (OFFICIAL_STATUS.find((x) => x.v === statusFor.status)?.t || statusFor.status)
+            + ' — تظهر في تقرير ثقتك. للاعتراض تواصل مع إدارة مرصد بالمستندات المُثبِتة.',
+          meta: { status: statusFor.status },
+        })
+      }
+
+      showToast('✅ سُجّلت الحالة الرسمية وأُبلغت الشركة')
       setStatusFor({ companyId: '', status: 'none', note: '' })
       load()
     } catch (err) {
