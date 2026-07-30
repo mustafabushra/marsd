@@ -40,9 +40,11 @@ const STATUS = {
   rejected: { t: '✕ مرفوض', bg: '#FEF2F2', fg: '#B91C1C' },
 }
 
-// 5 MB. Files are stored as data URLs, the same way the registration document
-// already is, and a larger one would sit in a row every read has to carry.
-const MAX_BYTES = 5 * 1024 * 1024
+// 15 MB of file. Stored as a data URL, which is about a third larger than
+// the bytes on disk — so the column guard downstream allows 21 MB, and a check
+// written against the encoded length would reject files well under the limit
+// this screen advertises.
+const MAX_BYTES = 15 * 1024 * 1024
 const ACCEPT = 'application/pdf,image/png,image/jpeg'
 
 export default function CompanyDocumentsSection() {
@@ -83,7 +85,7 @@ export default function CompanyDocumentsSection() {
   const upload = async (file) => {
     if (!file || !companyId) return
     if (file.size > MAX_BYTES) {
-      showToast(`❌ الملف أكبر من ٥ ميجابايت (${(file.size / 1024 / 1024).toFixed(1)} م.ب)`)
+      showToast(`❌ الملف أكبر من ١٥ ميجابايت (${(file.size / 1024 / 1024).toFixed(1)} م.ب)`)
       return
     }
     if (!ACCEPT.split(',').includes(file.type)) {
@@ -191,7 +193,7 @@ export default function CompanyDocumentsSection() {
               {busy ? 'جارٍ الرفع…' : '⬆ اختر ملفاً وارفعه'}
             </label>
             <span style={{ fontSize: '12px', color: '#94A3B8', marginRight: '12px', fontWeight: 600 }}>
-              PDF أو PNG أو JPG · حتى ٥ ميجابايت
+              PDF أو PNG أو JPG · حتى ١٥ ميجابايت
             </span>
           </div>
         </div>

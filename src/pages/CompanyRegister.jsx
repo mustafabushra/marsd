@@ -61,6 +61,13 @@ export default function CompanyRegister() {
   const [authPassword, setAuthPassword] = useState('')
 
   // Company Step State
+  // The registration document. Required: a company entering the registry without
+  // the paper that proves it exists is a record nobody can verify, and Marsad
+  // would be publishing a trust score for it. CompanyOnboarding enforces the
+  // same rule on its path; this one had no upload field at all.
+  const [crFile, setCrFile] = useState(null)
+  const [crFileError, setCrFileError] = useState('')
+
   const [companyData, setCompanyData] = useState({
     name: '',
     nameEn: '',
@@ -100,6 +107,7 @@ export default function CompanyRegister() {
     if (companyData.name.trim().length < 3) return 'اسم الشركة يجب أن يكون 3 أحرف على الأقل'
 
     if (!companyData.crNumber.trim()) return 'رقم السجل التجاري مطلوب'
+    if (!crFile) return 'صورة السجل التجاري مطلوبة'
     const crDigits = companyData.crNumber.replace(/\D/g, '')
     if (crDigits.length < 10) return 'رقم السجل يجب أن يكون 10 أرقام على الأقل'
 
@@ -141,8 +149,17 @@ export default function CompanyRegister() {
         return
       }
 
-      // Use the new API function that handles Clerk users
+      // Read the file here rather than on selection: holding a 20 MB data URL in
+      // component state for the length of a form is memory nobody asked for.
+      const crFileUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = () => resolve(r.result)
+        r.onerror = () => reject(new Error('تعذّرت قراءة ملف السجل التجاري'))
+        r.readAsDataURL(crFile)
+      })
+
       await createTenantAndUser(user.id, {
+        crFileUrl,
         name: companyData.name,
         crNumber: companyData.crNumber,
         email: companyData.email || user.primaryEmailAddress?.emailAddress,
@@ -289,6 +306,50 @@ export default function CompanyRegister() {
                   boxSizing: 'border-box'
                 }}
               />
+            </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                صورة السجل التجاري *
+              </label>
+              <input
+                id="cr-upload"
+                type="file"
+                accept="application/pdf,image/png,image/jpeg"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!f) return
+                  // Checked against the file on disk, not the encoded string: a
+                  // data URL is about a third larger, so testing the encoded
+                  // length would reject files well under the stated limit.
+                  if (f.size > 15 * 1024 * 1024) {
+                    setCrFileError(`الملف ${(f.size / 1024 / 1024).toFixed(1)} م.ب — الحد الأقصى 15 ميجابايت`)
+                    setCrFile(null)
+                    return
+                  }
+                  if (!['application/pdf', 'image/png', 'image/jpeg'].includes(f.type)) {
+                    setCrFileError('الصيغ المقبولة: PDF أو PNG أو JPG')
+                    setCrFile(null)
+                    return
+                  }
+                  setCrFileError('')
+                  setCrFile(f)
+                }}
+                style={{ display: 'none' }}
+              />
+              <label htmlFor="cr-upload" style={{
+                display: 'inline-block', padding: '11px 20px',
+                background: crFile ? '#ECFDF5' : '#fff',
+                color: crFile ? '#15803D' : '#1E2A52',
+                border: `1.5px solid ${crFile ? '#A7F3D0' : '#E2E8F0'}`,
+                borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer'
+              }}>
+                {crFile ? `✔ ${crFile.name}` : '⬆ اختر ملف السجل التجاري'}
+              </label>
+              <div style={{ fontSize: '12px', color: crFileError ? '#B91C1C' : '#94A3B8', fontWeight: 600, marginTop: '7px' }}>
+                {crFileError || 'PDF أو PNG أو JPG · حتى 15 ميجابايت — تراجعه إدارة مرصد قبل اعتماد الشركة'}
+              </div>
             </div>
           </div>
 

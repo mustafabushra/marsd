@@ -561,7 +561,7 @@ export async function createTenantAndUser(userId: string, companyData: any) {
     if (!emailRegex.test(companyData.email)) throw new Error('صيغة البريد الإلكتروني غير صحيحة')
 
     // Validate cr_file_url size (max 10MB base64)
-    if (companyData.crFileUrl && companyData.crFileUrl.length > 13 * 1024 * 1024) {
+    if (companyData.crFileUrl && companyData.crFileUrl.length > 21 * 1024 * 1024) {
       throw new Error('حجم السجل التجاري كبير جداً (أكثر من 10MB)')
     }
 

@@ -56,9 +56,9 @@ export default function CompanyOnboarding() {
       return
     }
 
-    const maxSize = 5 * 1024 * 1024
+    const maxSize = 15 * 1024 * 1024
     if (file.size > maxSize) {
-      setError(`❌ حجم الملف كبير جداً. الحد الأقصى 5MB`)
+      setError(`❌ حجم الملف كبير جداً. الحد الأقصى 15 ميجابايت`)
       return
     }
 
@@ -142,6 +142,9 @@ export default function CompanyOnboarding() {
     setError('')
     const mainTimer = createTimer()
 
+    // A company entering the registry without the paper that proves it exists is
+    // a record nobody can verify, and Marsad would be publishing a trust score
+    // for it. CompanyRegister enforces the same rule on its own path.
     if (!crFile) {
       setError('❌ رفع السجل التجاري مطلوب')
       return
@@ -191,7 +194,7 @@ export default function CompanyOnboarding() {
           crFileUrl = await new Promise((resolve, reject) => {
             reader.onload = () => {
               const result = reader.result
-              if (typeof result === 'string' && result.length > 13 * 1024 * 1024) {
+              if (typeof result === 'string' && result.length > 21 * 1024 * 1024) {
                 reject(new Error('الملف كبير جداً حتى بعد التحويل (>13MB)'))
               } else {
                 resolve(result)
@@ -692,7 +695,7 @@ export default function CompanyOnboarding() {
                     اضغط أو اسحب الملف
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    PDF أو صورة — الحد الأقصى 5MB
+                    PDF أو صورة — الحد الأقصى 15 ميجابايت
                   </div>
                 </label>
               )}
