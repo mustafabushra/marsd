@@ -30,7 +30,6 @@ import MyReports from './pages/MyReports'
 import MyCompanies from './pages/MyCompanies'
 import TrustReport from './pages/TrustReport'
 import Watchlist from './pages/Watchlist'
-import CompanyDocuments from './pages/CompanyDocuments'
 import Compare from './pages/Compare'
 import CompanyUsers from './pages/CompanyUsers'
 import Subscription from './pages/Subscription'
@@ -161,7 +160,9 @@ function AppContent() {
           <Route path="/my-companies" element={<CompanyRoute><MyCompanies /></CompanyRoute>} />
           <Route path="/trust-report/:id" element={<CompanyRoute><TrustReport /></CompanyRoute>} />
           <Route path="/watchlist" element={<CompanyRoute><Watchlist /></CompanyRoute>} />
-          <Route path="/documents" element={<CompanyRoute><CompanyDocuments /></CompanyRoute>} />
+          {/* The documents screen was merged into the company profile. The route
+              stays as a redirect so saved links and the completion card keep working. */}
+          <Route path="/documents" element={<Navigate to="/profile" replace />} />
           <Route path="/compare" element={<CompanyRoute><Compare /></CompanyRoute>} />
           <Route path="/users" element={<CompanyRoute><CompanyUsers /></CompanyRoute>} />
           <Route path="/subscription" element={<CompanyRoute><Subscription /></CompanyRoute>} />

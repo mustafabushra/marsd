@@ -3,11 +3,15 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
 import { useLiveData } from '../hooks/useLiveData'
-import { LiveBadge } from '../components/LiveBadge'
 import { notifyAdmins } from '../lib/notify'
 
 /**
- * /documents — the company supplies its own paperwork.
+ * The documents section of the company profile.
+ *
+ * It was a page of its own, and it should not have been. A company does not go
+ * looking for a "documents" screen — its papers are part of its record, and
+ * splitting them out meant the profile said the record was incomplete while the
+ * thing that completes it lived somewhere else.
  *
  * The trust report's official layer had nothing to weigh beyond a registration
  * status, and its confidence section could only ever say "لا مستندات رسمية
@@ -41,7 +45,7 @@ const STATUS = {
 const MAX_BYTES = 5 * 1024 * 1024
 const ACCEPT = 'application/pdf,image/png,image/jpeg'
 
-export default function CompanyDocuments() {
+export default function CompanyDocumentsSection() {
   const { user } = useUser()
   const { tenantId } = useUserRole()
   const [companyId, setCompanyId] = useState(null)
@@ -74,7 +78,7 @@ export default function CompanyDocuments() {
   }, [tenantId])
 
   useEffect(() => { if (tenantId) load() }, [tenantId, load])
-  const { connected, liveAt } = useLiveData(load, { tables: ['company_documents'] })
+  useLiveData(load, { tables: ['company_documents'] })
 
   const upload = async (file) => {
     if (!file || !companyId) return
@@ -143,19 +147,10 @@ export default function CompanyDocuments() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
+    return null
   }
 
-  if (!companyId) {
-    return (
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '32px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>مستندات الشركة</h1>
-        <p style={{ fontSize: '14.5px', color: '#64748B', margin: 0 }}>
-          لا توجد شركة مرتبطة بحسابك بعد. أكمل تسجيل شركتك أو مطالبة الملكية أولاً.
-        </p>
-      </div>
-    )
-  }
+  if (!companyId) return null
 
   const verified = docs.filter((d) => d.status === 'verified').length
   const missing = DOC_TYPES.filter((t) => t.v !== 'other'
@@ -163,35 +158,6 @@ export default function CompanyDocuments() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>مستندات الشركة</h1>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-            كل مستند توثّقه إدارة مرصد يرفع الطبقة الرسمية في مؤشر ثقتك — والمعلَّق لا يؤثّر حتى يُراجَع.
-          </p>
-        </div>
-        <LiveBadge connected={connected} liveAt={liveAt} />
-      </div>
-
-      {error && (
-        <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: '14px', marginBottom: '18px' }}>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>مستندات موثَّقة</div>
-          <div style={{ fontSize: '26px', fontWeight: 900, color: '#15803D', lineHeight: 1 }}>{verified}</div>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>قيد المراجعة</div>
-          <div style={{ fontSize: '26px', fontWeight: 900, color: '#B45309', lineHeight: 1 }}>{docs.filter((d) => d.status === 'pending').length}</div>
-        </div>
-        <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>لم تُرفع بعد</div>
-          <div style={{ fontSize: '26px', fontWeight: 900, color: '#94A3B8', lineHeight: 1 }}>{missing.length}</div>
-        </div>
-      </div>
-
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>رفع مستند</h2>
         <div style={{ display: 'grid', gap: '14px' }}>

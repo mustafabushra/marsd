@@ -6,6 +6,7 @@ import { canPerform } from '../utils/roles'
 import { notificationText, NOTIFICATION_STYLE, NOTIFICATION_PREFS } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import CompanyDocumentsSection from '../components/CompanyDocumentsSection'
 
 /**
  * /profile — the company's own record, and what the platform sends it.
@@ -321,6 +322,8 @@ export default function Profile() {
           ))}
         </div>
       </div>
+
+      <CompanyDocumentsSection />
     </div>
   )
 }

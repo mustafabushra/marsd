@@ -677,14 +677,25 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       throw new Error('فشل إنشاء شركة: ' + (companyError?.message || 'Unknown error'))
     }
 
-    // Link company to tenant
-    const { error: tenantUpdateError } = await supabase
+    // Link company to tenant.
+    //
+    // Read the row back. An UPDATE that RLS filters out raises nothing and
+    // returns nothing, so `no error` was never evidence the link was made — and
+    // an unlinked tenant is a company with an account and no record in the
+    // registry it just joined: no trust report, no documents, no profile. That
+    // is how شركة الدجاج الوطني ended up with a CR number, a subscription and
+    // users, and no company row anywhere.
+    const { data: linked, error: tenantUpdateError } = await supabase
       .from('tenants')
       .update({ company_id: companyInsertData.id })
       .eq('id', tenantData.id)
+      .select('id, company_id')
 
     if (tenantUpdateError) {
       throw new Error('فشل ربط الشركة بـ الحساب: ' + tenantUpdateError.message)
+    }
+    if (!linked?.length || !linked[0].company_id) {
+      throw new Error('لم تُربط الشركة بالحساب — أُنشئت الشركة ولم يُحفظ الربط')
     }
 
     // 4. Create default subscription (Free plan)

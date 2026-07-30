@@ -87,7 +87,7 @@ export default function ProfileCompletion() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {top.map((g) => (
-              <button key={g.key} onClick={() => navigate(g.action === 'documents' ? '/documents' : '/profile')}
+              <button key={g.key} onClick={() => navigate('/profile')}
                       style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
                         background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
