@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -11,67 +12,67 @@ import { AdminRoute, CompanyRoute } from './components/ProtectedRoute'
 import NotFound from './pages/NotFound'
 import Unauthorized from './pages/Unauthorized'
 import Landing from './pages/Landing'
-import About from './pages/About'
-import Pricing from './pages/Pricing'
-import Partners from './pages/Partners'
-import FAQ from './pages/FAQ'
-import Contact from './pages/Contact'
+const About = lazy(() => import('./pages/About'))
+const Pricing = lazy(() => import('./pages/Pricing'))
+const Partners = lazy(() => import('./pages/Partners'))
+const FAQ = lazy(() => import('./pages/FAQ'))
+const Contact = lazy(() => import('./pages/Contact'))
 import Register from './pages/Register'
-import CompanyRegister from './pages/CompanyRegister'
-import CompanyOnboarding from './pages/CompanyOnboarding'
+const CompanyRegister = lazy(() => import('./pages/CompanyRegister'))
+const CompanyOnboarding = lazy(() => import('./pages/CompanyOnboarding'))
 import Login from './pages/Login'
-import AdminLogin from './pages/AdminLogin'
-import ForgotPassword from './pages/ForgotPassword'
-import CompanyDashboard from './pages/CompanyDashboard'
-import Search from './pages/Search'
-import AddCompany from './pages/AddCompany'
-import AddReport from './pages/AddReport'
-import MyReports from './pages/MyReports'
-import MyCompanies from './pages/MyCompanies'
-import TrustReport from './pages/TrustReport'
-import Watchlist from './pages/Watchlist'
-import Compare from './pages/Compare'
-import CompanyUsers from './pages/CompanyUsers'
-import Subscription from './pages/Subscription'
-import Profile from './pages/Profile'
-import Notifications from './pages/Notifications'
-import ReportsAboutUs from './pages/ReportsAboutUs'
-import AdminDashboard from './pages/AdminDashboard'
-import AdminRequests from './pages/AdminRequests'
-import AdminReports from './pages/AdminReports'
-import AdminBulkImport from './pages/AdminBulkImport'
-import AdminCompaniesManagement from './pages/AdminCompaniesManagement'
-import AdminUsers from './pages/AdminUsers'
-import AdminLogs from './pages/AdminLogs'
-import AdminSettings from './pages/AdminSettings'
-import AdminTenants from './pages/AdminTenants'
-import AdminSubscriptions from './pages/AdminSubscriptions'
-import AdminAdminUsers from './pages/AdminAdminUsers'
-import AdminPlans from './pages/AdminPlans'
-import AdminPayments from './pages/AdminPayments'
-import AdminTrustScore from './pages/AdminTrustScore'
-import AdminReportAnalytics from './pages/AdminReportAnalytics'
-import AdminEmailTemplates from './pages/AdminEmailTemplates'
-import AdminDataExport from './pages/AdminDataExport'
-import AdminDisputes from './pages/AdminDisputes'
-import AdminDocuments from './pages/AdminDocuments'
-import AdminRoster from './pages/AdminRoster'
-import AdminSystemHealth from './pages/AdminSystemHealth'
-import AdminFraudDetection from './pages/AdminFraudDetection'
-import AdminIntegrations from './pages/AdminIntegrations'
-import AdminTenantAnalytics from './pages/AdminTenantAnalytics'
-import AdminCompanyVerification from './pages/AdminCompanyVerification'
-import AdminCompanyApproval from './pages/AdminCompanyApproval'
-import AccountPendingApproval from './pages/AccountPendingApproval'
-import AccountRejected from './pages/AccountRejected'
-import AccountSuspended from './pages/AccountSuspended'
-import RegistrationPending from './pages/RegistrationPending'
-import CompanyClaimPending from './pages/CompanyClaimPending'
-import AdminClaimRequests from './pages/AdminClaimRequests'
-import CompanyKnowledgeBase from './pages/CompanyKnowledgeBase'
-import ReportKnowledgeBase from './pages/ReportKnowledgeBase'
+const AdminLogin = lazy(() => import('./pages/AdminLogin'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const CompanyDashboard = lazy(() => import('./pages/CompanyDashboard'))
+const Search = lazy(() => import('./pages/Search'))
+const AddCompany = lazy(() => import('./pages/AddCompany'))
+const AddReport = lazy(() => import('./pages/AddReport'))
+const MyReports = lazy(() => import('./pages/MyReports'))
+const MyCompanies = lazy(() => import('./pages/MyCompanies'))
+const TrustReport = lazy(() => import('./pages/TrustReport'))
+const Watchlist = lazy(() => import('./pages/Watchlist'))
+const Compare = lazy(() => import('./pages/Compare'))
+const CompanyUsers = lazy(() => import('./pages/CompanyUsers'))
+const Subscription = lazy(() => import('./pages/Subscription'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const ReportsAboutUs = lazy(() => import('./pages/ReportsAboutUs'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const AdminRequests = lazy(() => import('./pages/AdminRequests'))
+const AdminReports = lazy(() => import('./pages/AdminReports'))
+const AdminBulkImport = lazy(() => import('./pages/AdminBulkImport'))
+const AdminCompaniesManagement = lazy(() => import('./pages/AdminCompaniesManagement'))
+const AdminUsers = lazy(() => import('./pages/AdminUsers'))
+const AdminLogs = lazy(() => import('./pages/AdminLogs'))
+const AdminSettings = lazy(() => import('./pages/AdminSettings'))
+const AdminTenants = lazy(() => import('./pages/AdminTenants'))
+const AdminSubscriptions = lazy(() => import('./pages/AdminSubscriptions'))
+const AdminAdminUsers = lazy(() => import('./pages/AdminAdminUsers'))
+const AdminPlans = lazy(() => import('./pages/AdminPlans'))
+const AdminPayments = lazy(() => import('./pages/AdminPayments'))
+const AdminTrustScore = lazy(() => import('./pages/AdminTrustScore'))
+const AdminReportAnalytics = lazy(() => import('./pages/AdminReportAnalytics'))
+const AdminEmailTemplates = lazy(() => import('./pages/AdminEmailTemplates'))
+const AdminDataExport = lazy(() => import('./pages/AdminDataExport'))
+const AdminDisputes = lazy(() => import('./pages/AdminDisputes'))
+const AdminDocuments = lazy(() => import('./pages/AdminDocuments'))
+const AdminRoster = lazy(() => import('./pages/AdminRoster'))
+const AdminSystemHealth = lazy(() => import('./pages/AdminSystemHealth'))
+const AdminFraudDetection = lazy(() => import('./pages/AdminFraudDetection'))
+const AdminIntegrations = lazy(() => import('./pages/AdminIntegrations'))
+const AdminTenantAnalytics = lazy(() => import('./pages/AdminTenantAnalytics'))
+const AdminCompanyVerification = lazy(() => import('./pages/AdminCompanyVerification'))
+const AdminCompanyApproval = lazy(() => import('./pages/AdminCompanyApproval'))
+const AccountPendingApproval = lazy(() => import('./pages/AccountPendingApproval'))
+const AccountRejected = lazy(() => import('./pages/AccountRejected'))
+const AccountSuspended = lazy(() => import('./pages/AccountSuspended'))
+const RegistrationPending = lazy(() => import('./pages/RegistrationPending'))
+const CompanyClaimPending = lazy(() => import('./pages/CompanyClaimPending'))
+const AdminClaimRequests = lazy(() => import('./pages/AdminClaimRequests'))
+const CompanyKnowledgeBase = lazy(() => import('./pages/CompanyKnowledgeBase'))
+const ReportKnowledgeBase = lazy(() => import('./pages/ReportKnowledgeBase'))
 import AuthCallback from './pages/AuthCallback'
-import AcceptInvite from './pages/AcceptInvite'
+const AcceptInvite = lazy(() => import('./pages/AcceptInvite'))
 
 /**
  * Clerk loads its script from a CDN, and until it answers the whole app is one
@@ -125,7 +126,12 @@ function AppContent() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <Suspense fallback={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#64748B', fontWeight: 600, fontSize: '14px' }}>
+            جاري التحميل…
+          </div>
+        }>
+        <Routes>
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>
           <Route path="/" element={<Landing />} />
@@ -213,6 +219,7 @@ function AppContent() {
         {/* Catch-all 404 */}
         <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>
+        </Suspense>
     </BrowserRouter>
   )
 }
