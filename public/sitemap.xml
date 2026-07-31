@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Only the pages a signed-out visitor can actually read. Everything else
+     requires an account, and listing it would send crawlers to sign-in. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://marsd-peach.vercel.app/</loc><priority>1.0</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://marsd-peach.vercel.app/about</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://marsd-peach.vercel.app/pricing</loc><priority>0.9</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://marsd-peach.vercel.app/partners</loc><priority>0.6</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://marsd-peach.vercel.app/faq</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://marsd-peach.vercel.app/contact</loc><priority>0.6</priority><changefreq>monthly</changefreq></url>
+</urlset>

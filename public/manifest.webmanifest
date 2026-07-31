@@ -1,0 +1,16 @@
+{
+  "name": "مرصد — منصة تقييم موثوقية الأعمال",
+  "short_name": "مرصد",
+  "description": "مؤشر ثقة للشركات السعودية مبني على السجلات الرسمية وتجارب المجتمع التجاري وتحليل المنصة.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E2A52",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
