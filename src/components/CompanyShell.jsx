@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/react'
+import NotificationBell from './NotificationBell'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import { useUserRole } from '../hooks/useUserRole'
@@ -235,10 +236,7 @@ export default function CompanyShell({ user }) {
               </div>
               ابحث عن شركة...
             </button>
-            <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#475569' }}>
-              <BellIcon />
-              <span style={{ position: 'absolute', top: '-3px', left: '-3px', width: '9px', height: '9px', background: '#DC2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
-            </div>
+            <NotificationBell />
             <UserButton
               afterSignOutUrl="/"
               appearance={{

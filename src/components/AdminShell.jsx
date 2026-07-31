@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/react'
+import NotificationBell from './NotificationBell'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import {
@@ -11,7 +12,6 @@ import {
   BuildingIcon,
   UsersIcon,
   LogIcon,
-  BellIcon,
 } from './icons'
 
 const TOP_ITEMS = [
@@ -244,10 +244,7 @@ export default function AdminShell({ user }) {
             <span style={{ background: '#F5F3FF', color: '#7C3AED', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800 }}>وضع المسؤول</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#475569' }}>
-              <BellIcon />
-              <span style={{ position: 'absolute', top: '-3px', left: '-3px', width: '9px', height: '9px', background: '#DC2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
-            </div>
+            <NotificationBell />
             <UserButton
               afterSignOutUrl="/"
               appearance={{ elements: { avatarBox: 'w-10 h-10', userButtonBox: 'flex-row-reverse' } }}
