@@ -55,6 +55,7 @@ import AdminEmailTemplates from './pages/AdminEmailTemplates'
 import AdminDataExport from './pages/AdminDataExport'
 import AdminDisputes from './pages/AdminDisputes'
 import AdminDocuments from './pages/AdminDocuments'
+import AdminRoster from './pages/AdminRoster'
 import AdminSystemHealth from './pages/AdminSystemHealth'
 import AdminFraudDetection from './pages/AdminFraudDetection'
 import AdminIntegrations from './pages/AdminIntegrations'
@@ -192,6 +193,7 @@ function AppContent() {
           <Route path="/admin/data-export" element={<AdminRoute><AdminDataExport /></AdminRoute>} />
           <Route path="/admin/disputes" element={<AdminRoute><AdminDisputes /></AdminRoute>} />
           <Route path="/admin/documents" element={<AdminRoute><AdminDocuments /></AdminRoute>} />
+          <Route path="/admin/roster" element={<AdminRoute><AdminRoster /></AdminRoute>} />
           <Route path="/admin/system-health" element={<AdminRoute><AdminSystemHealth /></AdminRoute>} />
           <Route path="/admin/fraud-detection" element={<AdminRoute><AdminFraudDetection /></AdminRoute>} />
           <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />

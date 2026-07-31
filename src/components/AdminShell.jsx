@@ -37,6 +37,7 @@ const GROUPS = [
     { label: 'مؤشر الثقة', path: '/admin/trust-score' },
   ] },
   { key: 'advanced', title: 'الإدارة المتقدمة', items: [
+    { label: 'سجلّ الشركات', path: '/admin/roster' },
     { label: 'الاعتراضات', path: '/admin/disputes' },
     { label: 'المستندات والحالة الرسمية', path: '/admin/documents' },
     { label: 'تصدير البيانات', path: '/admin/data-export' },
@@ -72,6 +73,7 @@ const SCREEN_LABELS = {
   '/admin/report-analytics': 'تحليلات التقارير',
   '/admin/tenant-analytics': 'تحليلات الشركات',
   '/admin/trust-score': 'تحليلات مؤشر الثقة',
+  '/admin/roster': 'سجلّ الشركات وحالاتها',
   '/admin/disputes': 'الاعتراضات على التقارير',
   '/admin/documents': 'المستندات والحالة الرسمية',
   '/admin/data-export': 'تصدير البيانات',
