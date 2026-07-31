@@ -1,0 +1,40 @@
+# مرصد — منصة تقييم موثوقية الأعمال
+#
+# There was no robots.txt at all. The SPA rewrite returned index.html for every
+# path that is not a file, so a crawler asking for /robots.txt was handed a page
+# of HTML and parsed it as directives — which is where Lighthouse's "16 errors"
+# came from. The file was not wrong; it did not exist.
+
+User-agent: *
+
+# The marketing pages are the whole public surface. Everything below requires an
+# account: 059 closed the registry and the trust scores to anonymous readers, so
+# a crawler following these would collect nothing but redirects to sign-in.
+Disallow: /dashboard
+Disallow: /search
+Disallow: /trust-report/
+Disallow: /admin
+Disallow: /profile
+Disallow: /documents
+Disallow: /notifications
+Disallow: /my-reports
+Disallow: /my-companies
+Disallow: /watchlist
+Disallow: /compare
+Disallow: /subscription
+Disallow: /users
+Disallow: /reports-about-us
+Disallow: /add-report
+Disallow: /add-company
+Disallow: /auth/
+Disallow: /accept-invite
+Disallow: /api/
+
+Allow: /$
+Allow: /about
+Allow: /pricing
+Allow: /partners
+Allow: /faq
+Allow: /contact
+
+Sitemap: https://marsd-peach.vercel.app/sitemap.xml
