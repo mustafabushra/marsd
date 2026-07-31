@@ -230,7 +230,7 @@ export default function AdminPayments() {
               <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{money(i.amount)}</span>
               <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{money(i.vat)}</span>
               <span style={{ fontSize: '13.5px', color: '#0F172A', fontWeight: 800 }}>{money(i.total)}</span>
-              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{i.issued_at ? new Date(i.issued_at).toLocaleDateString('en-GB') : '—'}</span>
+              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{i.issued_at ? new Date(i.issued_at).toLocaleDateString('en-GB') : '—'}</span>
             </div>
           ))}
         </div>
@@ -251,24 +251,24 @@ export default function AdminPayments() {
               <div key={r.id} style={{ ...card, padding: '22px', opacity: busyId === r.id ? 0.6 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
                   <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>{r.tenants?.name || 'شركة'}</h3>
-                    <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: 0, fontWeight: 600 }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>{r.tenants?.name || 'شركة'}</h2>
+                    <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0, fontWeight: 600 }}>
                       سجل {r.tenants?.cr_number || '—'}{r.tenants?.email ? ` · ${r.tenants.email}` : ''}
                     </p>
                     <p style={{ fontSize: '14px', color: '#334155', margin: '9px 0 0', fontWeight: 700 }}>
                       {r.current?.name || 'مجاني'} ← <strong style={{ color: '#0F172A' }}>{r.requested?.name}</strong>
-                      <span style={{ color: '#94A3B8', fontWeight: 700 }}> · {money(r.requested?.price_monthly)}/شهر</span>
+                      <span style={{ color: '#64748B', fontWeight: 700 }}> · {money(r.requested?.price_monthly)}/شهر</span>
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                     <span style={{ background: s.bg, color: s.c, borderRadius: '8px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>{s.label}</span>
-                    <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{new Date(r.created_at).toLocaleDateString('en-GB')}</span>
+                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{new Date(r.created_at).toLocaleDateString('en-GB')}</span>
                   </div>
                 </div>
 
                 {r.note && (
                   <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px 15px', marginTop: '13px', textAlign: 'right' }}>
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 800, marginBottom: '3px' }}>ملاحظة الشركة</div>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 800, marginBottom: '3px' }}>ملاحظة الشركة</div>
                     <p style={{ fontSize: '13.5px', color: '#334155', margin: 0, lineHeight: 1.9 }}>{r.note}</p>
                   </div>
                 )}

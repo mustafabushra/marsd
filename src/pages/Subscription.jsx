@@ -218,9 +218,9 @@ export default function Subscription() {
           company commits, not after. */}
       {upgradeTo && (
         <div style={{ ...card, padding: '24px', marginBottom: '18px', border: '1.5px solid #1E2A52' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>
+          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>
             طلب باقة «{upgradeTo.name}»
-          </h3>
+          </h2>
           <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
             تسجيل الطلب لا يخصم شيئاً. تتواصل معك إدارة مرصد لتأكيد السداد، وتُفعَّل الباقة عندها.
           </p>
@@ -322,7 +322,7 @@ export default function Subscription() {
       {/* Limits and consumption */}
       <div style={{ ...card, padding: '22px', marginBottom: '18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap', margin: '0 0 16px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>حدود باقتك واستهلاكها</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>حدود باقتك واستهلاكها</h2>
           <LiveBadge connected={connected} liveAt={liveAt} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '12px' }}>
@@ -361,7 +361,7 @@ export default function Subscription() {
       {/* How to earn — only where it applies */}
       {giveToGetEnabled && rules?.earn && (
         <div style={{ ...card, border: '1px solid #BBF7D0', padding: '22px', marginBottom: '18px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#15803D', margin: '0 0 6px' }}>فلسفة Give to Get</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#15803D', margin: '0 0 6px' }}>فلسفة Give to Get</h2>
           <p style={{ fontSize: '13.5px', color: '#334155', lineHeight: 1.9, margin: '0 0 16px' }}>
             مرصد يقوم على بيانات يساهم بها أعضاؤه. كل مساهمة موثقة من فريقك تضيف رصيداً لشركتك، وتوسّع حدودك دون أي تكلفة.
           </p>
@@ -384,7 +384,7 @@ export default function Subscription() {
       {/* Available plans — rendered from the database, not written here */}
       {allPlans.length > 1 && (
         <div style={{ ...card, padding: '22px', marginBottom: '18px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>الباقات المتاحة</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>الباقات المتاحة</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: '12px' }}>
             {allPlans.map((p) => {
               const current = p.code === plan?.code
@@ -415,7 +415,7 @@ export default function Subscription() {
                     </button>
                   )}
                   {!current && !canUpgrade && Number(p.price_monthly) > 0 && (
-                    <div style={{ marginTop: '14px', fontSize: '12px', color: '#94A3B8', fontWeight: 700, textAlign: 'center' }}>
+                    <div style={{ marginTop: '14px', fontSize: '12px', color: '#64748B', fontWeight: 700, textAlign: 'center' }}>
                       🔒 تغيير الباقة من صلاحيات مدير الشركة
                     </div>
                   )}

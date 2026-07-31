@@ -85,14 +85,14 @@ const CompaniesTable: React.FC<CompaniesTableProps> = ({
   const loadingStyles: React.CSSProperties = {
     textAlign: 'center',
     padding: '40px 16px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: '14px',
   }
 
   const emptyStyles: React.CSSProperties = {
     textAlign: 'center',
     padding: '40px 16px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: '14px',
   }
 
@@ -189,7 +189,7 @@ const CompaniesTable: React.FC<CompaniesTableProps> = ({
                       {company.trust_score.score}
                     </div>
                   ) : (
-                    <span style={{ color: '#94A3B8' }}>-</span>
+                    <span style={{ color: '#64748B' }}>-</span>
                   )}
                 </td>
                 <td style={tdStyles}>

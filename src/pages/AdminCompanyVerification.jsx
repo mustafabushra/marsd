@@ -205,7 +205,7 @@ export default function AdminCompanyVerification() {
               <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', alignItems: 'center', textAlign: 'right' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{c.name}{c.verified ? ' ✔' : ''}</div>
-                  <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{c.city || '—'}{c.sector ? ` · ${c.sector}` : ''}</div>
+                  <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{c.city || '—'}{c.sector ? ` · ${c.sector}` : ''}</div>
                 </div>
                 <span style={{ fontSize: '13px', color: '#334155', fontWeight: 600 }}>{c.cr_number || '—'}</span>
                 <span style={{ fontSize: '12.5px', fontWeight: 700, color: c.source === 'official' ? '#0369A1' : '#64748B' }}>{c.source === 'official' ? 'رسمي' : 'مجتمعي'}</span>
@@ -213,7 +213,7 @@ export default function AdminCompanyVerification() {
                   <div style={{ height: '6px', background: '#F1F5F9', borderRadius: '999px', overflow: 'hidden', marginBottom: '4px' }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#16A34A' : pct >= 60 ? '#F59E0B' : '#DC2626' }} />
                   </div>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{done}/{REQUIRED.length}</span>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{done}/{REQUIRED.length}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button onClick={() => setOpenId(open ? null : c.id)} style={{ background: '#F1F5F9', color: '#334155', border: 0, borderRadius: '8px', padding: '7px 13px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -252,7 +252,7 @@ export default function AdminCompanyVerification() {
                       ['وُثّقت في', c.verified_at ? new Date(c.verified_at).toLocaleString('en-GB') : null],
                     ].map(([k, v]) => (
                       <div key={k}>
-                        <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{k}</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{k}</div>
                         <div style={{ fontSize: '13.5px', fontWeight: 700, color: v ? '#334155' : '#CBD5E1' }}>{v || '—'}</div>
                       </div>
                     ))}

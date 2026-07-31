@@ -164,7 +164,7 @@ export default function AdminSystemHealth() {
         </div>
       )}
 
-      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>الحماية والبنية</h3>
+      <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>الحماية والبنية</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '14px', marginBottom: '18px' }}>
         <StatTile
           label="جداول محميّة بـ RLS"
@@ -177,7 +177,7 @@ export default function AdminSystemHealth() {
         <StatTile label="تقارير بانتظار المراجعة" value={activity.pending_review} sub={`${activity.reports_last_7d} تقريراً في ٧ أيام`} tone={activity.pending_review > 20 ? STATUS_COLOR.warning : undefined} />
       </div>
 
-      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>حجم البيانات</h3>
+      <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>حجم البيانات</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '14px', marginBottom: '18px' }}>
         {[
           ['شركات', volume.companies], ['حسابات شركات', volume.tenants], ['مستخدمون', volume.users],
@@ -186,7 +186,7 @@ export default function AdminSystemHealth() {
         ].map(([label, value]) => <StatTile key={label} label={label} value={Number(value).toLocaleString('en-US')} />)}
       </div>
 
-      <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>آخر نشاط</h3>
+      <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>آخر نشاط</h2>
       <div style={{ ...card, overflow: 'hidden' }}>
         {[
           ['آخر تقرير', activity.last_report],

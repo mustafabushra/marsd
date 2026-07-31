@@ -161,7 +161,7 @@ export default function AdminPlans() {
       {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>}
 
       <div style={{ marginBottom: '18px' }}>
-        <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>الباقات والصلاحيات ({plans.length})</h3>
+        <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>الباقات والصلاحيات ({plans.length})</h2>
         <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0, lineHeight: 1.8 }}>
           ما تعدّله هنا يُطبَّق على الكيانات مباشرة عند تحميلهم التالي — بلا نشر ولا تعديل كود.
         </p>
@@ -224,7 +224,7 @@ export default function AdminPlans() {
                   </div>
                   <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
                     {(plan.features || []).length === 0
-                      ? <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>لا ميزات إضافية</span>
+                      ? <span style={{ fontSize: '12.5px', color: '#64748B' }}>لا ميزات إضافية</span>
                       : plan.features.map((f) => (
                         <span key={f} style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '7px', padding: '5px 11px', fontSize: '12px', fontWeight: 700 }}>{catalog[f] || f}</span>
                       ))}
@@ -249,7 +249,7 @@ export default function AdminPlans() {
                   </label>
 
                   <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>
-                    الحدود <span style={{ fontWeight: 600, color: '#94A3B8' }}>— اكتب \u200E-1\u200E أو اترك الحقل فارغاً ليصبح بلا حد</span>
+                    الحدود <span style={{ fontWeight: 600, color: '#64748B' }}>— اكتب \u200E-1\u200E أو اترك الحقل فارغاً ليصبح بلا حد</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '10px', marginBottom: '16px' }}>
                     {Object.entries(LIMIT_LABELS).map(([key, label]) => (
@@ -266,7 +266,7 @@ export default function AdminPlans() {
 
                   <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>الميزات</div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                    {Object.keys(catalog).length === 0 && <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>لا يوجد فهرس ميزات — شغّل الهجرة 011</span>}
+                    {Object.keys(catalog).length === 0 && <span style={{ fontSize: '12.5px', color: '#64748B' }}>لا يوجد فهرس ميزات — شغّل الهجرة 011</span>}
                     {Object.entries(catalog).map(([key, label]) => {
                       const on = (editing.features || []).includes(key)
                       return (

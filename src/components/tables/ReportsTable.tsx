@@ -97,14 +97,14 @@ const ReportsTable: React.FC<ReportsTableProps> = ({
   const loadingStyles: React.CSSProperties = {
     textAlign: 'center',
     padding: '40px 16px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: '14px',
   }
 
   const emptyStyles: React.CSSProperties = {
     textAlign: 'center',
     padding: '40px 16px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: '14px',
   }
 

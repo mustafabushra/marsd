@@ -203,14 +203,14 @@ export default function AdminFraudDetection() {
               <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 20px', alignItems: 'center', textAlign: 'right' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{r.tenant_name}</div>
-                  <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600 }}>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>
                     {r.cr_number || '—'}{r.sector ? ` · ${r.sector}` : ''}
                   </div>
                 </div>
 
                 <div style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>
                   {r.reports_total}
-                  {r.reports_total > 0 && <span style={{ color: '#94A3B8', fontWeight: 600 }}> · {r.reject_rate}% مرفوض</span>}
+                  {r.reports_total > 0 && <span style={{ color: '#64748B', fontWeight: 600 }}> · {r.reject_rate}% مرفوض</span>}
                   {r.reports_overturned > 0 && (
                     <div style={{ fontSize: '11.5px', color: STATUS_COLOR.critical, fontWeight: 800 }}>
                       {r.reports_overturned} سُحب بعد اعتراض
@@ -221,7 +221,7 @@ export default function AdminFraudDetection() {
                 <div style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>
                   {r.companies_added}
                   {r.companies_not_approved > 0 && (
-                    <span style={{ color: '#94A3B8', fontWeight: 600 }}> · {r.companies_not_approved} لم تُعتمد</span>
+                    <span style={{ color: '#64748B', fontWeight: 600 }}> · {r.companies_not_approved} لم تُعتمد</span>
                   )}
                 </div>
 
@@ -239,7 +239,7 @@ export default function AdminFraudDetection() {
               {open && (
                 <div style={{ padding: '4px 20px 20px', background: '#FAFCFF' }}>
                   {!detail ? (
-                    <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600, padding: '10px 0' }}>جاري قراءة السجل…</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, padding: '10px 0' }}>جاري قراءة السجل…</div>
                   ) : (
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '13px', marginBottom: '16px', textAlign: 'right' }}>
@@ -254,7 +254,7 @@ export default function AdminFraudDetection() {
                           ['نقاط كسبتها', detail.risk?.credits_earned],
                         ].map(([k, v]) => (
                           <div key={k}>
-                            <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>{k}</div>
+                            <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{k}</div>
                             <div style={{ fontSize: '14px', fontWeight: 800, color: v != null && v !== '' ? '#334155' : '#CBD5E1' }}>{v ?? '—'}</div>
                           </div>
                         ))}
@@ -308,7 +308,7 @@ export default function AdminFraudDetection() {
                         >
                           {r.company_add_suspended ? 'إعادة تفعيل إضافة الشركات' : 'إيقاف إضافة الشركات'}
                         </button>
-                        <span style={{ alignSelf: 'center', fontSize: '12px', color: '#94A3B8', fontWeight: 600, lineHeight: 1.8 }}>
+                        <span style={{ alignSelf: 'center', fontSize: '12px', color: '#64748B', fontWeight: 600, lineHeight: 1.8 }}>
                           الحساب يبقى نشطاً: البحث والمراقبة والاشتراك لا تتأثر
                         </span>
                       </div>

@@ -58,14 +58,14 @@ export default function Pricing() {
               </div>
             )}
 
-            <h3 style={{
+            <h2 style={{
               fontSize: '21px',
               fontWeight: 900,
               color: '#1E2A52',
               margin: '0 0 6px'
             }}>
               {tier.name}
-            </h3>
+            </h2>
             <p style={{
               fontSize: '13.5px',
               color: '#64748B',
@@ -91,7 +91,7 @@ export default function Pricing() {
               </span>
               <span style={{
                 fontSize: '14px',
-                color: '#94A3B8',
+                color: '#64748B',
                 fontWeight: 600
               }}>
                 {tier.period}

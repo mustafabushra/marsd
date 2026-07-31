@@ -359,7 +359,7 @@ export default function Search() {
 
         {/* FILTERS */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 700, padding: '8px 0' }}>تصفية:</span>
+          <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, padding: '8px 0' }}>تصفية:</span>
           {[
             { key: 'sector', label: 'القطاع', options: sectors },
             { key: 'city', label: 'المدينة', options: cities },
@@ -436,7 +436,7 @@ export default function Search() {
                 <div style={{ width: '78px', height: '78px', borderRadius: '50%', background: c.gaugeBg, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: '21px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{c.scoreText}</span>
-                    <span style={{ fontSize: '9.5px', color: '#94A3B8' }}>من 100</span>
+                    <span style={{ fontSize: '9.5px', color: '#64748B' }}>من 100</span>
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -450,7 +450,7 @@ export default function Search() {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>● {c.riskLabel}</span>
-                <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{c.reports} تقرير</span>
+                <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{c.reports} تقرير</span>
               </div>
 
               {c.hasData ? (

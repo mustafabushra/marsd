@@ -295,10 +295,10 @@ export default function AdminRequests() {
                 <div key={r.key} onClick={() => setSel(i)} style={{ padding: '15px 18px', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', display: 'grid', gridTemplateColumns: '1.6fr 1fr auto', gap: '12px', alignItems: 'center', background: sel === i ? '#F5F3FF' : '#fff', borderRight: sel === i ? '3px solid #7C3AED' : '3px solid transparent' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', lineHeight: 1.4 }}>{r.name}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>مقدّم من: {r.by}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>مقدّم من: {r.by}</div>
                   </div>
                   <span><span style={{ background: m.bg, color: m.c, borderRadius: '7px', padding: '4px 10px', fontSize: '11.5px', fontWeight: 800 }}>{m.label}</span></span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{r.date ? new Date(r.date).toLocaleDateString('en-GB') : ''}</span>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{r.date ? new Date(r.date).toLocaleDateString('en-GB') : ''}</span>
                 </div>
               )
             })}
@@ -309,7 +309,7 @@ export default function AdminRequests() {
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', paddingBottom: '16px', borderBottom: '1px solid #F1F5F9' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>الشركة</div>
                   <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{current.name}</h2>
                 </div>
                 <span style={{ background: meta(current.kind).bg, color: meta(current.kind).c, borderRadius: '8px', padding: '6px 13px', fontSize: '12.5px', fontWeight: 800 }}>{meta(current.kind).label}</span>
@@ -324,7 +324,7 @@ export default function AdminRequests() {
                     ['المدينة', current.city],
                   ].map(([l, v, ltr]) => (
                     <div key={l} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '14px' }}>
-                      <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>{l}</div>
                       <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A', direction: ltr ? 'ltr' : undefined, textAlign: 'right' }}>{v || '—'}</div>
                     </div>
                   ))}
@@ -352,18 +352,18 @@ export default function AdminRequests() {
 
               {current.kind === 'add_company' && (
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '8px' }}>مستند السجل التجاري المرفق</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>مستند السجل التجاري المرفق</div>
                   {current.crFileUrl ? (
                     <button onClick={() => openDoc(current.crFileUrl)} style={{ display: 'inline-flex', alignItems: 'center', gap: '9px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', fontSize: '13.5px', fontWeight: 700, color: '#1E2A52', cursor: 'pointer', fontFamily: 'inherit' }}>📄 عرض المستند</button>
                   ) : (
-                    <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600 }}>لم يُرفق مستند السجل التجاري مع هذا الطلب.</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>لم يُرفق مستند السجل التجاري مع هذا الطلب.</div>
                   )}
                 </div>
               )}
 
               {current.note && (
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '11px', padding: '13px 16px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>ملاحظة العضو</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>ملاحظة العضو</div>
                   <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>{current.note}</div>
                 </div>
               )}

@@ -244,14 +244,14 @@ export default function AdminClaimRequests() {
               <div key={r.id} style={{ ...card, padding: '22px', opacity: busy ? 0.6 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
                   <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>{r.companies?.name || 'شركة'}</h3>
+                    <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>{r.companies?.name || 'شركة'}</h2>
                     <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
                       سجل {r.companies?.cr_number || '—'}{r.companies?.city ? ` · ${r.companies.city}` : ''}
                       <br />
                       مقدّم الطلب: <strong style={{ color: '#334155' }}>{claimant}</strong> — {r.users?.email}
                     </p>
                   </div>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
                     {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}
                   </span>
                 </div>

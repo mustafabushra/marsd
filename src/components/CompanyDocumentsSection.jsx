@@ -188,7 +188,7 @@ export default function CompanyDocumentsSection() {
 
   if (loading) {
     return (
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px', color: '#94A3B8', fontSize: '14px', fontWeight: 600 }}>
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px', color: '#64748B', fontSize: '14px', fontWeight: 600 }}>
         جاري تحميل مستندات الشركة…
       </div>
     )
@@ -234,7 +234,7 @@ export default function CompanyDocumentsSection() {
         <div style={{ height: '10px', background: '#E2E8F0', borderRadius: '5px', overflow: 'hidden' }}>
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: '5px', background: pct >= 70 ? '#16A34A' : pct >= 40 ? '#F59E0B' : '#DC2626' }}></div>
         </div>
-        <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
+        <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '8px' }}>
           {done} من {items.length} مستنداً معتمداً
         </div>
 
@@ -267,7 +267,7 @@ export default function CompanyDocumentsSection() {
                   {i.label}
                   {i.required && <span style={{ color: '#B91C1C', marginRight: '5px' }}>*</span>}
                 </div>
-                <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '4px' }}>
+                <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '4px' }}>
                   {i.file_name || 'لم يُرفع بعد'}
                   {i.expires_at && ` · ينتهي ${fmt(i.expires_at)}`}
                   {i.versions > 1 && ` · ${i.versions} نسخ`}
@@ -314,7 +314,7 @@ export default function CompanyDocumentsSection() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '18px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{openRow.label}</h3>
               <button onClick={() => setOpenRow(null)} aria-label="إغلاق"
-                      style={{ background: 'none', border: 0, fontSize: '22px', color: '#94A3B8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                      style={{ background: 'none', border: 0, fontSize: '22px', color: '#64748B', cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '11px', marginBottom: '22px' }}>
@@ -327,7 +327,7 @@ export default function CompanyDocumentsSection() {
                 ['سبب الرفض', openRow.rejection_reason],
               ].filter(([, v]) => v).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13.5px' }}>
-                  <span style={{ color: '#94A3B8', fontWeight: 700 }}>{k}</span>
+                  <span style={{ color: '#64748B', fontWeight: 700 }}>{k}</span>
                   <span style={{ color: '#0F172A', fontWeight: 700, textAlign: 'left' }}>{v}</span>
                 </div>
               ))}
@@ -348,7 +348,7 @@ export default function CompanyDocumentsSection() {
 
             <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>سجلّ النسخ</div>
             {versions.length === 0 ? (
-              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>لا نسخ سابقة.</p>
+              <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>لا نسخ سابقة.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {versions.map((v) => (
@@ -356,7 +356,7 @@ export default function CompanyDocumentsSection() {
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
                       {v.file_name || 'ملف'} — {(STATE[v.status] || { t: v.status }).t}
                     </div>
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '4px' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '4px' }}>
                       رُفع {fmt(v.uploaded_at)}
                       {v.verified_at && ` · اعتُمد ${fmt(v.verified_at)}`}
                       {v.superseded_at && ` · استُبدل ${fmt(v.superseded_at)}`}

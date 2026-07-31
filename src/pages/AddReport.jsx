@@ -387,17 +387,17 @@ export default function AddReport() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
               {companiesLoading ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>جاري تحميل الشركات...</div>
+                <div style={{ textAlign: 'center', padding: '30px', color: '#64748B', fontSize: '14px' }}>جاري تحميل الشركات...</div>
               ) : filteredCompanies.length === 0 ? (
                 companySearch.trim() ? (
                   <div style={{ textAlign: 'center', padding: '30px 16px', border: '1.5px dashed #CBD5E1', borderRadius: '14px', background: '#F8FAFC' }}>
                     <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔍</div>
                     <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>لم يتم العثور على نتائج</div>
-                    <div style={{ fontSize: '13.5px', color: '#94A3B8', marginBottom: '16px' }}>جرّب اسم شركة أخرى أو رقم سجل مختلف</div>
+                    <div style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '16px' }}>جرّب اسم شركة أخرى أو رقم سجل مختلف</div>
                     <button type="button" onClick={goAddCompany} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '12px 24px', fontSize: '14.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>+ طلب إضافة شركة</button>
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8', fontSize: '14px' }}>ابدأ بكتابة اسم الشركة أو رقم سجلها للبحث</div>
+                  <div style={{ textAlign: 'center', padding: '30px', color: '#64748B', fontSize: '14px' }}>ابدأ بكتابة اسم الشركة أو رقم سجلها للبحث</div>
                 )
               ) : filteredCompanies.slice(0, 40).map(c => {
                 const chosen = form.companyId === c.id
@@ -419,11 +419,11 @@ export default function AddReport() {
             {/* Auto-displayed company info */}
             {selectedCompany && (
               <div style={{ marginTop: '16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '18px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center' }}>
-                <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>الشركة</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedCompany.name}</div></div>
-                <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>رقم السجل</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedCompany.cr || '—'}</div></div>
-                <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>حالة السجل</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{companyInfo?.cr_status === 'active' ? 'نشط' : companyInfo?.cr_status || '—'}</div></div>
-                <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>مؤشر الثقة</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#1E2A52' }}>{selectedCompany.score != null ? `${selectedCompany.score} / 100` : '—'}</div></div>
-                <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>التحقق</div><div style={{ fontSize: '14px', fontWeight: 800, color: companyInfo?.verified ? '#1D4ED8' : '#94A3B8' }}>{companyInfo?.verified ? '✔ موثّقة' : 'غير موثّقة'}</div></div>
+                <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>الشركة</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedCompany.name}</div></div>
+                <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>رقم السجل</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedCompany.cr || '—'}</div></div>
+                <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>حالة السجل</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{companyInfo?.cr_status === 'active' ? 'نشط' : companyInfo?.cr_status || '—'}</div></div>
+                <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>مؤشر الثقة</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#1E2A52' }}>{selectedCompany.score != null ? `${selectedCompany.score} / 100` : '—'}</div></div>
+                <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>التحقق</div><div style={{ fontSize: '14px', fontWeight: 800, color: companyInfo?.verified ? '#1D4ED8' : '#94A3B8' }}>{companyInfo?.verified ? '✔ موثّقة' : 'غير موثّقة'}</div></div>
               </div>
             )}
           </>
@@ -593,7 +593,7 @@ export default function AddReport() {
                   ['حالة السداد', PAYMENT_STATUS.find(p => p.v === form.paymentStatus)?.t],
                   ['التوصية', RECOMMEND.find(r => r.v === form.wouldRecommend)?.t],
                 ].map(([l, v]) => (
-                  <div key={l}><div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700, marginBottom: '3px' }}>{l}</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{v}</div></div>
+                  <div key={l}><div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '3px' }}>{l}</div><div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{v}</div></div>
                 ))}
               </div>
             </div>

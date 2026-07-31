@@ -108,7 +108,7 @@ export default function Notifications() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الإشعارات</h3>
+          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الإشعارات</h2>
           {unreadCount > 0 && (
             <span style={{ background: '#FEE2E2', color: '#B91C1C', borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800 }}>{unreadCount} غير مقروء</span>
           )}
@@ -155,7 +155,7 @@ export default function Notifications() {
                     {unread && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3B82F6', flex: 'none' }} />}
                   </div>
                   {message && <div style={{ fontSize: '13.5px', color: '#64748B', lineHeight: 1.8 }}>{message}</div>}
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '5px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginTop: '5px' }}>
                     {new Date(n.created_at).toLocaleString('en-GB')}
                   </div>
                 </div>

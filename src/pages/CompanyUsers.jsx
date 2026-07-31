@@ -324,7 +324,7 @@ export default function CompanyUsers() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>المستخدمون ({users.length})</h3>
+          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>المستخدمون ({users.length})</h2>
           <LiveBadge connected={connected} liveAt={liveAt} />
           {pendingInvites.length > 0 && (
             <span style={S.badge('#FEF3C7', '#92400E')}>{pendingInvites.length} دعوة معلّقة</span>
@@ -369,12 +369,12 @@ export default function CompanyUsers() {
             <span>الاسم</span><span>البريد الإلكتروني</span><span>الدور</span><span>الحالة</span><span>آخر دخول</span><span>{isAdmin ? 'الإجراءات' : ''}</span>
           </div>
           {users.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>لا يوجد مستخدمون بعد</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>لا يوجد مستخدمون بعد</div>
           ) : users.map((u) => {
             const roleLocked = isLastActiveAdmin(u)
             return (
               <div key={u.id} style={{ display: 'grid', gridTemplateColumns: USERS_GRID, padding: '14px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{u.name}{u.isSelf && <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}> (أنت)</span>}</span>
+                <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{u.name}{u.isSelf && <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}> (أنت)</span>}</span>
                 <span style={{ fontSize: '13.5px', color: '#64748B', direction: 'ltr', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</span>
                 <span>
                   {isAdmin ? (
@@ -393,7 +393,7 @@ export default function CompanyUsers() {
                   )}
                 </span>
                 <span><span style={S.badge(u.active ? '#ECFDF5' : '#FEE2E2', u.active ? '#15803D' : '#B91C1C')}>{u.active ? 'نشط' : 'معطّل'}</span></span>
-                <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{u.lastLogin}</span>
+                <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{u.lastLogin}</span>
                 <span style={{ display: 'flex', gap: '8px' }}>
                   {isAdmin && !u.isSelf && (
                     u.active ? (

@@ -187,8 +187,8 @@ export default function AdminTrustScore() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.05fr', gap: '18px', alignItems: 'start' }}>
         {/* The model */}
         <div style={{ ...card, padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>المعاملات</h3>
-          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>المعاملات</h2>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
             الدرجة = الأساس + (نسبة السداد في موعده × وزنها) − (نسبة التعثّر × وزنها) − خصم التأخير
           </p>
 
@@ -196,7 +196,7 @@ export default function AdminTrustScore() {
             <div key={f.path.join('.')} style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '12px', alignItems: 'center', marginBottom: '13px' }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{f.label}</div>
-                {f.hint && <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600, lineHeight: 1.7 }}>{f.hint}</div>}
+                {f.hint && <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, lineHeight: 1.7 }}>{f.hint}</div>}
               </div>
               <input
                 type="number"
@@ -230,12 +230,12 @@ export default function AdminTrustScore() {
         {/* What it produces */}
         <div style={{ ...card, overflow: 'hidden' }}>
           <div style={{ padding: '18px 20px 14px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>الدرجات الحالية</h3>
-            <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '4px 0 0', fontWeight: 600, textAlign: 'right' }}>{scores.length} شركة مُحتسبة</p>
+            <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>الدرجات الحالية</h2>
+            <p style={{ fontSize: '12.5px', color: '#64748B', margin: '4px 0 0', fontWeight: 600, textAlign: 'right' }}>{scores.length} شركة مُحتسبة</p>
           </div>
           <div style={{ maxHeight: '620px', overflowY: 'auto' }}>
             {scores.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600 }}>لا توجد درجات محتسبة بعد</div>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '13.5px', fontWeight: 600 }}>لا توجد درجات محتسبة بعد</div>
             ) : scores.map((s, i) => {
               const b = BANDS[s.risk_band] || BANDS.none
               return (
@@ -243,7 +243,7 @@ export default function AdminTrustScore() {
                   <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.companies?.name || '—'}</span>
                   <span style={{ fontSize: '17px', fontWeight: 900, color: b.c }}>{s.tier === 'none' ? '—' : s.score}</span>
                   <span><span style={{ fontSize: '11.5px', fontWeight: 800, background: b.bg, color: b.c, padding: '3px 9px', borderRadius: '6px' }}>{b.label}</span></span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{s.approved_reports} تقرير</span>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{s.approved_reports} تقرير</span>
                 </div>
               )
             })}

@@ -81,7 +81,7 @@ export const PRESET_STYLES = {
   caption: {
     fontSize: '12px',
     fontWeight: 600,
-    color: '#94A3B8'
+    color: '#64748B'
   },
   label: {
     fontSize: '14px',

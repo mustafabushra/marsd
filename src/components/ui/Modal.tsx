@@ -79,7 +79,7 @@ const Modal: React.FC<ModalProps> = ({
     border: 'none',
     fontSize: '24px',
     cursor: 'pointer',
-    color: '#94A3B8',
+    color: '#64748B',
     padding: '0',
     width: '32px',
     height: '32px',

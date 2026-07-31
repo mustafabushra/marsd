@@ -483,7 +483,7 @@ export default function Partners() {
 
                   <div style={{
                     fontSize: '12px',
-                    color: '#94A3B8',
+                    color: '#64748B',
                     marginBottom: '10px'
                   }}>
                     تقرير معتمد · منذ {partner.joinDate}

@@ -171,8 +171,8 @@ export default function AdminAdminUsers() {
 
       {grantOpen && (
         <div style={{ ...card, padding: '22px', marginBottom: '18px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>منح دور على مستوى المنصة</h3>
-          <p style={{ fontSize: '13px', color: '#94A3B8', margin: '0 0 16px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>منح دور على مستوى المنصة</h2>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
             الحسابات تُنشأ بالتسجيل العادي — مرصد لا يحتفظ بكلمات المرور. ابحث عن حساب قائم بالبريد ثم امنحه الدور.
           </p>
 
@@ -183,20 +183,20 @@ export default function AdminAdminUsers() {
             </select>
           </div>
 
-          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 12px', fontWeight: 600, textAlign: 'right' }}>{PLATFORM_ROLES[grantRole].note}</p>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 12px', fontWeight: 600, textAlign: 'right' }}>{PLATFORM_ROLES[grantRole].note}</p>
 
-          {searching && <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600 }}>جاري البحث…</div>}
+          {searching && <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>جاري البحث…</div>}
           {results.map((r) => (
             <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #E2E8F0', borderRadius: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{`${r.first_name || ''} ${r.last_name || ''}`.trim() || r.email}</div>
-                <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.email}{r.tenants?.name ? ` · ${r.tenants.name}` : ''}</div>
+                <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.email}{r.tenants?.name ? ` · ${r.tenants.name}` : ''}</div>
               </div>
               <button onClick={() => grant(r)} disabled={busyId === r.id} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px 18px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>منح الدور</button>
             </div>
           ))}
           {query.trim().length >= 3 && !searching && results.length === 0 && (
-            <div style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600, textAlign: 'right' }}>لا حساب مطابق — أو أنه يحمل دوراً على المنصة بالفعل.</div>
+            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, textAlign: 'right' }}>لا حساب مطابق — أو أنه يحمل دوراً على المنصة بالفعل.</div>
           )}
         </div>
       )}

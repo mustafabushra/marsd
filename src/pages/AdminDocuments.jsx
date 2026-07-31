@@ -203,14 +203,14 @@ export default function AdminDocuments() {
 
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
-          مستندات بانتظار التوثيق <span style={{ color: '#94A3B8' }}>({pending.length})</span>
+          مستندات بانتظار التوثيق <span style={{ color: '#64748B' }}>({pending.length})</span>
         </h2>
         <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 18px' }}>
           افتح المستند قبل القرار. التوثيق يرفع الطبقة الرسمية فوراً.
         </p>
 
         {pending.length === 0 ? (
-          <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>لا مستندات معلَّقة.</p>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا مستندات معلَّقة.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {pending.map((d) => (
@@ -219,7 +219,7 @@ export default function AdminDocuments() {
                   <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>
                     {d.companies?.name || 'شركة'} — {DOC_LABEL[d.doc_type] || d.doc_type}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
                     س.ت {d.companies?.cr_number || '—'} · {d.file_name || '—'} · {new Date(d.created_at).toLocaleDateString('ar-SA')}
                   </div>
                   {d.note && <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '6px' }}>ملاحظة: {d.note}</div>}
@@ -298,7 +298,7 @@ export default function AdminDocuments() {
                     <span style={{ fontSize: '13px', fontWeight: 800, color: s?.fg || '#B91C1C' }}>
                       {s?.t || c.official_status}
                       {c.official_status_at && (
-                        <span style={{ color: '#94A3B8', fontWeight: 700, marginRight: '10px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 700, marginRight: '10px' }}>
                           {new Date(c.official_status_at).toLocaleDateString('ar-SA')}
                         </span>
                       )}

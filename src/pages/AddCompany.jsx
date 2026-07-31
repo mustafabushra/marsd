@@ -293,7 +293,7 @@ export default function AddCompany() {
                       <button type="button" onClick={() => setCrFile(null)} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', color: '#B91C1C', fontSize: '13px', fontWeight: 800, padding: '7px 12px', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إزالة</button>
                     </div>
                   ) : (
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#64748B', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
                       <UploadIcon />
                       اضغط لاختيار صورة أو PDF للسجل التجاري (حتى 10MB)
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*" onChange={handleCrFile} style={{ display: 'none' }} />

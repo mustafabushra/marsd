@@ -129,7 +129,7 @@ export default function AdminCompaniesManagement() {
       {/* Filter chips */}
       <div style={{ display: 'flex', gap: '9px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {statChips.map((s) => <span key={s.key} onClick={() => setFilter(s.key)} style={chipStyle(s.key)}>{s.key === 'all' ? 'الكل' : s.label}</span>)}
-        <span style={{ marginInlineStart: 'auto', fontSize: '13px', color: '#94A3B8', fontWeight: 700 }}>عرض {filtered.length} من {companies.length} شركة</span>
+        <span style={{ marginInlineStart: 'auto', fontSize: '13px', color: '#64748B', fontWeight: 700 }}>عرض {filtered.length} من {companies.length} شركة</span>
       </div>
 
       {/* Table */}
@@ -138,7 +138,7 @@ export default function AdminCompaniesManagement() {
           <span>الشركة</span><span>السجل التجاري</span><span>مؤشر الثقة</span><span>المخاطر</span><span>الحالة</span><span></span>
         </div>
         {filtered.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
         ) : filtered.map((c) => {
           const risk = riskFrom(c.score)
           const st = statusMeta(c.status)
@@ -148,7 +148,7 @@ export default function AdminCompaniesManagement() {
                 <span style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '15px', flex: 'none' }}>{(c.name || '؟').charAt(0)}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}{c.verified ? ' ✔' : ''}</div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>{c.sector || '—'} · {c.city || '—'}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>{c.sector || '—'} · {c.city || '—'}</div>
                 </div>
               </div>
               <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600, direction: 'ltr', textAlign: 'right' }}>{c.cr_number || '—'}</span>
@@ -189,7 +189,7 @@ export default function AdminCompaniesManagement() {
                   ['المدينة', drawer.city || '—'],
                 ].map(([l, v]) => (
                   <div key={l} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '14px' }}>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>{l}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>{l}</div>
                     <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{v}</div>
                   </div>
                 ))}
@@ -198,7 +198,7 @@ export default function AdminCompaniesManagement() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button onClick={() => navigate(`/trust-report/${drawer.id}`)} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
                   <span style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#EEF2FF', color: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flex: 'none' }}>📊</span>
-                  <div style={{ flex: 1 }}><div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>عرض تقرير الثقة الكامل</div><div style={{ fontSize: '12.5px', color: '#94A3B8' }}>كل المؤشرات والتقارير المعتمدة</div></div>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>عرض تقرير الثقة الكامل</div><div style={{ fontSize: '12.5px', color: '#64748B' }}>كل المؤشرات والتقارير المعتمدة</div></div>
                 </button>
                 {drawer.status === 'suspended' ? (
                   <button onClick={() => setStatus(drawer, 'active')} disabled={busy} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '14px 16px', cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>

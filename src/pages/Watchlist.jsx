@@ -183,7 +183,7 @@ export default function Watchlist() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُتابَعة {companies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 700 }}>({companies.length})</span>}</h3>
+            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُتابَعة {companies.length > 0 && <span style={{ color: '#64748B', fontWeight: 700 }}>({companies.length})</span>}</h3>
             <LiveBadge connected={connected} liveAt={liveAt} />
           </div>
           <button
@@ -199,7 +199,7 @@ export default function Watchlist() {
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '48px 32px', textAlign: 'center' }}>
             <div style={{ color: '#CBD5E1', marginBottom: '16px', fontSize: '44px' }}>📋</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>لا توجد شركات في قائمتك</div>
-            <div style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '20px' }}>أضِف شركات لمتابعة مؤشر ثقتها وتلقّي التنبيهات</div>
+            <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>أضِف شركات لمتابعة مؤشر ثقتها وتلقّي التنبيهات</div>
             <button onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>+ إضافة شركة للمراقبة</button>
           </div>
         ) : (
@@ -214,7 +214,7 @@ export default function Watchlist() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{w.name}</div>
-                    <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>{w.sector || '—'}{w.city ? ` · ${w.city}` : ''} · {w.approvedReports} تقرير معتمد</div>
+                    <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>{w.sector || '—'}{w.city ? ` · ${w.city}` : ''} · {w.approvedReports} تقرير معتمد</div>
                   </div>
                   <span style={{ background: risk.bg, color: risk.c, borderRadius: '8px', padding: '6px 13px', fontSize: '13px', fontWeight: 800, flex: 'none' }}>● {risk.label}</span>
                   <button
@@ -234,7 +234,7 @@ export default function Watchlist() {
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', alignSelf: 'start' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>التنبيهات</h3>
         {alerts.length === 0 ? (
-          <div style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 600 }}>لا توجد تنبيهات — أضِف شركات لبدء المتابعة.</div>
+          <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600 }}>لا توجد تنبيهات — أضِف شركات لبدء المتابعة.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {alerts.map((alert, idx) => (
@@ -242,7 +242,7 @@ export default function Watchlist() {
                 <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: alert.color, marginTop: '5px', flex: 'none' }}></span>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#334155', lineHeight: 1.5 }}>{alert.title}</div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '3px' }}>{alert.time}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px' }}>{alert.time}</div>
                 </div>
               </div>
             ))}
@@ -266,9 +266,9 @@ export default function Watchlist() {
             </div>
             <div style={{ padding: '14px 24px', overflowY: 'auto', flex: 1 }}>
               {addLoading ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
               ) : addResults.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {addResults.map((c) => {
@@ -277,7 +277,7 @@ export default function Watchlist() {
                       <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{c.name}</div>
-                          <div style={{ fontSize: '12.5px', color: '#94A3B8' }}>{c.sector || '—'}{c.city ? ` · ${c.city}` : ''} · <span style={{ color: risk.c, fontWeight: 700 }}>{risk.label}</span></div>
+                          <div style={{ fontSize: '12.5px', color: '#64748B' }}>{c.sector || '—'}{c.city ? ` · ${c.city}` : ''} · <span style={{ color: risk.c, fontWeight: 700 }}>{risk.label}</span></div>
                         </div>
                         <button onClick={() => addToWatchlist(c)} disabled={addingId === c.id} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px 16px', fontSize: '13px', fontWeight: 800, cursor: addingId === c.id ? 'not-allowed' : 'pointer', flex: 'none', fontFamily: 'inherit' }}>{addingId === c.id ? '...' : '+ إضافة'}</button>
                       </div>

@@ -92,7 +92,7 @@ export default function NotificationDropdown({ onClose }) {
           alignItems: 'center',
         }}
       >
-        <h3
+        <h2
           style={{
             margin: 0,
             fontSize: '14px',
@@ -101,7 +101,7 @@ export default function NotificationDropdown({ onClose }) {
           }}
         >
           الإشعارات ({notifications.length})
-        </h3>
+        </h2>
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAllAsRead}

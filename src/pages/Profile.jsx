@@ -214,7 +214,7 @@ export default function Profile() {
       {/* Left: Company Data */}
       <div style={{ ...card, padding: '26px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>بيانات الشركة</h3>
+          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>بيانات الشركة</h2>
           {company?.verified && (
             <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800 }}>✔ موثّقة</span>
           )}
@@ -222,7 +222,7 @@ export default function Profile() {
         </div>
 
         {!companyId ? (
-          <div style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 600, padding: '20px 0' }}>لا توجد شركة مرتبطة بحسابك.</div>
+          <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, padding: '20px 0' }}>لا توجد شركة مرتبطة بحسابك.</div>
         ) : (
           <>
             {!canEdit && (
@@ -272,7 +272,7 @@ export default function Profile() {
                   {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
                 </button>
                 {company?.verified && (
-                  <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '10px 2px 0', fontWeight: 600, lineHeight: 1.8 }}>
+                  <p style={{ fontSize: '12.5px', color: '#64748B', margin: '10px 2px 0', fontWeight: 600, lineHeight: 1.8 }}>
                     تعديل بيانات شركة موثّقة يُلغي التوثيق مؤقتاً حتى تراجعه إدارة مرصد.
                   </p>
                 )}
@@ -284,10 +284,10 @@ export default function Profile() {
 
       {/* Right: Notifications */}
       <div style={{ ...card, padding: '22px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>آخر الإشعارات</h3>
+        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px 0', textAlign: 'right' }}>آخر الإشعارات</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', paddingBottom: '18px', borderBottom: '1px solid #F1F5F9' }}>
           {notifications.length === 0 ? (
-            <div style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 600, padding: '6px 0', lineHeight: 1.9 }}>لا توجد إشعارات بعد.</div>
+            <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600, padding: '6px 0', lineHeight: 1.9 }}>لا توجد إشعارات بعد.</div>
           ) : notifications.map((n) => {
             const { title, message } = notificationText(n)
             const s = NOTIFICATION_STYLE[n.type] || DEFAULT_STYLE
@@ -297,15 +297,15 @@ export default function Profile() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '12.5px', fontWeight: 800, color: s.color }}>{title}</div>
                   {message && <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 600, margin: '2px 0', lineHeight: 1.5 }}>{message}</div>}
-                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>{new Date(n.created_at).toLocaleDateString('en-GB')}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>{new Date(n.created_at).toLocaleDateString('en-GB')}</div>
                 </div>
               </div>
             )
           })}
         </div>
 
-        <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px 0', textAlign: 'right' }}>تفضيلات الإشعارات</h3>
-        <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px', fontWeight: 600, lineHeight: 1.8 }}>تسري على حسابك وحده، ولا تؤثر على زملائك في الشركة.</p>
+        <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px 0', textAlign: 'right' }}>تفضيلات الإشعارات</h2>
+        <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 14px', fontWeight: 600, lineHeight: 1.8 }}>تسري على حسابك وحده، ولا تؤثر على زملائك في الشركة.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '13px' }}>
           {NOTIFICATION_PREFS.map((item) => (
             <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: savingPref === item.key ? 0.55 : 1 }}>

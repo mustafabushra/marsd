@@ -187,7 +187,7 @@ export default function CompanyDashboard() {
               </span>
             </div>
             <div style={{ fontSize: '32px', fontWeight: 900, color: k.color, lineHeight: 1, textAlign: 'right' }}>{k.value}</div>
-            <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '6px', textAlign: 'right' }}>{k.sub}</div>
+            <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '6px', textAlign: 'right' }}>{k.sub}</div>
           </div>
         ))}
       </div>
@@ -196,9 +196,9 @@ export default function CompanyDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '18px' }}>
         {/* Activity */}
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>نشاط حديث</h3>
+          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>نشاط حديث</h2>
           {activity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '28px 12px', color: '#94A3B8' }}>
+            <div style={{ textAlign: 'center', padding: '28px 12px', color: '#64748B' }}>
               <div style={{ fontSize: '34px', marginBottom: '8px' }}>🔔</div>
               <div style={{ fontSize: '14px', fontWeight: 700 }}>لا يوجد نشاط بعد</div>
               <div style={{ fontSize: '12.5px', marginTop: '4px' }}>ستظهر هنا إشعارات اعتماد تقاريرك وتغيّرات الشركات المتابَعة.</div>
@@ -210,7 +210,7 @@ export default function CompanyDashboard() {
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: a.dot, marginTop: '5px', flex: 'none' }}></span>
                   <div style={{ flex: 1, textAlign: 'right' }}>
                     <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#334155', lineHeight: 1.5 }}>{a.title}</div>
-                    <div style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '3px' }}>{a.time}</div>
+                    <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '3px' }}>{a.time}</div>
                   </div>
                 </div>
               ))}
@@ -235,7 +235,7 @@ export default function CompanyDashboard() {
 
           {/* Quick Actions */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px 0', textAlign: 'right' }}>إجراءات سريعة</h3>
+            <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px 0', textAlign: 'right' }}>إجراءات سريعة</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => navigate('/search')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#F1F5F9'} onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>

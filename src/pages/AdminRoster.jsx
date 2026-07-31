@@ -197,7 +197,7 @@ export default function AdminRoster() {
           </thead>
           <tbody>
             {shown.length === 0 && (
-              <tr><td colSpan={8} style={{ padding: '28px', textAlign: 'center', color: '#94A3B8', fontWeight: 600 }}>لا شركات في هذا التصنيف</td></tr>
+              <tr><td colSpan={8} style={{ padding: '28px', textAlign: 'center', color: '#64748B', fontWeight: 600 }}>لا شركات في هذا التصنيف</td></tr>
             )}
             {shown.map((r) => {
               const rv = REVIEW[r.review_status] || REVIEW.approved
@@ -205,7 +205,7 @@ export default function AdminRoster() {
                 <tr key={r.company_id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
                     <div style={{ fontWeight: 800, color: '#0F172A' }}>{r.name}</div>
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>
                       {r.cr_number || '—'} · {r.sector || 'بلا قطاع'}
                       {r.trust_score != null && ` · مؤشر ${r.trust_score}`}
                     </div>
@@ -231,13 +231,13 @@ export default function AdminRoster() {
                       fontWeight: 800, fontVariantNumeric: 'tabular-nums',
                       color: (r.completeness || 0) >= 70 ? '#15803D' : (r.completeness || 0) >= 40 ? '#B45309' : '#B91C1C',
                     }}>{r.completeness ?? 0}%</span>
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>
                       {r.reports_about ?? 0} تقرير
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                     <span style={{ color: '#15803D', fontWeight: 800 }}>{r.docs_verified ?? 0}</span>
-                    <span style={{ color: '#94A3B8' }}> موثَّق</span>
+                    <span style={{ color: '#64748B' }}> موثَّق</span>
                     {r.docs_pending > 0 && (
                       <div style={{ fontSize: '11.5px', color: '#B45309', fontWeight: 800, marginTop: '3px' }}>
                         {r.docs_pending} بانتظار المراجعة
@@ -247,12 +247,12 @@ export default function AdminRoster() {
                   <td style={{ padding: '12px 14px', verticalAlign: 'top', color: '#475569' }}>
                     {r.registrar || (r.source === 'community' ? 'مصدر غير مُتتبَّع' : 'تسجيل ذاتي')}
                     {r.claimed_by && (
-                      <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>مالكها: {r.claimed_by}</div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>مالكها: {r.claimed_by}</div>
                     )}
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top', color: '#475569', whiteSpace: 'nowrap' }}>
                     {r.last_action || '—'}
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>
                       {fmt(r.last_action_at)}{r.last_action_by ? ` · ${r.last_action_by}` : ''}
                     </div>
                   </td>
@@ -302,7 +302,7 @@ export default function AdminRoster() {
                 <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                        placeholder="مثال: رقم السجل التجاري لا يطابق الوثيقة المرفقة"
                        style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
-                <span style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
+                <span style={{ display: 'block', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
                   يُعرض للشركة كما تكتبه — ولا يمكن الإرسال بدونه.
                 </span>
               </label>

@@ -190,7 +190,7 @@ export default function AdminSubscriptions() {
 
               <span style={{ fontSize: '13px', color: left != null && left < 7 ? '#B45309' : '#64748B', fontWeight: 700 }}>
                 {row.current_period_end ? new Date(row.current_period_end).toLocaleDateString('en-GB') : '—'}
-                {left != null && <span style={{ fontSize: '11.5px', display: 'block', color: '#94A3B8' }}>{left >= 0 ? `${left} يوماً` : 'منتهٍ'}</span>}
+                {left != null && <span style={{ fontSize: '11.5px', display: 'block', color: '#64748B' }}>{left >= 0 ? `${left} يوماً` : 'منتهٍ'}</span>}
               </span>
 
               <span><span style={{ background: s.bg, color: s.c, borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>{s.label}</span></span>

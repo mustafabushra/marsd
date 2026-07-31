@@ -36,7 +36,7 @@ function RiskPill({ band, prelim = false }) {
         ● {b.label}
       </div>
       {prelim && (
-        <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700, marginTop: '7px' }}>
+        <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700, marginTop: '7px' }}>
           تقييم أوّلي — يكتمل عند ٥ تقارير
         </div>
       )}
@@ -82,7 +82,7 @@ function ScoreLayers({ layers, score }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '7px', flexWrap: 'wrap' }}>
               <div>
                 <span style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{r.label}</span>
-                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginRight: '8px' }}>وزنها {r.weight}%</span>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginRight: '8px' }}>وزنها {r.weight}%</span>
               </div>
               <div style={{ fontSize: '13.5px', color: '#334155', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
 <span style={{ color: '#1E2A52' }}>{r.contribution.toFixed(1)}</span> / {r.weight}
@@ -91,7 +91,7 @@ function ScoreLayers({ layers, score }) {
             <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '5px', overflow: 'hidden' }}>
               <div style={{ width: `${Math.min(100, Math.max(0, r.score))}%`, height: '100%', background: '#1E2A52', borderRadius: '5px' }}></div>
             </div>
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>{r.hint}</div>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>{r.hint}</div>
           </div>
         ))}
       </div>
@@ -142,7 +142,7 @@ function ScoreHistory({ points }) {
         </p>
         <div style={{ background: '#F8FAFC', border: '1.5px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center' }}>
           <div style={{ fontSize: '14px', fontWeight: 800, color: '#64748B' }}>قياس واحد حتى الآن</div>
-          <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>
+          <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '7px' }}>
             سُجّل في {fmt(points[0].recorded_at)} — يظهر المنحنى عند أول تغيّر في المؤشر
           </div>
         </div>
@@ -172,7 +172,7 @@ function ScoreHistory({ points }) {
           color: delta > 0 ? '#15803D' : delta < 0 ? '#B91C1C' : '#64748B',
         }}>
           {delta > 0 ? `▲ ارتفع ${delta}` : delta < 0 ? `▼ انخفض ${Math.abs(delta)}` : '— مستقرّ'}
-          <span style={{ color: '#94A3B8', fontWeight: 700, marginRight: '8px' }}>
+          <span style={{ color: '#64748B', fontWeight: 700, marginRight: '8px' }}>
             منذ {fmt(points[0].recorded_at)}
           </span>
         </div>
@@ -206,7 +206,7 @@ function ScoreHistory({ points }) {
               fill="#1E2A52" fontSize="13" fontWeight="800">{last}</text>
       </svg>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B', fontWeight: 600, marginTop: '6px' }}>
         <span>{fmt(points[0].recorded_at)}</span>
         <span>{fmt(points[points.length - 1].recorded_at)}</span>
       </div>
@@ -221,7 +221,7 @@ const CARD = { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius:
 const PANEL = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }
 const LBL = { fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }
 const BIG = { fontSize: '23px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }
-const SUB = { fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }
+const SUB = { fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px' }
 const H3 = { fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }
 const LEDE = { fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }
 
@@ -294,7 +294,7 @@ function CompanyCard({ identity, score, band, tier }) {
           <div style={{ fontSize: '40px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {tier === 'none' ? '—' : Math.round(score)}
           </div>
-          <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, marginTop: '4px' }}>من 100</div>
+          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '4px' }}>من 100</div>
           <div style={{ background: b.bg, color: b.fg, borderRadius: '999px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 800, marginTop: '10px' }}>
             ● {b.label}
           </div>
@@ -304,13 +304,13 @@ function CompanyCard({ identity, score, band, tier }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 28px', marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #E2E8F0' }}>
         {meta.map((m) => (
           <div key={m.k}>
-            <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>{m.k}</div>
+            <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{m.k}</div>
             <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{m.v}</div>
           </div>
         ))}
         {identity.computed_at && (
           <div style={{ marginRight: 'auto' }}>
-            <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>آخر تحديث للمؤشر</div>
+            <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>آخر تحديث للمؤشر</div>
             <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{fmtDate(identity.computed_at)}</div>
           </div>
         )}
@@ -353,7 +353,7 @@ function CommercialBehaviour({ b, recent }) {
                     {r.delay > 0 ? ` — تأخير ${r.delay} يوم` : ''}
                     {r.defaulted ? ' — تعثّر' : ''}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>{fmtDate(r.at)}</span>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{fmtDate(r.at)}</span>
                 </div>
               )
             })}
@@ -425,7 +425,7 @@ function ReportConfidence({ q, market }) {
         </div>
       )}
       {market?.rank != null && Number(market.rated_total) < 100 && (
-        <div style={{ marginTop: '16px', fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, background: '#F8FAFC', borderRadius: '9px', padding: '12px 14px' }}>
+        <div style={{ marginTop: '16px', fontSize: '12.5px', color: '#64748B', fontWeight: 600, background: '#F8FAFC', borderRadius: '9px', padding: '12px 14px' }}>
           الترتيب بين الشركات المصنّفة لا يُعرض بعد — {market.rated_total} شركة مصنّفة فقط، وترتيبٌ على هذا العدد لا يحمل دلالة إحصائية.
         </div>
       )}
@@ -511,7 +511,7 @@ function ScoreContext({ ctx, score }) {
   const card = { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }
   const label = { fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }
   const big = { fontSize: '23px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }
-  const sub = { fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }
+  const sub = { fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px' }
 
   return (
     <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
@@ -554,7 +554,7 @@ function ScoreContext({ ctx, score }) {
       {cats.length > 0 && (
         <div>
           <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>أسباب التقارير</div>
-          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px' }}>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 14px' }}>
             نوع المخاطرة، لا حجمها فقط.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
@@ -600,7 +600,7 @@ function ScoreEvidence({ facts }) {
           <div key={it.label} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
             <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{it.label}</div>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{it.value}</div>
-            {it.sub && <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>{it.sub}</div>}
+            {it.sub && <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px' }}>{it.sub}</div>}
           </div>
         ))}
       </div>
@@ -935,7 +935,7 @@ export default function TrustReport() {
             صدر في {issuedLabel}
           </div>
         </div>
-        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '9px 0 0', lineHeight: 1.8 }}>
+        <p style={{ fontSize: '11px', color: '#64748B', margin: '9px 0 0', lineHeight: 1.8 }}>
           الدرجة تعبّر عن التقارير المعتمدة حتى تاريخ الإصدار أعلاه، وتتغيّر باعتماد تقرير جديد أو سحب تقرير قائم.
         </p>
       </div>
@@ -970,7 +970,7 @@ export default function TrustReport() {
               <LiveBadge connected={connected} liveAt={liveAt} />
             </div>
             {company?.name_en && (
-              <div style={{ fontSize: '13.5px', color: '#94A3B8', fontWeight: 600, marginBottom: '8px', textAlign: 'right' }}>{company.name_en}</div>
+              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600, marginBottom: '8px', textAlign: 'right' }}>{company.name_en}</div>
             )}
             <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap', fontSize: '14px', color: '#64748B', fontWeight: 600 }}>
               {[
@@ -1003,7 +1003,7 @@ export default function TrustReport() {
               <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(${BAND[report.riskBand]?.ring || '#94A3B8'} 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
+                  <span style={{ fontSize: '11px', color: '#64748B' }}>من 100</span>
                 </div>
               </div>
               <RiskPill band={report.riskBand} />
@@ -1015,7 +1015,7 @@ export default function TrustReport() {
               <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#F59E0B 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>من 100</span>
+                  <span style={{ fontSize: '11px', color: '#64748B' }}>من 100</span>
                 </div>
               </div>
               <RiskPill band={report.riskBand} prelim />
@@ -1030,12 +1030,12 @@ export default function TrustReport() {
             <div style={{ textAlign: 'center', flex: 'none' }}>
               <div style={{ width: '140px', height: '140px', borderRadius: '50%', border: '3px dashed #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '30px', color: '#CBD5E1' }}>—</span>
-                <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>لا توجد درجة</span>
+                <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>لا توجد درجة</span>
               </div>
               <div style={{ background: '#F1F5F9', color: '#475569', borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 800, marginTop: '12px' }}>
                 بيانات غير كافية
               </div>
-              <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px', maxWidth: '170px', lineHeight: 1.8 }}>
+              <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px', maxWidth: '170px', lineHeight: 1.8 }}>
                 تحتاج تقريرين معتمدين على الأقل — أضِف تقريرك عن تعاملك معها
               </div>
             </div>
@@ -1147,7 +1147,7 @@ export default function TrustReport() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>تركيبة مؤشر الثقة</h3>
-              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>كيف تم احتساب الدرجة</span>
+              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>كيف تم احتساب الدرجة</span>
             </div>
             <div style={{ display: 'flex', borderRadius: '12px', overflow: 'hidden', height: '52px' }}>
               <div style={{ width: '30%', background: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>البيانات الرسمية 30%</div>
@@ -1163,7 +1163,7 @@ export default function TrustReport() {
             </div>
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
               <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>مؤشر الثقة الحالي</div>
-              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{Math.round(score)}<span style={{ fontSize: '16px', color: '#94A3B8' }}> / 100</span></div>
+              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{Math.round(score)}<span style={{ fontSize: '16px', color: '#64748B' }}> / 100</span></div>
             </div>
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
               <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>حالة التقييم</div>
@@ -1192,7 +1192,7 @@ export default function TrustReport() {
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8' }}>لا توجد تقارير بعد</div>
+              <div style={{ textAlign: 'center', padding: '20px', color: '#64748B' }}>لا توجد تقارير بعد</div>
             )}
           </div>
 
@@ -1259,7 +1259,7 @@ export default function TrustReport() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                        <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
+                        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
                           {new Date(report.created_at).toLocaleDateString('en-GB')}
                         </div>
                         <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{report.title}</div>
@@ -1267,7 +1267,7 @@ export default function TrustReport() {
                       <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.5, marginBottom: '6px' }}>
                         {report.summary}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
+                      <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
                         من {report.reporter_company_name}
                       </div>
                     </div>

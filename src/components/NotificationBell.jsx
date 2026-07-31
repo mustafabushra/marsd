@@ -140,7 +140,7 @@ export default function NotificationBell() {
 
           <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
             {items.length === 0 ? (
-              <p style={{ padding: '26px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600, margin: 0 }}>
+              <p style={{ padding: '26px 16px', textAlign: 'center', color: '#64748B', fontSize: '13.5px', fontWeight: 600, margin: 0 }}>
                 لا إشعارات بعد
               </p>
             ) : items.map((n) => {
@@ -163,7 +163,7 @@ export default function NotificationBell() {
                     {message && (
                       <span style={{ display: 'block', fontSize: '12.5px', color: '#64748B', marginTop: '3px', lineHeight: 1.6 }}>{message}</span>
                     )}
-                    <span style={{ display: 'block', fontSize: '11.5px', color: '#94A3B8', marginTop: '4px', fontWeight: 600 }}>{ago(n.created_at)}</span>
+                    <span style={{ display: 'block', fontSize: '11.5px', color: '#64748B', marginTop: '4px', fontWeight: 600 }}>{ago(n.created_at)}</span>
                   </span>
                 </button>
               )

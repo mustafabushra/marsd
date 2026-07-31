@@ -51,7 +51,7 @@ export default function AdminLogs() {
           <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.2fr 1fr', padding: '15px 18px', borderBottom: '1px solid #F1F5F9', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{log.action}</span>
             <span style={{ fontSize: '13.5px', color: '#64748B' }}>{log.user}</span>
-            <span style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600 }}>{log.timestamp}</span>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{log.timestamp}</span>
             <span>
               <span style={{ background: log.stBg, color: log.stC, borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>{log.status}</span>
             </span>

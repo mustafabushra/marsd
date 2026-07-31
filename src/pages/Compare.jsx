@@ -152,7 +152,7 @@ export default function Compare() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>مقارنة الشركات</h3>
-          <p style={{ fontSize: '13px', color: '#94A3B8', margin: '3px 0 0', fontWeight: 600 }}>قارن حتى {maxItems} شركات من واقع مؤشرات مرصد الحقيقية</p>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: '3px 0 0', fontWeight: 600 }}>قارن حتى {maxItems} شركات من واقع مؤشرات مرصد الحقيقية</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }} disabled={items.length >= maxItems} style={{ background: items.length >= maxItems ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '10px 18px', fontSize: '13.5px', fontWeight: 800, cursor: items.length >= maxItems ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>+ إضافة شركة</button>
@@ -165,7 +165,7 @@ export default function Compare() {
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '52px 32px', textAlign: 'center' }}>
           <div style={{ fontSize: '44px', marginBottom: '14px' }}>📊</div>
           <div style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>ابدأ بإضافة شركات للمقارنة</div>
-          <div style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '20px' }}>أضِف شركتين على الأقل لعرض مقارنة جنباً إلى جنب لمؤشرات الثقة والسداد والتقارير.</div>
+          <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>أضِف شركتين على الأقل لعرض مقارنة جنباً إلى جنب لمؤشرات الثقة والسداد والتقارير.</div>
           <button onClick={() => { setAddOpen(true); setAddSearch(''); setAddResults([]) }} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>+ إضافة شركة للمقارنة</button>
         </div>
       ) : (
@@ -180,9 +180,9 @@ export default function Compare() {
                 <div style={{ padding: '18px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13.5px', fontWeight: 800, color: '#64748B' }}>المؤشر</div>
                 {items.map((c) => (
                   <div key={c.id} style={{ padding: '16px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', textAlign: 'center', position: 'relative' }}>
-                    <button onClick={() => removeItem(c.id)} title="إزالة" style={{ position: 'absolute', top: '8px', left: '8px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '7px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', color: '#94A3B8', fontFamily: 'inherit' }}>✕</button>
+                    <button onClick={() => removeItem(c.id)} title="إزالة" style={{ position: 'absolute', top: '8px', left: '8px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '7px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', color: '#64748B', fontFamily: 'inherit' }}>✕</button>
                     <div onClick={() => navigate(`/trust-report/${c.id}`)} style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A', lineHeight: 1.4, cursor: 'pointer' }}>{c.name}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '3px' }}>{c.city || '—'}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px' }}>{c.city || '—'}</div>
                   </div>
                 ))}
               </div>
@@ -208,7 +208,7 @@ export default function Compare() {
               })}
             </div>
           </div>
-          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '12px 2px 0', fontWeight: 600 }}>القيم الخضراء تُشير إلى الأفضل في كل مؤشر. "—" يعني لا توجد بيانات كافية بعد.</p>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '12px 2px 0', fontWeight: 600 }}>القيم الخضراء تُشير إلى الأفضل في كل مؤشر. "—" يعني لا توجد بيانات كافية بعد.</p>
         </>
       )}
 
@@ -228,9 +228,9 @@ export default function Compare() {
             </div>
             <div style={{ padding: '14px 24px', overflowY: 'auto', flex: 1 }}>
               {addLoading ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
               ) : addResults.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {addResults.map((c) => {
@@ -239,7 +239,7 @@ export default function Compare() {
                       <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{c.name}</div>
-                          <div style={{ fontSize: '12.5px', color: '#94A3B8' }}>{c.sector || '—'}{c.city ? ` · ${c.city}` : ''} · <span style={{ color: risk.c, fontWeight: 700 }}>{risk.label}</span></div>
+                          <div style={{ fontSize: '12.5px', color: '#64748B' }}>{c.sector || '—'}{c.city ? ` · ${c.city}` : ''} · <span style={{ color: risk.c, fontWeight: 700 }}>{risk.label}</span></div>
                         </div>
                         <button onClick={() => addCompany(c)} disabled={addingId === c.id} style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px 16px', fontSize: '13px', fontWeight: 800, cursor: addingId === c.id ? 'not-allowed' : 'pointer', flex: 'none', fontFamily: 'inherit' }}>{addingId === c.id ? '...' : '+ إضافة'}</button>
                       </div>

@@ -122,7 +122,7 @@ export default function AdminSettings() {
         <label style={{ display: 'block', maxWidth: '280px', marginBottom: '14px' }}>
           <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>سقف الكسب الشهري لكل كيان</span>
           <input style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={v.monthly_earn_cap ?? ''} onChange={(e) => setCap(e.target.value)} />
-          <span style={{ display: 'block', fontSize: '11.5px', color: '#94A3B8', marginTop: '5px', lineHeight: 1.7 }}>
+          <span style={{ display: 'block', fontSize: '11.5px', color: '#64748B', marginTop: '5px', lineHeight: 1.7 }}>
             المساهمة بلا حد، وما تتحوّل إليه من صلاحيات محدود. صفر يعني بلا سقف.
           </span>
         </label>
@@ -245,7 +245,7 @@ export default function AdminSettings() {
       {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>}
 
       <div style={{ marginBottom: '18px' }}>
-        <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>إعدادات النظام ({rows.length})</h3>
+        <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>إعدادات النظام ({rows.length})</h2>
         <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0, lineHeight: 1.8 }}>
           هذه هي الصفوف التي يقرأها التطبيق فعلاً. ما يُحفظ هنا يسري على الجميع عند التحميل التالي — بلا نشر.
         </p>
@@ -274,7 +274,7 @@ export default function AdminSettings() {
               : renderRaw(row)}
 
             {row.updated_at && (
-              <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '14px' }}>
+              <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '14px' }}>
                 آخر تحديث: {new Date(row.updated_at).toLocaleString('en-GB')}
               </div>
             )}

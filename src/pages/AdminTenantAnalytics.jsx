@@ -182,7 +182,7 @@ export default function AdminTenantAnalytics() {
             <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{r.users}</span>
             <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>
               {r.reports}
-              {r.reports > 0 && <span style={{ color: '#94A3B8' }}> ({r.approved} معتمد)</span>}
+              {r.reports > 0 && <span style={{ color: '#64748B' }}> ({r.approved} معتمد)</span>}
             </span>
             <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{r.credits.toLocaleString('en-US')}</span>
             <span style={{ fontSize: '12.5px', color: r.lastLogin ? '#64748B' : '#CBD5E1', fontWeight: 600 }}>

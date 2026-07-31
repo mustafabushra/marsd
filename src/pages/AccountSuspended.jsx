@@ -33,7 +33,7 @@ export default function AccountSuspended() {
         <p style={{ fontSize: '16px', color: '#64748B', lineHeight: 1.6, margin: '0 0 24px 0' }}>
           حسابك قد تم تعليقه مؤقتاً من قبل فريق مرصد.
         </p>
-        <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 32px 0' }}>
+        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 32px 0' }}>
           يرجى التواصل مع فريق الدعم للحصول على المساعدة
         </p>
 

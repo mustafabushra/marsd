@@ -187,12 +187,12 @@ export default function AdminBulkImport() {
           <>
             <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>مطابقة أعمدة الملف بحقول مرصد</h2>
             <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 6px' }}>الملف: <b>{fileName}</b> · {rows.length} صف</p>
-            <p style={{ fontSize: '13.5px', color: '#94A3B8', margin: '0 0 22px' }}>راجع الربط التلقائي بين أعمدة ملفك وحقول قاعدة البيانات.</p>
+            <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 22px' }}>راجع الربط التلقائي بين أعمدة ملفك وحقول قاعدة البيانات.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {TARGET_FIELDS.map((f) => (
                 <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 1.4fr', gap: '14px', alignItems: 'center', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '11px', padding: '13px 16px' }}>
                   <span style={{ fontSize: '14px', fontWeight: 800, color: '#1E2A52' }}>{f.label}{f.required && <span style={{ color: '#DC2626' }}> *</span>}</span>
-                  <span style={{ color: '#94A3B8', fontWeight: 900 }}>←</span>
+                  <span style={{ color: '#64748B', fontWeight: 900 }}>←</span>
                   <select value={mapping[f.key] || ''} onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value }))} style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '9px', padding: '9px 12px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', textAlign: 'right', background: '#fff' }}>
                     <option value="">— تجاهل —</option>
                     {headers.map((h) => <option key={h} value={h}>{h}</option>)}
@@ -232,7 +232,7 @@ export default function AdminBulkImport() {
               {validation.invalid.slice(0, 100).map((r, i) => (
                 <div key={'i' + i} style={{ display: 'grid', gridTemplateColumns: '2fr 1.4fr 1fr 1fr', padding: '11px 16px', borderBottom: '1px solid #F1F5F9', alignItems: 'center' }}>
                   <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>{r.name}</span>
-                  <span style={{ fontSize: '12px', color: '#94A3B8' }}>صف {r.row}</span>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>صف {r.row}</span>
                   <span></span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#DC2626' }}></span><span style={{ fontSize: '12px', fontWeight: 700, color: '#B91C1C' }}>{r.reason}</span></span>
                 </div>

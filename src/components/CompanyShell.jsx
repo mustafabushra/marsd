@@ -77,6 +77,18 @@ export default function CompanyShell({ user }) {
 
   return (
     <div dir="rtl" style={{ fontFamily: 'Tajawal, system-ui, sans-serif', background: '#F8FAFC', display: 'flex', minHeight: '100vh', color: '#0F172A' }}>
+      {/* Skip link. Both shells put a sidebar of 15+ links before the content, so
+          a keyboard user tabs through the entire navigation on every page before
+          reaching anything. WCAG 2.4.1. Visible only when focused — it is for
+          people who cannot see it. */}
+      <a href="#main" style={{
+        position: 'absolute', insetInlineStart: '-9999px', top: '8px', zIndex: 1000,
+        background: '#1E2A52', color: '#fff', padding: '10px 18px', borderRadius: '9px',
+        fontSize: '14px', fontWeight: 800, textDecoration: 'none',
+      }} onFocus={(e) => { e.target.style.insetInlineStart = '8px' }}
+         onBlur={(e) => { e.target.style.insetInlineStart = '-9999px' }}>
+        تخطَّ إلى المحتوى
+      </a>
       {/* Sidebar */}
       <aside style={{
         width: '268px',
@@ -188,7 +200,7 @@ export default function CompanyShell({ user }) {
             <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
               إدارة مرصد
             </div>
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.8 }}>
+            <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px', lineHeight: 1.8 }}>
               تتصفّح واجهة الشركات — بلا حدود ولا خصم
             </div>
             <button
@@ -203,7 +215,7 @@ export default function CompanyShell({ user }) {
             <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginBottom: '5px' }}>
               {organizationName || 'الشركة'}
             </div>
-            <div style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '12px' }}>
+            <div style={{ fontSize: '12.5px', color: '#64748B', marginBottom: '12px' }}>
               دور: {userRole || 'عضو'}
             </div>
             <button onClick={() => navigate('/subscription')} style={{ width: '100%', background: '#16A34A', color: '#fff', border: 0, borderRadius: '9px', padding: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إدارة الباقة</button>
@@ -250,7 +262,7 @@ export default function CompanyShell({ user }) {
         </header>
 
         {/* Content */}
-        <main style={{ padding: '28px 32px', flex: 1 }}>
+        <main id="main" style={{ padding: '28px 32px', flex: 1 }}>
           <Outlet />
         </main>
       </div>

@@ -163,7 +163,7 @@ export default function ReportsAboutUs() {
     return (
       <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
         <div style={{ fontSize: '38px', marginBottom: '12px' }}>🏢</div>
-        <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>لا توجد شركة مرتبطة بحسابك</h3>
+        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>لا توجد شركة مرتبطة بحسابك</h2>
         <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
           هذه الصفحة تعرض ما نُشر عن شركتك في مرصد.
         </p>
@@ -203,7 +203,7 @@ export default function ReportsAboutUs() {
       {reports.length === 0 ? (
         <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
           <div style={{ fontSize: '38px', marginBottom: '12px' }}>✓</div>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>لا توجد تقارير منشورة عن شركتك</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>لا توجد تقارير منشورة عن شركتك</h2>
           <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
             سيظهر هنا أي تقرير تعتمده إدارة مرصد عن تعاملات شركتك، مع إمكانية الاعتراض عليه.
           </p>
@@ -219,10 +219,10 @@ export default function ReportsAboutUs() {
               <div key={r.id} style={{ ...card, padding: '22px', opacity: busyId === r.id ? 0.6 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
                   <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
+                    <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
                       {CATEGORY_LABEL[r.category] || 'تقرير تعامل'}
-                    </h3>
-                    <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: 0, fontWeight: 600 }}>
+                    </h2>
+                    <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0, fontWeight: 600 }}>
                       نُشر {r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-GB') : '—'}
                       {r.dealt_at && ` · تاريخ التعامل ${new Date(r.dealt_at).toLocaleDateString('en-GB')}`}
                     </p>
@@ -230,7 +230,7 @@ export default function ReportsAboutUs() {
                   {/* Who filed it is deliberately not shown. A company that can
                       identify its accuser can retaliate against them, and the
                       contributions Marsad runs on would stop. */}
-                  <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700, flexShrink: 0 }}>الجهة المُبلِّغة محجوبة</span>
+                  <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700, flexShrink: 0 }}>الجهة المُبلِّغة محجوبة</span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '13px', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #F1F5F9', textAlign: 'right' }}>
@@ -241,7 +241,7 @@ export default function ReportsAboutUs() {
                     ['قيمة التعامل', r.deal_value ? `${Number(r.deal_value).toLocaleString('en-US')} ${r.currency || 'ر.س'}` : null],
                   ].map(([k, v]) => (
                     <div key={k}>
-                      <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>{k}</div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{k}</div>
                       <div style={{ fontSize: '13.5px', fontWeight: 800, color: v ? '#334155' : '#CBD5E1' }}>{v || '—'}</div>
                     </div>
                   ))}

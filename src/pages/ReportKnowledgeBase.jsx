@@ -133,7 +133,7 @@ export default function ReportKnowledgeBase() {
         >
           المُعترَض عليها فقط
         </button>
-        <span style={{ alignSelf: 'center', fontSize: '13px', color: '#94A3B8', fontWeight: 700 }}>{filtered.length} تقرير</span>
+        <span style={{ alignSelf: 'center', fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{filtered.length} تقرير</span>
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
@@ -141,7 +141,7 @@ export default function ReportKnowledgeBase() {
           <span>المعرّف</span><span>الشركة المُبلَّغ عنها</span><span>الشركة المُبلِّغة</span><span>السبب</span><span>الاعتماد</span><span>الاعتراض</span>
         </div>
         {filtered.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
             {onlyDisputed ? 'لا توجد تقارير مُعترَض عليها' : 'لا توجد تقارير معتمدة بعد'}
           </div>
         ) : filtered.map((r) => {
@@ -151,14 +151,14 @@ export default function ReportKnowledgeBase() {
               <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1E2A52', fontFamily: 'monospace' }}>RPT-{String(r.id).slice(0, 8)}</span>
               <div>
                 <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 700 }}>{r.target_company || '—'}</div>
-                {r.target_sector && <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600 }}>{r.target_sector}</div>}
+                {r.target_sector && <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>{r.target_sector}</div>}
               </div>
               <div>
                 <div style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>{r.reporter_name || 'غير مُتتبَّع'}</div>
-                {r.reporter_cr && <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, direction: 'ltr', textAlign: 'right' }}>{r.reporter_cr}</div>}
+                {r.reporter_cr && <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, direction: 'ltr', textAlign: 'right' }}>{r.reporter_cr}</div>}
               </div>
               <span style={{ fontSize: '13px', color: '#334155', fontWeight: 600 }}>{CATEGORY_LABEL[r.category] || r.category || '—'}</span>
-              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-GB') : '—'}</span>
+              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-GB') : '—'}</span>
               <span>
                 {d ? (
                   <span style={{ background: d.bg, color: d.c, borderRadius: '7px', padding: '4px 10px', fontSize: '11.5px', fontWeight: 800 }}>{d.label}</span>

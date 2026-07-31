@@ -229,7 +229,7 @@ export default function AdminDataExport() {
       </div>
 
       <div style={{ ...card, padding: '22px', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px', textAlign: 'right' }}>ما الذي يُصدَّر</h3>
+        <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px', textAlign: 'right' }}>ما الذي يُصدَّر</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '11px' }}>
           {DATASETS.map((d) => (
             <label key={d.id} style={{ display: 'flex', gap: '11px', alignItems: 'flex-start', padding: '13px 15px', border: `1.5px solid ${selected[d.id] ? '#1E2A52' : '#E2E8F0'}`, borderRadius: '11px', cursor: 'pointer', background: selected[d.id] ? '#F8FAFC' : '#fff', textAlign: 'right', flexDirection: 'row-reverse' }}>
@@ -242,7 +242,7 @@ export default function AdminDataExport() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
                   {d.label}
-                  <span style={{ color: '#94A3B8', fontWeight: 700 }}> · {(counts[d.id] ?? 0).toLocaleString('en-US')}</span>
+                  <span style={{ color: '#64748B', fontWeight: 700 }}> · {(counts[d.id] ?? 0).toLocaleString('en-US')}</span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginTop: '3px', lineHeight: 1.7 }}>{d.note}</div>
               </div>
@@ -282,17 +282,17 @@ export default function AdminDataExport() {
         >
           {busy ? (progress || 'جاري التصدير…') : chosen.length ? `تصدير ${chosen.length} ملفاً` : 'اختر مجموعة واحدة على الأقل'}
         </button>
-        <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '11px 2px 0', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
+        <p style={{ fontSize: '12.5px', color: '#64748B', margin: '11px 2px 0', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
           ملف لكل مجموعة. ملفات CSV تحمل علامة ترميز حتى تفتح العربية سليمة في Excel.
         </p>
       </div>
 
       <div style={{ ...card, overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>آخر عمليات التصدير</h3>
+          <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>آخر عمليات التصدير</h2>
         </div>
         {history.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600 }}>لم يُصدَّر شيء بعد</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: '#64748B', fontSize: '13.5px', fontWeight: 600 }}>لم يُصدَّر شيء بعد</div>
         ) : history.map((h, i) => {
           let meta = {}
           try { meta = typeof h.meta === 'string' ? JSON.parse(h.meta) : (h.meta || {}) } catch { /* a log entry must never break the page */ }
@@ -300,9 +300,9 @@ export default function AdminDataExport() {
             <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 20px', borderBottom: i < history.length - 1 ? '1px solid #F1F5F9' : 'none', gap: '12px', flexWrap: 'wrap', textAlign: 'right' }}>
               <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>
                 {(meta.datasets || []).map((d) => DATASETS.find((x) => x.id === d)?.label || d).join('، ') || '—'}
-                <span style={{ color: '#94A3B8' }}> · {String(meta.format || '').toUpperCase()}</span>
+                <span style={{ color: '#64748B' }}> · {String(meta.format || '').toUpperCase()}</span>
               </span>
-              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 700 }}>
+              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700 }}>
                 {Number(meta.rows || 0).toLocaleString('en-US')} صف · {new Date(h.created_at).toLocaleString('en-GB')}
               </span>
             </div>

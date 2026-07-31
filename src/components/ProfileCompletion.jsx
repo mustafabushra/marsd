@@ -67,7 +67,7 @@ export default function ProfileCompletion() {
       {gaps.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '6px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>أكمل ملف شركتك</h3>
+            <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>أكمل ملف شركتك</h2>
             <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#15803D', fontVariantNumeric: 'tabular-nums' }}>
               +{points % 1 === 0 ? points : points.toFixed(1)} نقطة متاحة في مؤشرك
             </div>
@@ -95,7 +95,7 @@ export default function ProfileCompletion() {
                       }}>
                 <span>
                   <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{g.label}</span>
-                  {g.hint && <span style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginTop: '3px' }}>{g.hint}</span>}
+                  {g.hint && <span style={{ display: 'block', fontSize: '12px', color: '#64748B', marginTop: '3px' }}>{g.hint}</span>}
                 </span>
                 <span style={{ fontSize: '13.5px', fontWeight: 900, color: '#15803D', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   +{Number(g.points) % 1 === 0 ? Number(g.points) : Number(g.points).toFixed(1)}
@@ -105,7 +105,7 @@ export default function ProfileCompletion() {
           </div>
 
           {gaps.length > top.length && (
-            <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '12px' }}>
+            <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '12px' }}>
               و{gaps.length - top.length} بنداً آخر في صفحة الملف
             </div>
           )}

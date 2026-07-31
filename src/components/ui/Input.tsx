@@ -59,7 +59,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       alignItems: 'center',
       justifyContent: 'center',
       height: '20px',
-      color: '#94A3B8',
+      color: '#64748B',
       pointerEvents: 'none',
     }
 

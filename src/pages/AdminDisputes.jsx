@@ -201,10 +201,10 @@ export default function AdminDisputes() {
               <div key={d.id} style={{ ...card, padding: '22px', opacity: busyId === d.id ? 0.6 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
                   <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
                       {d.companies?.name || 'شركة'}
-                    </h3>
-                    <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: 0, fontWeight: 600 }}>
+                    </h2>
+                    <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0, fontWeight: 600 }}>
                       سجل {d.companies?.cr_number || '—'} · اعترضت عبر «{d.tenants?.name || '—'}»
                     </p>
                   </div>
@@ -212,12 +212,12 @@ export default function AdminDisputes() {
                     <span style={{ background: s.bg, color: s.color, borderRadius: '8px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
                       {s.icon} {s.label}
                     </span>
-                    <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{new Date(d.created_at).toLocaleDateString('en-GB')}</span>
+                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{new Date(d.created_at).toLocaleDateString('en-GB')}</span>
                   </div>
                 </div>
 
                 <div style={{ background: '#F8FAFC', borderRadius: '11px', padding: '14px 16px', margin: '15px 0 0', textAlign: 'right' }}>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 800, marginBottom: '5px' }}>نص الاعتراض</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 800, marginBottom: '5px' }}>نص الاعتراض</div>
                   <p style={{ fontSize: '14px', color: '#334155', margin: 0, lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>{d.reason}</p>
                   {d.evidence_url && (
                     <a href={d.evidence_url} target="_blank" rel="noreferrer" style={{ fontSize: '13px', color: '#2a78d6', fontWeight: 800, display: 'inline-block', marginTop: '9px' }}>
@@ -230,7 +230,7 @@ export default function AdminDisputes() {
                     front of you is deciding on the objection alone. */}
                 {r && (
                   <div style={{ border: '1px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', marginTop: '12px', textAlign: 'right' }}>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 800, marginBottom: '9px' }}>التقرير المُعترَض عليه</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 800, marginBottom: '9px' }}>التقرير المُعترَض عليه</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
                       {[
                         ['السداد', PAYMENT_LABEL[r.payment_commitment] || r.payment_commitment],
@@ -241,7 +241,7 @@ export default function AdminDisputes() {
                         ['حالة التقرير', r.status === 'approved' ? 'منشور' : r.status === 'rejected' ? 'مسحوب' : r.status],
                       ].map(([k, v]) => (
                         <div key={k}>
-                          <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>{k}</div>
+                          <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{k}</div>
                           <div style={{ fontSize: '13.5px', fontWeight: 700, color: v ? '#334155' : '#CBD5E1' }}>{v || '—'}</div>
                         </div>
                       ))}

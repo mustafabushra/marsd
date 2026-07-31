@@ -96,7 +96,7 @@ export function SetParametersModal({
 
         {/* Weight Distribution */}
         <div className="space-y-4">
-          <h3 className="font-medium text-slate-900">توزيع الأوزان</h3>
+          <h2 className="font-medium text-slate-900">توزيع الأوزان</h2>
 
           {/* Official Data Weight */}
           <div>

@@ -29,7 +29,7 @@ export default function VisitorShell() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <span style={{ fontSize: '21px', fontWeight: 900, color: '#fff' }}>مرصد</span>
             </div>
-            <p style={{ fontSize: '14px', lineHeight: '1.7', color: '#94A3B8', margin: 0 }}>
+            <p style={{ fontSize: '14px', lineHeight: '1.7', color: '#64748B', margin: 0 }}>
               المرجع الموثوق لتقييم موثوقية شركاء الأعمال في السوق السعودي والخليجي.
             </p>
           </div>

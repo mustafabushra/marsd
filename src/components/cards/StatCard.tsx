@@ -78,7 +78,7 @@ const StatCard: React.FC<StatCardProps> = ({
 
   const subtitleStyles: React.CSSProperties = {
     fontSize: '12px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontFamily: 'Tajawal, sans-serif',
     marginTop: '4px',
   }

@@ -39,7 +39,7 @@ export function LimitReached({ title, detail, giveToGet, contributeTo = '/add-co
 
   return (
     <div style={S.card}>
-      <h3 style={S.title}>⚠️ {title}</h3>
+      <h2 style={S.title}>⚠️ {title}</h2>
       <p style={S.body}>{detail}</p>
       <div style={S.actions}>
         {giveToGet && (
@@ -61,7 +61,7 @@ export function FeatureLocked({ feature, featureName }) {
 
   return (
     <div style={S.card}>
-      <h3 style={S.title}>🔒 {featureName || feature} غير متاحة في باقتك</h3>
+      <h2 style={S.title}>🔒 {featureName || feature} غير متاحة في باقتك</h2>
       <p style={S.body}>
         هذه الميزة تأتي مع الباقات المدفوعة. اطّلع على ما تشمله كل باقة واختر ما يناسب حجم عملك.
       </p>

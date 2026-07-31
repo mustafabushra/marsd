@@ -59,7 +59,7 @@ export function BarList({ title, rows, unit = '', color, empty = 'لا توجد 
 
   return (
     <div style={{ ...card, padding: '22px' }}>
-      <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 18px', textAlign: 'right' }}>{title}</h3>
+      <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 18px', textAlign: 'right' }}>{title}</h2>
       {rows.length === 0 ? (
         <div style={{ fontSize: '13.5px', color: INK.muted, fontWeight: 600, textAlign: 'right', padding: '12px 0' }}>{empty}</div>
       ) : (
@@ -113,7 +113,7 @@ export function TrendLine({ title, points, unit = '' }) {
   if (points.length < 2) {
     return (
       <div style={{ ...card, padding: '22px' }}>
-        <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 12px', textAlign: 'right' }}>{title}</h3>
+        <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 12px', textAlign: 'right' }}>{title}</h2>
         <div style={{ fontSize: '13.5px', color: INK.muted, fontWeight: 600, textAlign: 'right' }}>لا توجد فترة كافية للرسم</div>
       </div>
     )
@@ -127,7 +127,7 @@ export function TrendLine({ title, points, unit = '' }) {
   return (
     <div style={{ ...card, padding: '22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '14px', gap: '10px' }}>
-        <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: 0, textAlign: 'right' }}>{title}</h3>
+        <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: 0, textAlign: 'right' }}>{title}</h2>
         <span style={{ fontSize: '12.5px', color: INK.muted, fontWeight: 700 }}>
           {hover != null ? `${points[hover].label}: ${points[hover].value.toLocaleString('en-US')}${unit}` : `الذروة ${max.toLocaleString('en-US')}${unit}`}
         </span>
@@ -169,7 +169,7 @@ export function StatusBar({ title, segments }) {
   const total = segments.reduce((s, x) => s + x.value, 0)
   return (
     <div style={{ ...card, padding: '22px' }}>
-      <h3 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 16px', textAlign: 'right' }}>{title}</h3>
+      <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: INK.primary, margin: '0 0 16px', textAlign: 'right' }}>{title}</h2>
 
       {total === 0 ? (
         <div style={{ fontSize: '13.5px', color: INK.muted, fontWeight: 600, textAlign: 'right' }}>لا توجد بيانات</div>

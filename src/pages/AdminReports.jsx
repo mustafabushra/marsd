@@ -200,7 +200,7 @@ export default function AdminReports() {
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '48px', textAlign: 'center' }}>
           <div style={{ fontSize: '44px', marginBottom: '12px' }}>✅</div>
           <div style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>لا توجد تقارير قيد المراجعة</div>
-          <div style={{ fontSize: '14px', color: '#94A3B8', marginTop: '6px' }}>كل التقارير تمت مراجعتها.</div>
+          <div style={{ fontSize: '14px', color: '#64748B', marginTop: '6px' }}>كل التقارير تمت مراجعتها.</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '18px', alignItems: 'start' }}>
@@ -214,7 +214,7 @@ export default function AdminReports() {
               <div key={r.id} onClick={() => setSel(i)} style={{ padding: '16px 18px', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', background: sel === i ? '#F0FDF4' : '#fff', borderRight: sel === i ? '3px solid #16A34A' : '3px solid transparent' }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '5px', lineHeight: 1.4 }}>{r.companies?.name || 'شركة'}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}</span>
+                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}</span>
                   <span style={{ fontSize: '13px', fontWeight: 800, color: '#334155' }}>{dealValue(r)}</span>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export default function AdminReports() {
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '26px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '18px', borderBottom: '1px solid #F1F5F9' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلَّغ عنها</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلَّغ عنها</div>
                   <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{current.companies?.name || 'شركة'}</h2>
                   {current.title && <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '5px' }}>{current.title}{current.category ? ` · ${CATEGORY_LABELS[current.category] || current.category}` : ''}</div>}
                 </div>
@@ -245,10 +245,10 @@ export default function AdminReports() {
                   <div style={{ background: suspect ? '#FFFBEB' : '#F8FAFC', border: `1px solid ${suspect ? '#FDE68A' : '#E2E8F0'}`, borderRadius: '12px', padding: '15px 17px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلِّغة</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلِّغة</div>
                         <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A' }}>{current.reporter?.name || '—'}</div>
                         {current.reporter?.cr_number && (
-                          <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>سجل {current.reporter.cr_number}</div>
+                          <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>سجل {current.reporter.cr_number}</div>
                         )}
                       </div>
                       <div style={{ textAlign: 'left', fontSize: '12.5px', fontWeight: 700, color: '#52514e', lineHeight: 1.9 }}>
@@ -274,7 +274,7 @@ export default function AdminReports() {
                   ['فترة التعامل', period(current)],
                 ].map(([l, v]) => (
                   <div key={l} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '15px' }}>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '5px' }}>{l}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '5px' }}>{l}</div>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{v}</div>
                   </div>
                 ))}

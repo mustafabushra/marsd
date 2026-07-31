@@ -99,7 +99,7 @@ export default function CompanyKnowledgeBase() {
         >
           غير مُتتبَّعة فقط
         </button>
-        <span style={{ alignSelf: 'center', fontSize: '13px', color: '#94A3B8', fontWeight: 700 }}>{filtered.length} شركة</span>
+        <span style={{ alignSelf: 'center', fontSize: '13px', color: '#64748B', fontWeight: 700 }}>{filtered.length} شركة</span>
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
@@ -107,7 +107,7 @@ export default function CompanyKnowledgeBase() {
           <span>اسم الشركة</span><span>السجل التجاري</span><span>أضافها</span><span>مصدر البيانات</span><span>تقارير عنها</span><span>اكتمال البيانات</span>
         </div>
         {filtered.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>لا توجد شركات مطابقة</div>
         ) : filtered.map((c) => (
           <div key={c.id} style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', textAlign: 'right' }}>
             <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{c.name}{c.verified ? ' ✔' : ''}</span>
@@ -117,7 +117,7 @@ export default function CompanyKnowledgeBase() {
                 <>
                   <div style={{ fontSize: '13px', color: '#334155', fontWeight: 700 }}>{c.contributor_name}</div>
                   {c.contributed_at && (
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600 }}>{new Date(c.contributed_at).toLocaleDateString('en-GB')}</div>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>{new Date(c.contributed_at).toLocaleDateString('en-GB')}</div>
                   )}
                 </>
               ) : (
@@ -127,7 +127,7 @@ export default function CompanyKnowledgeBase() {
             <span style={{ fontSize: '13px', color: '#334155', fontWeight: 600 }}>{sourceLabel(c)}</span>
             <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>
               {c.reports_about}
-              {c.trust_score != null && <span style={{ color: '#94A3B8' }}> · درجة {c.trust_score}</span>}
+              {c.trust_score != null && <span style={{ color: '#64748B' }}> · درجة {c.trust_score}</span>}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ flex: 1, height: '7px', background: '#F1F5F9', borderRadius: '5px', overflow: 'hidden', minWidth: '50px' }}>

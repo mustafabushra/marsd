@@ -63,7 +63,7 @@ export default function About() {
           }}>
             ⚠
           </div>
-          <h3 style={{
+          <h2 style={{
             fontSize: '22px',
             fontWeight: 800,
             color: '#1E2A52',
@@ -71,7 +71,7 @@ export default function About() {
             textAlign: 'right'
           }}>
             المشكلة
-          </h3>
+          </h2>
           <p style={{
             fontSize: '15.5px',
             lineHeight: '1.8',
@@ -102,14 +102,14 @@ export default function About() {
           }}>
             <CheckIcon size={34} />
           </div>
-          <h3 style={{
+          <h2 style={{
             fontSize: '22px',
             fontWeight: 800,
             color: '#1E2A52',
             margin: '0 0 12px'
           }}>
             الحل
-          </h3>
+          </h2>
           <p style={{
             fontSize: '15.5px',
             lineHeight: '1.8',
@@ -128,7 +128,7 @@ export default function About() {
         padding: '38px',
         marginBottom: '24px'
       }}>
-        <h3 style={{
+        <h2 style={{
           fontSize: '24px',
           fontWeight: 900,
           color: '#1E2A52',
@@ -136,7 +136,7 @@ export default function About() {
           textAlign: 'right'
         }}>
           نموذج الثقة — ثلاث طبقات
-        </h3>
+        </h2>
         <p style={{
           fontSize: '15.5px',
           color: '#64748B',
@@ -199,7 +199,7 @@ export default function About() {
           borderRadius: '18px',
           padding: '32px'
         }}>
-          <h3 style={{
+          <h2 style={{
             fontSize: '21px',
             fontWeight: 800,
             color: '#1E2A52',
@@ -207,7 +207,7 @@ export default function About() {
             textAlign: 'right'
           }}>
             كيف نحمي النظام من التلاعب؟
-          </h3>
+          </h2>
           <p style={{
             fontSize: '15.5px',
             lineHeight: '1.8',
@@ -225,7 +225,7 @@ export default function About() {
           borderRadius: '18px',
           padding: '32px'
         }}>
-          <h3 style={{
+          <h2 style={{
             fontSize: '21px',
             fontWeight: 800,
             color: '#1E2A52',
@@ -233,7 +233,7 @@ export default function About() {
             textAlign: 'right'
           }}>
             خصوصية بيانات المبلّغين
-          </h3>
+          </h2>
           <p style={{
             fontSize: '15.5px',
             lineHeight: '1.8',

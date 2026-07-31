@@ -171,9 +171,9 @@ export default function AdminUsers() {
               {open && (
                 <div style={{ padding: '4px 18px 18px', background: '#FAFCFF' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '14px', textAlign: 'right', marginBottom: '14px' }}>
-                    <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>مُعرّف الحساب</div><div style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', wordBreak: 'break-all' }}>{u.id}</div></div>
-                    <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>أُنشئ في</div><div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{u.created_at ? new Date(u.created_at).toLocaleString('en-GB') : '—'}</div></div>
-                    <div><div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>آخر دخول</div><div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{u.last_login_at ? new Date(u.last_login_at).toLocaleString('en-GB') : 'لم يسجّل دخول'}</div></div>
+                    <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>مُعرّف الحساب</div><div style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', wordBreak: 'break-all' }}>{u.id}</div></div>
+                    <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>أُنشئ في</div><div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{u.created_at ? new Date(u.created_at).toLocaleString('en-GB') : '—'}</div></div>
+                    <div><div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>آخر دخول</div><div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155' }}>{u.last_login_at ? new Date(u.last_login_at).toLocaleString('en-GB') : 'لم يسجّل دخول'}</div></div>
                   </div>
 
                   {/* The role is not editable here on purpose: guard_user_privileges

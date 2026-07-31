@@ -123,10 +123,10 @@ export default function MyCompanies() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '11px', flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُرسلة ({items.length})</h3>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: 0 }}>الشركات المُرسلة ({items.length})</h2>
             <LiveBadge connected={connected} liveAt={liveAt} />
           </div>
-          <p style={{ fontSize: '13px', color: '#94A3B8', margin: '3px 0 0', fontWeight: 600 }}>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: '3px 0 0', fontWeight: 600 }}>
             الشركات التي أضافها فريقك لسجل مرصد وحالة مراجعتها
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function MyCompanies() {
                   <span style={{ fontSize: '13px', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{r.crNumber}</span>
                   <span style={{ fontSize: '13px', color: '#64748B' }}>{r.sector}</span>
                   <span style={{ fontSize: '13px', color: '#64748B' }}>{r.city}</span>
-                  <span style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600 }}>{r.filedAt}</span>
+                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.filedAt}</span>
                   <span>
                     <span style={{ background: s.bg, color: s.fg, borderRadius: '7px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap' }}>{s.label}</span>
                   </span>

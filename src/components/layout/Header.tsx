@@ -108,7 +108,7 @@ const Header: React.FC<HeaderProps> = ({
     <header style={containerStyles}>
       <div style={searchStyles}>
         <svg
-          style={{ position: 'absolute', left: '10px', width: '18px', height: '18px', color: '#94A3B8' }}
+          style={{ position: 'absolute', left: '10px', width: '18px', height: '18px', color: '#64748B' }}
           fill="currentColor"
           viewBox="0 0 24 24"
         >

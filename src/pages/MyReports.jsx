@@ -195,7 +195,7 @@ export default function MyReports() {
           <div style={{ padding: '48px 32px', textAlign: 'center' }}>
             <div style={{ color: '#CBD5E1', marginBottom: '16px', fontSize: '44px' }}>📝</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>لا توجد تقارير</div>
-            <div style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '20px' }}>ابدأ برفع التقارير الأولى عن الشركات لمساعدة المجتمع</div>
+            <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>ابدأ برفع التقارير الأولى عن الشركات لمساعدة المجتمع</div>
             <button
               onClick={() => window.location.href = '/add-report'}
               style={{
@@ -234,7 +234,7 @@ export default function MyReports() {
         )}
       </div>
       {filtered.length > 0 && (
-        <p style={{ fontSize: '13px', color: '#94A3B8', margin: '14px 2px 0', fontWeight: 600 }}>اضغط على أي صف لعرض التفاصيل الكاملة للتقرير.</p>
+        <p style={{ fontSize: '13px', color: '#64748B', margin: '14px 2px 0', fontWeight: 600 }}>اضغط على أي صف لعرض التفاصيل الكاملة للتقرير.</p>
       )}
 
       {/* Drawer */}
@@ -270,7 +270,7 @@ export default function MyReports() {
             <div style={{ padding: '26px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلَّغ عنها</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلَّغ عنها</div>
                   <h2 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{selectedReport.company}</h2>
                 </div>
                 <span style={{
@@ -309,7 +309,7 @@ export default function MyReports() {
                   { label: 'فترة التعامل', value: selectedReport.period }
                 ].map((item, idx) => (
                   <div key={idx} style={{ background: '#F8FAFC', borderRadius: '11px', padding: '15px' }}>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700, marginBottom: '5px' }}>{item.label}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '5px' }}>{item.label}</div>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{item.value}</div>
                   </div>
                 ))}

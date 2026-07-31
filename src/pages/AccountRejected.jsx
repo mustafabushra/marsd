@@ -33,7 +33,7 @@ export default function AccountRejected() {
         <p style={{ fontSize: '16px', color: '#64748B', lineHeight: 1.6, margin: '0 0 24px 0' }}>
           للأسف، لم تتم الموافقة على طلب تسجيل شركتك.
         </p>
-        <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 32px 0' }}>
+        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 32px 0' }}>
           يمكنك التواصل مع فريق الدعم للمزيد من التفاصيل
         </p>
 

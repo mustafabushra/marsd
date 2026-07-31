@@ -95,7 +95,7 @@ const CompanyCard: React.FC<CompanyCardProps> = ({
 
   const scoreLabelStyles: React.CSSProperties = {
     fontSize: '12px',
-    color: '#94A3B8',
+    color: '#64748B',
     fontFamily: 'Tajawal, sans-serif',
   }
 

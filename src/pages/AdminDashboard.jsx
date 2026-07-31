@@ -25,11 +25,11 @@ function GrowthChart({ points, loading }) {
   const PAD = 14
 
   if (loading) {
-    return <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#94A3B8', fontSize: '13px', fontWeight: 600 }}>…</div>
+    return <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#64748B', fontSize: '13px', fontWeight: 600 }}>…</div>
   }
   if (!points.length || points[points.length - 1].total === 0) {
     return (
-      <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#94A3B8', fontSize: '13.5px', fontWeight: 600 }}>
+      <div style={{ height: '198px', display: 'grid', placeItems: 'center', color: '#64748B', fontSize: '13.5px', fontWeight: 600 }}>
         لا توجد شركات مسجّلة بعد
       </div>
     )
@@ -71,7 +71,7 @@ function GrowthChart({ points, loading }) {
         <text x={x(points.length - 1)} y={y(last.total) - 12} textAnchor="end"
               fill="#1E2A52" fontSize="13" fontWeight="800">{last.total}</text>
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B', fontWeight: 600, marginTop: '8px' }}>
         {points.map((p) => <span key={p.label}>{p.label}</span>)}
       </div>
     </>
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
           <div key={i} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
             <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '12px' }}>{k.label}</div>
             <div style={{ fontSize: '32px', fontWeight: 900, color: k.color, lineHeight: 1 }}>{loading ? '…' : k.value}</div>
-            <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '6px' }}>{k.sub}</div>
+            <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '6px' }}>{k.sub}</div>
           </div>
         ))}
       </div>
@@ -244,16 +244,16 @@ export default function AdminDashboard() {
       {/* Growth + Risk distribution */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '18px', marginBottom: '18px' }}>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>نمو عدد الشركات</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>نمو عدد الشركات</h2>
           <GrowthChart points={growth} loading={loading} />
         </div>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>توزيع مستويات المخاطر</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>توزيع مستويات المخاطر</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div style={{ width: '130px', height: '130px', borderRadius: '50%', background: donut, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
               <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: '20px', fontWeight: 900, color: '#1E2A52' }}>{riskTotal === 1 && !risk.low && !risk.med && !risk.high ? 0 : riskTotal}</span>
-                <span style={{ fontSize: '11px', color: '#94A3B8' }}>شركة مُقيّمة</span>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>شركة مُقيّمة</span>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -275,15 +275,15 @@ export default function AdminDashboard() {
       {/* Top sectors + Operations center */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '18px' }}>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>أكثر القطاعات نشاطاً</h3>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px' }}>أكثر القطاعات نشاطاً</h2>
           {sectors.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px', fontSize: '14px' }}>لا توجد بيانات قطاعات بعد</div>
+            <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>لا توجد بيانات قطاعات بعد</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {sectors.map((s) => (
                 <div key={s.name}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    <span>{s.name}</span><span style={{ color: '#94A3B8' }}>{s.val.toLocaleString('en-US')}</span>
+                    <span>{s.name}</span><span style={{ color: '#64748B' }}>{s.val.toLocaleString('en-US')}</span>
                   </div>
                   <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '6px', overflow: 'hidden' }}>
                     <div style={{ width: `${s.pct}%`, height: '100%', background: '#1E2A52', borderRadius: '6px' }}></div>
@@ -295,7 +295,7 @@ export default function AdminDashboard() {
         </div>
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>مركز العمليات</h3>
+            <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0 }}>مركز العمليات</h2>
             <span style={{ background: '#FEF2F2', color: '#B91C1C', borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 900 }}>{opsPending} معلّق</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>تقارير بانتظار المراجعة</div>
                 <div style={{ fontSize: '12px', color: '#B45309', marginTop: '1px' }}>اعتماد أو رفض تقارير الأعضاء</div>
               </div>
-              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+              <span style={{ color: '#64748B', fontWeight: 900 }}>‹</span>
             </button>
             <button onClick={() => navigate('/admin/requests')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '13px 15px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
               <span style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#16A34A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', flex: 'none' }}>{stats.companyRequests}</span>
@@ -313,7 +313,7 @@ export default function AdminDashboard() {
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>طلبات إضافة/تعديل شركات</div>
                 <div style={{ fontSize: '12px', color: '#15803D', marginTop: '1px' }}>التحقق من السجل قبل النشر</div>
               </div>
-              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+              <span style={{ color: '#64748B', fontWeight: 900 }}>‹</span>
             </button>
             <button onClick={() => navigate('/admin/bulk-import')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '12px', padding: '13px 15px', cursor: 'pointer', textAlign: 'right', width: '100%', fontFamily: 'inherit' }}>
               <span style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#7C3AED', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flex: 'none' }}>⬆</span>
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>رفع دفعة شركات</div>
                 <div style={{ fontSize: '12px', color: '#6D28D9', marginTop: '1px' }}>استيراد جماعي من Excel</div>
               </div>
-              <span style={{ color: '#94A3B8', fontWeight: 900 }}>‹</span>
+              <span style={{ color: '#64748B', fontWeight: 900 }}>‹</span>
             </button>
           </div>
         </div>

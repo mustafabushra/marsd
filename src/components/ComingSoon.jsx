@@ -35,7 +35,7 @@ export default function ComingSoon({ icon, title, why, willDo, needs, instead })
         </div>
 
         <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '18px 20px', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A', margin: '0 0 11px' }}>ما ستقوم به هذه الشاشة</h3>
+          <h2 style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A', margin: '0 0 11px' }}>ما ستقوم به هذه الشاشة</h2>
           <ul style={{ margin: 0, paddingRight: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {willDo.map((line) => (
               <li key={line} style={{ fontSize: '13.5px', color: '#334155', fontWeight: 600, lineHeight: 1.9 }}>{line}</li>
@@ -44,13 +44,13 @@ export default function ComingSoon({ icon, title, why, willDo, needs, instead })
         </div>
 
         <div style={{ border: '1px solid #FDE68A', background: '#FFFBEB', borderRadius: '12px', padding: '15px 18px', marginBottom: instead ? '16px' : 0 }}>
-          <h3 style={{ fontSize: '13.5px', fontWeight: 900, color: '#92400E', margin: '0 0 7px' }}>ما تحتاجه قبل أن تعمل</h3>
+          <h2 style={{ fontSize: '13.5px', fontWeight: 900, color: '#92400E', margin: '0 0 7px' }}>ما تحتاجه قبل أن تعمل</h2>
           <p style={{ fontSize: '13.5px', color: '#78350F', margin: 0, fontWeight: 600, lineHeight: 1.9 }}>{needs}</p>
         </div>
 
         {instead && (
           <div style={{ border: '1px solid #BBF7D0', background: '#F0FDF4', borderRadius: '12px', padding: '15px 18px' }}>
-            <h3 style={{ fontSize: '13.5px', fontWeight: 900, color: '#15803D', margin: '0 0 7px' }}>ماذا تفعل الآن بدلاً منها</h3>
+            <h2 style={{ fontSize: '13.5px', fontWeight: 900, color: '#15803D', margin: '0 0 7px' }}>ماذا تفعل الآن بدلاً منها</h2>
             <p style={{ fontSize: '13.5px', color: '#14532D', margin: 0, fontWeight: 600, lineHeight: 1.9 }}>{instead}</p>
           </div>
         )}

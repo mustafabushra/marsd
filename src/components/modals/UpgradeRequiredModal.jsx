@@ -56,7 +56,7 @@ export function UpgradeRequiredModal({ isOpen, onClose, onUpgrade, featureName =
               key={plan.name}
               className="border border-slate-200 rounded-lg p-4 hover:border-green-400 transition-colors"
             >
-              <h3 className="font-bold text-slate-900 mb-1">{plan.name}</h3>
+              <h2 className="font-bold text-slate-900 mb-1">{plan.name}</h2>
               <p className="text-green-600 font-medium mb-3">{plan.price}</p>
               <ul className="space-y-2">
                 {plan.features.map((feature, idx) => (

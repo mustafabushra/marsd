@@ -153,7 +153,7 @@ export default function Landing() {
                   boxShadow: 'inset 0 2px 8px rgba(15, 23, 42, 0.05)'
                 }}>
                   <span style={{ fontSize: '52px', fontWeight: 900, color: '#1E2A52', lineHeight: '1' }}>94</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8', fontWeight: 600 }}>من 100</span>
+                  <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>من 100</span>
                 </div>
               </div>
               <div style={{
@@ -378,7 +378,7 @@ export default function Landing() {
             padding: '30px'
           }}>
             <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '8px' }}>مستوى مساهمتك</div>
-            <div style={{ fontSize: '13.5px', color: '#94A3B8', marginBottom: '18px' }}>
+            <div style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '18px' }}>
               أنت ضمن أعلى 15% من المساهمين هذا الشهر
             </div>
             <div style={{
@@ -399,7 +399,7 @@ export default function Landing() {
               display: 'flex',
               justifyContent: 'space-between',
               fontSize: '12.5px',
-              color: '#94A3B8',
+              color: '#64748B',
               fontWeight: 600
             }}>
               <span>مساهم نشط</span>

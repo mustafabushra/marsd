@@ -58,7 +58,7 @@ export default function Contact() {
           borderRadius: '20px',
           padding: '34px'
         }}>
-          <h3 style={{
+          <h2 style={{
             fontSize: '21px',
             fontWeight: 900,
             color: '#0F172A',
@@ -66,7 +66,7 @@ export default function Contact() {
             textAlign: 'right'
           }}>
             أرسل لنا رسالة
-          </h3>
+          </h2>
 
           <form onSubmit={handleSubmit}>
             <div style={{
@@ -325,7 +325,7 @@ export default function Contact() {
               <div>
                 <div style={{
                   fontSize: '13px',
-                  color: '#94A3B8',
+                  color: '#64748B',
                   fontWeight: 700
                 }}>
                   البريد الإلكتروني
@@ -370,7 +370,7 @@ export default function Contact() {
               <div>
                 <div style={{
                   fontSize: '13px',
-                  color: '#94A3B8',
+                  color: '#64748B',
                   fontWeight: 700
                 }}>
                   الهاتف الموحّد
@@ -414,7 +414,7 @@ export default function Contact() {
               <div>
                 <div style={{
                   fontSize: '13px',
-                  color: '#94A3B8',
+                  color: '#64748B',
                   fontWeight: 700
                 }}>
                   المقر
