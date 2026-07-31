@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
-import { useUserRole } from '../hooks/useUserRole'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
 
@@ -49,7 +48,13 @@ const ACCEPT = 'application/pdf,image/png,image/jpeg'
 
 export default function CompanyDocumentsSection() {
   const { user } = useUser()
-  const { tenantId } = useUserRole()
+  // The tenant and company are read here rather than taken from a hook.
+  // This component destructured `tenantId` from useUserRole, which returns
+  // { role, loading, error, isPlatformAdmin, isCompanyAdmin, refresh } and never
+  // a tenantId — so the effect guarded on it never fired, loading stayed true
+  // forever, and the section rendered nothing at all. verify-imports passed
+  // because the import was real; it was the property that did not exist.
+  const [tenantId, setTenantId] = useState(null)
   const [companyId, setCompanyId] = useState(null)
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -64,12 +69,21 @@ export default function CompanyDocumentsSection() {
     try {
       setError('')
       const supabase = getSupabase()
-      const { data: t } = await supabase
-        .from('tenants').select('company_id').eq('id', tenantId).maybeSingle()
-      if (!t?.company_id) { setLoading(false); return }
-      setCompanyId(t.company_id)
 
-      const { data, error: e } = await supabase.rpc('company_documents_for', { p_company_id: t.company_id })
+      // One call resolves both: the RPC already answers for the caller's own
+      // company and needs no argument, so there is no id to plumb through and
+      // nothing to get wrong.
+      const { data: me } = await supabase
+        .from('users').select('tenant_id, tenants:tenant_id ( company_id )')
+        .eq('id', user?.id).maybeSingle()
+
+      const tid = me?.tenant_id || null
+      const cid = me?.tenants?.company_id || null
+      setTenantId(tid)
+      if (!cid) { setLoading(false); return }
+      setCompanyId(cid)
+
+      const { data, error: e } = await supabase.rpc('company_documents_for', { p_company_id: cid })
       if (e) throw e
       setDocs(Array.isArray(data) ? data : [])
     } catch (err) {
@@ -77,9 +91,9 @@ export default function CompanyDocumentsSection() {
     } finally {
       setLoading(false)
     }
-  }, [tenantId])
+  }, [user?.id])
 
-  useEffect(() => { if (tenantId) load() }, [tenantId, load])
+  useEffect(() => { if (user?.id) load() }, [user?.id, load])
   useLiveData(load, { tables: ['company_documents'] })
 
   const upload = async (file) => {
