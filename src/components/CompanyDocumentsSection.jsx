@@ -95,7 +95,30 @@ export default function CompanyDocumentsSection() {
 
     try {
       setBusy(true)
-      const dataUrl = await new Promise((resolve, reject) => {
+      const sb = getSupabase()
+
+      // Storage first. A 15 MB file becomes about 20 MB of base64, and a row
+      // carrying that is fetched in full by every query that touches it — the
+      // admin queue would move hundreds of megabytes to list ten documents.
+      // Stored properly, the row holds a path and the bytes are fetched only
+      // when someone opens the file.
+      //
+      // The data URL stays as a fallback rather than being replaced by it. If
+      // the bucket is ever missing or storage refuses, uploading still works and
+      // the reader below renders either shape — which is exactly what kept this
+      // product running while the bucket did not exist at all.
+      let stored = null
+      const path = `${companyId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
+      const { error: upErr } = await sb.storage
+        .from('company-documents')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (!upErr) {
+        stored = path
+      } else {
+        console.warn('Storage upload failed, falling back to inline:', upErr.message)
+      }
+
+      const dataUrl = stored || await new Promise((resolve, reject) => {
         const r = new FileReader()
         r.onload = () => resolve(r.result)
         r.onerror = reject
@@ -105,7 +128,7 @@ export default function CompanyDocumentsSection() {
       // Read the row back. An insert RLS filters out raises nothing and returns
       // nothing, so "no error" is not evidence the document was stored — and a
       // company told its paperwork arrived when it did not will not send it again.
-      const { data, error: e } = await getSupabase()
+      const { data, error: e } = await sb
         .from('company_documents')
         .insert([{
           company_id: companyId,
@@ -139,6 +162,26 @@ export default function CompanyDocumentsSection() {
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Open a document, whichever way it was stored.
+   *
+   * A data: URL opens directly. A storage path needs a signed URL, because the
+   * bucket is private — a company's papers are not something a guessed link
+   * should return. Both shapes exist in the table and will for as long as the
+   * old rows do, so this reads the value rather than assuming a format.
+   */
+  const openDoc = async (url) => {
+    if (!url) return
+    if (url.startsWith('data:') || url.startsWith('http')) {
+      window.open(url, '_blank')
+      return
+    }
+    const { data, error: e } = await getSupabase().storage
+      .from('company-documents').createSignedUrl(url, 60)
+    if (e || !data?.signedUrl) { showToast('❌ تعذّر فتح المستند'); return }
+    window.open(data.signedUrl, '_blank')
   }
 
   const withdraw = async (id) => {
@@ -224,8 +267,8 @@ export default function CompanyDocumentsSection() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ background: s.bg, color: s.fg, borderRadius: '999px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 800 }}>{s.t}</span>
                     {d.file_url && (
-                      <a href={d.file_url} target="_blank" rel="noreferrer"
-                         style={{ fontSize: '13px', fontWeight: 800, color: '#1E2A52' }}>فتح</a>
+                      <button onClick={() => openDoc(d.file_url)}
+                              style={{ background: 'none', border: 0, fontSize: '13px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', fontFamily: 'inherit' }}>فتح</button>
                     )}
                     {d.status === 'pending' && (
                       <button onClick={() => withdraw(d.id)}

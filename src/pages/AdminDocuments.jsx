@@ -50,7 +50,12 @@ export default function AdminDocuments() {
       const supabase = getSupabase()
       const [{ data: docs }, { data: cos }] = await Promise.all([
         supabase.from('company_documents')
-          .select('id, company_id, doc_type, file_url, file_name, note, created_at, companies:company_id ( name, cr_number )')
+          // file_url is deliberately absent. Older rows hold the whole document
+          // as a base64 data URL, so selecting it here would move the bytes of
+          // every pending document just to draw a list — ten of them at the new
+          // size limit is a several-hundred-megabyte response to render a queue.
+          // It is fetched for one row, when a reviewer opens it.
+          .select('id, company_id, doc_type, file_name, note, created_at, companies:company_id ( name, cr_number )')
           .eq('status', 'pending')
           .order('created_at', { ascending: true })
           .limit(200),
@@ -70,6 +75,26 @@ export default function AdminDocuments() {
 
   useEffect(() => { load() }, [load])
   const { connected, liveAt } = useLiveData(load, { tables: ['company_documents', 'companies'] })
+
+  /**
+   * Fetch and open one document, whichever way it was stored.
+   *
+   * A data: URL opens directly; a storage path needs a signed URL because the
+   * bucket is private. Both shapes are in the table and will be for as long as
+   * the rows written before the bucket existed are, so this reads the value
+   * instead of assuming a format.
+   */
+  const openDoc = async (id) => {
+    const { data: row } = await getSupabase()
+      .from('company_documents').select('file_url').eq('id', id).maybeSingle()
+    const url = row?.file_url
+    if (!url) { showToast('❌ لا ملف مرفق'); return }
+    if (url.startsWith('data:') || url.startsWith('http')) { window.open(url, '_blank'); return }
+    const { data, error } = await getSupabase().storage
+      .from('company-documents').createSignedUrl(url, 60)
+    if (error || !data?.signedUrl) { showToast('❌ تعذّر فتح المستند'); return }
+    window.open(data.signedUrl, '_blank')
+  }
 
   const review = async (id, approve) => {
     let reason = null
@@ -200,10 +225,10 @@ export default function AdminDocuments() {
                   {d.note && <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '6px' }}>ملاحظة: {d.note}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '9px', alignItems: 'center' }}>
-                  <a href={d.file_url} target="_blank" rel="noreferrer"
-                     style={{ fontSize: '13px', fontWeight: 800, color: '#1E2A52', padding: '8px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px' }}>
+                  <button onClick={() => openDoc(d.id)}
+                          style={{ fontSize: '13px', fontWeight: 800, color: '#1E2A52', padding: '8px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
                     فتح المستند
-                  </a>
+                  </button>
                   <button onClick={() => review(d.id, true)} disabled={busy === d.id}
                           style={{ padding: '9px 18px', background: '#15803D', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     ✓ توثيق
