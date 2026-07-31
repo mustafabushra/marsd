@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
@@ -7,85 +7,79 @@ import { notifyAdmins } from '../lib/notify'
 /**
  * The documents section of the company profile.
  *
- * It was a page of its own, and it should not have been. A company does not go
- * looking for a "documents" screen — its papers are part of its record, and
- * splitting them out meant the profile said the record was incomplete while the
- * thing that completes it lived somewhere else.
+ * Built around the checklist rather than an upload form. It used to ask which
+ * type you were uploading and then take a file, which made filing a zakat
+ * certificate as a municipal licence a one-click mistake nothing could catch
+ * afterwards — the two are both PDFs and both real.
  *
- * The trust report's official layer had nothing to weigh beyond a registration
- * status, and its confidence section could only ever say "لا مستندات رسمية
- * مرفقة". This is where that changes, and it is the company's screen rather than
- * Marsad's on purpose: the company holds these papers, and asking Marsad to
- * source a company's own commercial registration is backwards.
+ * Now the document decides the button. Every type the platform expects is listed
+ * whether or not it exists, carrying its state and the single action that state
+ * allows: missing takes an upload, expired takes a replacement, rejected takes
+ * another attempt, verified takes nothing but a look. Both come from
+ * company_document_checklist, so what this screen offers and what the database
+ * permits cannot drift apart. A mistake that cannot be made needs no validation.
  *
  * Uploading is a claim. Only a document Marsad has verified moves the score, so
- * nothing here says "+4" until it has been reviewed — promising points for a
- * pending upload would be a number the screen cannot keep.
+ * nothing here promises points for a pending file.
  */
 
-const DOC_TYPES = [
-  { v: 'commercial_registration', t: 'السجل التجاري', hint: 'الوثيقة الرسمية من وزارة التجارة' },
-  { v: 'tax_certificate', t: 'الشهادة الضريبية', hint: 'شهادة التسجيل في ضريبة القيمة المضافة' },
-  { v: 'national_address', t: 'العنوان الوطني', hint: 'وثيقة العنوان الوطني للمنشأة' },
-  { v: 'chamber_membership', t: 'عضوية الغرفة التجارية', hint: 'شهادة عضوية سارية' },
-  { v: 'license', t: 'ترخيص النشاط', hint: 'ترخيص مزاولة النشاط من الجهة المختصة' },
-  { v: 'bank_letter', t: 'خطاب بنكي', hint: 'خطاب من البنك يثبت الحساب' },
-  { v: 'other', t: 'مستند آخر', hint: '' },
-]
-
-const STATUS = {
-  pending:  { t: 'قيد المراجعة', bg: '#FFFBEB', fg: '#B45309' },
-  verified: { t: '✔ موثَّق', bg: '#ECFDF5', fg: '#15803D' },
-  rejected: { t: '✕ مرفوض', bg: '#FEF2F2', fg: '#B91C1C' },
-}
-
-// 15 MB of file. Stored as a data URL, which is about a third larger than
-// the bytes on disk — so the column guard downstream allows 21 MB, and a check
-// written against the encoded length would reject files well under the limit
-// this screen advertises.
+// 15 MB of file. Stored as a data URL when storage is unavailable, which is
+// about a third larger than the bytes on disk — so the column guard downstream
+// allows 21 MB, and a check written against the encoded length would reject
+// files well under the limit this screen advertises.
 const MAX_BYTES = 15 * 1024 * 1024
 const ACCEPT = 'application/pdf,image/png,image/jpeg'
 
+const STATE = {
+  verified:          { t: '✅ معتمد',        bg: '#ECFDF5', fg: '#15803D' },
+  pending:           { t: '⏳ قيد المراجعة', bg: '#FFFBEB', fg: '#B45309' },
+  missing:           { t: '❌ مفقود',        bg: '#F1F5F9', fg: '#64748B' },
+  expired:           { t: '⚠ منتهٍ',         bg: '#FEF2F2', fg: '#B91C1C' },
+  rejected:          { t: '✕ مرفوض',        bg: '#FEF2F2', fg: '#B91C1C' },
+  reupload_required: { t: '🔄 إعادة رفع',    bg: '#FFFBEB', fg: '#B45309' },
+  superseded:        { t: 'نسخة سابقة',      bg: '#F1F5F9', fg: '#64748B' },
+}
+
+const ACTION = { upload: 'رفع', replace: 'استبدال', reupload: 'إعادة رفع', view: 'عرض' }
+
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('ar-SA') : null)
+
 export default function CompanyDocumentsSection() {
   const { user } = useUser()
-  // The tenant and company are read here rather than taken from a hook.
-  // This component destructured `tenantId` from useUserRole, which returns
-  // { role, loading, error, isPlatformAdmin, isCompanyAdmin, refresh } and never
-  // a tenantId — so the effect guarded on it never fired, loading stayed true
-  // forever, and the section rendered nothing at all. verify-imports passed
-  // because the import was real; it was the property that did not exist.
-  const [tenantId, setTenantId] = useState(null)
   const [companyId, setCompanyId] = useState(null)
-  const [docs, setDocs] = useState([])
+  const [tenantId, setTenantId] = useState(null)
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
-  const [form, setForm] = useState({ type: 'commercial_registration', note: '' })
+  const [busy, setBusy] = useState(null)
+  const [openRow, setOpenRow] = useState(null)
+  const [versions, setVersions] = useState([])
+  const fileInput = useRef(null)
+  const pendingType = useRef(null)
 
-  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3500) }
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4000) }
 
   const load = useCallback(async () => {
     try {
       setError('')
-      const supabase = getSupabase()
+      const sb = getSupabase()
 
-      // One call resolves both: the RPC already answers for the caller's own
-      // company and needs no argument, so there is no id to plumb through and
-      // nothing to get wrong.
-      const { data: me } = await supabase
+      // Read the tenant and company from the user's own row. This component
+      // destructured tenantId from useUserRole, which does not return one, so
+      // the effect guarded on it never fired and the section rendered nothing.
+      const { data: me } = await sb
         .from('users').select('tenant_id, tenants:tenant_id ( company_id )')
         .eq('id', user?.id).maybeSingle()
 
-      const tid = me?.tenant_id || null
+      setTenantId(me?.tenant_id || null)
       const cid = me?.tenants?.company_id || null
-      setTenantId(tid)
       if (!cid) { setLoading(false); return }
       setCompanyId(cid)
 
-      const { data, error: e } = await supabase.rpc('company_documents_for', { p_company_id: cid })
+      const { data, error: e } = await sb.rpc('company_document_checklist', { p_company_id: cid })
       if (e) throw e
-      setDocs(Array.isArray(data) ? data : [])
+      setItems(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err.message || 'تعذّر تحميل المستندات')
     } finally {
@@ -96,10 +90,18 @@ export default function CompanyDocumentsSection() {
   useEffect(() => { if (user?.id) load() }, [user?.id, load])
   useLiveData(load, { tables: ['company_documents'] })
 
+  // One hidden input for every row: the type is remembered rather than chosen,
+  // which is the whole point of the checklist.
+  const pick = (docType) => {
+    pendingType.current = docType
+    fileInput.current?.click()
+  }
+
   const upload = async (file) => {
-    if (!file || !companyId) return
+    const docType = pendingType.current
+    if (!file || !companyId || !docType) return
     if (file.size > MAX_BYTES) {
-      showToast(`❌ الملف أكبر من ١٥ ميجابايت (${(file.size / 1024 / 1024).toFixed(1)} م.ب)`)
+      showToast(`❌ الملف ${(file.size / 1024 / 1024).toFixed(1)} م.ب — الحد الأقصى ١٥ ميجابايت`)
       return
     }
     if (!ACCEPT.split(',').includes(file.type)) {
@@ -108,106 +110,82 @@ export default function CompanyDocumentsSection() {
     }
 
     try {
-      setBusy(true)
+      setBusy(docType)
       const sb = getSupabase()
 
-      // Storage first. A 15 MB file becomes about 20 MB of base64, and a row
-      // carrying that is fetched in full by every query that touches it — the
-      // admin queue would move hundreds of megabytes to list ten documents.
-      // Stored properly, the row holds a path and the bytes are fetched only
-      // when someone opens the file.
-      //
-      // The data URL stays as a fallback rather than being replaced by it. If
-      // the bucket is ever missing or storage refuses, uploading still works and
-      // the reader below renders either shape — which is exactly what kept this
-      // product running while the bucket did not exist at all.
+      // Storage first; the inline fallback is what kept this working before the
+      // bucket existed and stays for the same reason.
       let stored = null
       const path = `${companyId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
       const { error: upErr } = await sb.storage
-        .from('company-documents')
-        .upload(path, file, { contentType: file.type, upsert: false })
-      if (!upErr) {
-        stored = path
-      } else {
-        console.warn('Storage upload failed, falling back to inline:', upErr.message)
-      }
+        .from('company-documents').upload(path, file, { contentType: file.type })
+      if (!upErr) stored = path
+      else console.warn('Storage upload failed, falling back to inline:', upErr.message)
 
-      const dataUrl = stored || await new Promise((resolve, reject) => {
+      const fileUrl = stored || await new Promise((resolve, reject) => {
         const r = new FileReader()
         r.onload = () => resolve(r.result)
         r.onerror = reject
         r.readAsDataURL(file)
       })
 
-      // Read the row back. An insert RLS filters out raises nothing and returns
-      // nothing, so "no error" is not evidence the document was stored — and a
-      // company told its paperwork arrived when it did not will not send it again.
-      const { data, error: e } = await sb
-        .from('company_documents')
-        .insert([{
-          company_id: companyId,
-          uploaded_by_tenant_id: tenantId,
-          uploaded_by_user_id: user?.id || null,
-          doc_type: form.type,
-          file_url: dataUrl,
-          file_name: file.name,
-          note: form.note.trim() || null,
-          status: 'pending',
-        }])
-        .select('id')
+      // Read the row back: an insert RLS filters out raises nothing and returns
+      // nothing, and a company told its paperwork arrived when it did not will
+      // not send it again.
+      const { data, error: e } = await sb.from('company_documents').insert([{
+        company_id: companyId,
+        uploaded_by_tenant_id: tenantId,
+        uploaded_by_user_id: user?.id || null,
+        doc_type: docType,
+        file_url: fileUrl,
+        file_name: file.name,
+        status: 'pending',
+      }]).select('id')
       if (e) throw e
       if (!data?.length) throw new Error('لم يُحفظ المستند — تحقّق من صلاحيتك')
 
-      // Tell Marsad. Without this the pending queue is found by opening the
-      // admin screen and looking, which is the failure 047 fixed for
-      // registrations and claims and 068 reintroduced for documents.
+      const label = items.find((i) => i.doc_type === docType)?.label || docType
       await notifyAdmins('document_submitted', {
         title: 'مستند جديد بانتظار التوثيق',
-        message: `${DOC_TYPES.find((t) => t.v === form.type)?.t || form.type} — ${file.name}`,
+        message: `${label} — ${file.name}`,
         tenantId,
-        meta: { company_id: companyId, doc_type: form.type },
+        meta: { company_id: companyId, doc_type: docType },
       })
 
-      setForm((f) => ({ ...f, note: '' }))
       showToast('✅ أُرسل المستند — ستراجعه إدارة مرصد')
       load()
     } catch (err) {
       showToast('❌ تعذّر الرفع: ' + (err?.message || 'خطأ غير معروف'))
     } finally {
-      setBusy(false)
+      setBusy(null)
+      pendingType.current = null
     }
   }
 
-  /**
-   * Open a document, whichever way it was stored.
-   *
-   * A data: URL opens directly. A storage path needs a signed URL, because the
-   * bucket is private — a company's papers are not something a guessed link
-   * should return. Both shapes exist in the table and will for as long as the
-   * old rows do, so this reads the value rather than assuming a format.
-   */
-  const openDoc = async (url) => {
-    if (!url) return
-    if (url.startsWith('data:') || url.startsWith('http')) {
-      window.open(url, '_blank')
-      return
-    }
+  /** Open a document, whichever way it was stored: a data URL directly, a
+      storage path through a signed link because the bucket is private. */
+  const openFile = async (documentId) => {
+    if (!documentId) return
+    const { data: row } = await getSupabase()
+      .from('company_documents').select('file_url').eq('id', documentId).maybeSingle()
+    const url = row?.file_url
+    if (!url) { showToast('❌ لا ملف مرفق'); return }
+    if (url.startsWith('data:') || url.startsWith('http')) { window.open(url, '_blank'); return }
     const { data, error: e } = await getSupabase().storage
       .from('company-documents').createSignedUrl(url, 60)
     if (e || !data?.signedUrl) { showToast('❌ تعذّر فتح المستند'); return }
     window.open(data.signedUrl, '_blank')
   }
 
-  const withdraw = async (id) => {
-    if (!window.confirm('سحب هذا المستند قبل مراجعته؟')) return
-    const { error: e } = await getSupabase().from('company_documents').delete().eq('id', id)
-    if (e) showToast('❌ تعذّر السحب: ' + e.message)
-    else { showToast('✅ سُحب المستند'); load() }
+  const openPanel = async (row) => {
+    setOpenRow(row)
+    setVersions([])
+    const { data } = await getSupabase().rpc('document_versions', {
+      p_company_id: companyId, p_doc_type: row.doc_type,
+    })
+    setVersions(Array.isArray(data) ? data : [])
   }
 
-  // Never disappear without saying why. Returning null on either of these is how
-  // the upload area became impossible to find: the page simply had no documents
-  // section and nothing indicated one was expected.
   if (loading) {
     return (
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px', color: '#94A3B8', fontSize: '14px', fontWeight: 600 }}>
@@ -221,100 +199,178 @@ export default function CompanyDocumentsSection() {
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
         <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>مستندات الشركة</h2>
         <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.8 }}>
-          لا توجد شركة مرتبطة بحسابك بعد، فلا مكان تُرفع إليه المستندات.
-          أكمل تسجيل شركتك أو مطالبة الملكية أولاً — وإن كنت أكملتها فتواصل مع إدارة مرصد.
+          لا توجد شركة مرتبطة بحسابك، فلا مكان تُرفع إليه المستندات.
+          إن كان حسابك من إدارة مرصد فهذه شاشة الشركات — راجع لوحة الإدارة.
         </p>
       </div>
     )
   }
 
-  const verified = docs.filter((d) => d.status === 'verified').length
-  const missing = DOC_TYPES.filter((t) => t.v !== 'other'
-    && !docs.some((d) => d.doc_type === t.v && d.status === 'verified'))
+  const done = items.filter((i) => i.state === 'verified').length
+  const pct = items.length ? Math.round((done / items.length) * 100) : 0
+  const missing = items.filter((i) => ['missing', 'expired', 'rejected', 'reupload_required'].includes(i.state))
 
   return (
-    <div>
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>رفع مستند</h2>
-        <div style={{ display: 'grid', gap: '14px' }}>
-          <label>
-            <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>نوع المستند</span>
-            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                    style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', background: '#fff' }}>
-              {DOC_TYPES.map((t) => <option key={t.v} value={t.v}>{t.t}</option>)}
-            </select>
-            <span style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
-              {DOC_TYPES.find((t) => t.v === form.type)?.hint}
-            </span>
-          </label>
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+      <input ref={fileInput} type="file" accept={ACCEPT} style={{ display: 'none' }}
+             onChange={(e) => { upload(e.target.files?.[0]); e.target.value = '' }} />
 
-          <label>
-            <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>ملاحظة للمراجع (اختياري)</span>
-            <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                   placeholder="مثال: الشهادة سارية حتى نهاية العام"
-                   style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
-          </label>
+      <h2 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>مستندات الشركة</h2>
+      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px' }}>
+        كل مستند توثّقه إدارة مرصد يرفع الطبقة الرسمية في مؤشر ثقتك — والمعلَّق لا يؤثّر حتى يُراجَع.
+      </p>
 
-          <div>
-            <input id="docfile" type="file" accept={ACCEPT} disabled={busy}
-                   onChange={(e) => { upload(e.target.files?.[0]); e.target.value = '' }}
-                   style={{ display: 'none' }} />
-            <label htmlFor="docfile" style={{
-              display: 'inline-block', padding: '12px 24px', background: busy ? '#94A3B8' : '#1E2A52',
-              color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: 800,
-              cursor: busy ? 'default' : 'pointer',
-            }}>
-              {busy ? 'جارٍ الرفع…' : '⬆ اختر ملفاً وارفعه'}
-            </label>
-            <span style={{ fontSize: '12px', color: '#94A3B8', marginRight: '12px', fontWeight: 600 }}>
-              PDF أو PNG أو JPG · حتى ١٥ ميجابايت
-            </span>
-          </div>
+      {error && (
+        <div style={{ marginBottom: '16px', padding: '12px 15px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', color: '#B91C1C', fontSize: '13.5px', fontWeight: 700 }}>⚠️ {error}</div>
+      )}
+
+      {/* Completion first, and the gaps named. Someone who has to work out what
+          is missing from a list of nine rows will not do it. */}
+      <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '18px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '10px' }}>
+          <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#334155' }}>اكتمال المستندات</span>
+          <span style={{ fontSize: '20px', fontWeight: 900, color: '#1E2A52', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
         </div>
-      </div>
+        <div style={{ height: '10px', background: '#E2E8F0', borderRadius: '5px', overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', borderRadius: '5px', background: pct >= 70 ? '#16A34A' : pct >= 40 ? '#F59E0B' : '#DC2626' }}></div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: '#94A3B8', fontWeight: 600, marginTop: '8px' }}>
+          {done} من {items.length} مستنداً معتمداً
+        </div>
 
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>المستندات المرفوعة</h2>
-        {docs.length === 0 ? (
-          <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>لم تُرفع أي مستندات بعد.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {docs.map((d) => {
-              const s = STATUS[d.status] || STATUS.pending
-              const t = DOC_TYPES.find((x) => x.v === d.doc_type)
-              return (
-                <div key={d.id} style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ minWidth: '200px' }}>
-                    <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>{t?.t || d.doc_type}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
-                      {d.file_name || '—'} · {new Date(d.created_at).toLocaleDateString('ar-SA')}
-                    </div>
-                    {d.status === 'rejected' && d.rejection_reason && (
-                      <div style={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 700, marginTop: '6px' }}>
-                        سبب الرفض: {d.rejection_reason}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ background: s.bg, color: s.fg, borderRadius: '999px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 800 }}>{s.t}</span>
-                    {d.file_url && (
-                      <button onClick={() => openDoc(d.file_url)}
-                              style={{ background: 'none', border: 0, fontSize: '13px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', fontFamily: 'inherit' }}>فتح</button>
-                    )}
-                    {d.status === 'pending' && (
-                      <button onClick={() => withdraw(d.id)}
-                              style={{ background: 'none', border: 0, color: '#B91C1C', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>سحب</button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+        {missing.length > 0 && (
+          <div style={{ marginTop: '14px', paddingTop: '13px', borderTop: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#B45309', marginBottom: '8px' }}>يحتاج منك:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {missing.map((m) => (
+                <button key={m.doc_type} onClick={() => pick(m.doc_type)}
+                        style={{ background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '999px', padding: '5px 13px', fontSize: '12.5px', fontWeight: 700, color: '#334155', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+        {items.map((i) => {
+          const st = STATE[i.state] || STATE.missing
+          const isView = i.action === 'view'
+          return (
+            <div key={i.doc_type} style={{
+              border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px',
+              display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', alignItems: 'center',
+            }}>
+              <div style={{ minWidth: '210px' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>
+                  {i.label}
+                  {i.required && <span style={{ color: '#B91C1C', marginRight: '5px' }}>*</span>}
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '4px' }}>
+                  {i.file_name || 'لم يُرفع بعد'}
+                  {i.expires_at && ` · ينتهي ${fmt(i.expires_at)}`}
+                  {i.versions > 1 && ` · ${i.versions} نسخ`}
+                </div>
+                {i.rejection_reason && ['rejected', 'reupload_required'].includes(i.state) && (
+                  <div style={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 700, marginTop: '5px' }}>
+                    سبب الرفض: {i.rejection_reason}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ background: st.bg, color: st.fg, borderRadius: '999px', padding: '5px 13px', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap' }}>{st.t}</span>
+
+                {/* One action, decided by the state rather than by the user. */}
+                <button onClick={() => (isView ? openFile(i.document_id) : pick(i.doc_type))}
+                        disabled={busy === i.doc_type}
+                        style={{
+                          padding: '8px 16px', borderRadius: '9px', fontSize: '13px', fontWeight: 800,
+                          border: isView ? '1.5px solid #E2E8F0' : 0,
+                          background: isView ? '#fff' : '#1E2A52',
+                          color: isView ? '#1E2A52' : '#fff',
+                          cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        }}>
+                  {busy === i.doc_type ? '…' : ACTION[i.action] || 'عرض'}
+                </button>
+
+                {i.document_id && (
+                  <button onClick={() => openPanel(i)}
+                          style={{ background: 'none', border: 0, color: '#64748B', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    تفاصيل
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {openRow && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', justifyContent: 'flex-start', zIndex: 200 }}
+             onClick={(e) => { if (e.target === e.currentTarget) setOpenRow(null) }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '440px', height: '100%', overflowY: 'auto', padding: '26px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '18px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{openRow.label}</h3>
+              <button onClick={() => setOpenRow(null)} aria-label="إغلاق"
+                      style={{ background: 'none', border: 0, fontSize: '22px', color: '#94A3B8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '11px', marginBottom: '22px' }}>
+              {[
+                ['الحالة', (STATE[openRow.state] || STATE.missing).t],
+                ['تاريخ الرفع', fmt(openRow.uploaded_at)],
+                ['تاريخ الاعتماد', fmt(openRow.verified_at)],
+                ['تاريخ الانتهاء', fmt(openRow.expires_at)],
+                ['المراجع', openRow.reviewer],
+                ['سبب الرفض', openRow.rejection_reason],
+              ].filter(([, v]) => v).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13.5px' }}>
+                  <span style={{ color: '#94A3B8', fontWeight: 700 }}>{k}</span>
+                  <span style={{ color: '#0F172A', fontWeight: 700, textAlign: 'left' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '9px', marginBottom: '22px', flexWrap: 'wrap' }}>
+              {openRow.document_id && (
+                <button onClick={() => openFile(openRow.document_id)}
+                        style={{ padding: '10px 18px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  عرض
+                </button>
+              )}
+              <button onClick={() => { const t = openRow.doc_type; setOpenRow(null); pick(t) }}
+                      style={{ padding: '10px 18px', border: 0, borderRadius: '9px', background: '#1E2A52', color: '#fff', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                رفع نسخة جديدة
+              </button>
+            </div>
+
+            <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>سجلّ النسخ</div>
+            {versions.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>لا نسخ سابقة.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {versions.map((v) => (
+                  <div key={v.id} style={{ background: '#F8FAFC', borderRadius: '9px', padding: '11px 13px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                      {v.file_name || 'ملف'} — {(STATE[v.status] || { t: v.status }).t}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '4px' }}>
+                      رُفع {fmt(v.uploaded_at)}
+                      {v.verified_at && ` · اعتُمد ${fmt(v.verified_at)}`}
+                      {v.superseded_at && ` · استُبدل ${fmt(v.superseded_at)}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {toast && (
-        <div style={{ position: 'fixed', bottom: '24px', insetInlineStart: '24px', background: '#0F172A', color: '#fff', padding: '13px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, zIndex: 90 }}>{toast}</div>
+        <div style={{ position: 'fixed', bottom: '24px', insetInlineStart: '24px', background: '#0F172A', color: '#fff', padding: '13px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, zIndex: 300 }}>{toast}</div>
       )}
     </div>
   )
