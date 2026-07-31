@@ -123,7 +123,12 @@ export default function NotificationBell() {
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 12px)', insetInlineStart: 0,
+          // insetInlineEnd, not Start. In RTL, insetInlineStart resolves to right,
+          // which pinned the panel's right edge to the bell and made it grow
+          // leftwards — and the bell sits near the viewport's left edge, so the
+          // panel ran straight off the screen. Anchoring the end edge grows it
+          // back toward the page.
+          position: 'absolute', top: 'calc(100% + 12px)', insetInlineEnd: 0,
           width: 'min(360px, calc(100vw - 32px))', background: '#fff',
           border: '1px solid #E2E8F0', borderRadius: '14px',
           boxShadow: '0 12px 32px rgba(15,23,42,.16)', zIndex: 300, overflow: 'hidden',
