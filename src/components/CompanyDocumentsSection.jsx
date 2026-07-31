@@ -191,11 +191,28 @@ export default function CompanyDocumentsSection() {
     else { showToast('✅ سُحب المستند'); load() }
   }
 
+  // Never disappear without saying why. Returning null on either of these is how
+  // the upload area became impossible to find: the page simply had no documents
+  // section and nothing indicated one was expected.
   if (loading) {
-    return null
+    return (
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px', color: '#94A3B8', fontSize: '14px', fontWeight: 600 }}>
+        جاري تحميل مستندات الشركة…
+      </div>
+    )
   }
 
-  if (!companyId) return null
+  if (!companyId) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
+        <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>مستندات الشركة</h2>
+        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.8 }}>
+          لا توجد شركة مرتبطة بحسابك بعد، فلا مكان تُرفع إليه المستندات.
+          أكمل تسجيل شركتك أو مطالبة الملكية أولاً — وإن كنت أكملتها فتواصل مع إدارة مرصد.
+        </p>
+      </div>
+    )
+  }
 
   const verified = docs.filter((d) => d.status === 'verified').length
   const missing = DOC_TYPES.filter((t) => t.v !== 'other'

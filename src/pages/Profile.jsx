@@ -211,6 +211,15 @@ export default function Profile() {
         <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '420px', lineHeight: 1.7 }}>{toast}</div>
       )}
 
+      {/* Documents span the whole width: the page root is a two-column grid, and
+          appending this as another cell buried it in the left column below the
+          notification preferences — which is why nobody could find where to
+          upload. It leads the page because completing the record is what the
+          dashboard card sends people here to do. */}
+      <div style={{ gridColumn: '1 / -1' }}>
+        <CompanyDocumentsSection />
+      </div>
+
       {/* Left: Company Data */}
       <div style={{ ...card, padding: '26px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -323,7 +332,6 @@ export default function Profile() {
         </div>
       </div>
 
-      <CompanyDocumentsSection />
     </div>
   )
 }
