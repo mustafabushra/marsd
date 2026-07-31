@@ -6,6 +6,7 @@ import { canPerform } from '../utils/roles'
 import { notificationText, NOTIFICATION_STYLE, NOTIFICATION_PREFS } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import ClarificationRequests from '../components/ClarificationRequests'
 import CompanyDocumentsSection from '../components/CompanyDocumentsSection'
 
 /**
@@ -210,6 +211,14 @@ export default function Profile() {
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', left: '24px', background: '#0F172A', color: '#fff', borderRadius: '10px', padding: '12px 18px', fontSize: '13.5px', fontWeight: 700, zIndex: 100, boxShadow: '0 8px 24px rgba(15,23,42,.25)', maxWidth: '420px', lineHeight: 1.7 }}>{toast}</div>
       )}
+
+      {/* An open clarification is why the company's application is not moving,
+          so it leads the page. The notification already told them to come here;
+          burying it would repeat that failure one screen later. It renders
+          nothing when there is no request. */}
+      <div style={{ gridColumn: '1 / -1' }}>
+        <ClarificationRequests />
+      </div>
 
       {/* Left: Company Data */}
       <div style={{ ...card, padding: '26px' }}>
