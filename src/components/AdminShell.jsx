@@ -14,28 +14,25 @@ import {
   LogIcon,
 } from './icons'
 
-// Grouped by subject, not by kind of screen.
+// Grouped by the work, not by the kind of screen.
 //
-// The sidebar had 14 groups and loose items, sorted by what a screen *is* —
-// "analytics", "advanced administration" — while an administrator thinks about
-// what a thing *is about*: this company, this report. So a single company's work
-// was spread across nine destinations in four different groups.
+// The first pass grouped by subject and that was already better than sorting by
+// "analytics" and "advanced administration". The sharper reading is that an
+// administrator does not want a documents screen — they want to review a
+// company, or clear a queue, or check a batch of paperwork. Those are three
+// different jobs and the menu should name them.
 //
-// "الإدارة المتقدمة" is gone. It held companies, reports, data export and email
-// templates: four unrelated things, grouped by the one thing they had in common,
-// which was that nobody had decided where they went. "Advanced" is not a
-// category.
+// Documents get their own entry rather than sitting under Companies. The work is
+// document-shaped: you verify a hundred of them without opening a hundred
+// companies, and burying that inside a company section makes a daily operational
+// queue look like a per-company detail.
 //
-// Two placements are deliberate and worth stating. Documents sit under Companies
-// because there are pending ones waiting for review right now — that is daily
-// operational work, and filing it beside integrations and email templates buries
-// it. Disputes sit under Reports because a dispute is an objection to a report;
-// the row carries report_id, and the reviewer's work is report-shaped.
+// "مركز المراجعة" rather than "طلبات الشركات", because what waits for a decision
+// is not only additions — it is ownership claims, verifications, registrations
+// and data changes. Naming it after one of its five contents hides the other
+// four.
 //
-// Only the grouping changes here. Every path is untouched, so no link, bookmark
-// or permission moves. Merging the three company lists into one screen is the
-// next step and a separate change — doing both at once would mean a broken link
-// and a broken page arriving together with no way to tell them apart.
+// Paths are still untouched. Only names and grouping move.
 
 const TOP_ITEMS = [
   { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
@@ -46,20 +43,23 @@ const GROUPS = [
     { label: 'سجلّ الشركات', path: '/admin/roster' },
     { label: 'قائمة الشركات', path: '/admin/companies' },
     { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
-    { header: 'المراجعة' },
-    { label: 'طلبات الشركات', path: '/admin/requests', indent: true, badgeKey: 'requests', badgeBg: '#DC2626' },
-    { label: 'مراجعة التسجيل', path: '/admin/company-approval', indent: true },
-    { label: 'طلبات الملكية', path: '/admin/claim-requests', indent: true },
-    { label: 'التحقق من الشركات', path: '/admin/company-verification', indent: true },
-    { header: 'المستندات والبيانات' },
-    { label: 'المستندات والحالة الرسمية', path: '/admin/documents', indent: true },
-    { label: 'رفع دفعة', path: '/admin/bulk-import', indent: true },
-    { label: 'تحليلات الشركات', path: '/admin/tenant-analytics', indent: true },
+  ] },
+  { key: 'review', title: 'مركز المراجعة', items: [
+    { label: 'طلبات إضافة وتعديل', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
+    { label: 'مراجعة التسجيل', path: '/admin/company-approval' },
+    { label: 'طلبات الملكية', path: '/admin/claim-requests' },
+    { label: 'التحقق من الشركات', path: '/admin/company-verification' },
+  ] },
+  { key: 'documents', title: 'المستندات', items: [
+    { label: 'المستندات والحالة الرسمية', path: '/admin/documents' },
   ] },
   { key: 'reports', title: 'التقارير', items: [
     { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
     { label: 'مستودع التقارير', path: '/admin/knowledge-base/reports' },
     { label: 'الاعتراضات', path: '/admin/disputes' },
+  ] },
+  { key: 'analytics', title: 'التحليلات', items: [
+    { label: 'تحليلات الشركات', path: '/admin/tenant-analytics' },
     { label: 'تحليلات التقارير', path: '/admin/report-analytics' },
     { label: 'مؤشر الثقة', path: '/admin/trust-score' },
   ] },
@@ -69,6 +69,7 @@ const GROUPS = [
     { label: 'المدفوعات', path: '/admin/payments' },
   ] },
   { key: 'platform', title: 'المنصة', items: [
+    { label: 'الاستيراد الجماعي', path: '/admin/bulk-import' },
     { label: 'المستخدمون', path: '/admin/users' },
     { label: 'حسابات الشركات', path: '/admin/tenants' },
     { label: 'مسؤولو المنصة', path: '/admin/admin-users' },

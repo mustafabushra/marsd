@@ -49,7 +49,20 @@ const { rows: [reporter] } = await c.query(`
    where t.status = 'active'
      and exists (select 1 from public.users u where u.tenant_id = t.id and u.status = 'active')
    limit 1`)
-const { rows: [target] } = await c.query('select id from public.companies limit 1')
+// A company this tenant has not reported on recently. prevent_duplicate_reports
+// refuses a second report on the same company inside 90 days, so taking the
+// first row made the probe fail the moment real data happened to use that pair —
+// which is exactly what 067 produced when it corrected eight reports. The probe
+// was picking a fixture that the platform's own rules forbid.
+const { rows: [target] } = await c.query(`
+  select c.id from public.companies c
+   where c.approved
+     and not exists (
+       select 1 from public.reports r
+        where r.target_company_id = c.id
+          and r.reporter_tenant_id = $1
+          and r.created_at > now() - interval '90 days')
+   limit 1`, [reporter.tenant_id])
 
 if (!admin || !reporter?.user_id || !target) {
   console.error('\n  يلزم مدير منصة، وكيان بمستخدم، وشركة.\n'); await c.end(); process.exit(1)
