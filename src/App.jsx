@@ -57,6 +57,7 @@ const AdminDataExport = lazy(() => import('./pages/AdminDataExport'))
 const AdminDisputes = lazy(() => import('./pages/AdminDisputes'))
 const AdminDocuments = lazy(() => import('./pages/AdminDocuments'))
 const AdminRoster = lazy(() => import('./pages/AdminRoster'))
+const AdminCompanyFile = lazy(() => import('./pages/AdminCompanyFile'))
 const AdminSystemHealth = lazy(() => import('./pages/AdminSystemHealth'))
 const AdminFraudDetection = lazy(() => import('./pages/AdminFraudDetection'))
 const AdminIntegrations = lazy(() => import('./pages/AdminIntegrations'))
@@ -200,6 +201,7 @@ function AppContent() {
           <Route path="/admin/disputes" element={<AdminRoute><AdminDisputes /></AdminRoute>} />
           <Route path="/admin/documents" element={<AdminRoute><AdminDocuments /></AdminRoute>} />
           <Route path="/admin/roster" element={<AdminRoute><AdminRoster /></AdminRoute>} />
+          <Route path="/admin/company/:id" element={<AdminRoute><AdminCompanyFile /></AdminRoute>} />
           <Route path="/admin/system-health" element={<AdminRoute><AdminSystemHealth /></AdminRoute>} />
           <Route path="/admin/fraud-detection" element={<AdminRoute><AdminFraudDetection /></AdminRoute>} />
           <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />

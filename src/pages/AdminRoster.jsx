@@ -309,6 +309,14 @@ export default function AdminRoster() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => navigate(`/admin/company/${r.company_id}`)}
+                            style={{
+                              padding: '7px 14px', border: 0, borderRadius: '8px',
+                              background: '#1E2A52', color: '#fff', fontSize: '12.5px', fontWeight: 800,
+                              cursor: 'pointer', fontFamily: 'inherit', marginInlineEnd: '7px',
+                            }}>
+                      الملف
+                    </button>
                     <button onClick={() => navigate(`/trust-report/${r.company_id}`)}
                             style={{
                               padding: '7px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px',

@@ -39,19 +39,10 @@ const TOP_ITEMS = [
 ]
 
 const GROUPS = [
-  // One list. There were three — /admin/roster, /admin/companies and
-  // /admin/knowledge-base/companies — all reading the same tables and answering
-  // the same question with different columns. The roster carries what the other
-  // two showed and more: review state and its reason, data completeness,
-  // documents, who registered the company, who owns it now, the last action and
-  // who took it.
-  //
-  // The two routes still exist and still work. Removing them from the menu makes
-  // the roster the way in without breaking a bookmark or a link that already
-  // points at them; deleting the screens is a separate change, and one worth
-  // making only after this has been used for a while.
   { key: 'companies', title: 'الشركات', items: [
     { label: 'سجلّ الشركات', path: '/admin/roster' },
+    { label: 'قائمة الشركات', path: '/admin/companies' },
+    { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
   ] },
   { key: 'review', title: 'مركز المراجعة', items: [
     { label: 'طلبات إضافة وتعديل', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
@@ -110,6 +101,7 @@ const SCREEN_LABELS = {
   '/admin/tenant-analytics': 'تحليلات الشركات',
   '/admin/trust-score': 'تحليلات مؤشر الثقة',
   '/admin/roster': 'سجلّ الشركات وحالاتها',
+  '/admin/company': 'ملفّ الشركة',
   '/admin/disputes': 'الاعتراضات على التقارير',
   '/admin/documents': 'المستندات والحالة الرسمية',
   '/admin/data-export': 'تصدير البيانات',
