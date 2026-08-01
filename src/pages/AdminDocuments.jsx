@@ -35,6 +35,16 @@ const OFFICIAL_STATUS = [
   { v: 'struck_off', t: 'شطب السجل', fg: '#B91C1C' },
 ]
 
+const TABS = [
+  { v: 'pending',           t: 'بانتظار التوثيق' },
+  { v: 'reupload_required', t: 'مطلوب إعادة رفع' },
+  { v: 'expiring',          t: 'تنتهي خلال شهر' },
+  { v: 'expired',           t: 'منتهية' },
+  { v: 'rejected',          t: 'مرفوضة' },
+  { v: 'verified',          t: 'موثّقة' },
+  { v: 'all',               t: 'الكل' },
+]
+
 export default function AdminDocuments() {
   const [pending, setPending] = useState([])
   const [companies, setCompanies] = useState([])
@@ -42,36 +52,33 @@ export default function AdminDocuments() {
   const [busy, setBusy] = useState(null)
   const [toast, setToast] = useState('')
   const [statusFor, setStatusFor] = useState({ companyId: '', status: 'none', note: '' })
+  // The screen only ever queried status = 'pending', so a verified document left
+  // the queue and left Marsad's view with it — nobody could answer "which
+  // registrations expire this month" or "what did we reject and why".
+  const [tab, setTab] = useState('pending')
+  const [counts, setCounts] = useState({})
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3500) }
 
   const load = useCallback(async () => {
     try {
       const supabase = getSupabase()
-      const [{ data: docs }, { data: cos }] = await Promise.all([
-        supabase.from('company_documents')
-          // file_url is deliberately absent. Older rows hold the whole document
-          // as a base64 data URL, so selecting it here would move the bytes of
-          // every pending document just to draw a list — ten of them at the new
-          // size limit is a several-hundred-megabyte response to render a queue.
-          // It is fetched for one row, when a reviewer opens it.
-          .select('id, company_id, doc_type, file_name, note, created_at, companies:company_id ( name, cr_number )')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true })
-          .limit(200),
+      const [{ data: overview }, { data: cos }] = await Promise.all([
+        supabase.rpc('documents_overview', { p_state: tab }),
         supabase.from('companies')
           .select('id, name, cr_number, official_status, official_status_at, official_status_note')
           .order('name')
           .limit(500),
       ])
-      setPending(docs || [])
+      setPending(overview?.items || [])
+      setCounts(overview?.counts || {})
       setCompanies(cos || [])
     } catch (err) {
       console.error('Error loading documents:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tab])
 
   useEffect(() => { load() }, [load])
   const { connected, liveAt } = useLiveData(load, { tables: ['company_documents', 'companies'] })
@@ -202,15 +209,34 @@ export default function AdminDocuments() {
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
-          مستندات بانتظار التوثيق <span style={{ color: '#64748B' }}>({pending.length})</span>
+        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px' }}>
+          المستندات
         </h2>
+
+        {/* The tabs are the states a document can be in, each with how many are
+            in it — so "nothing to do" and "nothing recorded" cannot look alike. */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {TABS.map((t) => (
+            <button key={t.v} onClick={() => setTab(t.v)} style={{
+              padding: '8px 15px', borderRadius: '9px', fontSize: '12.5px', fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'inherit',
+              background: tab === t.v ? '#1E2A52' : '#fff',
+              color: tab === t.v ? '#fff' : '#334155',
+              border: tab === t.v ? 0 : '1.5px solid #E2E8F0',
+            }}>
+              {t.t}
+              {counts[t.v] != null && (
+                <span style={{ opacity: 0.7, marginInlineStart: '6px' }}>{counts[t.v]}</span>
+              )}
+            </button>
+          ))}
+        </div>
         <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 18px' }}>
           افتح المستند قبل القرار. التوثيق يرفع الطبقة الرسمية فوراً.
         </p>
 
         {pending.length === 0 ? (
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا مستندات معلَّقة.</p>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا مستندات في هذا التصنيف.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {pending.map((d) => (
@@ -229,6 +255,7 @@ export default function AdminDocuments() {
                           style={{ fontSize: '13px', fontWeight: 800, color: '#1E2A52', padding: '8px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
                     فتح المستند
                   </button>
+                  {tab === 'pending' && (<>
                   <button onClick={() => review(d.id, true)} disabled={busy === d.id}
                           style={{ padding: '9px 18px', background: '#15803D', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     ✓ توثيق
@@ -237,6 +264,7 @@ export default function AdminDocuments() {
                           style={{ padding: '9px 18px', background: '#fff', color: '#B91C1C', border: '1.5px solid #FECACA', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     ✕ رفض
                   </button>
+                  </>)}
                 </div>
               </div>
             ))}
