@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
@@ -54,6 +55,7 @@ const DOC_OPTIONS = [
 const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString('ar-SA') : '—')
 
 export default function AdminRoster() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -95,6 +97,7 @@ export default function AdminRoster() {
     no_data: rows.filter((r) => (r.completeness || 0) < 50 && r.docs_verified === 0).length,
     waiting: rows.filter((r) => ['clarification_needed', 'awaiting_documents'].includes(r.review_status)).length,
     flagged: rows.filter((r) => r.official_status && r.official_status !== 'none').length,
+    untraced: rows.filter((r) => !r.registrar).length,
   }), [rows])
 
   const shown = useMemo(() => {
@@ -103,6 +106,10 @@ export default function AdminRoster() {
     else if (filter === 'no_data') list = list.filter((r) => (r.completeness || 0) < 50 && r.docs_verified === 0)
     else if (filter === 'waiting') list = list.filter((r) => ['clarification_needed', 'awaiting_documents'].includes(r.review_status))
     else if (filter === 'flagged') list = list.filter((r) => r.official_status && r.official_status !== 'none')
+    // Carried over from the knowledge base, which was the only screen that had
+    // it: companies whose registrar cannot be traced. A record nobody can be
+    // asked about is the one you cannot correct at the source.
+    else if (filter === 'untraced') list = list.filter((r) => !r.registrar)
     if (status) list = list.filter((r) => r.review_status === status)
     const term = q.trim()
     if (term) list = list.filter((r) => (r.name || '').includes(term) || (r.cr_number || '').includes(term))
@@ -165,6 +172,7 @@ export default function AdminRoster() {
     { v: 'waiting', t: 'بانتظار الشركة', n: counts.waiting },
     { v: 'no_data', t: 'لم تُعطِ بياناتها', n: counts.no_data },
     { v: 'flagged', t: 'حالة رسمية', n: counts.flagged },
+    { v: 'untraced', t: 'غير مُتتبَّعة', n: counts.untraced },
     { v: 'all', t: 'الكل', n: counts.all },
   ]
 
@@ -301,6 +309,14 @@ export default function AdminRoster() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => navigate(`/trust-report/${r.company_id}`)}
+                            style={{
+                              padding: '7px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                              background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
+                              cursor: 'pointer', fontFamily: 'inherit', marginInlineEnd: '7px',
+                            }}>
+                      تقرير الثقة
+                    </button>
                     <button onClick={() => setAsking(r)}
                             disabled={r.open_clarifications > 0}
                             title={r.open_clarifications > 0 ? 'يوجد طلب توضيح مفتوح بالفعل' : ''}
