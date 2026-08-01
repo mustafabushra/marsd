@@ -88,6 +88,14 @@ export default function AdminCompanyFile() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const [busy, setBusy] = useState(false)
+  // The file could show that a company needed a clarification and offered no way
+  // to ask for one — you read the problem here and went to another screen to act
+  // on it. A control room you can only read from is a report.
+  const [asking, setAsking] = useState(false)
+  const [form, setForm] = useState({ type: 'information', reason: '', details: '', docs: [], days: 14 })
+  const [statusForm, setStatusForm] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -114,6 +122,59 @@ export default function AdminCompanyFile() {
 
   useEffect(() => { load() }, [load])
   useLiveData(load, { tables: ['companies', 'company_documents', 'clarification_requests', 'reports'] })
+
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4000) }
+
+  const askClarification = async () => {
+    if (!form.reason.trim()) { showToast('❌ السبب مطلوب'); return }
+    try {
+      setBusy(true)
+      const { data, error: e } = await getSupabase().rpc('request_clarification', {
+        p_company_id: id, p_reason: form.reason.trim(),
+        p_details: form.details.trim() || null, p_type: form.type,
+        p_documents: form.docs.length ? form.docs : null,
+        p_due_days: Number(form.days) || 14,
+      })
+      if (e) throw e
+      if (!data?.ok) { showToast('❌ ' + (data?.reason || 'تعذّر الإرسال')); return }
+
+      const { notifyTenant } = await import('../lib/notify')
+      const { data: t } = await getSupabase()
+        .from('tenants').select('id').eq('company_id', id).maybeSingle()
+      if (t?.id) {
+        await notifyTenant(t.id, 'clarification_requested', {
+          title: 'مطلوب توضيح على طلب شركتك',
+          message: `${form.reason.trim()} — راجع «طلبات التوضيح» في ملف شركتك.`,
+          meta: { company_id: id },
+        })
+      }
+      showToast('✅ أُرسل الطلب وأُوقف سير المراجعة')
+      setAsking(false)
+      setForm({ type: 'information', reason: '', details: '', docs: [], days: 14 })
+      load()
+    } catch (err) { showToast('❌ ' + (err?.message || 'خطأ')) } finally { setBusy(false) }
+  }
+
+  // The guard refuses a non-approved state with no reason and refuses leaving
+  // clarification_needed at all, so both are asked for here rather than letting
+  // the save fail with a database message.
+  const saveStatus = async () => {
+    if (!statusForm?.status) return
+    if (statusForm.status !== 'approved' && !statusForm.reason.trim()) {
+      showToast('❌ الحالة تحتاج سبباً يُعرض على الشركة'); return
+    }
+    try {
+      setBusy(true)
+      const { data, error: e } = await getSupabase().from('companies')
+        .update({ review_status: statusForm.status, review_reason: statusForm.reason.trim() || null })
+        .eq('id', id).select('id')
+      if (e) throw e
+      if (!data?.length) throw new Error('لم تُحفظ الحالة — تحقّق من صلاحيتك')
+      showToast('✅ حُفظت الحالة')
+      setStatusForm(null)
+      load()
+    } catch (err) { showToast('❌ ' + (err?.message || 'خطأ')) } finally { setBusy(false) }
+  }
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
@@ -166,6 +227,21 @@ export default function AdminCompanyFile() {
               {full?.market?.rank != null ? Math.round(history[history.length - 1]?.score ?? 0) || '—' : '—'}
             </div>
             <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '4px' }}>مؤشر الثقة</div>
+            <button onClick={() => setAsking(true)}
+                    disabled={openClar.length > 0}
+                    title={openClar.length > 0 ? 'يوجد طلب توضيح مفتوح' : ''}
+                    style={{ marginTop: '10px', display: 'block', width: '100%', padding: '8px 14px', border: 0, borderRadius: '8px',
+                             background: openClar.length > 0 ? '#CBD5E1' : '#B45309', color: '#fff',
+                             fontSize: '12.5px', fontWeight: 800,
+                             cursor: openClar.length > 0 ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+              طلب توضيح
+            </button>
+            <button onClick={() => setStatusForm({ status: file.review_status, reason: file.review_reason || '' })}
+                    style={{ marginTop: '7px', display: 'block', width: '100%', padding: '8px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                             background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
+                             cursor: 'pointer', fontFamily: 'inherit' }}>
+              تغيير الحالة
+            </button>
             <button onClick={() => navigate(`/trust-report/${id}`)}
                     style={{ marginTop: '10px', padding: '7px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px', background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
               التقرير الكامل
@@ -398,6 +474,110 @@ export default function AdminCompanyFile() {
           )}
         </div>
       )}
+
+      {asking && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'grid', placeItems: 'center', zIndex: 200, padding: '20px' }}
+             onClick={(e) => { if (e.target === e.currentTarget) setAsking(false) }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>طلب توضيح</h2>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px' }}>
+              {file.name} — سيتوقّف سير المراجعة حتى تردّ الشركة.
+            </p>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>نوع التوضيح</span>
+                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                        style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', background: '#fff' }}>
+                  <option value="information">معلومات ناقصة</option>
+                  <option value="documents">مستندات مطلوبة</option>
+                  <option value="correction">تصحيح بيانات</option>
+                  <option value="verification">تحقّق من الهوية</option>
+                </select>
+              </label>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>السبب *</span>
+                <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                       placeholder="يُعرض للشركة كما تكتبه"
+                       style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
+              </label>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>التفاصيل</span>
+                <textarea value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} rows={3}
+                          style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
+              </label>
+              <div>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>مستندات مطلوبة</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                  {docs.map((d) => {
+                    const on = form.docs.includes(d.doc_type)
+                    return (
+                      <button key={d.doc_type} type="button"
+                              onClick={() => setForm((f) => ({ ...f, docs: on ? f.docs.filter((x) => x !== d.doc_type) : [...f.docs, d.doc_type] }))}
+                              style={{ padding: '6px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 800,
+                                       border: on ? 0 : '1.5px solid #E2E8F0', background: on ? '#1E2A52' : '#fff',
+                                       color: on ? '#fff' : '#334155', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {on ? '✔ ' : ''}{d.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>مهلة الردّ (أيام)</span>
+                <input type="number" min="0" value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))}
+                       style={{ width: '110px', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '9px', marginTop: '18px' }}>
+              <button onClick={askClarification} disabled={busy || !form.reason.trim()}
+                      style={{ padding: '11px 22px', background: form.reason.trim() ? '#1E2A52' : '#CBD5E1', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: form.reason.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                {busy ? 'جارٍ الإرسال…' : 'إرسال وإيقاف السير'}
+              </button>
+              <button onClick={() => setAsking(false)}
+                      style={{ padding: '11px 20px', background: '#fff', color: '#475569', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statusForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'grid', placeItems: 'center', zIndex: 200, padding: '20px' }}
+             onClick={(e) => { if (e.target === e.currentTarget) setStatusForm(null) }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '460px' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px' }}>تغيير حالة المراجعة</h2>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>الحالة</span>
+                <select value={statusForm.status} onChange={(e) => setStatusForm((f) => ({ ...f, status: e.target.value }))}
+                        style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', background: '#fff' }}>
+                  {Object.entries(REVIEW).map(([k, v]) => <option key={k} value={k}>{v.t}</option>)}
+                </select>
+              </label>
+              <label>
+                <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
+                  السبب {statusForm.status !== 'approved' && <span style={{ color: '#B91C1C' }}>*</span>}
+                </span>
+                <input value={statusForm.reason} onChange={(e) => setStatusForm((f) => ({ ...f, reason: e.target.value }))}
+                       placeholder="يُعرض للشركة"
+                       style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '9px', marginTop: '18px' }}>
+              <button onClick={saveStatus} disabled={busy}
+                      style={{ padding: '11px 22px', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {busy ? 'جارٍ الحفظ…' : 'حفظ'}
+              </button>
+              <button onClick={() => setStatusForm(null)}
+                      style={{ padding: '11px 20px', background: '#fff', color: '#475569', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', insetInlineStart: '24px', background: '#0F172A', color: '#fff', padding: '13px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, zIndex: 300 }}>{toast}</div>
+      )}
+
     </div>
   )
 }
