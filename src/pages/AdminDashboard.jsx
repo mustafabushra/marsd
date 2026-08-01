@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import AdminInbox from '../components/AdminInbox'
 
 const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -220,6 +221,9 @@ export default function AdminDashboard() {
 
   return (
     <div>
+      {/* Work first, numbers second. The tiles below say how many; this says
+          which, and takes you there. */}
+      <AdminInbox />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 3px' }}>نظرة عامة على المنصة</h1>
