@@ -14,47 +14,73 @@ import {
   LogIcon,
 } from './icons'
 
+// Grouped by subject, not by kind of screen.
+//
+// The sidebar had 14 groups and loose items, sorted by what a screen *is* —
+// "analytics", "advanced administration" — while an administrator thinks about
+// what a thing *is about*: this company, this report. So a single company's work
+// was spread across nine destinations in four different groups.
+//
+// "الإدارة المتقدمة" is gone. It held companies, reports, data export and email
+// templates: four unrelated things, grouped by the one thing they had in common,
+// which was that nobody had decided where they went. "Advanced" is not a
+// category.
+//
+// Two placements are deliberate and worth stating. Documents sit under Companies
+// because there are pending ones waiting for review right now — that is daily
+// operational work, and filing it beside integrations and email templates buries
+// it. Disputes sit under Reports because a dispute is an objection to a report;
+// the row carries report_id, and the reviewer's work is report-shaped.
+//
+// Only the grouping changes here. Every path is untouched, so no link, bookmark
+// or permission moves. Merging the three company lists into one screen is the
+// next step and a separate change — doing both at once would mean a broken link
+// and a broken page arriving together with no way to tell them apart.
+
 const TOP_ITEMS = [
   { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
-  { label: 'طلبات الشركات', icon: DocumentIcon, path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
-  { label: 'مراجعة التقارير', icon: ListIcon, path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
-  { label: 'رفع دفعة', icon: UploadIcon, path: '/admin/bulk-import' },
-  { label: 'الشركات', icon: BuildingIcon, path: '/admin/companies' },
-  { label: 'المستخدمون', icon: UsersIcon, path: '/admin/users' },
-  { label: 'السجلات', icon: LogIcon, path: '/admin/logs' },
 ]
 
 const GROUPS = [
-  { key: 'admin', title: 'الإدارة', items: [
-    { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
-    { label: 'الباقات', path: '/admin/plans' },
-    { label: 'المدفوعات والاشتراكات', path: '/admin/payments' },
-    { label: 'الإعدادات', path: '/admin/settings' },
-  ] },
-  { key: 'analytics', title: 'التحليلات', items: [
-    { label: 'تحليلات التقارير', path: '/admin/report-analytics' },
-    { label: 'تحليلات الشركات', path: '/admin/tenant-analytics' },
-    { label: 'مؤشر الثقة', path: '/admin/trust-score' },
-  ] },
-  { key: 'advanced', title: 'الإدارة المتقدمة', items: [
+  { key: 'companies', title: 'الشركات', items: [
     { label: 'سجلّ الشركات', path: '/admin/roster' },
-    { label: 'الاعتراضات', path: '/admin/disputes' },
-    { label: 'المستندات والحالة الرسمية', path: '/admin/documents' },
-    { label: 'تصدير البيانات', path: '/admin/data-export' },
-    { label: '🔒 نماذج البريد', path: '/admin/email-templates' },
-    { header: 'مراجعات' },
+    { label: 'قائمة الشركات', path: '/admin/companies' },
+    { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
+    { header: 'المراجعة' },
+    { label: 'طلبات الشركات', path: '/admin/requests', indent: true, badgeKey: 'requests', badgeBg: '#DC2626' },
     { label: 'مراجعة التسجيل', path: '/admin/company-approval', indent: true },
     { label: 'طلبات الملكية', path: '/admin/claim-requests', indent: true },
     { label: 'التحقق من الشركات', path: '/admin/company-verification', indent: true },
+    { header: 'المستندات والبيانات' },
+    { label: 'المستندات والحالة الرسمية', path: '/admin/documents', indent: true },
+    { label: 'رفع دفعة', path: '/admin/bulk-import', indent: true },
+    { label: 'تحليلات الشركات', path: '/admin/tenant-analytics', indent: true },
   ] },
-  { key: 'repos', title: '📚 مستودعات المعرفة', items: [
-    { label: '🏢 مستودع الشركات', path: '/admin/knowledge-base/companies' },
-    { label: '📋 مستودع التقارير', path: '/admin/knowledge-base/reports' },
+  { key: 'reports', title: 'التقارير', items: [
+    { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
+    { label: 'مستودع التقارير', path: '/admin/knowledge-base/reports' },
+    { label: 'الاعتراضات', path: '/admin/disputes' },
+    { label: 'تحليلات التقارير', path: '/admin/report-analytics' },
+    { label: 'مؤشر الثقة', path: '/admin/trust-score' },
   ] },
-  { key: 'monitoring', title: 'المراقبة', items: [
-    { label: 'حالة النظام', path: '/admin/system-health' },
-    { label: 'سجل المساهمين', path: '/admin/fraud-detection' },
-    { label: '🔒 التكاملات', path: '/admin/integrations' },
+  { key: 'billing', title: 'الاشتراكات', items: [
+    { label: 'الباقات', path: '/admin/plans' },
+    { label: 'الاشتراكات', path: '/admin/subscriptions' },
+    { label: 'المدفوعات', path: '/admin/payments' },
+  ] },
+  { key: 'platform', title: 'المنصة', items: [
+    { label: 'المستخدمون', path: '/admin/users' },
+    { label: 'حسابات الشركات', path: '/admin/tenants' },
+    { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
+    { label: 'الإعدادات', path: '/admin/settings' },
+    { header: 'المراقبة' },
+    { label: 'السجلات', path: '/admin/logs', indent: true },
+    { label: 'حالة النظام', path: '/admin/system-health', indent: true },
+    { label: 'سجل المساهمين', path: '/admin/fraud-detection', indent: true },
+    { header: 'أدوات' },
+    { label: 'تصدير البيانات', path: '/admin/data-export', indent: true },
+    { label: '🔒 نماذج البريد', path: '/admin/email-templates', indent: true },
+    { label: '🔒 التكاملات', path: '/admin/integrations', indent: true },
   ] },
 ]
 
