@@ -59,6 +59,11 @@ export default function AdminRoster() {
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [filter, setFilter] = useState('needs_attention')
+  // A second axis, not more tabs. The row above answers "what needs me"; this
+  // answers "show me companies in state X". Ten states as tabs beside five
+  // actions is fifteen buttons and no hierarchy — and folding the states into
+  // the actions would hide the four that no action names.
+  const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
   const [asking, setAsking] = useState(null)   // the company a request is being written for
   const [form, setForm] = useState({ type: 'information', reason: '', details: '', docs: [], days: 14 })
@@ -98,10 +103,11 @@ export default function AdminRoster() {
     else if (filter === 'no_data') list = list.filter((r) => (r.completeness || 0) < 50 && r.docs_verified === 0)
     else if (filter === 'waiting') list = list.filter((r) => ['clarification_needed', 'awaiting_documents'].includes(r.review_status))
     else if (filter === 'flagged') list = list.filter((r) => r.official_status && r.official_status !== 'none')
+    if (status) list = list.filter((r) => r.review_status === status)
     const term = q.trim()
     if (term) list = list.filter((r) => (r.name || '').includes(term) || (r.cr_number || '').includes(term))
     return list
-  }, [rows, filter, q])
+  }, [rows, filter, q, status])
 
   const sendRequest = async () => {
     if (!form.reason.trim()) { showToast('❌ سبب طلب التوضيح مطلوب'); return }
@@ -147,6 +153,13 @@ export default function AdminRoster() {
     return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
   }
 
+  // Only states that exist. An empty state as a permanent chip is a filter that
+  // never returns anything, and people learn to stop pressing it.
+  const statusCounts = rows.reduce((m, r) => {
+    m[r.review_status] = (m[r.review_status] || 0) + 1
+    return m
+  }, {})
+
   const TABS = [
     { v: 'needs_attention', t: 'تحتاج متابعة', n: counts.needs_attention },
     { v: 'waiting', t: 'بانتظار الشركة', n: counts.waiting },
@@ -185,6 +198,37 @@ export default function AdminRoster() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو السجل التجاري"
                style={{ flex: 1, minWidth: '200px', padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
       </div>
+
+      {/* States, as a filter under the actions. Every state the platform can
+          record appears here when a company is in it, so none of the ten is
+          reachable only by scrolling the full list. */}
+      {Object.keys(statusCounts).length > 1 && (
+        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', marginBottom: '14px', alignItems: 'center' }}>
+          <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#64748B' }}>الحالة:</span>
+          <button onClick={() => setStatus('')} style={{
+            padding: '6px 13px', borderRadius: '999px', fontSize: '12px', fontWeight: 800,
+            cursor: 'pointer', fontFamily: 'inherit',
+            background: status === '' ? '#334155' : '#fff', color: status === '' ? '#fff' : '#475569',
+            border: status === '' ? 0 : '1.5px solid #E2E8F0',
+          }}>الكل</button>
+          {Object.entries(statusCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, n]) => {
+              const rv = REVIEW[k] || REVIEW.approved
+              const on = status === k
+              return (
+                <button key={k} onClick={() => setStatus(on ? '' : k)} style={{
+                  padding: '6px 13px', borderRadius: '999px', fontSize: '12px', fontWeight: 800,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  background: on ? rv.fg : rv.bg, color: on ? '#fff' : rv.fg,
+                  border: 0,
+                }}>
+                  {rv.t} <span style={{ opacity: 0.75 }}>{n}</span>
+                </button>
+              )
+            })}
+        </div>
+      )}
 
       <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '13.5px', minWidth: '980px' }}>
