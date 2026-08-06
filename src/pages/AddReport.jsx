@@ -7,6 +7,7 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
 import { titlesFor, groupsFor, buildDescription } from '../lib/reference/reportStatements'
 import { SkeletonPanel } from '../components/Skeleton'
+import ReportAttachments, { uploadReportFiles } from '../components/ReportAttachments'
 
 const STEPS = [
   { n: 1, label: 'اختيار الشركة' },
@@ -102,6 +103,9 @@ export default function AddReport() {
   const [companyInfo, setCompanyInfo] = useState(null)
   const [ownCompanyId, setOwnCompanyId] = useState(null)
   const [loading, setLoading] = useState(false)
+  // Held here until the report is inserted: the storage path is keyed on the
+  // report id, which does not exist until then.
+  const [attachments, setAttachments] = useState([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -187,7 +191,11 @@ export default function AddReport() {
     ]
     const filled = checks.filter(Boolean).length
     const completeness = Math.round((filled / checks.length) * 100)
-    const evidenceCount = 0 // documents arrive in Phase B
+    // Was `0 // documents arrive in Phase B`. They have arrived, and a report
+    // with a contract behind it is not as reliable as one without — showing the
+    // count as zero while the reporter is looking at three attached files said
+    // their evidence counted for nothing.
+    const evidenceCount = attachments.length
     const needsManualReview = ['fraud', 'dispute'].includes(form.category) || form.hasLegalCase || form.hasDispute
     let reliability = 'low'
     if (completeness >= 80) reliability = 'high'
@@ -323,13 +331,31 @@ export default function AddReport() {
       // contributions that turn out to be real. The award happens on approval,
       // in the admin review flow, where that is finally known.
 
+      // The evidence, now that there is an id to file it under. The storage path
+      // is keyed on the report, which is what the policies read to decide whose
+      // it is, so this cannot happen before the insert.
+      //
+      // A failure here does not undo the report. The report is saved and the
+      // reporter is told exactly which files did not go, so they can attach them
+      // from the report itself rather than typing everything again.
+      const failed = await uploadReportFiles(reportData.id, attachments, user.id)
+
       await supabase.from('audit_logs').insert([{
         tenant_id: userData.tenant_id, actor_id: user.id,
         action: statusValue === 'draft' ? 'report_draft_saved' : 'report_submitted',
         entity: 'report', entity_id: reportData.id,
-        meta: JSON.stringify({ company_id: form.companyId, category: form.category, type: form.reportType }),
+        meta: JSON.stringify({
+          company_id: form.companyId, category: form.category, type: form.reportType,
+          attachments: attachments.length - failed.length,
+        }),
         created_at: new Date().toISOString(),
       }])
+
+      if (failed.length) {
+        setError(`حُفظ التقرير، لكن تعذّر رفع: ${failed.join('، ')}. أرفقها من صفحة التقرير.`)
+        setLoading(false)
+        return
+      }
 
       setSuccess(statusValue === 'draft' ? 'draft' : 'submitted')
       setTimeout(() => navigate('/my-reports'), 1800)
@@ -686,6 +712,11 @@ export default function AddReport() {
               </div>
               {toggle(form.isAnonymous, (v) => setField('isAnonymous', v))}
             </div>
+
+            {/* Immediately above the declaration, because the declaration is
+                what asks for them: «وأن لديّ مستندات تثبتها». Until now it asked
+                and there was nowhere to answer. */}
+            <ReportAttachments files={attachments} onChange={setAttachments} disabled={loading} />
 
             {/* Declaration */}
             <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '16px', cursor: 'pointer', marginBottom: '8px' }}>

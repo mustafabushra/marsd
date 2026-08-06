@@ -8,6 +8,7 @@ import { canPerform } from '../utils/roles'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import ReportEvidence from '../components/ReportEvidence'
 
 export default function MyReports() {
   const { user } = useUser()
@@ -292,6 +293,11 @@ export default function MyReports() {
                   )}
                 </div>
               )}
+              {/* What the reporter attached. Shown to them as well as to the
+                  reviewer: they signed for having evidence, so they should be
+                  able to see what Marsad actually received. */}
+              <ReportEvidence reportId={selectedReport.id} />
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
                 {[
                   { label: 'قيمة التعامل', value: selectedReport.value },

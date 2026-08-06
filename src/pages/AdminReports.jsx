@@ -6,6 +6,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import { creditsGrantedFor } from '../lib/entitlements'
 import { notifyTenant } from '../lib/notify'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import ReportEvidence from '../components/ReportEvidence'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
@@ -309,6 +310,11 @@ export default function AdminReports() {
                   <p style={{ fontSize: '14.5px', color: '#475569', lineHeight: 1.7, margin: 0, background: '#F8FAFC', borderRadius: '11px', padding: '16px' }}>{current.description || current.notes}</p>
                 </div>
               )}
+
+              {/* Above the decision, because it is what the decision rests on.
+                  A reviewer was approving or rejecting an accusation with the
+                  accuser's proof unreachable. */}
+              <ReportEvidence reportId={current.id} />
 
               <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '11px', padding: '13px 16px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <span style={{ fontSize: '17px' }}>ℹ</span>
