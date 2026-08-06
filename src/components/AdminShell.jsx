@@ -1,8 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import DeferredSkeleton from './DeferredSkeleton'
 import { SkeletonPage } from './Skeleton'
-import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/react'
 import NotificationBell from './NotificationBell'
 import { getSupabase } from '../lib/api'
@@ -145,6 +144,13 @@ export default function AdminShell({ user }) {
   const location = useLocation()
   const path = location.pathname
 
+  // The sidebar is 268px of a 360px phone. Below 1024px the stylesheet takes it
+  // out of the flow and this opens it. Closed on every navigation: leaving it
+  // over the page the user just asked for is how this pattern usually goes
+  // wrong.
+  const [navOpen, setNavOpen] = useState(false)
+  useEffect(() => { setNavOpen(false) }, [path])
+
   const isActive = (p) => (p === '/admin' ? path === '/admin' : path === p || path.startsWith(p + '/'))
   const currentLabel = SCREEN_LABELS[
     Object.keys(SCREEN_LABELS).sort((a, b) => b.length - a.length).find(isActive)
@@ -188,7 +194,10 @@ export default function AdminShell({ user }) {
         تخطَّ إلى المحتوى
       </a>
       {/* Sidebar */}
-      <aside style={{ width: '268px', background: '#0B1220', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      {/* Tapping beside an open overlay closes it — the expected way out. */}
+      {navOpen && <div className="marsad-scrim" onClick={() => setNavOpen(false)} />}
+
+      <aside className="marsad-sidebar" data-open={navOpen} style={{ width: '268px', background: '#0B1220', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         {/* Logo */}
         <div onClick={() => navigate('/admin')} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '0 8px 22px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: '16px' }}>
           <span style={{ display: 'inline-flex', background: '#fff', borderRadius: '9px', padding: '5px', flex: 'none' }}>
@@ -303,8 +312,22 @@ export default function AdminShell({ user }) {
             shells that put the same control in two different places is one
             product that behaves like two. */}
         <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
-            <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>{currentLabel}</div>
+          <div className="marsad-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
+            {/* Shown only where the sidebar is an overlay. */}
+            <button
+              className="marsad-nav-toggle"
+              onClick={() => setNavOpen(true)}
+              aria-label="فتح القائمة"
+              aria-expanded={navOpen}
+              style={{
+                alignItems: 'center', justifyContent: 'center', background: '#F8FAFC',
+                border: '1px solid #E2E8F0', borderRadius: '10px', width: '40px',
+                height: '40px', fontSize: '17px', cursor: 'pointer',
+                fontFamily: 'inherit', flex: 'none',
+              }}>
+              ☰
+            </button>
+            <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentLabel}</div>
             <span style={{ background: '#F5F3FF', color: '#7C3AED', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800, flex: 'none' }}>وضع المسؤول</span>
           </div>
 

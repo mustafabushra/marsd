@@ -217,7 +217,7 @@ export default function AdminBulkImport() {
               <div style={{ background: '#ECFDF5', borderRadius: '12px', padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '26px', fontWeight: 900, color: '#15803D' }}>{validation.valid.length}</div><div style={{ fontSize: '12.5px', color: '#15803D', fontWeight: 700 }}>جاهزة للاستيراد</div></div>
               <div style={{ background: '#FEF2F2', borderRadius: '12px', padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '26px', fontWeight: 900, color: '#B91C1C' }}>{validation.invalid.length}</div><div style={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 700 }}>مستبعَدة</div></div>
             </div>
-            <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden', maxHeight: '320px', overflowY: 'auto' }}>
+            <div className="marsad-table" style={{ border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden', maxHeight: '320px', overflowY: 'auto' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.4fr 1fr 1fr', padding: '12px 16px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12.5px', fontWeight: 800, color: '#64748B', position: 'sticky', top: 0 }}>
                 <span>اسم الشركة</span><span>السجل التجاري</span><span>المدينة</span><span>الحالة</span>
               </div>

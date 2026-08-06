@@ -221,7 +221,7 @@ export default function AdminPayments() {
       </div>
 
       {tab === 'invoices' ? (
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="marsad-table" style={{ ...card, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 1fr 1fr 1fr 1fr', padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
             <span>الشركة</span><span>الباقة</span><span>المبلغ</span><span>الضريبة</span><span>الإجمالي</span><span>التاريخ</span>
           </div>

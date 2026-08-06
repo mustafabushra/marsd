@@ -234,7 +234,7 @@ export default function AdminTrustScore() {
             <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>الدرجات الحالية</h2>
             <p style={{ fontSize: '12.5px', color: '#64748B', margin: '4px 0 0', fontWeight: 600, textAlign: 'right' }}>{scores.length} شركة مُحتسبة</p>
           </div>
-          <div style={{ maxHeight: '620px', overflowY: 'auto' }}>
+          <div className="marsad-table" style={{ maxHeight: '620px', overflowY: 'auto' }}>
             {scores.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '13.5px', fontWeight: 600 }}>لا توجد درجات محتسبة بعد</div>
             ) : scores.map((s, i) => {

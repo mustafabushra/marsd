@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import DeferredSkeleton from './DeferredSkeleton'
 import { SkeletonPage } from './Skeleton'
 import { UserButton } from '@clerk/react'
@@ -31,6 +31,13 @@ import {
 export default function CompanyShell({ user, gate = false }) {
   const navigate = useNavigate()
   const location = useLocation()
+
+  // The sidebar is 268px of a 360px phone. Below 1024px the stylesheet takes it
+  // out of the flow and this opens it. Closed on every navigation: leaving it
+  // over the page the user just asked for is how this pattern usually goes
+  // wrong.
+  const [navOpen, setNavOpen] = useState(false)
+  useEffect(() => { setNavOpen(false) }, [location.pathname])
   const { organizationName, userRole } = useClerkOrganization()
   const { needsOnboarding, loading } = useCompanyOnboarding()
   const { isPlatformAdmin, role, loading: roleLoading } = useUserRole()
@@ -98,8 +105,12 @@ export default function CompanyShell({ user, gate = false }) {
          onBlur={(e) => { e.target.style.insetInlineStart = '-9999px' }}>
         تخطَّ إلى المحتوى
       </a>
+      {/* Tapping beside an open overlay closes it — the expected way out, and
+          the only one for a reader who does not think to look for the ☰ again. */}
+      {navOpen && <div className="marsad-scrim" onClick={() => setNavOpen(false)} />}
+
       {/* Sidebar */}
-      <aside style={{
+      <aside className="marsad-sidebar" data-open={navOpen} style={{
         width: '268px',
         background: '#1E2A52',
         flex: 'none',
@@ -255,8 +266,25 @@ export default function CompanyShell({ user, gate = false }) {
           top: 0,
           zIndex: 30
         }}>
-          <div style={{ minWidth: 0, fontSize: '18px', fontWeight: 900, color: '#0F172A', justifySelf: 'start', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {currentScreenLabel}
+          <div className="marsad-nowrap" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '10px', justifySelf: 'start' }}>
+            {/* Shown only where the sidebar is an overlay. The stylesheet
+                decides that; this is the way to open it. */}
+            <button
+              className="marsad-nav-toggle"
+              onClick={() => setNavOpen(true)}
+              aria-label="فتح القائمة"
+              aria-expanded={navOpen}
+              style={{
+                alignItems: 'center', justifyContent: 'center', background: '#F8FAFC',
+                border: '1px solid #E2E8F0', borderRadius: '10px', width: '40px',
+                height: '40px', fontSize: '17px', cursor: 'pointer',
+                fontFamily: 'inherit', flex: 'none',
+              }}>
+              ☰
+            </button>
+            <span style={{ minWidth: 0, fontSize: '18px', fontWeight: 900, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentScreenLabel}
+            </span>
           </div>
 
           {/* Opens the command palette rather than the search page.

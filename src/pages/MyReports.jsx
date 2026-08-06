@@ -183,8 +183,11 @@ export default function MyReports() {
         })}
       </div>
 
-      {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
+      {/* Table.
+          `marsad-table` is what lets it scroll sideways on a phone instead of
+          squeezing four columns into 360px. A table stays readable by keeping
+          its columns; only forms and card grids are better stacked. */}
+      <div className="marsad-table" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: '48px 32px', textAlign: 'center' }}>
             <div style={{ color: '#CBD5E1', marginBottom: '16px', fontSize: '44px' }}>📝</div>

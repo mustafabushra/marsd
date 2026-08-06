@@ -175,3 +175,115 @@ p {
      of a panel splits a number from what it means. */
   main { padding: 0 !important; }
 }
+
+/* ===========================================================================
+   Narrow screens
+   ===========================================================================
+   This product is written in inline styles, and an inline style cannot carry a
+   media query. Every width is therefore the width at every size, and before
+   this file there was not one width-based rule anywhere: 197 places assume a
+   wide window, across 68 files.
+
+   Editing 197 style objects by hand would be 197 chances to break a layout that
+   works. So the structural corrections are made here, once, against the shapes
+   React actually renders — `style="display: flex"`, `style="grid-template-
+   columns: …"` — and `!important` is what lets a stylesheet win against an
+   inline style. It is used deliberately and only inside these queries, so
+   nothing changes on a desktop.
+
+   Two breakpoints, and they mean different things:
+     1024px  the sidebar stops fitting beside the content
+      720px  a phone: rows have to wrap and columns have to stack
+   =========================================================================== */
+
+/* --- The shell ---------------------------------------------------------- */
+/* The sidebar is 268px of a 360px phone. It becomes an overlay the header can
+   summon; these rules take it out of the flow, and CompanyShell/AdminShell
+   carry the toggle. */
+@media (max-width: 1024px) {
+  .marsad-sidebar {
+    position: fixed !important;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 90;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    box-shadow: -8px 0 30px rgba(15, 23, 42, .18);
+  }
+
+  .marsad-sidebar[data-open="true"] { transform: translateX(0); }
+
+  .marsad-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 89;
+    background: rgba(15, 23, 42, .45);
+  }
+}
+
+/* The toggle is the reverse: only there when the sidebar is not. */
+.marsad-nav-toggle { display: none; }
+@media (max-width: 1024px) {
+  .marsad-nav-toggle { display: inline-flex !important; }
+}
+
+@media (max-width: 720px) {
+  #main { padding: 16px 14px !important; }
+
+  header { padding: 0 14px !important; }
+}
+
+/* --- Rows ---------------------------------------------------------------- */
+/* A flex row with a gap and no `flex-wrap` shrinks its children past reading
+   rather than moving them to a second line. 174 of the 197 findings are this.
+   Wrapping is the right default at this width for every one of them: a toolbar,
+   a set of chips, a header with actions. */
+@media (max-width: 720px) {
+  [style*="display: flex"] { flex-wrap: wrap; }
+
+  /* Except where wrapping would separate a thing from its own label — an icon
+     and the word beside it are one object. Opted into by name. */
+  .marsad-nowrap { flex-wrap: nowrap !important; }
+}
+
+/* --- Columns ------------------------------------------------------------- */
+/* `auto-fit` grids already reflow and are left alone. A fixed column list is a
+   table, and a table does not become readable by being squeezed — it becomes
+   readable by keeping its columns and letting the reader move sideways. The
+   scroll is put on the table itself so the page never moves. */
+@media (max-width: 900px) {
+  .marsad-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .marsad-table > * { min-width: 620px; }
+}
+
+/* Everything that is not a table: one column. A three-column form on a phone
+   gives each field about a hundred pixels. */
+@media (max-width: 720px) {
+  [style*="grid-template-columns"]:not(.marsad-table):not(.marsad-table > *) {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* --- Wide boxes ---------------------------------------------------------- */
+/* A drawer or a panel with a hard pixel width, wider than the screen it is on. */
+@media (max-width: 720px) {
+  [style*="width: 480px"],
+  [style*="width: 520px"],
+  [style*="width: 560px"],
+  [style*="width: 640px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* `min-width` cannot be squeezed at all, which is worse than a width. */
+  [style*="min-width: 340px"],
+  [style*="min-width: 400px"],
+  [style*="min-width: 440px"] {
+    min-width: 0 !important;
+  }
+}
