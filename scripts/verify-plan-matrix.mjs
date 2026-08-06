@@ -12,6 +12,7 @@
 
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
+import pg from 'pg'
 
 const env = (file, key) => {
   const line = readFileSync(file, 'utf8').split('\n').find((l) => l.trim().startsWith(key + '='))
@@ -58,21 +59,58 @@ const free = plans.find((p) => p.code === 'free')
 // paid tiers were seeded and dormant; 037 gave companies a way to buy one, so
 // an active paid plan is now the normal state. What still matters is that
 // nothing is offered for sale without a price on it.
-const offered = (plans || []).filter((p) => p.active && p.code !== 'free')
+//
+// free and partner are the two that are not sold: one is the default, the other
+// is granted by Marsad for contribution and has no price by design. Everything
+// else active is on the price list and must carry a price.
+const GRANTED = ['free', 'partner']
+const offered = (plans || []).filter((p) => p.active && !GRANTED.includes(p.code))
 check('كل باقة معروضة مُسعّرة', offered.every((p) => Number(p.price_monthly) > 0),
   `${offered.length} معروضة: ${offered.map((p) => p.code).join('، ') || 'لا شيء'}`)
-check('free وحدها افتراضية', plans.filter((p) => p.is_default).length === 1 && free?.is_default)
-check('free وحدها Give-to-Get', plans.filter((p) => p.give_to_get_enabled).map((p) => p.code).join(',') === 'free')
 
-// Settings the enforcement reads.
-const { data: settings } = await supabase.from('system_settings').select('key, value')
-const rules = settings?.find((s) => s.key === 'give_to_get_rules')?.value
-const catalog = settings?.find((s) => s.key === 'feature_catalog')?.value
+// A granted plan with a price would be sold by accident from the pricing page.
+const granted = (plans || []).filter((p) => GRANTED.includes(p.code))
+check('الباقات الممنوحة بلا سعر', granted.every((p) => Number(p.price_monthly) === 0),
+  granted.map((p) => `${p.code}=${p.price_monthly}`).join('، '))
+check('free وحدها افتراضية', plans.filter((p) => p.is_default).length === 1 && free?.is_default)
+// This asserted that only the free plan carried Give-to-Get. 095 turned it on
+// everywhere: the points were earned by contributing, and withholding them from
+// the subscribers most able to contribute is backwards for a registry that is
+// mostly empty. The balance a company can see must be a balance it can spend.
+check('كل الباقات تحتسب النقاط',
+  plans.every((p) => p.give_to_get_enabled),
+  plans.filter((p) => !p.give_to_get_enabled).map((p) => p.code).join('، ') || 'لا استثناء')
+
+// What now bounds the exposure is monthly_earn_cap, which this file already
+// asserts below once the settings are read.
+
+// Settings the enforcement reads. Over the database connection, not the browser
+// key: system_settings is admin-only, so the anon client gets an empty list and
+// every check below it compares against undefined and reports a wrong value
+// where the truth is that it never read one.
+const settings = await (async () => {
+  const c = new pg.Client({
+    connectionString: env('.env.migrations', 'DATABASE_URL'),
+    ssl: { rejectUnauthorized: false },
+  })
+  await c.connect()
+  const { rows } = await c.query('select key, value from public.system_settings')
+  await c.end()
+  return rows
+})()
+
 console.log('')
+check('الإعدادات مقروءة أصلاً', settings.length > 0, `${settings.length} مفتاح`)
+
+const rules = settings.find((s) => s.key === 'give_to_get_rules')?.value
+const catalog = settings.find((s) => s.key === 'feature_catalog')?.value
 check('سقف الكسب الشهري مضبوط', Number(rules?.monthly_earn_cap) === 200, `${rules?.monthly_earn_cap}`)
+
+const used = [...new Set(plans.flatMap((p) => p.features || []))]
 check('فهرس الميزات يعرّف كل ميزة مستخدمة',
-  [...new Set(plans.flatMap((p) => p.features || []))].every((f) => catalog?.[f]),
-  Object.keys(catalog || {}).length + ' مفتاح')
+  used.length > 0 && used.every((f) => catalog?.[f]),
+  `${used.length} مستخدمة · ${Object.keys(catalog || {}).length} معرّفة` +
+  (used.filter((f) => !catalog?.[f]).length ? ` · ناقص: ${used.filter((f) => !catalog?.[f]).join('، ')}` : ''))
 
 // The arithmetic the app runs: free member, no credits, three lookups made.
 const UNLIMITED = -1

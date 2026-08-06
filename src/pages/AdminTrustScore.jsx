@@ -3,6 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /admin/trust-score — the model behind the number, and what it currently says.
@@ -142,7 +143,7 @@ export default function AdminTrustScore() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return <SkeletonPage stats={4} panels={2} />
   }
 
   const rated = scores.filter((s) => s.tier !== 'none')

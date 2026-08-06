@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /admin/company/:id — one company, everything about it.
@@ -53,6 +54,34 @@ const TABS = [
   { v: 'activity', t: 'سجل النشاط' },
 ]
 
+// Exactly the fields admin_update_company accepts. approved, verified, status,
+// review_status and official_status are absent on purpose — each has its own
+// guarded flow, and a general-purpose form is the wrong place to change what a
+// company is allowed to be.
+const EDITABLE = [
+  { k: 'name', t: 'اسم الشركة', req: true },
+  { k: 'commercial_name', t: 'الاسم التجاري' },
+  { k: 'name_en', t: 'الاسم بالإنجليزية' },
+  { k: 'cr_number', t: 'السجل التجاري', hint: '١٠ أرقام' },
+  { k: 'unified_number', t: 'الرقم الموحّد' },
+  { k: 'tax_id', t: 'الرقم الضريبي' },
+  { k: 'license_number', t: 'رقم الترخيص' },
+  { k: 'entity_type', t: 'نوع الكيان' },
+  { k: 'enterprise_size', t: 'حجم المنشأة' },
+  { k: 'sector', t: 'القطاع' },
+  { k: 'main_activity', t: 'النشاط الرئيسي' },
+  { k: 'sub_activities', t: 'أنشطة فرعية' },
+  { k: 'city', t: 'المدينة' },
+  { k: 'region', t: 'المنطقة' },
+  { k: 'national_address', t: 'العنوان الوطني' },
+  { k: 'phone', t: 'الهاتف' },
+  { k: 'official_email', t: 'البريد الرسمي' },
+  { k: 'website', t: 'الموقع', hint: 'يبدأ بـ https://' },
+  { k: 'founding_date', t: 'تاريخ التأسيس', type: 'date' },
+  { k: 'founded_year', t: 'سنة التأسيس', type: 'number' },
+  { k: 'keywords', t: 'كلمات للبحث' },
+]
+
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('ar-SA') : '—')
 const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }
 const h3 = { fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px' }
@@ -96,6 +125,9 @@ export default function AdminCompanyFile() {
   const [asking, setAsking] = useState(false)
   const [form, setForm] = useState({ type: 'information', reason: '', details: '', docs: [], days: 14 })
   const [statusForm, setStatusForm] = useState(null)
+  // Reading a wrong sector and being unable to fix it is the same dead end as
+  // reading a needed clarification and being unable to ask for one.
+  const [editForm, setEditForm] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -138,21 +170,64 @@ export default function AdminCompanyFile() {
       if (e) throw e
       if (!data?.ok) { showToast('❌ ' + (data?.reason || 'تعذّر الإرسال')); return }
 
+      // The tenant comes back with the request. It used to be looked up here and
+      // notified `if (t?.id)` — so for a company nobody owned, the request was
+      // created and the notification silently skipped. The function now refuses
+      // that case outright, and hands back who to tell, so there is no branch
+      // left in which a request is filed and nobody hears about it.
       const { notifyTenant } = await import('../lib/notify')
-      const { data: t } = await getSupabase()
-        .from('tenants').select('id').eq('company_id', id).maybeSingle()
-      if (t?.id) {
-        await notifyTenant(t.id, 'clarification_requested', {
-          title: 'مطلوب توضيح على طلب شركتك',
-          message: `${form.reason.trim()} — راجع «طلبات التوضيح» في ملف شركتك.`,
-          meta: { company_id: id },
-        })
-      }
+      await notifyTenant(data.tenant_id, 'clarification_requested', {
+        title: 'مطلوب توضيح على طلب شركتك',
+        message: `${form.reason.trim()} — راجع «طلبات التوضيح» في ملف شركتك.`,
+        meta: { company_id: id },
+      })
       showToast('✅ أُرسل الطلب وأُوقف سير المراجعة')
       setAsking(false)
       setForm({ type: 'information', reason: '', details: '', docs: [], days: 14 })
       load()
     } catch (err) { showToast('❌ ' + (err?.message || 'خطأ')) } finally { setBusy(false) }
+  }
+
+  // The form is filled from the table and not from company_review_file: that RPC
+  // returns a presentation of the company (age in years, "مسجّلة ضريبياً: نعم"),
+  // and an editor has to round-trip the stored values themselves.
+  const openEdit = async () => {
+    try {
+      setBusy(true)
+      const { data, error: e } = await getSupabase()
+        .from('companies')
+        .select(EDITABLE.map((f) => f.k).join(','))
+        .eq('id', id).single()
+      if (e) throw e
+      const values = Object.fromEntries(EDITABLE.map((f) => [f.k, data[f.k] ?? '']))
+      // Kept separately so the save can send only what the administrator
+      // actually changed.
+      setEditForm({ values, original: { ...values }, reason: '' })
+    } catch (err) { showToast('❌ ' + (err?.message || 'تعذّر فتح البيانات')) } finally { setBusy(false) }
+  }
+
+  const saveEdit = async () => {
+    try {
+      setBusy(true)
+      // Only what moved. The RPC treats an absent key as "leave it" and a null
+      // as "clear it", so sending the whole form would rewrite untouched fields
+      // and fill the audit log with changes nobody made.
+      const patch = {}
+      for (const f of EDITABLE) {
+        const now = String(editForm.values[f.k] ?? '').trim()
+        const was = String(editForm.original?.[f.k] ?? '')
+        if (now !== was) patch[f.k] = now === '' ? null : now
+      }
+      if (!Object.keys(patch).length) { showToast('لا يوجد تغيير'); return }
+
+      const { data, error: e } = await getSupabase().rpc('admin_update_company', {
+        p_company_id: id, p_patch: patch, p_reason: editForm.reason.trim(),
+      })
+      if (e) throw e
+      showToast(`✅ حُفظ ${data?.count || 0} حقل`)
+      setEditForm(null)
+      load()
+    } catch (err) { showToast('❌ ' + (err?.message || 'تعذّر الحفظ')) } finally { setBusy(false) }
   }
 
   // The guard refuses a non-approved state with no reason and refuses leaving
@@ -177,7 +252,7 @@ export default function AdminCompanyFile() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
+    return <SkeletonPage stats={0} panels={3} />
   }
 
   if (error || !file?.company_id) {
@@ -298,7 +373,13 @@ export default function AdminCompanyFile() {
 
       {tab === 'data' && (
         <div style={card}>
-          <h2 style={h3}>البيانات الأساسية</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <h2 style={{ ...h3, margin: 0 }}>البيانات الأساسية</h2>
+            <button onClick={openEdit} disabled={busy}
+                    style={{ padding: '8px 16px', borderRadius: '9px', border: '1.5px solid #E2E8F0', background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+              ✎ تصحيح البيانات
+            </button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '18px' }}>
             <Field k="اسم الشركة" v={ident.name} />
             <Field k="السجل التجاري" v={ident.cr_number} />
@@ -535,6 +616,63 @@ export default function AdminCompanyFile() {
               </button>
               <button onClick={() => setAsking(false)}
                       style={{ padding: '11px 20px', background: '#fff', color: '#475569', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'grid', placeItems: 'center', zIndex: 200, padding: '20px' }}
+             onClick={(e) => { if (e.target === e.currentTarget) setEditForm(null) }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '760px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>تصحيح بيانات الشركة</h2>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 18px', lineHeight: 1.7 }}>
+              يُحفظ التغيير في سجل الشركة باسمك وبالسبب الذي تكتبه. حالة الاعتماد والتوثيق
+              والمراجعة لا تُغيَّر من هنا — لكلٍّ منها مسارها.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '13px' }}>
+              {EDITABLE.map((f) => {
+                const changed = String(editForm.values[f.k] ?? '') !== String(editForm.original[f.k] ?? '')
+                return (
+                  <label key={f.k}>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: changed ? '#B45309' : '#334155', marginBottom: '5px' }}>
+                      {f.t}{f.req && <span style={{ color: '#B91C1C' }}> *</span>}
+                      {f.hint && <span style={{ fontWeight: 600, color: '#94A3B8' }}> · {f.hint}</span>}
+                      {changed && <span style={{ fontWeight: 700 }}> · مُعدّل</span>}
+                    </span>
+                    <input type={f.type || 'text'}
+                           value={editForm.values[f.k] ?? ''}
+                           onChange={(e) => setEditForm((s) => ({ ...s, values: { ...s.values, [f.k]: e.target.value } }))}
+                           dir={f.k === 'website' || f.k === 'official_email' || f.k === 'name_en' ? 'ltr' : 'rtl'}
+                           style={{ width: '100%', padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit',
+                                    border: `1.5px solid ${changed ? '#FCD34D' : '#E2E8F0'}`,
+                                    background: changed ? '#FFFBEB' : '#fff' }} />
+                  </label>
+                )
+              })}
+            </div>
+
+            <label style={{ display: 'block', marginTop: '18px' }}>
+              <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
+                سبب التصحيح <span style={{ color: '#B91C1C' }}>*</span>
+              </span>
+              <input value={editForm.reason}
+                     onChange={(e) => setEditForm((s) => ({ ...s, reason: e.target.value }))}
+                     placeholder="مثال: تصحيح رقم السجل التجاري بناءً على شهادة السجل المرفوعة"
+                     style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
+            </label>
+
+            <div style={{ display: 'flex', gap: '9px', marginTop: '18px', alignItems: 'center' }}>
+              <button onClick={saveEdit} disabled={busy || !editForm.reason.trim()}
+                      style={{ padding: '11px 22px', background: editForm.reason.trim() ? '#1E2A52' : '#CBD5E1', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: editForm.reason.trim() && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                {busy ? 'جارٍ الحفظ…' : 'حفظ التصحيح'}
+              </button>
+              <button onClick={() => setEditForm(null)}
+                      style={{ padding: '11px 20px', background: '#fff', color: '#475569', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700 }}>
+                {EDITABLE.filter((f) => String(editForm.values[f.k] ?? '') !== String(editForm.original[f.k] ?? '')).length} حقل مُعدّل
+              </span>
             </div>
           </div>
         </div>

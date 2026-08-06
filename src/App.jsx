@@ -45,8 +45,11 @@ const AdminCompaniesManagement = lazy(() => import('./pages/AdminCompaniesManage
 const AdminUsers = lazy(() => import('./pages/AdminUsers'))
 const AdminLogs = lazy(() => import('./pages/AdminLogs'))
 const AdminSettings = lazy(() => import('./pages/AdminSettings'))
+const AdminActivities = lazy(() => import('./pages/AdminActivities'))
+import CommandPalette from './components/CommandPalette'
 const AdminTenants = lazy(() => import('./pages/AdminTenants'))
 const AdminSubscriptions = lazy(() => import('./pages/AdminSubscriptions'))
+const AdminPartners = lazy(() => import('./pages/AdminPartners'))
 const AdminAdminUsers = lazy(() => import('./pages/AdminAdminUsers'))
 const AdminPlans = lazy(() => import('./pages/AdminPlans'))
 const AdminPayments = lazy(() => import('./pages/AdminPayments'))
@@ -73,6 +76,8 @@ const AdminClaimRequests = lazy(() => import('./pages/AdminClaimRequests'))
 const CompanyKnowledgeBase = lazy(() => import('./pages/CompanyKnowledgeBase'))
 const ReportKnowledgeBase = lazy(() => import('./pages/ReportKnowledgeBase'))
 import AuthCallback from './pages/AuthCallback'
+import { SkeletonPage } from './components/Skeleton'
+import DeferredSkeleton from './components/DeferredSkeleton'
 const AcceptInvite = lazy(() => import('./pages/AcceptInvite'))
 
 /**
@@ -91,7 +96,15 @@ function AuthLoading() {
 
   const wrap = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '18px', padding: '24px' }
 
-  if (!stalled) return <div style={wrap}>جاري التحميل...</div>
+  // The very first paint, before Clerk has answered. There is no shell yet and
+  // nothing is known about where this person is going, so the skeleton is
+  // generic — but it is still a skeleton rather than a sentence, because a line
+  // of text centred in an empty viewport is what a crashed app looks like, and
+  // this is the screen a slow connection sits on longest.
+  //
+  // After twelve seconds it gives up and says so; that message is below and is
+  // deliberately not a skeleton, because by then the wait is the news.
+  if (!stalled) return <div style={{ padding: '28px 32px' }}><SkeletonPage /></div>
 
   return (
     <div style={wrap}>
@@ -127,11 +140,13 @@ function AppContent() {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#64748B', fontWeight: 600, fontSize: '14px' }}>
-            جاري التحميل…
-          </div>
-        }>
+      {/* Inside the router because it navigates, and outside <Routes> because
+          Ctrl+K has to work on every screen rather than on a chosen few. */}
+      <CommandPalette />
+      {/* Still needed for the visitor pages and the auth screens, which have
+          no shell to hold a boundary of their own. The shells each carry one
+          now, so a navigation inside them never reaches this. */}
+      <Suspense fallback={<DeferredSkeleton><div style={{ padding: '28px 32px' }}><SkeletonPage /></div></DeferredSkeleton>}>
         <Routes>
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>
@@ -189,8 +204,10 @@ function AppContent() {
           <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path="/admin/logs" element={<AdminRoute><AdminLogs /></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+          <Route path="/admin/activities" element={<AdminRoute><AdminActivities /></AdminRoute>} />
           <Route path="/admin/tenants" element={<AdminRoute><AdminTenants /></AdminRoute>} />
           <Route path="/admin/subscriptions" element={<AdminRoute><AdminSubscriptions /></AdminRoute>} />
+          <Route path="/admin/partners" element={<AdminRoute><AdminPartners /></AdminRoute>} />
           <Route path="/admin/admin-users" element={<AdminRoute><AdminAdminUsers /></AdminRoute>} />
           <Route path="/admin/plans" element={<AdminRoute><AdminPlans /></AdminRoute>} />
           <Route path="/admin/payments" element={<AdminRoute><AdminPayments /></AdminRoute>} />

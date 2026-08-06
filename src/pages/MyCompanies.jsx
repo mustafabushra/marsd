@@ -5,6 +5,7 @@ import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /my-companies — the registry entries this company contributed.
@@ -106,7 +107,12 @@ export default function MyCompanies() {
   })
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   const items = rows.items || []

@@ -1,3 +1,9 @@
+
+// mockPricingTiers lived here and drove the public /pricing page: four cards of
+// hand-written prices that said 99 ر.س where the plan row says 1499, and listed
+// three plans that are switched off. The page now reads public_plans(), so the
+// prices a visitor sees are the prices in the system. mockKPIs went with it —
+// nothing had rendered it in a long time.
 export const mockCompanies = [
   {
     id: 1,
@@ -73,36 +79,6 @@ export const mockCompanies = [
   },
 ]
 
-export const mockKPIs = [
-  {
-    label: 'عمليات البحث المتبقية',
-    icon: '🔍',
-    value: '128',
-    sub: 'من 200 هذا الشهر',
-    color: '#1E2A52',
-  },
-  {
-    label: 'تقاريري المعتمدة',
-    icon: '✓',
-    value: '34',
-    sub: '+3 هذا الأسبوع',
-    color: '#16A34A',
-  },
-  {
-    label: 'شركات في قوائسي',
-    icon: '⭐',
-    value: '12',
-    sub: 'تحت المراقبة',
-    color: '#F59E0B',
-  },
-  {
-    label: 'مساهماتي',
-    icon: '📈',
-    value: '17',
-    sub: 'ضمن أعلى 15%',
-    color: '#7C3AED',
-  },
-]
 
 export const mockActivity = [
   {
@@ -132,84 +108,6 @@ export const mockActivity = [
   },
 ]
 
-export const mockPricingTiers = [
-  {
-    name: 'مجاني',
-    tagline: 'للشركات الصغيرة',
-    price: '0',
-    period: 'ر.س/شهرياً',
-    cta: 'ابدأ الآن',
-    ctaBg: '#fff',
-    ctaColor: '#1E2A52',
-    badge: null,
-    border: '1px solid #E2E8F0',
-    shadow: 'none',
-    features: [
-      '3 عمليات بحث شهرية',
-      'عرض مؤشر الثقة الأساسي',
-      'إضافة شركات للسجل',
-      'إرسال تقرير واحد شهرياً',
-    ],
-  },
-  {
-    name: 'أساسي',
-    tagline: 'للشركات المتوسطة',
-    price: '99',
-    period: 'ر.س/شهرياً',
-    cta: 'الترقية',
-    ctaBg: '#1E2A52',
-    ctaColor: '#fff',
-    badge: null,
-    border: '1px solid #E2E8F0',
-    shadow: '0 4px 12px rgba(15,23,42,.08)',
-    features: [
-      '50 عملية بحث شهرية',
-      'مؤشر الثقة الكامل',
-      'إدارة فريق (حتى 3 أعضاء)',
-      'تقارير غير محدودة',
-      'قوائم المراقبة',
-    ],
-  },
-  {
-    name: 'احترافي',
-    tagline: 'الأكثر طلباً',
-    price: '299',
-    period: 'ر.س/شهرياً',
-    cta: 'الترقية',
-    ctaBg: '#16A34A',
-    ctaColor: '#fff',
-    badge: 'الأفضل قيمة',
-    border: '2px solid #16A34A',
-    shadow: '0 12px 32px rgba(22,163,74,.15)',
-    features: [
-      'عمليات بحث غير محدودة',
-      'مؤشر الثقة المتقدم',
-      'إدارة فريق (حتى 10 أعضاء)',
-      'تقارير متقدمة',
-      'مقارنة الشركات',
-      'تنبيهات مخصصة',
-    ],
-  },
-  {
-    name: 'مؤسسات',
-    tagline: 'للشركات الكبرى',
-    price: 'مخصص',
-    period: 'تحديث سنوي',
-    cta: 'اتصل بنا',
-    ctaBg: '#fff',
-    ctaColor: '#1E2A52',
-    badge: null,
-    border: '1px solid #E2E8F0',
-    shadow: 'none',
-    features: [
-      'كل المميزات المتقدمة',
-      'API مخصص',
-      'دعم 24/7',
-      'تخصيص كامل',
-      'ضمان الخدمة (SLA)',
-    ],
-  },
-]
 
 export const mockFAQs = [
   // This answer described a three-layer model that did not exist: the score was
@@ -236,7 +134,7 @@ export const mockFAQs = [
   },
   {
     q: 'كم تكلفة الاشتراك؟',
-    a: 'نوفر 4 باقات: مجاني (3 بحث/شهر)، أساسي (99 ر.س)، احترافي (299 ر.س)، ومؤسسات (مخصص). بالإضافة إلى برنامج الشركاء المختارة. اختر ما يناسب احتياجاتك.',
+    a: 'نوفر 4 باقات: مجاني (تقارير 3 شركات/شهر)، أساسي (99 ر.س)، احترافي (299 ر.س)، ومؤسسات (مخصص). بالإضافة إلى برنامج الشركاء المختارة. اختر ما يناسب احتياجاتك.',
   },
   {
     q: 'هل يمكنني تغيير الباقة؟',

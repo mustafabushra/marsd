@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { useUserRecord } from './useUserRecord'
 
 /**
  * Hook: Resolve company status from database (source of truth)
@@ -15,6 +16,7 @@ import { getSupabase } from '../lib/api'
  * Status values: null (no company), pending, approved, rejected, suspended
  */
 export function useCompanyStatus() {
+  const { tenantId: sharedTenantId, loading: recordLoading } = useUserRecord()
   const { user } = useUser()
   const [status, setStatus] = useState(null)
   const [companyId, setCompanyId] = useState(null)
@@ -28,29 +30,21 @@ export function useCompanyStatus() {
       return
     }
 
+    // The user's row comes from the shared record rather than a fourth query
+    // for it. This hook runs on the login path, behind useUserRole and
+    // useCompanyOnboarding, and all three were fetching the same row of the
+    // same table one after another — the wait after signing in was that queue,
+    // not any single slow request.
+    if (recordLoading) return
+
     const resolveCompanyStatus = async () => {
       try {
         const supabase = getSupabase()
 
-        // STEP 1: Get user by Clerk ID
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('tenant_id')
-          .eq('id', user.id)
-          .single()
+        const userData = { tenant_id: sharedTenantId }
 
-        if (userError) {
-          if (userError.code === 'PGRST116') {
-            // User not found in Supabase = New user, no company
-            setStatus(null)
-            setLoading(false)
-            return
-          }
-          throw userError
-        }
-
-        if (!userData?.tenant_id) {
-          // No tenant linked to this user
+        if (!userData.tenant_id) {
+          // No tenant linked to this user — a new account, not a failure.
           setStatus(null)
           setLoading(false)
           return
@@ -115,7 +109,7 @@ export function useCompanyStatus() {
     }
 
     resolveCompanyStatus()
-  }, [user?.id])
+  }, [user?.id, sharedTenantId, recordLoading])
 
   return {
     status,      // null | pending | approved | rejected | suspended

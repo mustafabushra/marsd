@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { SkeletonPage } from './Skeleton'
 
 /**
  * What a user sees when a plan limit stops them.
@@ -94,9 +95,7 @@ export function FeatureLocked({ feature, featureName }) {
 export function FeatureGate({ loading, allowed, feature, featureName, children }) {
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>
-        جاري التحميل...
-      </div>
+      <SkeletonPage stats={0} panels={2} />
     )
   }
 
@@ -121,6 +120,11 @@ export function FeatureGate({ loading, allowed, feature, featureName, children }
 export function UsageMeter({ label, used, ceiling, credits = 0, giveToGet = false }) {
   if (ceiling === Infinity || ceiling === -1) return null
 
+  // One number, two buckets. The plan's allowance resets every month; earned
+  // points never do. They are shown added together because that is what the
+  // limit check actually uses — remaining() has always been
+  // (ceiling - used) + credits — and showing them as two unrelated figures made
+  // a balance of 43 look like 43 lookups nobody could spend.
   const total = ceiling + (giveToGet ? credits : 0)
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 100
   const left = Math.max(0, total - used)
@@ -139,7 +143,8 @@ export function UsageMeter({ label, used, ceiling, credits = 0, giveToGet = fals
       </div>
       {giveToGet && credits > 0 && (
         <div style={{ fontSize: '12px', color: '#15803D', fontWeight: 700, marginTop: '7px' }}>
-          منها {credits} من رصيد مساهماتك
+          {ceiling} من باقتك · {credits} من نقاط مساهماتك
+          <span style={{ color: '#64748B', fontWeight: 600 }}> — حصة الباقة تتجدّد كل شهر، والنقاط تبقى</span>
         </div>
       )}
     </div>

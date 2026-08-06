@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
+import { SkeletonPanel } from './Skeleton'
 
 /**
  * What Marsad has to do today, in one list.
@@ -61,9 +62,7 @@ export default function AdminInbox() {
 
   if (loading) {
     return (
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px', color: '#64748B', fontSize: '14px', fontWeight: 600 }}>
-        جاري التحميل…
-      </div>
+      <SkeletonPanel rows={3} />
     )
   }
 

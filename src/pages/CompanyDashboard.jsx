@@ -9,6 +9,7 @@ import { useUserRole } from '../hooks/useUserRole'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
 import ProfileCompletion from '../components/ProfileCompletion'
+import { SkeletonPage } from '../components/Skeleton'
 
 export default function CompanyDashboard() {
   const navigate = useNavigate()
@@ -98,7 +99,11 @@ export default function CompanyDashboard() {
           { label: 'مساهماتي', value: (reportsCount || 0).toString(), icon: '📋', color: '#7C3AED', sub: `${approvedCount || 0} معتمدة` },
           { label: 'شركات في قوائمي', value: (watchlistCount || 0).toString(), icon: '⭐', color: '#F59E0B', sub: 'تحت المراقبة' },
           { label: 'تقاريري المعتمدة', value: (approvedCount || 0).toString(), icon: '✓', color: '#16A34A', sub: 'من إجمالي مساهماتي' },
-          { label: 'رصيدي من النقاط', value: (creditsData || 0).toString(), icon: '💎', color: '#1E2A52', sub: 'نقاط متراكمة' }
+          // "نقاط متراكمة" said what the number was and not what it does, and a
+          // balance with no stated use reads as decoration. Every point is one
+          // more company report you can open, on top of the plan's monthly
+          // allowance — which is what the meter on the subscription page adds up.
+          { label: 'رصيدي من النقاط', value: (creditsData || 0).toString(), icon: '💎', color: '#1E2A52', sub: 'تُضاف إلى حصتك الشهرية' }
         ])
 
         const dotColor = (type) => {
@@ -139,9 +144,7 @@ export default function CompanyDashboard() {
 
   if (loading || roleLoading || systemStatus.isLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#64748B', fontWeight: 600 }}>
-        جاري التحميل...
-      </div>
+      <SkeletonPage stats={4} panels={2} />
     )
   }
 
@@ -236,8 +239,16 @@ export default function CompanyDashboard() {
           {/* Quick Actions */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px 0', textAlign: 'right' }}>إجراءات سريعة</h2>
+            {/* flex-start, not space-between.
+                Two of these buttons hold an icon and a label as separate flex
+                items and the third holds one string, so space-between spread the
+                first two across the full width — icon pinned to one edge, label
+                to the other — while the third sat neatly at the start. Three
+                buttons in a column, two of them torn open. The gap already sets
+                the distance between an icon and its label; letting the alignment
+                do it as well is what made them disagree. */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={() => navigate('/search')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#F1F5F9'} onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}>
+              <button onClick={() => navigate('/search')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#F1F5F9'} onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
                 بحث جديد
               </button>
@@ -248,7 +259,7 @@ export default function CompanyDashboard() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'flex-start',
                   gap: '10px',
                   background: canAddReport ? '#16A34A' : '#D1D5DB',
                   border: 0,
@@ -268,8 +279,13 @@ export default function CompanyDashboard() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 إضافة تقرير
               </button>
-              <button onClick={() => navigate('/add-company')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#F1F5F9'} onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}>
-                🏢 إضافة شركة
+              <button onClick={() => navigate('/add-company')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '14px 16px', fontSize: '14.5px', fontWeight: 800, color: '#1E2A52', cursor: 'pointer', textAlign: 'right', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#F1F5F9'} onMouseLeave={(e) => e.target.style.background = '#F8FAFC'}>
+                {/* The emoji sits in the same 18px slot the two icons above
+                    occupy, so all three labels start on one line. Left inside
+                    the text it was just a character in the string, and the
+                    label began wherever the emoji happened to end. */}
+                <span style={{ width: '18px', textAlign: 'center', flex: 'none' }}>🏢</span>
+                إضافة شركة
               </button>
             </div>
           </div>

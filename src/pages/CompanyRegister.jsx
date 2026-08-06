@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { createTenantAndUser } from '../lib/api'
+import { SkeletonPage } from '../components/Skeleton'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -196,9 +197,7 @@ export default function CompanyRegister() {
 
   if (!isLoaded) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        جاري التحميل...
-      </div>
+      <SkeletonPage stats={0} panels={3} />
     )
   }
 

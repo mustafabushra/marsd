@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { SkeletonPanel } from '../components/Skeleton'
 
 /**
  * /auth/callback — نقطة الدخول الوحيدة بعد تسجيل الدخول عبر Clerk
@@ -203,23 +204,42 @@ export default function AuthCallback() {
     }
   }
 
+  // Inline styles, like every other screen here.
+  //
+  // This page was written in Tailwind classes — `flex items-center`,
+  // `text-red-600`, `animate-spin` — and Tailwind is not built into this
+  // project: it is in package.json and has no config file, no PostCSS entry and
+  // no import in index.css. Every class was inert. So the sign-in callback, the
+  // screen someone lands on between Clerk and their dashboard, rendered as
+  // unstyled black text on white with an invisible spinner that was an empty
+  // 0×0 div.
+  const centre = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    minHeight: '100vh', padding: '24px', background: '#F8FAFC',
+    fontFamily: 'Tajawal, system-ui, sans-serif',
+  }
+
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">خطأ في المصادقة</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <p className="text-sm text-gray-500">جاري التوجيه...</p>
+      <div dir="rtl" style={centre}>
+        <div style={{ maxWidth: '520px', width: '100%', background: '#fff', border: '1px solid #FECACA', borderRadius: '16px', padding: '28px', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 900, color: '#B91C1C', margin: '0 0 12px' }}>
+            خطأ في المصادقة
+          </h1>
+          <p style={{ fontSize: '14.5px', color: '#334155', lineHeight: 1.9, margin: '0 0 10px' }}>{error}</p>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>جاري التوجيه…</p>
         </div>
       </div>
     )
   }
 
+  // No spinner. The skeleton is the loading language everywhere else in this
+  // product, and the spinner beside it was the only one in the codebase — and
+  // invisible at that.
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">جاري تحميل حسابك...</p>
+    <div dir="rtl" style={{ ...centre, alignItems: 'flex-start', paddingTop: '48px' }}>
+      <div style={{ maxWidth: '520px', width: '100%' }}>
+        <SkeletonPanel rows={3} title={false} />
       </div>
     </div>
   )

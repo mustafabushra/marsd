@@ -3,6 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { COMPANY_STATUS } from '../lib/constants'
 import { notifyTenant } from '../lib/notify'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/company-approval — letting a registered company onto the platform.
@@ -232,7 +233,12 @@ export default function AdminCompanyApproval() {
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ fontSize: '20px' }}>جاري التحميل...</div>
+        (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
       </div>
     )
   }

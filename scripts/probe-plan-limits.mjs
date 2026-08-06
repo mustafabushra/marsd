@@ -148,17 +148,48 @@ await c.query('select set_config($1, $2, true)',
 await c.query('set local role postgres')
 const raised = (await c.query('select public.tenant_limit($1, $2) as v', [actor.tenant_id, 'watchlist_items'])).rows[0].v
 await c.query('set local role authenticated')
-const spare = companies[companies.length - 1]
+// A company this tenant has not already watch-listed — made here, not found.
+//
+// It was `companies[companies.length - 1]`, which the fill loop above had
+// already added. The insert failed on a unique index and the probe reported that
+// raising the limit «لم يسرِ», blaming the entitlement system for a duplicate
+// row; the ceiling had been raised correctly the whole time. Looking for an
+// unused company does not work either — the loop above watch-lists every one
+// there is, so the check would skip itself and pass by testing nothing.
+//
+// Everything here is inside the transaction that is rolled back at the end.
+// The claims go too, not just the role: adding a company as a signed-in tenant
+// requires its commercial registration (096), and that guard reads the session
+// rather than the role. This row is scaffolding for a limit check, not a
+// company being registered.
+await c.query('set local role postgres')
+await c.query("select set_config('request.jwt.claims', '', true)")
+const { rows: [spare] } = await c.query(`
+  insert into public.companies (name, cr_number, approved, source)
+  values ('شركة فحص الحد', $1, false, 'community') returning id`,
+[`99${String(Date.now()).slice(-8)}`])
+await c.query('set local role authenticated')
+await c.query('select set_config($1, $2, true)',
+  ['request.jwt.claims', JSON.stringify({ sub: actor.id, role: 'authenticated' })])
 let raisedOk = false
+let why = ''
 try {
+  if (!spare) throw new Error('لا شركة خارج قائمة المراقبة')
   await c.query('insert into public.watchlist_items (tenant_id, company_id, created_by) values ($1, $2, $3)',
     [actor.tenant_id, spare.id, actor.id])
-  raisedOk = (await count()) > have
-} catch { raisedOk = false }
+  const now = await count()
+  raisedOk = now > have
+  if (!raisedOk) why = `الإدخال مرّ لكن العدد لم يزد (${have} → ${now})`
+} catch (e) {
+  // Bare `catch {}` here reported «لم يسرِ» for any reason at all — including a
+  // duplicate row, which is not a limit at work. A check that cannot say why it
+  // failed sends the reader to the wrong place.
+  why = e.message.split('\n')[0]
+}
 
 raisedOk
   ? ok(`رفع الحد من لوحة الإدارة إلى ${raised}: سرى فوراً بلا نشر`)
-  : bad('رفع الحد من لوحة الإدارة: لم يسرِ')
+  : bad(`رفع الحد من لوحة الإدارة: لم يسرِ — ${why} · السقف المقروء=${raised}`)
 
 // Everything above happened inside one transaction, including the plan change.
 await c.query('rollback')

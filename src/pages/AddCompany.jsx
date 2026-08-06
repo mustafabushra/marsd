@@ -1,17 +1,27 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
 
-const ENTITY_TYPES = ['مؤسسة', 'شركة ذات مسؤولية محدودة', 'شركة مساهمة', 'شركة تضامن', 'شركة توصية بسيطة']
-const ENTERPRISE_SIZES = ['متناهية الصغر', 'صغيرة', 'متوسطة', 'كبيرة']
-const SAUDI_REGIONS = ['منطقة الرياض', 'منطقة مكة المكرمة', 'المنطقة الشرقية', 'منطقة المدينة المنورة', 'منطقة القصيم', 'منطقة عسير', 'منطقة تبوك', 'منطقة حائل', 'منطقة الحدود الشمالية', 'منطقة جازان', 'منطقة نجران', 'منطقة الباحة', 'منطقة الجوف']
-const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الظهران', 'الطائف', 'بريدة', 'عنيزة', 'تبوك', 'حائل', 'أبها', 'خميس مشيط', 'نجران', 'جازان', 'الجبيل', 'ينبع', 'الأحساء', 'القطيف', 'عرعر', 'سكاكا', 'الباحة']
-const SECTORS = ['تقنية المعلومات', 'المقاولات والإنشاءات', 'التجارة', 'الصناعة', 'النقل واللوجستيات', 'الخدمات', 'الرعاية الصحية', 'التعليم', 'العقارات', 'المالية والتأمين', 'الطاقة', 'الأغذية والمشروبات', 'السياحة والضيافة', 'الإعلام والتسويق', 'الزراعة']
-const ACTIVITIES = ['تجارة الجملة', 'تجارة التجزئة', 'المقاولات العامة', 'مقاولات متخصصة', 'الاستيراد والتصدير', 'تطوير البرمجيات', 'الاستشارات', 'النقل والشحن', 'التصنيع', 'الصيانة والتشغيل', 'الخدمات اللوجستية', 'التسويق والإعلان', 'المطاعم والضيافة', 'العقارات والتطوير']
-const CR_STATUSES = [{ v: 'active', t: 'نشط' }, { v: 'suspended', t: 'موقوف' }, { v: 'terminated', t: 'منتهٍ / مشطوب' }, { v: 'pending', t: 'قيد المعالجة' }]
+// Lazy on purpose. Behind this sheet sit tesseract.js, pdfjs and a QR reader —
+// several megabytes that somebody typing a company's details by hand must never
+// download. They arrive only if the import button is pressed.
+const CompanyImportSheet = lazy(() => import('../components/CompanyImportSheet'))
+
+import SearchableSelect from '../components/form/SearchableSelect'
+import TagsInput from '../components/form/TagsInput'
+import ActivityPicker from '../components/form/ActivityPicker'
+import { CR_STATUS, ENTITY_TYPE, COMPANY_TYPE, COMPANY_TRAITS, CR_TYPE, ENTITY_SIZE, crStatusToDb, matchOption, splitEntityType } from '../lib/reference/companyOptions'
+import { CITIES, REGIONS } from '../lib/extraction/data/cities'
+import { SECTORS } from '../lib/extraction/data/isic'
+
+// Every city the extractor knows, so the form and the import agree on spelling.
+// Sorted in Arabic rather than by insertion, because a person scrolling a list
+// of a hundred cities is looking alphabetically.
+const SAUDI_CITIES = [...new Set([...CITIES.values()].map((c) => c.name))]
+  .sort((a, b) => a.localeCompare(b, 'ar'))
 
 export default function AddCompany() {
   const navigate = useNavigate()
@@ -22,6 +32,16 @@ export default function AddCompany() {
   // approves the entry.
   const pointsOnApproval = Number(entitlements?.giveToGetRules?.earn?.company_added?.points) || 0
   const [submitted, setSubmitted] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  // Which fields arrived from a document rather than the keyboard, so the form
+  // can mark them after the sheet closes.
+  const [imported, setImported] = useState({})
+  // The verification link and the official facts with no form field, carried
+  // from the import sheet to the insert.
+  const [officialSource, setOfficialSource] = useState(null)
+  // What the person changed about what the import read. Written after the
+  // company saves — see applyImport.
+  const [corrections, setCorrections] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
@@ -30,13 +50,17 @@ export default function AddCompany() {
     registryNumber: location.state?.registryNumber || '',
     unifiedNumber: '',
     entityType: '',
+    companyType: '',
+    companyTraits: '',
+    crType: '',
     crStatus: '',
     enterpriseSize: '',
     crExpiryDate: '',
     foundingDate: '',
+    annualConfirmationDate: '',
+    crVersion: '',
+    capital: '',
     sector: '',
-    mainActivity: '',
-    subActivities: '',
     city: '',
     region: '',
     nationalAddress: '',
@@ -45,29 +69,21 @@ export default function AddCompany() {
     phone: ''
   })
 
-  const [crFile, setCrFile] = useState(null) // { name, url(base64) }
-  const [otherMode, setOtherMode] = useState({}) // { field: true } → show custom text input
-  const [otherActivity, setOtherActivity] = useState('')
+  // The two list fields. Kept out of formData because they are arrays of
+  // objects, not strings, and every helper above treats formData as flat.
+  const [activities, setActivities] = useState([])   // [{code, name}]
+  const [managers, setManagers] = useState([])       // ['اسم']
 
-  const setOther = (name, on) => setOtherMode(prev => ({ ...prev, [name]: on }))
+  const [crFile, setCrFile] = useState(null) // { name, url(base64) }
+
+  // The "أخرى…" escape hatch and the pill-based activity picker are gone. Every
+  // list field is now a searchable select that accepts a value outside its list
+  // directly, so there is no second mode to toggle into — and activities are
+  // objects with codes, which a comma-joined string could not carry.
   const setFieldValue = (name, value) => setFormData(prev => ({ ...prev, [name]: value }))
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
-
-  // Multi-select (sub-activities) stored as a comma-joined string
-  const subActs = (formData.subActivities || '').split('،').map(s => s.trim()).filter(Boolean)
-  const toggleSubAct = (val) => {
-    const set = new Set(subActs)
-    set.has(val) ? set.delete(val) : set.add(val)
-    setFieldValue('subActivities', Array.from(set).join('، '))
-  }
-  const addOtherActivity = () => {
-    const v = otherActivity.trim()
-    if (!v) return
-    if (!subActs.includes(v)) setFieldValue('subActivities', [...subActs, v].join('، '))
-    setOtherActivity('')
   }
 
   const handleCrFile = (e) => {
@@ -85,10 +101,69 @@ export default function AddCompany() {
     reader.readAsDataURL(file)
   }
 
+  // Everything in the patch has already been shown to the person and was
+  // editable on the review screen, so it is applied as typed input would be.
+  const applyImport = (patch, source, origin = null) => {
+    const next = { ...patch }
+
+    // A document says «شركة ذات مسؤولية محدودة» on one line. The form asks two
+    // questions — company or establishment, and which legal form — so the one
+    // string is split before it lands, or `companyType` stays empty next to an
+    // `entityType` that swallowed the whole sentence.
+    if (patch.entityType) {
+      const { entityType, companyType } = splitEntityType(patch.entityType)
+      if (entityType) next.entityType = entityType
+      if (companyType && !patch.companyType) next.companyType = companyType
+    }
+
+    // Snap every list field onto its canonical option. This is what makes an
+    // imported value and a picked value the same string: «نشط» read from a
+    // certificate has to be the same «نشط» the dropdown stores, or the two
+    // records never group together.
+    for (const field of ['crStatus', 'companyType', 'companyTraits', 'crType', 'enterpriseSize']) {
+      const raw = next[field]
+      if (!raw) continue
+      // No match keeps the original text. The select accepts a value outside
+      // its list and marks it, which is better than discarding what the
+      // document actually said.
+      next[field] = matchOption(field, raw) ?? raw
+    }
+
+    // «561010 المطاعم مع الخدمة» → a code and a name, so the picker shows it as
+    // a recognised activity rather than an untagged string.
+    const asActivity = (t) => {
+      const m = /^(\d{4,7})\s+(.+)$/.exec(String(t).trim())
+      return m ? { code: m[1], name: m[2] } : { code: null, name: String(t).trim() }
+    }
+    const list = [
+      ...(patch.mainActivity ? [patch.mainActivity] : []),
+      ...String(patch.subActivities || '').split('،').map((x) => x.trim()).filter(Boolean),
+    ]
+    if (list.length) setActivities(list.map(asActivity))
+    delete next.mainActivity
+    delete next.subActivities
+
+    if (origin?.managers?.length) setManagers(origin.managers)
+
+    setFormData((prev) => ({ ...prev, ...next }))
+    setImported(Object.fromEntries(Object.keys(next).map((k) => [k, source])))
+    setOfficialSource(origin?.verificationUrl || origin?.officialData ? origin : null)
+    // Held until the company is saved, so each correction can be tied to the
+    // record it was made on. If the person abandons the form they are dropped —
+    // a correction to a company that was never created teaches nothing.
+    setCorrections(origin?.corrections ?? [])
+  }
+
   const handleSubmit = async () => {
     setError('')
     if (!formData.companyName.trim()) {
       setError('اسم الشركة مطلوب')
+      return
+    }
+    // Also enforced by trg_company_requires_cr_doc, which is what actually binds
+    // — this only spares the person a round trip and a database message.
+    if (!crFile) {
+      setError('صورة السجل التجاري مطلوبة — أرفقها قبل الإرسال')
       return
     }
     setSubmitting(true)
@@ -100,7 +175,28 @@ export default function AddCompany() {
       // and harmless if wrong. Capping it would throttle the asset the product
       // is built on in order to protect nothing.
 
-      // Avoid obvious duplicates by name
+      // The registration number first, because it is the identity.
+      //
+      // Checking the name alone lets the same company in twice under two
+      // spellings — «مجموعة ظهران التجارية» and «مجموعه ظهران التجاريه» are one
+      // business and two records. The CR number is the thing the state issued,
+      // it is what the import now fills in reliably, and it is the only field
+      // where "already present" is a fact rather than a resemblance.
+      const cr = formData.registryNumber.trim()
+      if (cr) {
+        const { data: sameCr } = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('cr_number', cr)
+          .limit(1)
+        if (sameCr?.length) {
+          setError(`⚠️ رقم السجل ${cr} مسجّل بالفعل باسم «${sameCr[0].name}» — افتح سجلها بدل إضافتها من جديد.`)
+          setSubmitting(false)
+          return
+        }
+      }
+
+      // Then the name, which still catches a duplicate added without a CR.
       const { data: existing } = await supabase
         .from('companies')
         .select('id')
@@ -115,19 +211,30 @@ export default function AddCompany() {
       // companies.cr_number is NOT NULL — generate a placeholder if none provided
       const crNumber = formData.registryNumber.trim() || `CR${Date.now().toString().slice(-8)}`
 
+      // The status the person picked is one Arabic word; the database keeps it
+      // as two coded columns. See crStatusToDb — the trust score penalises
+      // «مشطوب» and «تحت التصفية» differently, and it can only do that if the
+      // distinction survives the save.
+      const status = crStatusToDb(formData.crStatus)
+
+      // Activities carry their ISIC codes. `main_activity` and `sub_activities`
+      // are still written as text because the search index reads them — the
+      // coded list goes to its own column rather than replacing them.
+      const asText = (a) => (a.code ? `${a.code} ${a.name}` : a.name)
+
       const insert = buildCompanyInsert({
         name: formData.companyName,
         nameEn: formData.nameEn,
         crNumber,
         unifiedNumber: formData.unifiedNumber,
         entityType: formData.entityType,
-        crStatus: formData.crStatus || undefined,
+        crStatus: status.cr,
         enterpriseSize: formData.enterpriseSize,
         crExpiryDate: formData.crExpiryDate || null,
         foundingDate: formData.foundingDate || null,
         sector: formData.sector || null,
-        mainActivity: formData.mainActivity,
-        subActivities: formData.subActivities,
+        mainActivity: activities[0] ? asText(activities[0]) : '',
+        subActivities: activities.slice(1).map(asText).join('، '),
         city: formData.city || null,
         region: formData.region,
         nationalAddress: formData.nationalAddress,
@@ -135,8 +242,27 @@ export default function AddCompany() {
         officialEmail: formData.officialEmail,
         phone: formData.phone,
         crFileUrl: crFile?.url || null,
+        verificationUrl: officialSource?.verificationUrl || null,
+        officialData: officialSource?.officialData || null,
         approved: false,      // pending admin review
         source: 'community',
+      })
+
+      // Columns buildCompanyInsert does not know about yet. Added here rather
+      // than threaded through it, because that helper is a validated allowlist
+      // for the fields the enums cover and these carry no enum.
+      Object.assign(insert, {
+        official_status: status.official,
+        company_type: formData.companyType || null,
+        company_traits: formData.companyTraits || null,
+        cr_type: formData.crType || null,
+        cr_version: formData.crVersion || null,
+        annual_confirmation_date: formData.annualConfirmationDate || null,
+        // An empty box is "not stated", not zero. Storing 0 would say this
+        // company has no capital, which is a different claim.
+        capital: formData.capital === '' ? null : Number(formData.capital),
+        activities: activities.length ? activities : null,
+        managers: managers.length ? managers : null,
       })
 
       const { data: company, error: insertError } = await supabase
@@ -145,6 +271,18 @@ export default function AddCompany() {
         .select()
         .single()
       if (insertError) throw insertError
+
+      // Where the extractor got it wrong, now that there is a company to hang
+      // it on. Deliberately not awaited into the success path: this is telemetry
+      // for improving the parser, and a company that saved must not be reported
+      // as failed because a research table refused a row.
+      if (corrections.length && user?.id) {
+        supabase.from('extraction_corrections').insert(
+          corrections.map((c) => ({ ...c, user_id: user.id, company_id: company.id })),
+        ).then(({ error: corrErr }) => {
+          if (corrErr) console.warn('extraction_corrections:', corrErr.message)
+        })
+      }
 
       // Best-effort audit log (tenant lookup via Clerk user id)
       if (user?.id) {
@@ -197,93 +335,153 @@ export default function AddCompany() {
               </div>
             )}
 
+            <Suspense fallback={null}>
+              <CompanyImportSheet open={importOpen}
+                                  onClose={() => setImportOpen(false)}
+                                  onApply={applyImport} />
+            </Suspense>
+
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '32px' }}>
-              <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px 0', textAlign: 'right' }}>بيانات الشركة</h2>
-              <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 24px 0', textAlign: 'right' }}>كل ما كانت البيانات أدق، أسرعت الموافقة</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px 0' }}>بيانات الشركة</h2>
+                  <p style={{ fontSize: '14.5px', color: '#64748B', margin: '0 0 24px 0' }}>كل ما كانت البيانات أدق، أسرعت الموافقة</p>
+                </div>
+                <button type="button" onClick={() => setImportOpen(true)}
+                        style={{ background: '#EEF2FF', color: '#1E2A52', border: '1.5px solid #C7D2FE', borderRadius: '11px', padding: '12px 20px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flex: 'none' }}>
+                  ⚡ استيراد من السجل التجاري
+                </button>
+              </div>
+
+              {Object.keys(imported).length > 0 && (
+                <div style={{ background: '#ECFDF5', border: '1px solid #BBF7D0', borderRadius: '11px', padding: '13px 16px', marginBottom: '20px', fontSize: '13.5px', color: '#15803D', fontWeight: 700, lineHeight: 1.9 }}>
+                  عُبِّئ {Object.keys(imported).length} حقلاً من المستند — راجعها قبل الإرسال.
+                  {officialSource?.verificationUrl && (
+                    <div style={{ fontWeight: 600, marginTop: '5px' }}>
+                      المصدر: صفحة تحقّق مركز الأعمال — يُحفظ رابطها مع السجل.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
                 {[
-                  { name: 'companyName', label: 'اسم الشركة (عربي)', ph: 'مثال: شركة الرياض للتجارة المحدودة', full: true },
-                  { name: 'nameEn', label: 'اسم الشركة (إنجليزي)', ph: 'Riyadh Trading Co.' },
-                  { name: 'registryNumber', label: 'رقم السجل التجاري', ph: '1010XXXXXX' },
-                  { name: 'unifiedNumber', label: 'الرقم الموحّد (700)', ph: '7001234567' },
-                  { name: 'entityType', label: 'نوع الكيان', type: 'selectOther', options: ENTITY_TYPES },
-                  { name: 'crStatus', label: 'حالة السجل', type: 'select', options: CR_STATUSES },
-                  { name: 'enterpriseSize', label: 'حجم المنشأة', type: 'select', options: ENTERPRISE_SIZES },
-                  { name: 'foundingDate', label: 'تاريخ التأسيس', type: 'date' },
-                  { name: 'crExpiryDate', label: 'تاريخ انتهاء السجل', type: 'date' },
-                  { name: 'sector', label: 'القطاع', type: 'selectOther', options: SECTORS },
-                  { name: 'mainActivity', label: 'النشاط الرئيسي', type: 'selectOther', options: ACTIVITIES },
-                  { name: 'subActivities', label: 'الأنشطة الفرعية', type: 'multi', options: ACTIVITIES, full: true },
-                  { name: 'city', label: 'المدينة', type: 'selectOther', options: SAUDI_CITIES },
-                  { name: 'region', label: 'المنطقة', type: 'selectOther', options: SAUDI_REGIONS },
-                  { name: 'nationalAddress', label: 'العنوان الوطني', ph: 'الرمز البريدي + رقم المبنى', full: true },
-                  { name: 'website', label: 'الموقع الإلكتروني', ph: 'https://' },
-                  { name: 'officialEmail', label: 'البريد الإلكتروني', ph: 'info@company.sa' },
-                  { name: 'phone', label: 'رقم الهاتف', ph: '0112345678' },
+                  // Grouped the way the registration itself reads: who it is,
+                  // then what it is, then when, then where, then how to reach
+                  // it. Somebody copying from the paper document moves down the
+                  // page rather than hunting.
+                  { name: 'companyName', label: 'اسم المنشأة', ph: 'مثال: مجموعة ظهران التجارية', full: true },
+                  { name: 'nameEn', label: 'الاسم بالإنجليزي', ph: 'Dhahran Trading Group' },
+                  { name: 'crStatus', label: 'حالة السجل', type: 'select', options: CR_STATUS },
+
+                  { name: 'entityType', label: 'نوع المنشأة', type: 'select', options: ENTITY_TYPE },
+                  { name: 'companyType', label: 'نوع الشركة', type: 'select', options: COMPANY_TYPE,
+                    // Meaningless for an establishment, so it is disabled rather
+                    // than left inviting an answer that cannot be true.
+                    onlyWhen: (d) => d.entityType !== 'مؤسسة' },
+                  { name: 'companyTraits', label: 'صفات الشركة', type: 'select', options: COMPANY_TRAITS,
+                    onlyWhen: (d) => d.entityType !== 'مؤسسة' },
+                  { name: 'crType', label: 'نوع السجل', type: 'select', options: CR_TYPE },
+
+                  { name: 'registryNumber', label: 'رقم السجل التجاري', ph: '4030304834', inputMode: 'numeric' },
+                  { name: 'unifiedNumber', label: 'الرقم الوطني الموحّد', ph: '7004309873', inputMode: 'numeric' },
+                  { name: 'crVersion', label: 'رقم نسخة السجل', type: 'number', ph: '1' },
+                  { name: 'capital', label: 'رأس المال (ريال)', type: 'number', ph: '50000' },
+
+                  { name: 'foundingDate', label: 'تاريخ قيد السجل التجاري', type: 'date' },
+                  // The new commercial registration law removed the expiry date
+                  // and replaced renewal with a yearly confirmation. Asking for
+                  // an expiry date would be asking for something the document no
+                  // longer prints.
+                  { name: 'annualConfirmationDate', label: 'تاريخ التأكيد السنوي للسجل التجاري', type: 'date',
+                    note: 'يحل محل تاريخ الانتهاء في السجل الجديد' },
+                  // Shown only when something put a value in it — an older
+                  // certificate that still carries one. Hiding it outright
+                  // would mean the import could fill a field nobody can see,
+                  // and nothing may be saved unreviewed.
+                  { name: 'crExpiryDate', label: 'تاريخ انتهاء السجل', type: 'date',
+                    note: 'من سجل قديم — النظام الجديد لا يتضمن تاريخ انتهاء',
+                    onlyWhen: (d) => !!d.crExpiryDate },
+                  { name: 'enterpriseSize', label: 'حجم المنشأة', type: 'select', options: ENTITY_SIZE },
+
+                  { name: 'city', label: 'مدينة عنوان الأعمال', type: 'select', options: SAUDI_CITIES, free: true },
+                  { name: 'region', label: 'المنطقة', type: 'select', options: REGIONS, free: true },
+                  { name: 'nationalAddress', label: 'العنوان الوطني', ph: 'الحي، الرمز البريدي، رقم المبنى', full: true },
+
+                  { name: 'phone', label: 'رقم الجوال', type: 'tel', ph: '0555000142' },
+                  { name: 'officialEmail', label: 'البريد الإلكتروني', type: 'email', ph: 'info@company.sa' },
+                  { name: 'website', label: 'عنوان الموقع الإلكتروني', type: 'url', ph: 'https://company.sa' },
+                  { name: 'sector', label: 'القطاع', type: 'select', options: SECTORS, free: true },
+
+                  { name: 'activities', label: 'أنشطة السجل التجاري', type: 'activities', full: true },
+                  { name: 'managers', label: 'المديرون', type: 'managers', full: true },
                 ].map(f => {
-                  const opts = (f.options || []).map(o => (typeof o === 'string' ? { v: o, t: o } : o))
-                  const isOther = !!otherMode[f.name]
+                  if (f.onlyWhen && !f.onlyWhen(formData)) return null
                   const baseInput = { width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }
+                  const fromImport = imported[f.name]
                   return (
                     <div key={f.name} style={f.full ? { gridColumn: '1/3' } : undefined}>
-                      <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
+                      <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
+                        {f.label}
+                        {fromImport && (
+                          <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '6px', padding: '2px 7px', fontSize: '10.5px', fontWeight: 800 }}>
+                            من المستند
+                          </span>
+                        )}
+                      </label>
+                      {f.note && (
+                        <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '-3px', marginBottom: '6px', lineHeight: 1.7 }}>
+                          {f.note}
+                        </div>
+                      )}
 
                       {f.type === 'select' ? (
-                        <select name={f.name} value={formData[f.name]} onChange={handleChange} style={{ ...baseInput, background: '#fff' }}>
-                          <option value="">— اختر —</option>
-                          {opts.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
-                        </select>
+                        <SearchableSelect
+                          value={formData[f.name]}
+                          onChange={(v) => {
+                            setFieldValue(f.name, v)
+                            // Picking a city fills the region, because the two
+                            // are not independent facts and asking twice invites
+                            // a contradiction. Only when empty: a region the
+                            // person typed themselves is not overwritten.
+                            if (f.name === 'city' && !formData.region) {
+                              const hit = [...CITIES.values()].find((c) => c.name === v)
+                              if (hit) setFieldValue('region', hit.region)
+                            }
+                          }}
+                          options={f.options}
+                          allowFree={!!f.free}
+                          placeholder="اختر أو ابحث…" />
 
-                      ) : f.type === 'selectOther' ? (
-                        <>
-                          <select
-                            value={isOther ? '__other__' : (formData[f.name] || '')}
-                            onChange={(e) => {
-                              if (e.target.value === '__other__') { setOther(f.name, true); setFieldValue(f.name, '') }
-                              else { setOther(f.name, false); setFieldValue(f.name, e.target.value) }
-                            }}
-                            style={{ ...baseInput, background: '#fff' }}>
-                            <option value="">— اختر —</option>
-                            {opts.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
-                            <option value="__other__">أخرى…</option>
-                          </select>
-                          {isOther && (
-                            <input autoFocus placeholder="اكتب القيمة" value={formData[f.name]} onChange={(e) => setFieldValue(f.name, e.target.value)} style={{ ...baseInput, marginTop: '8px' }} />
-                          )}
-                        </>
+                      ) : f.type === 'activities' ? (
+                        <ActivityPicker value={activities} onChange={setActivities} />
 
-                      ) : f.type === 'multi' ? (
-                        <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#fff' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {opts.map(o => {
-                              const on = subActs.includes(o.v)
-                              return (
-                                <span key={o.v} onClick={() => toggleSubAct(o.v)} style={{ background: on ? '#16A34A' : '#F1F5F9', color: on ? '#fff' : '#475569', borderRadius: '999px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{on ? '✓ ' : ''}{o.t}</span>
-                              )
-                            })}
-                          </div>
-                          {subActs.filter(s => !opts.some(o => o.v === s)).length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                              {subActs.filter(s => !opts.some(o => o.v === s)).map(s => (
-                                <span key={s} onClick={() => toggleSubAct(s)} style={{ background: '#1E2A52', color: '#fff', borderRadius: '999px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>✕ {s}</span>
-                              ))}
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                            <input value={otherActivity} onChange={(e) => setOtherActivity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOtherActivity() } }} placeholder="إضافة نشاط آخر…" style={{ ...baseInput, padding: '9px 12px', fontSize: '14px' }} />
-                            <button type="button" onClick={addOtherActivity} style={{ background: '#EEF2FF', color: '#1E2A52', border: 0, borderRadius: '9px', padding: '0 16px', fontSize: '13.5px', fontWeight: 800, cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إضافة</button>
-                          </div>
-                        </div>
+                      ) : f.type === 'managers' ? (
+                        <TagsInput value={managers} onChange={setManagers}
+                                   placeholder="اسم المدير، ثم Enter" />
 
                       ) : (
-                        <input type={f.type === 'date' ? 'date' : 'text'} placeholder={f.ph} name={f.name} value={formData[f.name]} onChange={handleChange} style={{ ...baseInput, textAlign: f.type === 'date' ? 'right' : undefined }} />
+                        <input
+                          type={['date', 'number', 'email', 'url', 'tel'].includes(f.type) ? f.type : 'text'}
+                          inputMode={f.inputMode}
+                          placeholder={f.ph}
+                          name={f.name}
+                          value={formData[f.name]}
+                          onChange={handleChange}
+                          // Latin-script fields read left-to-right even on an
+                          // Arabic page; forcing them right puts the cursor and
+                          // the punctuation in the wrong place.
+                          dir={['email', 'url', 'tel', 'number'].includes(f.type) || f.inputMode === 'numeric' ? 'ltr' : undefined}
+                          style={{ ...baseInput, textAlign: ['email', 'url', 'tel', 'number'].includes(f.type) || f.inputMode === 'numeric' ? 'left' : 'right' }} />
                       )}
                     </div>
                   )
                 })}
                 <div style={{ gridColumn: '1/3' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>مستند داعم (السجل التجاري) — اختياري</label>
+                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>
+                    السجل التجاري <span style={{ color: '#B91C1C' }}>*</span>
+                    <span style={{ fontWeight: 600, color: '#64748B' }}> — مطلوب لإضافة الشركة</span>
+                  </label>
                   {crFile ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1.5px solid #BBF7D0', background: '#F0FDF4', borderRadius: '12px', padding: '14px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
@@ -293,7 +491,7 @@ export default function AddCompany() {
                       <button type="button" onClick={() => setCrFile(null)} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', color: '#B91C1C', fontSize: '13px', fontWeight: 800, padding: '7px 12px', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إزالة</button>
                     </div>
                   ) : (
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #CBD5E1', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#F8FAFC', color: '#64748B', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #FCA5A5', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#FEF2F2', color: '#B91C1C', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
                       <UploadIcon />
                       اضغط لاختيار صورة أو PDF للسجل التجاري (حتى 10MB)
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*" onChange={handleCrFile} style={{ display: 'none' }} />
@@ -303,7 +501,14 @@ export default function AddCompany() {
               </div>
 
               <div style={{ display: 'flex', gap: '11px', marginTop: '26px', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
-                <button onClick={handleSubmit} disabled={submitting} style={{ background: submitting ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>{submitting ? 'جاري الإرسال...' : 'إرسال طلب الإضافة'}</button>
+                {/* Disabled rather than failing on click: the document is the one
+                    requirement a person cannot satisfy by retyping, and finding
+                    that out after pressing send is the wrong moment. */}
+                <button onClick={handleSubmit} disabled={submitting || !crFile}
+                        title={!crFile ? 'أرفق صورة السجل التجاري أولاً' : ''}
+                        style={{ background: submitting || !crFile ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting || !crFile ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {submitting ? 'جاري الإرسال...' : (crFile ? 'إرسال طلب الإضافة' : 'أرفق السجل التجاري للإرسال')}
+                </button>
                 <button onClick={() => navigate('/search')} disabled={submitting} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
               </div>
             </div>

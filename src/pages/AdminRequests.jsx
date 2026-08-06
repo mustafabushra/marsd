@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { creditsGrantedFor } from '../lib/entitlements'
 import { notifyTenant } from '../lib/notify'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 const FIELD_LABELS = {
   name: 'اسم الشركة', name_en: 'الاسم (إنجليزي)', cr_number: 'رقم السجل التجاري', unified_number: 'الرقم الموحّد (700)',
@@ -263,7 +264,12 @@ export default function AdminRequests() {
     } finally { setActionLoading(false) }
   }
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+  if (loading) return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
 
   const meta = (k) => TYPE_META[k] || TYPE_META.add_company
 

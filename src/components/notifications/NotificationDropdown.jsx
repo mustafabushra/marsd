@@ -3,6 +3,7 @@ import { useNotifications } from './useNotifications'
 import NotificationItem from './NotificationItem'
 import Button from '../common/Button'
 import { Link } from 'react-router-dom'
+import { Skeleton } from '../Skeleton'
 
 export default function NotificationDropdown({ onClose }) {
   const { notifications, unreadCount, loading, error, markAsRead } = useNotifications()
@@ -33,7 +34,9 @@ export default function NotificationDropdown({ onClose }) {
           marginTop: '8px',
         }}
       >
-        <p style={{ color: '#6B7280', fontSize: '14px' }}>جاري التحميل...</p>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          {[0, 1, 2].map((i) => <Skeleton key={i} w={i === 1 ? '78%' : '92%'} h={14} />)}
+        </div>
       </div>
     )
   }

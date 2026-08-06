@@ -8,6 +8,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import ClarificationRequests from '../components/ClarificationRequests'
 import CompanyDocumentsSection from '../components/CompanyDocumentsSection'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /profile — the company's own record, and what the platform sends it.
@@ -200,9 +201,7 @@ export default function Profile() {
 
   if (loading || roleLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>
-        جاري تحميل بيانات الشركة...
-      </div>
+      <SkeletonPage stats={0} panels={3} />
     )
   }
 

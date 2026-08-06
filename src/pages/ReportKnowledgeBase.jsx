@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/knowledge-base/reports — the approved-report archive, and who filed each one.
@@ -91,7 +92,12 @@ export default function ReportKnowledgeBase() {
     },
   ]
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل الأرشيف...</div>
+  if (loading) return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
 
   return (
     <div>

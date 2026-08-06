@@ -3,6 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
 
 /**
  * /admin/admin-users — who works for Marsad.
@@ -143,7 +144,12 @@ export default function AdminAdminUsers() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   return (
@@ -185,7 +191,7 @@ export default function AdminAdminUsers() {
 
           <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 12px', fontWeight: 600, textAlign: 'right' }}>{PLATFORM_ROLES[grantRole].note}</p>
 
-          {searching && <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>جاري البحث…</div>}
+          {searching && <SkeletonList rows={2} />}
           {results.map((r) => (
             <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #E2E8F0', borderRadius: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'right' }}>

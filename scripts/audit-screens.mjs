@@ -115,10 +115,21 @@ const adminFiles = readdirSync(PAGES)
 
 const fake = []
 const dead = []
+const honest = []
 
 for (const f of adminFiles) {
   const src = readFileSync(join(PAGES, f), 'utf8')
   const name = f.replace('.jsx', '')
+
+  // A screen that says plainly it is not built is the opposite of fabricated
+  // data, and flagging it as fabricated was a false alarm this audit reported
+  // on every run for weeks. An audit that cries wolf is one people stop
+  // reading — which costs more than the two screens it was pointing at.
+  //
+  // AdminEmailTemplates and AdminIntegrations both render <ComingSoon>, which
+  // states what does not exist, why, what it would need, and what to use
+  // instead. That is exactly the honest treatment, so it passes.
+  if (/ComingSoon/.test(src)) { honest.push(name); continue }
 
   const reachesDb = /getSupabase|\.from\(['"]|from '\.\.\/lib\/api'|api\.\w+\(/.test(src)
   if (!reachesDb) { fake.push(name); continue }
@@ -133,6 +144,10 @@ for (const f of adminFiles) {
 
 console.log('  بيانات مُختلقة — لا تصل القاعدة إطلاقاً:')
 console.log(fake.length ? fake.map((f) => `    ❌ ${f}`).join('\n') : '    ✅ لا يوجد')
+
+if (honest.length) {
+  console.log(`\n  شاشات تعلن صراحةً أنها غير مبنية (سليمة): ${honest.join('، ')}`)
+}
 
 console.log('\n  أزرار بلا onClick:')
 console.log(dead.length

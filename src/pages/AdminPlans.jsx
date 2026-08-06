@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /admin/plans — the control surface for what every plan allows.
@@ -23,8 +24,12 @@ const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '1
 const input = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '9px 11px', fontSize: '13.5px', fontFamily: 'inherit', outline: 'none' }
 const btn = (bg, fg, border) => ({ background: bg, color: fg, border: border || 0, borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' })
 
+// The key is called searches_per_month and does not count searches. It counts
+// distinct companies whose report the tenant opened this month — search is free
+// and runs on every keystroke. An operator setting this number needs to know
+// which of the two they are setting.
 const LIMIT_LABELS = {
-  searches_per_month: 'بحث/شهر',
+  searches_per_month: 'تقارير شركات/شهر',
   reports_per_month: 'تقارير/شهر',
   companies_per_month: 'شركات/شهر',
   pending_reports: 'تقارير قيد المراجعة',
@@ -108,6 +113,20 @@ export default function AdminPlans() {
     patch(plan, { give_to_get_enabled: !plan.give_to_get_enabled },
       plan.give_to_get_enabled ? 'أُلغي Give-to-Get لهذه الباقة' : 'فُعِّل Give-to-Get لهذه الباقة')
 
+  // Whether the plan appears on the public price list. Separate from `active`
+  // because the two are different questions: شريك مرصد is active — it grants
+  // real entitlements — and is awarded rather than sold, so it must never be
+  // offered for purchase. Being off the list does not affect anyone already on
+  // the plan.
+  const toggleListed = (plan) => {
+    if (plan.is_default && plan.listed_publicly) {
+      showToast('❌ الباقة الافتراضية تبقى معروضة — هي نقطة البداية للزائر')
+      return
+    }
+    patch(plan, { listed_publicly: !plan.listed_publicly },
+      plan.listed_publicly ? 'أُخفيت من صفحة الأسعار' : 'ظهرت في صفحة الأسعار')
+  }
+
   const saveEdit = async () => {
     if (!editing) return
 
@@ -151,7 +170,7 @@ export default function AdminPlans() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return <SkeletonPage stats={0} panels={3} />
   }
 
   return (
@@ -190,6 +209,13 @@ export default function AdminPlans() {
                     </span>
                     {plan.is_default && <span style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>افتراضية</span>}
                     {plan.give_to_get_enabled && <span style={{ background: '#F0FDF4', color: '#15803D', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>Give-to-Get</span>}
+                    {/* Only worth a badge when the answer is surprising: an
+                        active plan the visitor is never offered. */}
+                    {plan.active && !plan.listed_publicly && (
+                      <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: '7px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>
+                        لا تُباع
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: '13px', color: '#64748B' }}>
                     {Number(plan.price_monthly) > 0 ? `${Number(plan.price_monthly).toLocaleString('en-US')} ر.س / شهرياً` : 'مجانية'} · {subscribers} مشترك
@@ -202,6 +228,9 @@ export default function AdminPlans() {
                   </button>
                   <button disabled={busyId === plan.id} onClick={() => toggleGiveToGet(plan)} style={btn(plan.give_to_get_enabled ? '#FEF3C7' : '#F0FDF4', plan.give_to_get_enabled ? '#92400E' : '#15803D', '1px solid ' + (plan.give_to_get_enabled ? '#FDE68A' : '#BBF7D0'))}>
                     {plan.give_to_get_enabled ? 'إيقاف Give-to-Get' : 'تفعيل Give-to-Get'}
+                  </button>
+                  <button disabled={busyId === plan.id} onClick={() => toggleListed(plan)} style={btn('#F8FAFC', '#334155', '1px solid #E2E8F0')}>
+                    {plan.listed_publicly ? 'إخفاء من الأسعار' : 'عرض في الأسعار'}
                   </button>
                   <button disabled={busyId === plan.id} onClick={() => toggleActive(plan)} style={btn(plan.active ? '#FEF2F2' : '#F0FDF4', plan.active ? '#B91C1C' : '#15803D', '1px solid ' + (plan.active ? '#FECACA' : '#BBF7D0'))}>
                     {plan.active ? 'إيقاف' : 'تفعيل'}

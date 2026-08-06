@@ -12,13 +12,16 @@
  * التشغيل:
  *   npm run check:enums
  *
- * يقرأ نفس متغيرات البيئة التي يستخدمها التطبيق:
- *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
- * (يقبل أيضاً SUPABASE_URL / SUPABASE_ANON_KEY).
+ * يقرأ القيود من القاعدة مباشرة عبر DATABASE_URL في .env.migrations.
+ *
+ * كان يستدعي list_check_constraints بمفتاح المتصفح حتى المهاجرة 058، التي سحبت
+ * تلك الدالة من anon و authenticated لأنها كانت تكشف بنية القاعدة لأي زائر.
+ * فصار السكربت يخرج بخطأ صلاحيات لا بنتيجة فحص — أي أن انحراف القيم لم يُفحص
+ * منذ ذلك الحين. القراءة المباشرة من pg_constraint لا تحتاج تلك الدالة أصلاً.
  * ============================================================================
  */
 
-import { createClient } from '@supabase/supabase-js'
+import pg from 'pg'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -41,11 +44,15 @@ function loadDotEnv() {
 }
 loadDotEnv()
 
-const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+const dbUrl = (() => {
+  const p = join(root, '.env.migrations')
+  if (!existsSync(p)) return null
+  const line = readFileSync(p, 'utf8').split(/\r?\n/).find((l) => l.trim().startsWith('DATABASE_URL='))
+  return line ? line.split('=').slice(1).join('=').trim() : null
+})()
 
-if (!url || !key) {
-  console.error('❌ متغيرات البيئة مفقودة: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY')
+if (!dbUrl) {
+  console.error('❌ DATABASE_URL مفقود في .env.migrations')
   process.exit(2)
 }
 
@@ -106,10 +113,21 @@ function arraysEqualAsSets(a, b) {
 }
 
 async function main() {
-  const supabase = createClient(url, key)
-  const { data, error } = await supabase.rpc('list_check_constraints')
-  if (error) {
-    console.error('❌ فشل استدعاء list_check_constraints:', error.message)
+  const client = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+  await client.connect()
+  const { rows: data } = await client.query(`
+    select c.conrelid::regclass::text  as table_name,
+           c.conname::text             as constraint_name,
+           pg_get_constraintdef(c.oid) as definition
+      from pg_constraint c
+     where c.contype = 'c'
+       and c.connamespace = 'public'::regnamespace
+     order by 1, 2`)
+  await client.end()
+
+  if (!data.length) {
+    // لا صفوف = لا شيء يُقارَن، وكل الفحوص تنجح بلا معنى.
+    console.error('❌ لم تُقرأ أي قيود CHECK من القاعدة')
     process.exit(2)
   }
 

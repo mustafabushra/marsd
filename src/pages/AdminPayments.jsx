@@ -5,6 +5,7 @@ import { notifyTenant } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/payments — activating a plan a company has paid for.
@@ -171,7 +172,12 @@ export default function AdminPayments() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   const pending = requests.filter((r) => r.status === 'pending')

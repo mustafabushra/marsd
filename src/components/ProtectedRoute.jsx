@@ -2,6 +2,8 @@ import { Navigate } from 'react-router-dom'
 import { useUser, useOrganization } from '@clerk/react'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import { useUserRole } from '../hooks/useUserRole'
+import { SkeletonPage } from './Skeleton'
+import DeferredSkeleton from './DeferredSkeleton'
 
 /**
  * Admin screens, gated on the role the database enforces.
@@ -19,7 +21,7 @@ export function AdminRoute({ children }) {
   const { loading: roleLoading, isPlatformAdmin } = useUserRole()
 
   if (!isLoaded || roleLoading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>جاري التحميل...</div>
+    return <DeferredSkeleton><div style={{ padding: '28px 32px' }}><SkeletonPage stats={0} panels={2} /></div></DeferredSkeleton>
   }
 
   if (!user) {
@@ -45,7 +47,7 @@ export function CompanyRoute({ children }) {
   const isStaff = isPlatformAdmin || role === 'reviewer'
 
   if (!isLoaded || onboardingLoading || roleLoading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px' }}>جاري التحميل...</div>
+    return <DeferredSkeleton><div style={{ padding: '28px 32px' }}><SkeletonPage stats={0} panels={2} /></div></DeferredSkeleton>
   }
 
   if (!user) {

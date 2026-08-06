@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
 import { notifyTenant } from '../lib/notify'
 import { AlertCircle } from 'lucide-react'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 export default function AdminTenants() {
   const [tenants, setTenants] = useState([])
@@ -100,12 +101,10 @@ export default function AdminTenants() {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #E2E8F0', borderTop: '4px solid #16A34A', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }}></div>
-          <p style={{ color: '#64748B', fontSize: '14px' }}>جاري تحميل المشتركين...</p>
-        </div>
-      </div>
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
     )
   }
 
@@ -256,12 +255,6 @@ export default function AdminTenants() {
           <p style={{ fontSize: '16px', margin: 0 }}>لا توجد نتائج</p>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

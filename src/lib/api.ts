@@ -42,6 +42,10 @@ let supabaseClient: SupabaseClient | null = null
 
 export interface CompanyInsertInput {
   name: string
+  /** رابط صفحة التحقّق الرسمية التي استُخرجت منها البيانات، إن وُجدت. */
+  verificationUrl?: string | null
+  /** ما عرضته تلك الصفحة ولا يوجد له حقل في النموذج. */
+  officialData?: Record<string, unknown> | null
   crNumber?: string | null
   unifiedNumber?: string | null
   licenseNumber?: string | null
@@ -91,6 +95,12 @@ export function buildCompanyInsert(input: CompanyInsertInput): Record<string, an
     city: input.city ?? null,
     founded_year: input.foundedYear ?? null,
     cr_file_url: input.crFileUrl ?? null,
+    // Where the entry came from, when it came from an official verification page.
+    // Constrained in the database to the Business Centre host: a link to anywhere
+    // else recorded as an official source would be the registry lying on its own
+    // behalf.
+    verification_url: input.verificationUrl ?? null,
+    official_data: input.officialData ?? null,
     // ===== Identity fields (Layer 1) =====
     name_en: input.nameEn?.trim() || null,
     entity_type: input.entityType?.trim() || null,
@@ -880,7 +890,7 @@ export async function getAutocompleteCompanies(q: string, limit = 10) {
     })
 
   if (error) {
-    console.warn('Autocomplete RPC failed, returning empty:', error)
+    console.error('Autocomplete RPC failed, returning empty:', error)
     return { data: [] }
   }
 
@@ -913,17 +923,21 @@ export async function searchCompanies(q: string, page = 1, limit = 20) {
     }
   }
 
-  // Use Full Text Search for better search quality
-  const { data: companies, count, error } = await supabase
-    .rpc('search_companies_fts', {
+  // Ranked search: exact CR number first, then exact name, then similarity.
+  const [{ data: companies, error }, { data: totalMatches }] = await Promise.all([
+    supabase.rpc('search_companies_fts', {
       search_query: q.trim(),
       limit_val: limit,
       offset_val: offset
-    })
+    }),
+    supabase.rpc('count_companies_fts', { search_query: q.trim() }),
+  ])
 
   if (error) {
-    // Fallback to ILIKE if RPC not available
-    console.warn('FTS not available, falling back to ILIKE:', error)
+    // The ILIKE branch below is a safety net, not a normal path — it cannot rank
+    // and it ignores the commercial name. Log it loudly so a regression in the
+    // RPC shows up as degraded search instead of passing for search.
+    console.error('search_companies_fts failed, falling back to ILIKE:', error)
 
     const { data: companies, count, error: fallbackError } = await supabase
       .from('companies')
@@ -966,12 +980,21 @@ export async function searchCompanies(q: string, page = 1, limit = 20) {
 
   if (fetchError) throw new Error('Failed to fetch company details: ' + fetchError.message)
 
+  // PostgREST returns the .in() rows in its own order, which would throw away
+  // the ranking the RPC just computed. Put them back in the order it gave.
+  const byId = new Map((fullCompanies || []).map(c => [c.id, c]))
+  const ranked = companyIds
+    .map((cid: string) => byId.get(cid))
+    .filter(Boolean)
+    .map((c: any) => ({ ...c, trust_score: trustScoreOf(c) || null }))
+
+  // total is every match, not this page — otherwise the pager only ever shows
+  // one page.
+  const total = totalMatches ?? companyIds.length
+
   return {
-    data: fullCompanies?.map(c => ({
-      ...c,
-      trust_score: trustScoreOf(c) || null,
-    })) || [],
-    pagination: { page, limit, total: companyIds.length, pages: Math.ceil((companyIds.length) / limit) },
+    data: ranked,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   }
 }
 
@@ -1042,12 +1065,12 @@ export async function getCompanyReportsTimeline(companyId: string, limit = 10) {
 
   const { data, error } = await supabase
     .rpc('get_company_reports_timeline', {
-      company_id: companyId,
+      p_company_id: companyId,
       limit_val: limit
     })
 
   if (error) {
-    console.warn('Timeline RPC error:', error)
+    console.error('Timeline RPC error:', error)
     return { data: [] }
   }
 
@@ -1060,11 +1083,11 @@ export async function getCompanyTrends(companyId: string) {
 
   const { data, error } = await supabase
     .rpc('get_company_trends', {
-      company_id: companyId
+      p_company_id: companyId
     })
 
   if (error) {
-    console.warn('Trends RPC error:', error)
+    console.error('Trends RPC error:', error)
     return { data: [] }
   }
 
@@ -1077,11 +1100,11 @@ export async function getCompanyReportsSummary(companyId: string) {
 
   const { data, error } = await supabase
     .rpc('get_company_reports_summary', {
-      company_id: companyId
+      p_company_id: companyId
     })
 
   if (error) {
-    console.warn('Summary RPC error:', error)
+    console.error('Summary RPC error:', error)
     return { data: [] }
   }
 
@@ -1637,6 +1660,40 @@ export async function getUserCompany(clerKUserId: string): Promise<any | null> {
  * - Claim status
  * - Registration status
  */
+/**
+ * Open a company's trust report, and charge it to the plan.
+ *
+ * Must be called — and must return ok — before getCompanyKnowledgeBase,
+ * getCompanyReportsTimeline or getCompanyReportsSummary will answer for this
+ * company. That is enforced in the database, not here: the three functions ask
+ * `company_report_access`, which reads the record this call writes.
+ *
+ * Free, and returns `metered: false`, for Marsad staff, for a company reading
+ * its own file, when enforcement is switched off in settings, and when the plan
+ * is unlimited. Every other opening is charged — including a second opening of
+ * a company already looked at this month, which used to be free and is not any
+ * more (migration 109). Past the plan's allowance it draws on the credit
+ * balance, and returns `ok: false` with a reason when there is nothing left.
+ *
+ * Never throws for an exhausted allowance — that is an answer, not a fault.
+ */
+export async function openCompanyReport(companyId: string): Promise<{
+  ok: boolean; reason?: string; metered?: boolean; used?: number; ceiling?: number
+}> {
+  try {
+    const { data, error } = await getSupabase()
+      .rpc('open_company_report', { p_company_id: companyId })
+    if (error) throw error
+    return data ?? { ok: false, reason: 'تعذّر احتساب فتح التقرير' }
+  } catch (err) {
+    console.error('open_company_report failed:', err)
+    // A failed meter must not become a free report: the database refuses the
+    // three report functions regardless, so reporting success here would only
+    // produce an empty page with no explanation.
+    return { ok: false, reason: 'تعذّر الوصول إلى خدمة الاحتساب' }
+  }
+}
+
 export async function getCompanyKnowledgeBase(companyId: string) {
   const supabase = getSupabase()
 

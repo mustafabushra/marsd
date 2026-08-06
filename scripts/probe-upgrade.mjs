@@ -57,13 +57,32 @@ const { rows: [buyer] } = await c.query(`
 
 const { rows: [admin] } = await c.query(
   "select id, email from public.users where role = 'platform_admin' and status = 'active' limit 1")
-const { rows: [pro] } = await c.query("select id, name, price_monthly from public.plans where code = 'pro'")
-const { rows: [ent] } = await c.query("select id, name from public.plans where code = 'enterprise'")
-const { rows: [free] } = await c.query("select id from public.plans where code = 'free'")
+// The plan being bought is whichever priced plan is actually on sale, not 'pro'
+// by name. The paid tiers were switched off when payment was deferred, and a
+// probe that hardcodes one of them reports the purchase path as broken when it
+// is merely closed.
+const { rows: [pro] } = await c.query(`
+  select id, name, price_monthly from public.plans
+   where active and price_monthly > 0 and not is_default
+   order by price_monthly asc limit 1`)
 
-if (!buyer?.admin_id || !admin || !pro) {
-  console.error('\n  يلزم كيان بمدير، ومدير منصة، وباقة احترافية.\n')
+// Something switched off, to prove the guard refuses it. Any inactive plan does.
+const { rows: [ent] } = await c.query(
+  'select id, name from public.plans where not active order by price_monthly desc limit 1')
+const { rows: [free] } = await c.query('select id from public.plans where is_default limit 1')
+
+if (!buyer?.admin_id || !admin) {
+  console.error('\n  يلزم كيان بمدير، ومدير منصة.\n')
   await c.end(); process.exit(1)
+}
+
+if (!pro) {
+  // Not a pass and not a failure: there is nothing to buy, so the purchase path
+  // cannot be exercised. Said out loud rather than reported as green, because a
+  // check that passes by matching nothing is worse than no check.
+  console.log('\n  ⏭  لا توجد باقة مدفوعة مفعّلة — مسار الشراء غير قابل للفحص الآن.')
+  console.log('     (الباقات المدفوعة موقوفة حتى تتوفّر بوابة الدفع)\n')
+  await c.end(); process.exit(0)
 }
 
 console.log(`\n  الشركة: ${buyer.name}`)
@@ -81,7 +100,7 @@ if (buyer.member_id) {
 }
 
 await as(buyer.admin_id)
-if (ent) await refused('طلب باقة معطّلة (مؤسسات)', REQ, [buyer.tenant_id, buyer.admin_id, ent.id])
+if (ent) await refused(`طلب باقة معطّلة (${ent.name})`, REQ, [buyer.tenant_id, buyer.admin_id, ent.id])
 if (free) await refused('طلب الباقة الحالية نفسها', REQ, [buyer.tenant_id, buyer.admin_id, free.id])
 
 // ── the request ─────────────────────────────────────────────────────────────

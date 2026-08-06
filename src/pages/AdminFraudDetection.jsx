@@ -5,6 +5,7 @@ import { notifyTenant } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
+import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
 
 /**
  * /admin/fraud-detection — who contributes to Marsad, and what their
@@ -131,7 +132,12 @@ export default function AdminFraudDetection() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   // What surfaces without asking for the detailed signals. The per-company
@@ -239,7 +245,7 @@ export default function AdminFraudDetection() {
               {open && (
                 <div style={{ padding: '4px 20px 20px', background: '#FAFCFF' }}>
                   {!detail ? (
-                    <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, padding: '10px 0' }}>جاري قراءة السجل…</div>
+                    <SkeletonList rows={3} />
                   ) : (
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '13px', marginBottom: '16px', textAlign: 'right' }}>

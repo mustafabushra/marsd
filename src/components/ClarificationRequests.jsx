@@ -52,12 +52,84 @@ export default function ClarificationRequests() {
   const { user } = useUser()
   const [file, setFile] = useState(null)
   const [tenantId, setTenantId] = useState(null)
+  // Kept rather than discarded inside load(): the uploader needs it, and
+  // re-deriving it per upload would be a second round trip for a value the
+  // screen already fetched.
+  const [companyId, setCompanyId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState({})
+  // Documents attached to a reply, per request: { [requestId]: [{id, name}] }.
+  // They are uploaded on selection — the row has to exist before the answer can
+  // point at it — and the answer records which ones were meant as its evidence.
+  const [attached, setAttached] = useState({})
+  const [uploading, setUploading] = useState(null)
+
   const [busy, setBusy] = useState(null)
   const [toast, setToast] = useState('')
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4000) }
+
+  /**
+   * Attach a document to a reply.
+   *
+   * Uploads into company_documents — the same table, storage bucket, RLS and
+   * verification workflow every other document uses. Nothing new is invented
+   * for clarifications; the answer simply records which existing documents it
+   * meant.
+   *
+   * The row has to exist before the reply can reference it, so the upload
+   * happens on selection rather than on send. A file picked and never sent is
+   * therefore a pending document the company can see and delete — which is
+   * better than a reply that fails halfway and leaves nothing behind.
+   */
+  const attach = async (requestId, docType, file) => {
+    if (!file || !companyId || !tenantId) return
+    if (file.size > 10 * 1024 * 1024) { showToast('❌ حجم الملف أكبر من 10 ميغابايت'); return }
+
+    setUploading(requestId)
+    try {
+      const sb = getSupabase()
+      const path = `${companyId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
+
+      let stored = null
+      const { error: upErr } = await sb.storage
+        .from('company-documents').upload(path, file, { contentType: file.type })
+      if (!upErr) stored = path
+      else console.warn('Storage upload failed, falling back to inline:', upErr.message)
+
+      const fileUrl = stored || await new Promise((resolve, reject) => {
+        const rd = new FileReader()
+        rd.onload = () => resolve(rd.result)
+        rd.onerror = reject
+        rd.readAsDataURL(file)
+      })
+
+      // Read the row back. An insert RLS filters out raises nothing and returns
+      // nothing, and a company told its document arrived when it did not will
+      // not send it again.
+      const { data, error } = await sb.from('company_documents').insert([{
+        company_id: companyId,
+        uploaded_by_tenant_id: tenantId,
+        uploaded_by_user_id: user?.id || null,
+        doc_type: docType,
+        file_url: fileUrl,
+        file_name: file.name,
+        status: 'pending',
+      }]).select('id')
+      if (error) throw error
+      if (!data?.length) throw new Error('لم يُحفظ المستند — تحقّق من صلاحيتك')
+
+      setAttached((a) => ({
+        ...a,
+        [requestId]: [...(a[requestId] || []), { id: data[0].id, name: file.name, docType }],
+      }))
+      showToast('✅ أُرفق المستند — اضغط «إرسال» لإتمام الرد')
+    } catch (e) {
+      showToast('❌ ' + (e?.message || 'تعذّر رفع المستند'))
+    } finally {
+      setUploading(null)
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +139,7 @@ export default function ClarificationRequests() {
         .eq('id', user?.id).maybeSingle()
       setTenantId(me?.tenant_id || null)
       const cid = me?.tenants?.company_id
+      setCompanyId(cid || null)
       if (!cid) { setLoading(false); return }
 
       const { data } = await sb.rpc('company_review_file', { p_company_id: cid })
@@ -83,11 +156,17 @@ export default function ClarificationRequests() {
 
   const send = async (requestId) => {
     const body = (drafts[requestId] || '').trim()
-    if (!body) { showToast('❌ اكتب توضيحك قبل الإرسال'); return }
+    const docIds = (attached[requestId] || []).map((d) => d.id)
+
+    // Either will do. The request is usually «أرسل صورة السجل», and demanding a
+    // sentence to accompany the file only produces «مرفق».
+    if (!body && !docIds.length) {
+      showToast('❌ اكتب توضيحاً أو أرفق مستنداً قبل الإرسال'); return
+    }
     try {
       setBusy(requestId)
       const { data, error } = await getSupabase().rpc('answer_clarification', {
-        p_request_id: requestId, p_body: body,
+        p_request_id: requestId, p_body: body, p_document_ids: docIds.length ? docIds : null,
       })
       if (error) throw error
       // The function answers with its own refusal rather than throwing.
@@ -103,7 +182,10 @@ export default function ClarificationRequests() {
       })
 
       setDrafts((d) => ({ ...d, [requestId]: '' }))
-      showToast('✅ أُرسل توضيحك — ستتابع إدارة مرصد المراجعة')
+      setAttached((a) => ({ ...a, [requestId]: [] }))
+      showToast(docIds.length
+        ? `✅ أُرسل ردّك مع ${docIds.length} مستند — ستتابع إدارة مرصد المراجعة`
+        : '✅ أُرسل توضيحك — ستتابع إدارة مرصد المراجعة')
       load()
     } catch (err) {
       showToast('❌ ' + (err?.message || 'خطأ غير معروف'))
@@ -170,7 +252,7 @@ export default function ClarificationRequests() {
                     ))}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '7px' }}>
-                    ارفعها من قسم «مستندات الشركة» أسفل هذه الصفحة، ثم اكتب ردّك هنا.
+                    أرفقها مباشرة في ردّك أدناه.
                   </div>
                 </div>
               )}
@@ -212,17 +294,67 @@ export default function ClarificationRequests() {
                     value={drafts[r.id] || ''}
                     onChange={(e) => setDrafts((d) => ({ ...d, [r.id]: e.target.value }))}
                     rows={3}
-                    placeholder="اكتب المعلومات المطلوبة، أو أشر إلى المستندات التي رفعتها"
+                    placeholder="اكتب المعلومات المطلوبة — أو أرفق المستند وحده دون كتابة"
                     style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
                   />
+                  {/* The document goes with the reply, not in another section
+                      of another page. The screen used to say «ارفعها من قسم
+                      مستندات الشركة أسفل هذه الصفحة، ثم اكتب ردّك هنا» — two
+                      disconnected acts for one request, with nothing tying the
+                      file to the question it answered. */}
+                  <div style={{ marginTop: '11px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <label style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        background: '#F8FAFC', border: '1.5px dashed #CBD5E1', borderRadius: '10px',
+                        padding: '10px 16px', fontSize: '13.5px', fontWeight: 700, color: '#475569',
+                        cursor: uploading === r.id ? 'default' : 'pointer',
+                      }}>
+                        📎 {uploading === r.id ? 'جارٍ الرفع…' : 'أرفق مستنداً'}
+                        <input
+                          type="file"
+                          accept="application/pdf,image/*"
+                          disabled={uploading === r.id}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            // The first document Marsad asked for, when it named
+                            // any — so the file lands under the right heading
+                            // without asking the company to classify it.
+                            attach(r.id, r.documents?.[0] || 'other', f)
+                            e.target.value = ''
+                          }}
+                          style={{ display: 'none' }} />
+                      </label>
+
+                      {(attached[r.id] || []).map((d) => (
+                        <span key={d.id} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '8px',
+                          background: '#ECFDF5', border: '1px solid #BBF7D0', borderRadius: '9px',
+                          padding: '8px 12px', fontSize: '12.5px', fontWeight: 700, color: '#15803D',
+                        }}>
+                          📄 {d.name}
+                          <button type="button"
+                                  onClick={() => setAttached((a) => ({
+                                    ...a, [r.id]: (a[r.id] || []).filter((x) => x.id !== d.id),
+                                  }))}
+                                  aria-label={`إزالة ${d.name}`}
+                                  style={{ background: 'none', border: 0, cursor: 'pointer', color: '#64748B', fontSize: '15px', lineHeight: 1, padding: 0 }}>
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
                   <button
                     onClick={() => send(r.id)}
-                    disabled={busy === r.id || !(drafts[r.id] || '').trim()}
+                    disabled={busy === r.id || (!(drafts[r.id] || '').trim() && !(attached[r.id] || []).length)}
                     style={{
-                      marginTop: '10px', padding: '11px 24px',
-                      background: (drafts[r.id] || '').trim() ? '#1E2A52' : '#CBD5E1',
+                      marginTop: '12px', padding: '11px 24px',
+                      background: ((drafts[r.id] || '').trim() || (attached[r.id] || []).length) ? '#1E2A52' : '#CBD5E1',
                       color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800,
-                      cursor: (drafts[r.id] || '').trim() ? 'pointer' : 'default', fontFamily: 'inherit',
+                      cursor: ((drafts[r.id] || '').trim() || (attached[r.id] || []).length) ? 'pointer' : 'default',
+                      fontFamily: 'inherit',
                     }}>
                     {busy === r.id ? 'جارٍ الإرسال…' : 'إرسال التوضيح'}
                   </button>

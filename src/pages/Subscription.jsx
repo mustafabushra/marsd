@@ -8,6 +8,7 @@ import { formatLimit, limitOf, UNLIMITED } from '../lib/entitlements'
 import { UsageMeter } from '../components/LimitGate'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /subscription — the plan a company is on, what it allows, and what it has left.
@@ -23,8 +24,16 @@ import { LiveBadge } from '../components/LiveBadge'
  * every tenant regardless of what they were subscribed to.
  */
 
+// searches_per_month counts how many times this tenant opened a company's
+// report in the current month — count(*) over audit_logs.company_report_viewed,
+// in my_entitlements. Typing in the search box costs nothing; opening the same
+// company a second time costs a second lookup (migration 109 — it used to be
+// free, and the owner decided each opening is a lookup).
+//
+// The label has to say "مرات فتح" rather than "التقارير المفتوحة", because the
+// latter reads as a count of companies and is what the meter used to be.
 const LIMIT_LABELS = {
-  searches_per_month: 'عمليات البحث شهرياً',
+  searches_per_month: 'مرات فتح تقارير الشركات شهرياً',
   reports_per_month: 'التقارير شهرياً',
   companies_per_month: 'إضافة الشركات شهرياً',
   users: 'المستخدمون',
@@ -172,7 +181,7 @@ export default function Subscription() {
   })
 
   if (loading || entLoading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return <SkeletonPage stats={0} panels={3} />
   }
 
   const plan = entitlements?.plan

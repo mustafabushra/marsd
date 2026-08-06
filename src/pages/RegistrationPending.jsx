@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { SkeletonPage } from '../components/Skeleton'
 
 export default function RegistrationPending() {
   const navigate = useNavigate()
@@ -56,15 +57,7 @@ export default function RegistrationPending() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        fontSize: '16px'
-      }}>
-        جاري التحميل...
-      </div>
+      <SkeletonPage stats={0} panels={3} />
     )
   }
 
@@ -171,9 +164,6 @@ export default function RegistrationPending() {
       </div>
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
         }
       `}</style>
     </main>

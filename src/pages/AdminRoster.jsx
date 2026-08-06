@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/roster — every company, and what each one is waiting on.
@@ -133,17 +134,16 @@ export default function AdminRoster() {
       if (!data?.ok) { showToast('❌ ' + (data?.reason || 'تعذّر الإرسال')); return }
 
       // Tell the company. A request nobody is told about is a file that stops
-      // for a reason its owner cannot see.
+      // for a reason its owner cannot see — which is what happened whenever the
+      // company had no owner at all: filed, frozen, and unsent. The function
+      // refuses that now and returns the tenant to notify, so this no longer
+      // needs an `if` that can quietly do nothing.
       const { notifyTenant } = await import('../lib/notify')
-      const { data: t } = await getSupabase()
-        .from('tenants').select('id').eq('company_id', asking.company_id).maybeSingle()
-      if (t?.id) {
-        await notifyTenant(t.id, 'clarification_requested', {
-          title: 'مطلوب توضيح على طلب شركتك',
-          message: `${form.reason.trim()} — راجع «طلبات التوضيح» في ملف شركتك وأضف المعلومات أو المستندات المطلوبة لاستكمال المراجعة.`,
-          meta: { company_id: asking.company_id, type: form.type },
-        })
-      }
+      await notifyTenant(data.tenant_id, 'clarification_requested', {
+        title: 'مطلوب توضيح على طلب شركتك',
+        message: `${form.reason.trim()} — راجع «طلبات التوضيح» في ملف شركتك وأضف المعلومات أو المستندات المطلوبة لاستكمال المراجعة.`,
+        meta: { company_id: asking.company_id, type: form.type },
+      })
 
       showToast('✅ أُرسل طلب التوضيح وأُوقف سير المراجعة حتى الردّ')
       setAsking(null)
@@ -157,7 +157,12 @@ export default function AdminRoster() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   // Only states that exist. An empty state as a permanent chip is a filter that

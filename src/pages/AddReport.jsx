@@ -5,6 +5,8 @@ import { Search as SearchIcon, Send } from 'lucide-react'
 import { getSupabase, trustScoreOf } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
+import { titlesFor, groupsFor, buildDescription } from '../lib/reference/reportStatements'
+import { SkeletonPanel } from '../components/Skeleton'
 
 const STEPS = [
   { n: 1, label: 'اختيار الشركة' },
@@ -62,7 +64,10 @@ const EMPTY_FORM = {
   reportType: 'negative',
   category: '',
   title: '',
-  description: '',
+  // The whole body of the report, as codes. There is no free-text field: the
+  // readable `description` every screen already shows is built from these, so
+  // nothing downstream had to change.
+  detailCodes: [],
   relationshipType: '',
   fromDate: '',
   toDate: '',
@@ -149,7 +154,15 @@ export default function AddReport() {
     } catch (e) { setCompanyInfo(null) }
   }
 
-  const setField = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
+  const setField = (name, value) => setForm(prev => (
+    // The title and the ticked statements belong to a category. Changing the
+    // category without clearing them leaves a report titled «لم يسدد
+    // المستحقات إطلاقاً» filed under «جودة العمل», and codes that do not exist
+    // in the new category's list — invisible on screen, still saved.
+    name === 'category' && value !== prev.category
+      ? { ...prev, category: value, title: '', detailCodes: [] }
+      : { ...prev, [name]: value }
+  ))
   const setRating = (k, v) => setForm(prev => ({ ...prev, ratings: { ...prev.ratings, [k]: v } }))
 
   const selectedCompany = companies.find(c => c.id === form.companyId)
@@ -168,7 +181,7 @@ export default function AddReport() {
   // ===== Impact / reliability computation (client-side, Phase A) =====
   const impact = (() => {
     const checks = [
-      !!form.category, !!form.title, form.description.trim().length >= 20, !!form.relationshipType,
+      !!form.category, !!form.title, form.detailCodes.length > 0, !!form.relationshipType,
       !!form.fromDate, !!form.dealValue, !!form.paymentStatus,
       Object.values(form.ratings).some(v => v > 0), !!form.wouldRecommend,
     ]
@@ -187,8 +200,8 @@ export default function AddReport() {
     if (s === 1 && ownCompanyId && form.companyId === ownCompanyId) return 'لا يمكن تقديم تقرير عن شركتك نفسها'
     if (s === 2) {
       if (!form.category) return 'اختر تصنيف التقرير'
-      if (!form.title.trim()) return 'أدخل عنوان التقرير'
-      if (form.description.trim().length < 20) return 'وصف التقرير يجب أن يكون 20 حرفاً على الأقل'
+      if (!form.title.trim()) return 'اختر عنوان التقرير'
+      if (!form.detailCodes.length) return 'اختر ما ينطبق على التعامل — عبارة واحدة على الأقل'
       if (!form.fromDate) return 'حدّد تاريخ بداية التعامل'
     }
     return ''
@@ -208,8 +221,15 @@ export default function AddReport() {
     report_type: form.reportType,
     category: form.category || null,
     title: form.title.trim() || null,
-    description: form.description.trim() || null,
-    notes: form.description.trim() || null,
+    // Readable prose for every screen that already shows a description, built
+    // from the same choices the codes record. Two views of one answer, so
+    // neither can drift from the other.
+    // Readable prose for every screen that already shows a description, built
+    // from the same choices the codes record. Two views of one answer, so
+    // neither can drift from the other.
+    description: buildDescription(form.category, form.detailCodes) || null,
+    detail_codes: form.detailCodes.length ? form.detailCodes : null,
+    notes: null,
     relationship_type: form.relationshipType || null,
     dealt_at: form.fromDate ? new Date(form.fromDate).toISOString() : new Date().toISOString(),
     deal_end_date: form.toDate || null,
@@ -387,7 +407,7 @@ export default function AddReport() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
               {companiesLoading ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#64748B', fontSize: '14px' }}>جاري تحميل الشركات...</div>
+                <SkeletonPanel rows={3} title={false} />
               ) : filteredCompanies.length === 0 ? (
                 companySearch.trim() ? (
                   <div style={{ textAlign: 'center', padding: '30px 16px', border: '1.5px dashed #CBD5E1', borderRadius: '14px', background: '#F8FAFC' }}>
@@ -458,12 +478,71 @@ export default function AddReport() {
               </div>
               <div style={{ gridColumn: '1/3' }}>
                 <label style={labelStyle}>عنوان التقرير</label>
-                <input value={form.title} onChange={(e) => setField('title', e.target.value)} placeholder="عنوان موجز يصف التعامل" style={fieldStyle} />
+                {form.category ? (
+                  <select value={form.title} onChange={(e) => setField('title', e.target.value)}
+                          style={{ ...fieldStyle, background: '#fff' }}>
+                    <option value="">— اختر العبارة الأقرب لما حدث —</option>
+                    {titlesFor(form.category).map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                ) : (
+                  <div style={{ ...fieldStyle, color: '#94A3B8', background: '#F8FAFC' }}>
+                    اختر تصنيف التقرير أولاً
+                  </div>
+                )}
               </div>
-              <div style={{ gridColumn: '1/3' }}>
-                <label style={labelStyle}>وصف التقرير</label>
-                <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="اشرح تفاصيل التعامل (20 حرفاً على الأقل)" style={{ ...fieldStyle, minHeight: '100px', resize: 'vertical' }} />
-              </div>
+
+              {form.category && (
+                <div style={{ gridColumn: '1/3' }}>
+                  <label style={labelStyle}>
+                    تفاصيل التعامل
+                    <span style={{ fontWeight: 600, color: '#64748B' }}> — اختر كل ما ينطبق</span>
+                  </label>
+                  <div style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.8, marginBottom: '12px' }}>
+                    ما تختاره هنا هو التقرير كله — لا يوجد صندوق نص. كلّما اخترت أدق، كان
+                    البلاغ أوضح للمراجع وأسرع في الاعتماد.
+                  </div>
+
+                  {/* Grouped, because a flat run of twenty-five checkboxes is a
+                      list nobody reads to the end — and the ones at the bottom
+                      are the evidence questions. */}
+                  {groupsFor(form.category).map((grp) => (
+                    <div key={grp.label} style={{ marginBottom: '14px' }}>
+                      <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#475569', marginBottom: '7px' }}>
+                        {grp.label}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '8px' }}>
+                        {grp.items.map((pt) => {
+                          const on = form.detailCodes.includes(pt.v)
+                          return (
+                            <label key={pt.v}
+                                   style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', cursor: 'pointer',
+                                            background: on ? '#EEF2FF' : '#fff',
+                                            border: `1.5px solid ${on ? '#1E2A52' : '#E2E8F0'}`,
+                                            borderRadius: '10px', padding: '10px 13px' }}>
+                              <input type="checkbox" checked={on}
+                                     onChange={() => setField('detailCodes',
+                                       on ? form.detailCodes.filter((c) => c !== pt.v)
+                                          : [...form.detailCodes, pt.v])}
+                                     style={{ marginTop: '2px', flex: 'none' }} />
+                              <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: on ? 700 : 500, lineHeight: 1.7 }}>
+                                {pt.t}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: form.detailCodes.length >= 3 ? '#15803D' : '#92400E', marginTop: '4px' }}>
+                    {form.detailCodes.length === 0
+                      ? 'لم تختر شيئاً بعد'
+                      : form.detailCodes.length < 3
+                        ? `اخترت ${form.detailCodes.length} — كل عبارة إضافية تجعل البلاغ أقوى`
+                        : `اخترت ${form.detailCodes.length} عبارة`}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', margin: '4px 0 12px' }}>معلومات التعامل</div>

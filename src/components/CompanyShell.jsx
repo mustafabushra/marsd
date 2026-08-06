@@ -1,4 +1,7 @@
 import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Suspense } from 'react'
+import DeferredSkeleton from './DeferredSkeleton'
+import { SkeletonPage } from './Skeleton'
 import { UserButton } from '@clerk/react'
 import NotificationBell from './NotificationBell'
 import { useClerkOrganization } from '../hooks/useClerkOrganization'
@@ -19,7 +22,13 @@ import {
   BellIcon
 } from './icons'
 
-export default function CompanyShell({ user }) {
+/**
+ * `gate` — CompanyStatusRouter has not yet decided whether this person belongs
+ * here. The chrome is drawn so it does not appear and disappear around the
+ * decision, and the content area holds a skeleton rather than the page, because
+ * mounting the page would show a dashboard to someone about to be redirected.
+ */
+export default function CompanyShell({ user, gate = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { organizationName, userRole } = useClerkOrganization()
@@ -231,23 +240,62 @@ export default function CompanyShell({ user }) {
           borderBottom: '1px solid #E2E8F0',
           padding: '0 32px',
           height: '68px',
-          display: 'flex',
+          // A three-column grid rather than a flex row.
+          //
+          // Flex splits what is left over, so the centre column is only truly
+          // centred while both sides happen to be the same width — and the
+          // moment the page title grows, the search box drifts and the avatar
+          // stops sitting in the corner. `1fr auto 1fr` fixes both at once: the
+          // middle is centred by construction, and each side owns its edge.
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: '24px',
           position: 'sticky',
           top: 0,
           zIndex: 30
         }}>
-          <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>
+          <div style={{ minWidth: 0, fontSize: '18px', fontWeight: 900, color: '#0F172A', justifySelf: 'start', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {currentScreenLabel}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-            <button onClick={() => navigate('/search')} style={{ display: 'flex', alignItems: 'center', gap: '9px', background: '#F1F5F9', border: 0, borderRadius: '10px', padding: '9px 16px', fontSize: '14px', color: '#64748B', cursor: 'pointer', fontWeight: 600, minWidth: '240px' }}>
-              <div style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}>
-                <SearchIcon />
-              </div>
-              ابحث عن شركة...
-            </button>
+
+          {/* Opens the command palette rather than the search page.
+              The palette searches the registry as well as the application, so
+              typing a company's name still finds the company — which is what
+              stops the new behaviour from making this label a lie. It also
+              answers «كيف أضيف تقرير» in the same keystroke.
+
+              Still a button, not only a shortcut: there is no Ctrl on a phone,
+              and a keyboard shortcut nobody is told about is one nobody uses. */}
+          <button
+            onClick={() => window.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            title="ابحث عن شركة أو نفّذ أمراً"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '11px',
+              background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '11px',
+              padding: '12px 18px', fontSize: '14px', color: '#64748B',
+              cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit',
+              // The grid's middle column sizes to this. 340 is the floor —
+              // chosen by hand because the box felt cramped, and a box that can
+              // shrink below the number somebody picked for comfort has not
+              // fixed anything.
+              width: 'min(520px, 100%)', minWidth: '340px',
+            }}>
+            <div style={{ color: 'inherit', display: 'flex', alignItems: 'center', flex: 'none' }}>
+              <SearchIcon />
+            </div>
+            <span style={{ flex: 1, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              ابحث عن شركة أو نفّذ أمراً…
+            </span>
+            <kbd style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '5px', padding: '1px 6px', fontSize: '10.5px', fontWeight: 800, direction: 'ltr', color: '#94A3B8', flex: 'none' }}>
+              Ctrl K
+            </kbd>
+          </button>
+
+          {/* justifySelf pins this to the far edge of the header, so the bell
+              and the avatar sit in the corner whatever the title does. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', justifySelf: 'end' }}>
             <NotificationBell />
             <UserButton
               afterSignOutUrl="/"
@@ -263,7 +311,13 @@ export default function CompanyShell({ user }) {
 
         {/* Content */}
         <main id="main" style={{ padding: '28px 32px', flex: 1 }}>
-          <Outlet />
+          {/* The boundary lives here, not around <Routes>. Around the routes it
+              took the sidebar and header down on every navigation and rebuilt
+              them — the page appeared to reload when only its content had
+              changed. */}
+          <Suspense fallback={<DeferredSkeleton><SkeletonPage /></DeferredSkeleton>}>
+            {gate ? <DeferredSkeleton><SkeletonPage /></DeferredSkeleton> : <Outlet />}
+          </Suspense>
         </main>
       </div>
     </div>

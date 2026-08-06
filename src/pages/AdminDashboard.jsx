@@ -82,6 +82,8 @@ function GrowthChart({ points, loading }) {
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  // What is waiting for somebody, as opposed to what the platform contains.
+  const [queues, setQueues] = useState([])
   const [stats, setStats] = useState({
     totalCompanies: 0,
     activeSubscriptions: 0,
@@ -128,6 +130,39 @@ export default function AdminDashboard() {
           approvedToday: approvedTodayCount || 0,
           companyRequests: companyReqCount,
         })
+
+        // ---- what is waiting for somebody ---------------------------------
+        // The panel above counts what the platform has. This counts what it is
+        // holding up. Six things can block a customer, and the dashboard showed
+        // one of them — a company could sit unapproved for a week and the
+        // landing screen would look perfectly healthy.
+        //
+        // Each count is fetched on its own and allowed to fail on its own: a
+        // table missing in an older environment must cost its own row, not the
+        // whole panel.
+        const countOf = async (table, build) => {
+          try {
+            const { count, error } = await build(
+              supabase.from(table).select('id', { count: 'exact', head: true }))
+            return error ? null : (count || 0)
+          } catch { return null }
+        }
+
+        const [companiesWaiting, claims, openDisputes, planRequests] = await Promise.all([
+          countOf('companies', (q) => q.eq('approved', false)),
+          countOf('claim_requests', (q) => q.eq('status', 'pending')),
+          countOf('disputes', (q) => q.in('status', ['open', 'under_review'])),
+          countOf('plan_change_requests', (q) => q.eq('status', 'pending')),
+        ])
+
+        setQueues([
+          { label: 'شركات بانتظار الاعتماد', n: companiesWaiting, to: '/admin/company-approval' },
+          { label: 'تقارير قيد المراجعة', n: pendingCount || 0, to: '/admin/reports' },
+          { label: 'طلبات مطالبة بملكية', n: claims, to: '/admin/claim-requests' },
+          { label: 'نزاعات مفتوحة', n: openDisputes, to: '/admin/disputes' },
+          { label: 'طلبات بيانات معلّقة', n: companyReqCount, to: '/admin/requests' },
+          { label: 'طلبات تغيير باقة', n: planRequests, to: '/admin/payments' },
+        ])
 
         // Company growth, actually measured.
         //
@@ -233,6 +268,28 @@ export default function AdminDashboard() {
         </div>
         <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
+
+      {/* What needs a decision, before what the platform contains. An admin
+          opening this screen is asking what to do next, not how many companies
+          exist — and a queue at zero is not news, so it is not shown. */}
+      {queues.some((q) => q.n > 0) && (
+        <div style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: '16px', padding: '18px 22px', marginBottom: '18px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 900, color: '#92400E', marginBottom: '13px' }}>
+            بانتظار إجراء منك
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {queues.filter((q) => q.n > 0).map((q) => (
+              <a key={q.label} href={q.to}
+                 style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFBEB',
+                          border: '1px solid #FDE68A', borderRadius: '11px', padding: '11px 15px',
+                          textDecoration: 'none' }}>
+                <span style={{ fontSize: '19px', fontWeight: 900, color: '#B45309' }}>{q.n}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400E' }}>{q.label}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '18px', marginBottom: '18px' }}>

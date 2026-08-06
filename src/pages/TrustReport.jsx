@@ -1,16 +1,21 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCompanyKnowledgeBase, getCompanyReportsTimeline, getCompanyTrends, getCompanyReportsSummary } from '../lib/api'
-import { DocumentIcon } from '../components/icons'
+import { openCompanyReport, getCompanyKnowledgeBase, getCompanyReportsTimeline, getCompanyReportsSummary } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
+import ReportHeader from '../components/report/ReportHeader'
+import PaymentBehaviour from '../components/report/PaymentBehaviour'
+import EvidenceStrength from '../components/report/EvidenceStrength'
+import OfficialIdentity from '../components/report/OfficialIdentity'
+import ReportBreakdown from '../components/report/ReportBreakdown'
+import ReportTimeline from '../components/report/ReportTimeline'
 import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
 import { useEntitlements } from '../hooks/useEntitlements'
-import { isPaidWithCredits, spendCredits, UNLIMITED } from '../lib/entitlements'
-import { hasViewedCompany, recordCompanyView } from '../lib/companyViews'
+// entitlements helpers and the browser-side view meter are both gone from this
+// page: open_company_report decides and records in one call, on the server.
 import { LimitReached } from '../components/LimitGate'
 import { useLiveData } from '../hooks/useLiveData'
-import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonReport } from '../components/Skeleton'
 
 /**
  * The risk band, read from the database rather than decided here.
@@ -28,21 +33,6 @@ const BAND = {
   none:   { label: 'بيانات غير كافية', bg: '#F1F5F9', fg: '#475569', ring: '#94A3B8' },
 }
 
-function RiskPill({ band, prelim = false }) {
-  const b = BAND[band] || BAND.none
-  return (
-    <div style={{ marginTop: '12px' }}>
-      <div style={{ background: b.bg, color: b.fg, borderRadius: '999px', padding: '6px 16px', fontSize: '13.5px', fontWeight: 800, display: 'inline-block' }}>
-        ● {b.label}
-      </div>
-      {prelim && (
-        <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700, marginTop: '7px' }}>
-          تقييم أوّلي — يكتمل عند ٥ تقارير
-        </div>
-      )}
-    </div>
-  )
-}
 
 /**
  * Where the number came from.
@@ -246,123 +236,9 @@ const sinceDays = (iso) => {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
 }
 
-/**
- * The card a reader takes in before deciding whether to read on.
- *
- * Every fact here is shown only when it is known. Tax registration is recorded
- * on none of the companies and a founding date on ten of twenty-seven, so a
- * green tick beside either would be a claim rather than a fact — and a reader
- * cannot tell a verified tick from a decorative one, which makes the decorative
- * one worse than the missing line.
- */
-function CompanyCard({ identity, score, band, tier }) {
-  if (!identity) return null
-  const facts = [
-    identity.verified && { icon: '✔', text: 'موثّقة من مرصد' },
-    identity.cr_status === 'active' && { icon: '✔', text: 'سجل تجاري نشط' },
-    identity.cr_status && identity.cr_status !== 'active' && { icon: '✕', text: `السجل التجاري ${identity.cr_status}`, bad: true },
-    identity.has_tax_id && { icon: '✔', text: 'مسجّلة ضريبياً' },
-  ].filter(Boolean)
-
-  const meta = [
-    identity.sector && { k: 'القطاع', v: identity.sector },
-    identity.city && { k: 'المدينة', v: identity.city },
-    identity.entity_type && { k: 'نوع الكيان', v: identity.entity_type },
-    identity.founded && { k: 'تأسست', v: String(identity.founded).slice(0, 4) },
-    identity.age_years != null && { k: 'عمر الشركة', v: `${identity.age_years} سنة` },
-    identity.enterprise_size && { k: 'الحجم', v: identity.enterprise_size },
-    identity.cr_number && { k: 'السجل التجاري', v: identity.cr_number },
-  ].filter(Boolean)
-
-  const b = BAND[band] || BAND.none
-
-  return (
-    <div style={PANEL}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={{ minWidth: '240px', flex: 1 }}>
-          <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px' }}>{identity.name}</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {facts.map((f) => (
-              <span key={f.text} style={{
-                fontSize: '12.5px', fontWeight: 800, padding: '5px 12px', borderRadius: '999px',
-                background: f.bad ? '#FEF2F2' : '#ECFDF5', color: f.bad ? '#B91C1C' : '#15803D',
-              }}>{f.icon} {f.text}</span>
-            ))}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center', flex: 'none' }}>
-          <div style={{ fontSize: '40px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {tier === 'none' ? '—' : Math.round(score)}
-          </div>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '4px' }}>من 100</div>
-          <div style={{ background: b.bg, color: b.fg, borderRadius: '999px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 800, marginTop: '10px' }}>
-            ● {b.label}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 28px', marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #E2E8F0' }}>
-        {meta.map((m) => (
-          <div key={m.k}>
-            <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{m.k}</div>
-            <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{m.v}</div>
-          </div>
-        ))}
-        {identity.computed_at && (
-          <div style={{ marginRight: 'auto' }}>
-            <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>آخر تحديث للمؤشر</div>
-            <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: 800, marginTop: '3px' }}>{fmtDate(identity.computed_at)}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 const PAY_AR = { full: 'سداد كامل', partial: 'سداد جزئي', late: 'سُدِّد متأخراً', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
 
-/** Counts, and the last five outcomes as a reader would scan them. */
-function CommercialBehaviour({ b, recent }) {
-  if (!b) return null
-  return (
-    <div style={PANEL}>
-      <h3 style={H3}>السلوك التجاري</h3>
-      <p style={LEDE}>ما تقوله التقارير المعتمَدة عن سلوك السداد.</p>
-      <Grid>
-        <Stat label="التقارير المعتمدة" value={b.reports_approved ?? 0} sub={`من ${b.reports_total ?? 0} تقريراً`} />
-        <Stat label="نسبة السداد الكامل" value={b.on_time_pct == null ? '—' : `${b.on_time_pct}%`} />
-        <Stat label="متوسط التأخير" value={`${b.avg_delay ?? 0} يوم`} sub={`أعلى تأخير ${b.max_delay ?? 0} يوم`} />
-        <Stat label="حالات عدم السداد" value={b.defaults ?? 0} />
-        <Stat label="أطراف تعاملت معها" value={b.counterparties ?? 0} sub="جهات مُبلِّغة مستقلّة" />
-        <Stat label="قيد المراجعة" value={b.reports_pending ?? 0} sub={`${b.reports_rejected ?? 0} مرفوضاً`} />
-      </Grid>
-
-      {recent?.length > 0 && (
-        <div style={{ marginTop: '22px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>آخر {recent.length} نتائج</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {recent.map((r, i) => {
-              const ok = r.payment === 'full' && !r.defaulted
-              return (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
-                  background: ok ? '#F0FDF4' : '#FFFBEB', borderRadius: '9px', padding: '10px 14px',
-                }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: ok ? '#15803D' : '#B45309' }}>
-                    {ok ? '✔' : '!'} {PAY_AR[r.payment] || r.payment || '—'}
-                    {r.delay > 0 ? ` — تأخير ${r.delay} يوم` : ''}
-                    {r.defaulted ? ' — تعثّر' : ''}
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{fmtDate(r.at)}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 /**
  * Why this report can be relied on — a different question from whether the
@@ -433,30 +309,6 @@ function ReportConfidence({ q, market }) {
   )
 }
 
-/** Where the evidence came from, by the reporters' own sectors — never by name. */
-function SourceMix({ sources }) {
-  if (!sources?.length) return null
-  const total = sources.reduce((a, s) => a + Number(s.count), 0)
-  return (
-    <div style={PANEL}>
-      <h3 style={H3}>توزيع مصادر البيانات</h3>
-      <p style={LEDE}>قطاعات الجهات التي أبلغت — بلا أسماء. كلّما تنوّعت المصادر قلّ احتمال أن يكون الرقم رأي طرف واحد.</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
-        {sources.map((s) => (
-          <div key={s.sector}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-              <span>{s.sector}</span>
-              <span style={{ fontVariantNumeric: 'tabular-nums', color: '#64748B' }}>{s.count} {s.count === 1 ? 'جهة' : 'جهات'}</span>
-            </div>
-            <div style={{ height: '7px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${(Number(s.count) / total) * 100}%`, height: '100%', background: '#1E2A52', borderRadius: '4px' }}></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /**
  * The limits of what this document is.
@@ -469,11 +321,19 @@ function SourceMix({ sources }) {
 function Disclaimer() {
   return (
     <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '18px 20px', marginBottom: '18px' }}>
-      <div style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', letterSpacing: '.08em', marginBottom: '8px' }}>إخلاء مسؤولية</div>
-      <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
+      <div style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', letterSpacing: '.08em', marginBottom: '8px' }}>إخلاء مسؤولية وحدود الاستخدام</div>
+      <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 10px', lineHeight: 1.9 }}>
         يستند هذا التقرير إلى البيانات الرسمية المتاحة والتقارير التجارية المعتمَدة من إدارة مرصد حتى تاريخ إصداره.
         وهو عرضٌ لما سُجّل، لا ضمانٌ لأداء الشركة مستقبلاً ولا توصية ائتمانية.
         القرار التجاري مسؤولية متّخذه، ويُنصح بعدم الاعتماد على مؤشر مرصد وحده دون سياسات الائتمان والتحصيل الداخلية لديك.
+      </p>
+      {/* Moved here from a standalone blue banner in the middle of the report.
+          It is a statement about how the data may be used, which is what this
+          section is for — and floating it between two panels interrupted the
+          argument without belonging to either side of it. */}
+      <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: 1.9 }}>
+        🛡 لا تُعرض أسماء الشركات المبلّغة في أي موضع من هذا التقرير — تُعرض المؤشرات المجمّعة
+        وقطاعات المُبلِّغين فقط، حفاظاً على خصوصية الأطراف.
       </p>
     </div>
   )
@@ -576,55 +436,31 @@ function ScoreContext({ ctx, score }) {
   )
 }
 
-/** The evidence the community layer was built from — counts, not adjectives. */
-function ScoreEvidence({ facts }) {
-  if (!facts) return null
-  const n = Number(facts.approved_reports) || 0
-  if (!n) return null
-
-  const items = [
-    { label: 'تقارير معتمدة', value: n, sub: 'وحدها تدخل الحساب' },
-    { label: 'سُدِّدت كاملةً', value: `${facts.on_time_pct ?? 0}%`, sub: `${facts.on_time ?? 0} من ${n}` },
-    { label: 'حالات عدم سداد', value: facts.defaults ?? 0, sub: n ? `${Math.round(((facts.defaults || 0) / n) * 100)}% من التقارير` : '' },
-    { label: 'متوسط التأخير', value: `${facts.avg_delay_days ?? 0} يوم`, sub: 'نقطة لكل ٥ أيام، بحدّ ٢٠' },
-  ]
-
-  return (
-    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>الأدلّة تحت طبقة المجتمع</h3>
-      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 20px' }}>
-        التقرير قيد المراجعة أو المرفوض لا يدخل هذه الأرقام.
-      </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '14px' }}>
-        {items.map((it) => (
-          <div key={it.label} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
-            <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>{it.label}</div>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#1E2A52', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{it.value}</div>
-            {it.sub && <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px' }}>{it.sub}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export default function TrustReport() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { role } = useUserRole()
   const systemStatus = useSystemStatus()
-  const { entitlements, limitOf, remaining, can, loading: entLoading, refresh: refreshEntitlements } = useEntitlements()
+  const { entitlements, limitOf, can, loading: entLoading, refresh: refreshEntitlements } = useEntitlements()
+  // The server's own words for why it refused. Kept rather than assumed: a
+  // refusal can also be "الشركة غير موجودة" or a failure to reach the meter at
+  // all, and showing «بلغت حد عمليات البحث» for either of those is a lie the
+  // reader cannot check.
+  const [blockedReason, setBlockedReason] = useState('')
   const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [company, setCompany] = useState(null)
   const [report, setReport] = useState(null)
   const [timeline, setTimeline] = useState([])
-  const [trends, setTrends] = useState([])
   const [summary, setSummary] = useState([])
   const [scoreCtx, setScoreCtx] = useState(null)
   const [scoreHistory, setScoreHistory] = useState([])
   const [full, setFull] = useState(null)
+  // Null unless the company holds a running partnership. Carries its own label
+  // and disclaimer, both read from the database.
+  const [partner, setPartner] = useState(null)
 
   useEffect(() => {
     const loadReport = async () => {
@@ -635,26 +471,28 @@ export default function TrustReport() {
           return
         }
 
-        // Meter the lookup before fetching anything. A company already opened
-        // this month is free to open again, so a revisit never costs and never
-        // records a second time.
-        const tenantId = entitlements?.tenantId
-        const ceiling = limitOf('searches_per_month')
-        let alreadySeen = true
-        let payWithCredits = false
-
-        if (tenantId && ceiling !== UNLIMITED && !entitlements?.degraded && !entitlements?.enforcementDisabled) {
-          alreadySeen = await hasViewedCompany(tenantId, id)
-          if (!alreadySeen) {
-            if (remaining('searches_per_month') <= 0) {
-              setQuotaBlocked(true)
-              setLoading(false)
-              return
-            }
-            payWithCredits = isPaidWithCredits(entitlements, 'searches_per_month')
-          }
-        } else if (tenantId) {
-          alreadySeen = await hasViewedCompany(tenantId, id)
+        // Meter the lookup before fetching anything, on the server.
+        //
+        // This used to be four decisions taken here: has this company been
+        // opened this month, is there allowance left, should credits pay for it,
+        // and afterwards, record it. Every one of them was advisory. The report
+        // functions never asked what plan the caller was on, so anything that
+        // skipped this page — the RPC called directly, or simply a page that
+        // fetched anyway — read the whole report for nothing. And two tabs
+        // opening two companies on the last remaining slot both read the same
+        // count and both passed, which no amount of care in the browser can fix.
+        //
+        // open_company_report does the lot in one transaction: it checks, it
+        // debits credits when the plan's own allowance is spent, and it records
+        // — under a per-tenant lock. get_company_knowledge_base and the two
+        // report functions now refuse to answer until it has. So the block below
+        // is what the reader is told, not what stops them.
+        const opened = await openCompanyReport(id)
+        if (!opened.ok) {
+          setBlockedReason(opened.reason || '')
+          setQuotaBlocked(true)
+          setLoading(false)
+          return
         }
 
         // Load complete company profile from Knowledge Base (single source of truth)
@@ -724,10 +562,13 @@ export default function TrustReport() {
         }
         setReport(reportObj)
 
-        // Load Timeline, Trends, and Summary in parallel
-        const [timelineData, trendsData, summaryData] = await Promise.all([
+        // Timeline and summary, in parallel.
+        //
+        // getCompanyTrends() went with the panel it fed: <ScoreHistory> plots
+        // the same series properly, and a request whose result nothing renders
+        // is latency charged to every reader for nothing.
+        const [timelineData, summaryData] = await Promise.all([
           getCompanyReportsTimeline(id, 8),
-          getCompanyTrends(id),
           getCompanyReportsSummary(id),
         ])
 
@@ -743,6 +584,12 @@ export default function TrustReport() {
           ])
           const { data: fullData } = await sb.rpc('company_report_full', { p_company_id: id })
           setFull(fullData || null)
+
+          // Whether the company holds a running partnership with Marsad. The
+          // wording and the disclaimer both come from the database so they
+          // cannot drift between the screens that show them.
+          const { data: partner } = await sb.rpc('company_partner_status', { p_company_id: id })
+          setPartner(partner?.is_partner ? partner : null)
           setScoreCtx(ctx || null)
           setScoreHistory(Array.isArray(hist) ? hist : [])
         } catch (e) {
@@ -750,23 +597,20 @@ export default function TrustReport() {
         }
 
         setTimeline(timelineData.data || [])
-        setTrends(trendsData.data || [])
         setSummary(summaryData.data || [])
 
-        // Charged only once the report actually loaded, and only the first time
-        // this company is opened this month. Recording before the fetch would
-        // bill a member for a page that then failed.
-        if (entitlements?.tenantId && !alreadySeen) {
-          // Past the plan's own allowance, the lookup is paid for out of the
-          // balance. The debit runs first: recording the view without it would
-          // consume the lookup and leave the balance untouched.
-          if (payWithCredits) {
-            const paid = await spendCredits(entitlements, 'search_unlock')
-            if (!paid) { setQuotaBlocked(true); setLoading(false); return }
-          }
-          await recordCompanyView(entitlements.tenantId, id, null)
-          await refreshEntitlements()
-        }
+        // The charge already happened, above and on the server. What is left is
+        // to re-read the allowance so the header stops showing the number from
+        // before this lookup.
+        //
+        // It used to be charged down here instead, after the report had loaded,
+        // so that a page which failed to load was not billed. That ordering is
+        // no longer available: the report functions will not answer until the
+        // lookup is recorded, which is exactly what makes them enforceable. The
+        // trade is deliberate — a load that fails after the record costs the
+        // reader one lookup out of a hundred, and the alternative is a gate that
+        // anyone can walk past.
+        if (opened.metered) await refreshEntitlements()
       } catch (err) {
         setError(err.message || 'خطأ في تحميل البيانات')
       } finally {
@@ -783,11 +627,15 @@ export default function TrustReport() {
    * Re-read only what can move while the page is open: the score and the
    * evidence under it.
    *
-   * Deliberately not the whole loadReport. That path meters the lookup against
-   * the plan, and re-running it on every change event would put a metered read
-   * on a timer — harmless today because a company already opened this month is
-   * free to open again, but one edit to that rule away from charging a reader
-   * for standing still.
+   * Deliberately not the whole loadReport. That path calls open_company_report,
+   * which charges — and since migration 109 it charges every time, including for
+   * a company already opened this month. Re-running it here would bill a reader
+   * for standing still: a busy company's score moves several times an hour, and
+   * a hundred lookups would be gone by lunchtime without anyone doing anything.
+   *
+   * The edit that this comment used to warn about has now been made, which is
+   * why the warning is stated as a fact. Whatever else changes here, the live
+   * refresh must never reach the meter.
    *
    * This is the page the product exists for. A report approved while someone is
    * reading it changes the number they are deciding on, and the old behaviour
@@ -800,13 +648,11 @@ export default function TrustReport() {
       if (!kb) return
       setReport((prev) => (prev ? { ...prev, ...kb, score: kb.trust_score || 0, approvedReports: kb.approved_reports_count || 0 } : prev))
 
-      const [timelineData, trendsData, summaryData] = await Promise.all([
+      const [timelineData, summaryData] = await Promise.all([
         getCompanyReportsTimeline(id, 8),
-        getCompanyTrends(id),
         getCompanyReportsSummary(id),
       ])
       setTimeline(timelineData.data || [])
-      setTrends(trendsData.data || [])
       setSummary(summaryData.data || [])
     } catch (err) {
       console.error('Score refresh failed:', err)
@@ -823,19 +669,24 @@ export default function TrustReport() {
   })
 
   if (quotaBlocked) {
+    // Only the allowance case gets the allowance screen. The other refusals —
+    // a company that does not exist, a meter that could not be reached — are
+    // shown as themselves rather than dressed up as a limit the reader could
+    // lift by contributing.
+    const quota = blockedReason.includes('انتهت مشاهدات')
     const ceiling = limitOf('searches_per_month')
     return (
       <div style={{ maxWidth: '620px', margin: '40px auto' }}>
         <LimitReached
-          title="بلغت حد عمليات البحث لهذا الشهر"
-          detail={
-            `باقتك تتيح ${ceiling} شركة في الشهر، وقد اطّلعت عليها جميعاً. ` +
-            'الشركات التي فتحتها هذا الشهر تبقى متاحة لك بلا احتساب إضافي' +
-            (entitlements?.giveToGetEnabled
-              ? '. أضف شركة للسجل أو أرسل تقريراً لكسب رصيد يوسّع حدّك فوراً.'
-              : '.')
-          }
-          giveToGet={!!entitlements?.giveToGetEnabled}
+          title={quota ? 'بلغت حد تقارير الشركات لهذا الشهر' : 'تعذّر فتح التقرير'}
+          detail={quota
+            ? (`باقتك تتيح ${ceiling} فتحة تقرير في الشهر، وقد استهلكتها. ` +
+               'البحث نفسه لا يُحتسب، وكل فتحة لتقرير تُحتسب حتى لو كانت لشركة فتحتها من قبل' +
+               (entitlements?.giveToGetEnabled
+                 ? '. أضف شركة للسجل أو أرسل تقريراً لكسب رصيد يوسّع حدّك فوراً.'
+                 : '.'))
+            : (blockedReason || 'لم يتمكّن النظام من فتح هذا التقرير. أعد المحاولة.')}
+          giveToGet={quota && !!entitlements?.giveToGetEnabled}
         />
       </div>
     )
@@ -843,18 +694,7 @@ export default function TrustReport() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '44px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>⏳</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#64748B' }}>جاري تحميل بيانات الشركة...</div>
-        </div>
-      </div>
+    <SkeletonReport />
     )
   }
 
@@ -939,167 +779,64 @@ export default function TrustReport() {
           الدرجة تعبّر عن التقارير المعتمدة حتى تاريخ الإصدار أعلاه، وتتغيّر باعتماد تقرير جديد أو سحب تقرير قائم.
         </p>
       </div>
-      <div style={{
-        background: '#fff', border: '1px solid #E2E8F0', borderRadius: '18px', padding: '30px',
-        marginBottom: '18px'
-      }}>
-        <div style={{ display: 'flex', gap: '28px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ width: '66px', height: '66px', borderRadius: '16px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 900, flex: 'none' }}>
-            {company?.name.charAt(0)}
-          </div>
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', margin: '0 0 0 0', textAlign: 'right' }}>{company?.name}</h1>
-              {/* The badge is the strongest claim on the page: it says someone
-                  at Marsad checked this record. A claim like that without a date
-                  is worth less than none — a company verified two years ago and
-                  a company verified this morning are not the same thing, and the
-                  reader could not tell them apart. */}
-              {company?.verified && (
-                <span
-                  title={company.verified_at ? `وُثّقت في ${new Date(company.verified_at).toLocaleDateString('en-GB')}` : 'بلا تاريخ توثيق مسجَّل'}
-                  style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}
-                >
-                  ✔ موثّقة
-                  {company.verified_at && (
-                    <span style={{ fontWeight: 600, opacity: 0.75 }}> · {new Date(company.verified_at).toLocaleDateString('en-GB')}</span>
-                  )}
-                </span>
-              )}
-              <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '4px 11px', fontSize: '12.5px', fontWeight: 800 }}>● سجل نشط</span>
-              <LiveBadge connected={connected} liveAt={liveAt} />
-            </div>
-            {company?.name_en && (
-              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 600, marginBottom: '8px', textAlign: 'right' }}>{company.name_en}</div>
-            )}
-            <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap', fontSize: '14px', color: '#64748B', fontWeight: 600 }}>
-              {[
-                ['القطاع', company?.sector],
-                ['النشاط الرئيسي', company?.main_activity],
-                ['نوع الكيان', company?.entity_type],
-                ['المدينة', company?.city],
-                ['المنطقة', company?.region],
-                ['السجل', company?.cr_number],
-                ['الرقم الموحّد', company?.unified_number],
-                ['تاريخ الانتهاء', company?.cr_expiry_date],
-              ].filter(([, v]) => v && v !== '—').map(([label, v]) => (
-                <span key={label}>{label}: {v}</span>
-              ))}
-              {company?.website && (
-                <span>الموقع: <a href={company.website} target="_blank" rel="noreferrer" style={{ color: '#1D4ED8', fontWeight: 700 }}>{company.website}</a></span>
-              )}
-            </div>
-          </div>
+      {/* One header for the whole report.
 
-          {tier === 'none' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', background: '#F8FAFC', border: '1.5px dashed #CBD5E1', borderRadius: '16px', padding: '24px 30px', minWidth: '240px' }}>
-              <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🔒</div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#64748B', textAlign: 'center', lineHeight: 1.5 }}>لا توجد بيانات معتمدة كافية<br />لإصدار تقييم موثوق</div>
-            </div>
-          )}
-
-          {tier === 'full' && (
-            <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(${BAND[report.riskBand]?.ring || '#94A3B8'} 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
-                  <span style={{ fontSize: '11px', color: '#64748B' }}>من 100</span>
-                </div>
-              </div>
-              <RiskPill band={report.riskBand} />
-            </div>
-          )}
-
-          {tier === 'prelim' && (
-            <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', background: `conic-gradient(#F59E0B 0% ${Math.min(score, 100)}%,#E2E8F0 ${Math.min(score, 100)}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: '108px', height: '108px', borderRadius: '50%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '42px', fontWeight: 900, color: '#1E2A52', lineHeight: 1 }}>{Math.round(score)}</span>
-                  <span style={{ fontSize: '11px', color: '#64748B' }}>من 100</span>
-                </div>
-              </div>
-              <RiskPill band={report.riskBand} prelim />
-            </div>
-          )}
-
-          {/* Not blurred and not locked: there is no hidden number here. The
-              company has too few approved reports for a score to mean anything,
-              and saying so invites the contribution that would fix it — which
-              blurring a number nobody has computed does not. */}
-          {tier === 'thin' && (
-            <div style={{ textAlign: 'center', flex: 'none' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '50%', border: '3px dashed #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '30px', color: '#CBD5E1' }}>—</span>
-                <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>لا توجد درجة</span>
-              </div>
-              <div style={{ background: '#F1F5F9', color: '#475569', borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 800, marginTop: '12px' }}>
-                بيانات غير كافية
-              </div>
-              <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginTop: '7px', maxWidth: '170px', lineHeight: 1.8 }}>
-                تحتاج تقريرين معتمدين على الأقل — أضِف تقريرك عن تعاملك معها
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '20px', marginTop: '22px', paddingTop: '22px', borderTop: '1px solid #F1F5F9', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '240px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#334155' }}>مستوى موثوقية التقرير</span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#16A34A' }}>{report?.approvedReports || 0} تقرير معتمد</span>
-            </div>
-            <div style={{ height: '9px', background: '#F1F5F9', borderRadius: '6px', overflow: 'hidden' }}>
-              <div style={{ width: Math.min(((report?.approvedReports || 0) / 50) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg,#16A34A,#4ADE80)', borderRadius: '6px' }}></div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {/* The browser's own print-to-PDF rather than a PDF library.
-                Arabic in jsPDF means embedding a font and hand-shaping the text,
-                and it still breaks on ligatures; the browser already renders
-                this page correctly in RTL and every browser can save the result
-                as PDF. What was here before had no onClick at all. */}
-            <button
-              onClick={() => window.print()}
-              style={{
-                background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 18px',
-                fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
-              }}
-            >
-              ⬇ تحميل PDF
-            </button>
-            <button
-              onClick={() => navigate('/watchlist')}
-              style={{
-                background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px',
-                fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit'
-              }}>
-              + قائمة المراقبة
-            </button>
-            <button
-              onClick={() => {
-                const canAdd = canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0
-                if (canAdd) {
-                  navigate('/add-report', { state: { companyId: id, companyName: company?.name } })
-                }
-              }}
-              disabled={!canPerform(role, 'canAddReport') || !systemStatus.subscriptionActive || !systemStatus.accountActive || systemStatus.creditsBalance <= 0}
-              style={{
-                background: '#fff',
-                color: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? '#1E2A52' : '#94A3B8',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '10px',
-                padding: '11px 18px',
-                fontSize: '14px',
-                fontWeight: 800,
-                cursor: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 'pointer' : 'not-allowed',
-                opacity: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 1 : 0.6,
-                fontFamily: 'inherit'
-              }}>
-              ⭐ إضافة تقرير
-            </button>
-          </div>
-        </div>
-      </div>
+          It replaced three blocks that each opened with the company's name, its
+          score and its risk band — a reader met all three twice over before
+          reaching a single new fact. What that header could not do, and this
+          one does, is say how much evidence stands behind the number: a score
+          built on one report from one counterparty now says so, beside itself,
+          where somebody reading only the top of the page will see it. */}
+      <ReportHeader
+        identity={full?.identity}
+        company={company}
+        score={score}
+        band={report?.riskBand}
+        tier={report?.tier}
+        market={full?.market}
+        behaviour={full?.behaviour}
+        quality={full?.quality}
+        partner={partner}
+        connected={connected}
+        liveAt={liveAt}
+        actions={<>
+          {/* The browser's own print-to-PDF rather than a PDF library. Arabic in
+              jsPDF means embedding a font and hand-shaping the text, and it
+              still breaks on ligatures; the browser already renders this page
+              correctly in RTL and every browser can save the result as PDF. */}
+          <button
+            onClick={() => window.print()}
+            style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
+                     padding: '11px 18px', fontSize: '14px', fontWeight: 800,
+                     cursor: 'pointer', fontFamily: 'inherit' }}>
+            ⬇ تحميل PDF
+          </button>
+          <button
+            onClick={() => navigate('/watchlist')}
+            style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0',
+                     borderRadius: '10px', padding: '11px 18px', fontSize: '14px',
+                     fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            + قائمة المراقبة
+          </button>
+          <button
+            onClick={() => {
+              const canAdd = canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0
+              if (canAdd) navigate('/add-report', { state: { companyId: id, companyName: company?.name } })
+            }}
+            disabled={!canPerform(role, 'canAddReport') || !systemStatus.subscriptionActive || !systemStatus.accountActive || systemStatus.creditsBalance <= 0}
+            style={{
+              background: '#fff',
+              color: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? '#1E2A52' : '#94A3B8',
+              border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 18px',
+              fontSize: '14px', fontWeight: 800,
+              cursor: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 'pointer' : 'not-allowed',
+              opacity: canPerform(role, 'canAddReport') && systemStatus.subscriptionActive && systemStatus.accountActive && systemStatus.creditsBalance > 0 ? 1 : 0.6,
+              fontFamily: 'inherit',
+            }}>
+            ⭐ إضافة تقرير
+          </button>
+        </>}
+      />
 
       {tier === 'none' && (
         <div style={{
@@ -1133,149 +870,75 @@ export default function TrustReport() {
 
       {tier === 'full' && canSeeFull && (
         <>
-          <CompanyCard identity={full?.identity} score={score} band={report.riskBand} tier={report.tier} />
-          <ScoreLayers layers={report.layers} score={score} />
+          {/* The verdict is in <ReportHeader> above, which every tier sees.
+              What follows is the evidence, in the order a reader asks for it. */}
+
+          {/* 1 — does it pay on time? The first question a credit decision asks,
+                  so it is the first panel and not a row inside a general card. */}
+          <PaymentBehaviour
+            b={full?.behaviour}
+            recent={full?.recent}
+            delays={(full?.recent || []).map((r) => r.delay)}
+          />
+
+          {/* 2 — how much is behind that? Independent counterparties lead,
+                  because ten reports from one company is one opinion. */}
+          <EvidenceStrength
+            behaviour={full?.behaviour}
+            quality={full?.quality}
+            sources={full?.sources}
+          />
+
+          {/* 3 — why this number. Meaning before arithmetic: a reader wants to
+                  know what 72 says before they want to see it added up. */}
           <ScoreContext ctx={scoreCtx} score={score} />
+          <ScoreLayers layers={report.layers} score={score} />
+          {/* 4 — which way it is moving.
+
+              «سجل تغيّرات التقييم» used to repeat this below as six rows with an
+              arrow each: the same series, less of it, and no shape to read. */}
           <ScoreHistory points={scoreHistory} />
-          <CommercialBehaviour b={full?.behaviour} recent={full?.recent} />
-          <SourceMix sources={full?.sources} />
+
+          {/* 5 — what the reports said. Categories and stories were two panels
+                  with a chart between them; they answer one question, so they
+                  are one run now. */}
+          {/* This was a row of tiles showing an emoji, a count and the raw
+              database code — «⚔️ 2 dispute». The Arabic names were already in
+              this file and used by another panel; the emoji came out of a CASE
+              statement inside get_company_reports_summary, so the look of the
+              report was being decided in SQL. And four bare counts answer «how
+              many of each» while hiding «out of how many», which is the only
+              version of the question that means anything. */}
+          <ReportBreakdown summary={summary} />
+
+          {/* Every row used to draw the same grey 📋: the icon was chosen by
+              comparing a category code against Arabic labels, so no branch ever
+              matched. And each row printed the reporting company's name, which
+              migration 107 stopped the database from returning to anyone but
+              Marsad. */}
+          <ReportTimeline reports={timeline} />
+
+          {/* 6 — the registry record in full, gaps included.
+                  Every field is shown whether or not it has a value: an empty
+                  one says the question was asked and the answer is missing,
+                  which is a fact about the record and is already part of what
+                  profile_completeness feeds into the platform layer. Rendering
+                  only what exists made a thin record look as complete as a
+                  full one. */}
+          <OfficialIdentity
+            company={company}
+            identity={full?.identity}
+            completeness={full?.quality?.profile_completeness}
+          />
+
+          {/* 7 — how far to trust all of the above.
+                  After the evidence rather than before it: «why is this
+                  reliable» is a question a reader has once they have seen what
+                  «this» is. */}
           <ReportConfidence q={full?.quality} market={full?.market} />
+
+          {/* 7 — the limits, last, where the reader has seen what they apply to. */}
           <Disclaimer />
-          <ScoreEvidence facts={report.facts} />
-          <div style={{
-            background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>تركيبة مؤشر الثقة</h3>
-              <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>كيف تم احتساب الدرجة</span>
-            </div>
-            <div style={{ display: 'flex', borderRadius: '12px', overflow: 'hidden', height: '52px' }}>
-              <div style={{ width: '30%', background: '#1E2A52', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>البيانات الرسمية 30%</div>
-              <div style={{ width: '50%', background: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>بيانات المجتمع 50%</div>
-              <div style={{ width: '20%', background: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', textAlign: 'center', padding: '0 8px' }}>المنصة 20%</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '18px' }}>
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
-              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>عدد التقارير المعتمدة</div>
-              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{report?.approvedReports || 0}</div>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
-              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>مؤشر الثقة الحالي</div>
-              <div style={{ fontSize: '30px', fontWeight: 900, color: '#1E2A52' }}>{Math.round(score)}<span style={{ fontSize: '16px', color: '#64748B' }}> / 100</span></div>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }}>
-              <div style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>حالة التقييم</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#15803D', marginTop: '6px' }}>موثوق</div>
-            </div>
-          </div>
-
-          <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', display: 'flex', gap: '11px', alignItems: 'center' }}>
-            <span style={{ fontSize: '18px' }}>🛡</span>
-            <span style={{ fontSize: '13.5px', color: '#3730A3', fontWeight: 700 }}>لا تُعرض أسماء الشركات المبلّغة — تُعرض المؤشرات المجمّعة فقط حفاظاً على الخصوصية.</span>
-          </div>
-
-          {/* Reports Summary */}
-          <div style={{
-            background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
-          }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>ملخص التقارير</h3>
-            {summary.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-                {summary.map((item, idx) => (
-                  <div key={idx} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', marginBottom: '6px' }}>{item.icon}</div>
-                    <div style={{ fontSize: '24px', fontWeight: 900, color: item.color, marginBottom: '4px' }}>{item.count}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{item.category}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#64748B' }}>لا توجد تقارير بعد</div>
-            )}
-          </div>
-
-          {/* Trends */}
-          {trends.length > 0 && (
-            <div style={{
-              background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>سجل تغيّرات التقييم</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {trends.slice(0, 6).map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px',
-                      background: '#F8FAFC', borderRadius: '12px', transition: 'all 0.3s ease',
-                      border: '1px solid #E2E8F0'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#F1F5F9'
-                      e.currentTarget.style.transform = 'translateX(-4px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#F8FAFC'
-                      e.currentTarget.style.transform = 'translateX(0)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ fontSize: '18px' }}>
-                        {item.trend_direction === 'improving' ? '📈' : item.trend_direction === 'declining' ? '📉' : '➡️'}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{item.period_month}</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>{item.avg_score}% • {item.approved_reports} تقرير</div>
-                      </div>
-                    </div>
-                    <div style={{
-                      background: item.trend_direction === 'improving' ? '#ECFDF5' : item.trend_direction === 'declining' ? '#FEE2E2' : '#F1F5F9',
-                      color: item.trend_direction === 'improving' ? '#15803D' : item.trend_direction === 'declining' ? '#DC2626' : '#64748B',
-                      borderRadius: '8px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 700
-                    }}>
-                      {item.trend_direction === 'improving' ? '✓ تحسّن' : item.trend_direction === 'declining' ? '✗ تراجع' : '→ مستقر'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Timeline */}
-          {timeline.length > 0 && (
-            <div style={{
-              background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>أحدث التقارير المعتمدة</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {timeline.map((report, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '14px', paddingBottom: '14px', borderBottom: idx < timeline.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', fontSize: '18px' }}>
-                      {report.severity === 'دفع متأخر' ? '💳' : report.severity === 'عدم التزام' ? '⚠️' : report.severity === 'ممتاز' ? '⭐' : report.severity === 'قضايا' ? '⚔️' : '📋'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
-                          {new Date(report.created_at).toLocaleDateString('en-GB')}
-                        </div>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{report.title}</div>
-                      </div>
-                      <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.5, marginBottom: '6px' }}>
-                        {report.summary}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
-                        من {report.reporter_company_name}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

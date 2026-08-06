@@ -54,6 +54,78 @@ p {
 }
 
 /* Animations */
+
+/*
+ * The shimmer behind every loading placeholder.
+ *
+ * It replaced thirty-six hand-written «جاري التحميل...» blocks — in four
+ * different heights, with two different ellipsis characters, each centred a
+ * slightly different way. A person moving between two screens saw the wait
+ * announce itself twice, differently, and the page jump when the text was
+ * swapped for content of another shape.
+ *
+ * A skeleton in the shape of what is coming does the opposite: the layout is
+ * already correct when the data lands, so nothing moves, and there is no
+ * sentence to read.
+ *
+ * The direction is right-to-left to match the page. A sweep running the wrong
+ * way against Arabic text reads as something sliding out rather than filling.
+ */
+@keyframes marsadShimmer {
+  from { background-position: -160% 0; }
+  to   { background-position: 160% 0; }
+}
+
+/*
+ * Respect a reader who has asked the operating system for less motion. A
+ * shimmer is decoration; for somebody with vestibular sensitivity it is not.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .marsad-skeleton {
+    animation: none !important;
+    background: #EEF2F6 !important;
+  }
+}
+
+/*
+ * The slow breath on the waiting-status pages — «حسابك قيد المراجعة» and its
+ * siblings. It was defined three separate times, once inside an inline <style>
+ * on each of those pages, so the same effect had three definitions that could
+ * drift apart and nobody would notice until two of them looked different.
+ */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="pulse"] { animation: none !important; }
+}
+
+/*
+ * A skeleton fades in rather than appearing. Combined with the delay in
+ * DeferredSkeleton, a slow load arrives softly instead of snapping into place —
+ * the snap is what read as breakage.
+ */
+@keyframes skeletonFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/*
+ * And the content that replaces it. Without this the swap from placeholder to
+ * data is a hard cut on every navigation, which is the «تقطيع» — the page does
+ * not move, but everything in it changes at once with no transition.
+ */
+@keyframes contentIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="skeletonFade"], [style*="contentIn"] { animation: none !important; }
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -77,4 +149,29 @@ p {
   --color-gray-dark: #64748B;
   --color-text-primary: #0F172A;
   --color-text-secondary: #475569;
+}
+
+/* ---------------------------------------------------------------------------
+   Print
+   ---------------------------------------------------------------------------
+   TrustReport renders a header marked `print-only` — the company name and the
+   date, so a printed report is identifiable on paper. The class was never
+   defined anywhere, so it did nothing: the block was visible on screen to every
+   reader, and the page carried no header when printed either. A class name is
+   not a style. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only { display: block; }
+
+  /* What is on screen for navigating is noise on paper. */
+  aside, header, nav, .no-print { display: none !important; }
+
+  body { background: #fff; }
+
+  /* A trust report is evidence in a decision; a page break through the middle
+     of a panel splits a number from what it means. */
+  main { padding: 0 !important; }
 }

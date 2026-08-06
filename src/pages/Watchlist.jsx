@@ -7,6 +7,7 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { watchlistRoom } from '../lib/entitlements'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
 
 const riskOf = (s) => {
   if (s == null) return { label: 'بيانات غير كافية', bg: '#F1F5F9', c: '#64748B', gauge: '#CBD5E1' }
@@ -165,13 +166,12 @@ export default function Watchlist() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '44px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>⏳</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#64748B' }}>جاري تحميل قائمة المراقبة...</div>
-        </div>
-      </div>
+    (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
     )
   }
 
@@ -266,7 +266,7 @@ export default function Watchlist() {
             </div>
             <div style={{ padding: '14px 24px', overflowY: 'auto', flex: 1 }}>
               {addLoading ? (
-                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
+                <SkeletonList rows={4} />
               ) : addResults.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
               ) : (

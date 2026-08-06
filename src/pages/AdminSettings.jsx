@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /admin/settings — the settings the platform actually reads.
@@ -232,10 +233,11 @@ export default function AdminSettings() {
     give_to_get_rules: 'قواعد Give-to-Get',
     feature_catalog: 'فهرس الميزات',
     entitlements_enforcement: 'تطبيق الحدود',
+    document_ai: 'قراءة المستندات آلياً',
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return <SkeletonPage stats={0} panels={3} />
   }
 
   return (

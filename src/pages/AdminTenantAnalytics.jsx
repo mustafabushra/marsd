@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, BarList, TrendLine, StatusBar, STATUS_COLOR, SERIES } from '../components/Charts'
+import { SkeletonPage } from '../components/Skeleton'
 
 /**
  * /admin/tenant-analytics — the companies on Marsad, in aggregate.
@@ -78,7 +79,7 @@ export default function AdminTenantAnalytics() {
   })
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري التحميل...</div>
+    return <SkeletonPage stats={4} panels={2} />
   }
 
   const active = rows.filter((r) => r.status === 'active')

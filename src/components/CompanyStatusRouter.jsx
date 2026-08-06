@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { cloneElement, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCompanyStatus } from '../hooks/useCompanyStatus'
 import { useUserRole } from '../hooks/useUserRole'
@@ -49,12 +49,21 @@ export default function CompanyStatusRouter({ children }) {
   // Waiting on the role as well as the status: deciding on the status alone
   // redirects staff for the moment before the role arrives, and a replace()
   // cannot be taken back.
+  //
+  // What the wait looks like matters more here than anywhere else, because this
+  // is the first thing anyone sees after signing in. It was a line of grey text
+  // centred in an empty viewport — no sidebar, no header, its own background.
+  // Three differently-shaped screens went past on every login: the boot
+  // skeleton, then that sentence, then the real shell. The sequence, not the
+  // total wait, is what read as slow.
+  //
+  // So the shell is drawn while the answer is on its way, with a skeleton where
+  // the page will be. The chrome paints once and stays. The child is cloned
+  // rather than composed because the gate has to sit outside the shell — a shell
+  // that mounted the page first and hid it afterwards would flash a dashboard at
+  // someone on their way to onboarding.
   if (loading || roleLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px', color: '#64748B', background: '#F8FAFC' }}>
-        🔍 جاري التحقق من حالة الشركة...
-      </div>
-    )
+    return cloneElement(children, { gate: true })
   }
 
   if (isStaff) return children

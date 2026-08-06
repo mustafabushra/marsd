@@ -3,6 +3,7 @@ import { useNotifications } from './useNotifications'
 import NotificationItem from './NotificationItem'
 import Button from '../common/Button'
 import { Trash2, Check } from 'lucide-react'
+import { SkeletonPage, SkeletonTable } from '../Skeleton'
 
 export default function NotificationHistoryPage() {
   const {
@@ -153,15 +154,12 @@ export default function NotificationHistoryPage() {
 
       {/* Notifications List */}
       {loading && notifications.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '48px 24px',
-            color: '#6B7280',
-          }}
-        >
-          جاري تحميل الإشعارات...
-        </div>
+        (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
       ) : error ? (
         <div
           style={{

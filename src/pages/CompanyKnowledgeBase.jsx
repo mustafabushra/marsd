@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/knowledge-base/companies — the company registry, and where each row
@@ -68,7 +69,12 @@ export default function CompanyKnowledgeBase() {
 
   const untraced = companies.filter((c) => !c.contributor_tenant_id).length
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل المستودع...</div>
+  if (loading) return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
 
   return (
     <div>

@@ -186,6 +186,34 @@ const SELF_DESCRIBING = {
   whoami: 'تصف جلسة المُنادي نفسه؛ كلها فارغة بلا هوية',
 }
 
+/**
+ * Functions that publish to the open web on purpose.
+ *
+ * Different in kind from SELF_DESCRIBING: these do return other people's data,
+ * and are meant to. The exception is therefore narrower — the listed columns are
+ * the whole of what may cross, and anything else appearing in the response is
+ * treated as a leak even though the function is on this list. An allowlist that
+ * excuses a function forever is how a widened function stops being noticed.
+ */
+const PUBLISHED = {
+  public_partners: {
+    why: 'قائمة الشركاء على /partners — الظهور فيها إحدى مزايا الشراكة المعلنة (091)',
+    columns: ['name', 'sector', 'reports_approved', 'partner_since'],
+  },
+  public_plans: {
+    why: 'قائمة الأسعار على /pricing — سعر معلن لباقة معروضة للبيع (111)',
+    columns: ['plans', 'featureLabels'],
+    // The data is one level down, and a check that stopped at the top would be
+    // approving the word «plans» rather than what is inside it — an allowlist
+    // that excuses a function forever, which is the thing this file warns
+    // against two comments above.
+    inside: {
+      plans: ['code', 'name', 'description', 'priceMonthly',
+        'isDefault', 'giveToGet', 'limits', 'features'],
+    },
+  },
+}
+
 let leaked = 0
 let refused = 0
 let skipped = 0
@@ -228,6 +256,34 @@ for (const fn of fns) {
 
   // A 4xx is a refusal, which is the correct answer to an anonymous caller.
   if (status >= 400) { refused++; continue }
+
+  const published = PUBLISHED[fn.proname]
+  if (published) {
+    // Allowed to answer — but only with the columns it was allowed to publish.
+    const extra = [...new Set(
+      (Array.isArray(parsed) ? parsed : [parsed])
+        .filter((r) => r && typeof r === 'object')
+        .flatMap((r) => Object.keys(r)))]
+      .filter((k) => !published.columns.includes(k))
+
+    // And whatever the declared keys contain, when the payload is nested.
+    for (const [key, allowed] of Object.entries(published.inside || {})) {
+      const rows = (Array.isArray(parsed) ? parsed : [parsed])
+        .flatMap((r) => (Array.isArray(r?.[key]) ? r[key] : []))
+      for (const k of new Set(rows.flatMap((r) => Object.keys(r || {})))) {
+        if (!allowed.includes(k)) extra.push(`${key}.${k}`)
+      }
+    }
+
+    if (extra.length) {
+      leaked++
+      console.log(`  ❌ ${fn.proname}  — تنشر أعمدة خارج المسموح: ${extra.join('، ')}`)
+    } else {
+      refused++
+      console.log(`  ℹ️  ${fn.proname}  — منشورة عمداً · ${published.why}`)
+    }
+    continue
+  }
 
   if (leaks(parsed)) {
     leaked++

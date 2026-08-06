@@ -40,7 +40,11 @@ check('قراءة plans', !plans.error, plans.error?.message || `${plans.data?.l
 
 const free = (plans.data || []).find((p) => p.code === 'free')
 check('باقة free موجودة ومفعّلة', !!free?.active)
-check('free تحمل Give-to-Get', free?.give_to_get_enabled === true)
+// Since 095 this is true of every plan, not only free — earned points count
+// toward the allowance whatever the company is subscribed to.
+check('كل الباقات تحتسب النقاط',
+  (plans.data || []).every((p) => p.give_to_get_enabled),
+  (plans.data || []).filter((p) => !p.give_to_get_enabled).map((p) => p.code).join('، ') || 'لا استثناء')
 // The value, not a value. This asserted searches_per_month === 10 and started
 // failing the moment an operator changed it in the admin panel — which is what
 // the panel is for. A check that breaks when the product is used as designed
@@ -54,10 +58,21 @@ check('free لها حد بحث معرّف', Number.isFinite(freeSearches) && fre
 // were seeded and dormant; 037 gave companies a way to buy one, so a paid plan
 // being active is now the normal state. What still matters is that whatever is
 // offered is priced.
-const paid = (plans.data || []).filter((p) => p.code !== 'free')
+//
+// free and partner are not offered for sale: one is the default, the other is
+// granted by Marsad for contribution (090) and is zero-priced by design. Both
+// are excluded here and checked for the opposite below — a granted plan that
+// acquired a price would start being sold from the pricing page.
+const GRANTED = ['free', 'partner']
+const paid = (plans.data || []).filter((p) => !GRANTED.includes(p.code))
 check('الباقات المعروضة مُسعّرة',
   paid.filter((p) => p.active).every((p) => Number(p.price_monthly) > 0),
   `${paid.filter((p) => p.active).length} معروضة من ${paid.length}`)
+
+const granted = (plans.data || []).filter((p) => GRANTED.includes(p.code))
+check('الباقات الممنوحة بلا سعر',
+  granted.length > 0 && granted.every((p) => Number(p.price_monthly) === 0),
+  granted.map((p) => `${p.code}=${p.price_monthly}`).join('، ') || 'لا شيء')
 // Which feature belongs to which plan is asserted cell by cell in
 // verify-plan-matrix.mjs. Here the point is only that the paid plans were
 // seeded complete rather than switched off and left empty — this check named

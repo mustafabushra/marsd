@@ -5,6 +5,7 @@ import { getSupabase, searchCompaniesKnowledgeBase, trustScoreOf } from '../lib/
 import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
 import { FeatureGate } from '../components/LimitGate'
+import { SkeletonList } from '../components/Skeleton'
 
 // Fallback only. How many companies may be compared is a plan limit
 // (compare_items); this is what applies when a plan does not name one.
@@ -228,7 +229,7 @@ export default function Compare() {
             </div>
             <div style={{ padding: '14px 24px', overflowY: 'auto', flex: 1 }}>
               {addLoading ? (
-                <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>جاري البحث...</div>
+                <SkeletonList rows={4} />
               ) : addResults.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#64748B', padding: '24px', fontSize: '14px' }}>{addSearch.trim() ? 'لا توجد نتائج مطابقة' : 'اكتب اسم الشركة للبحث'}</div>
               ) : (

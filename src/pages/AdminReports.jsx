@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { creditsGrantedFor } from '../lib/entitlements'
 import { notifyTenant } from '../lib/notify'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 const CATEGORY_LABELS = { late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد', quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع', fraud: 'احتيال', other: 'أخرى' }
 const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي', late: 'متأخر', default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق' }
@@ -47,7 +48,6 @@ export default function AdminReports() {
         .limit(QUEUE_LIMIT)
 
       const rows = data || []
-      setReports(rows)
 
       // The record of the company that filed each report. A reviewer approving a
       // claim about a named business without knowing who made it cannot weigh it
@@ -70,10 +70,20 @@ export default function AdminReports() {
             total: Number(t.reports_total) || 0,
             approved: Number(t.reports_approved) || 0,
             rejected: Number(t.reports_rejected) || 0,
+            isPartner: !!t.is_partner,
           }
         })
         setReporterHistory(tally)
+
+        // Priority in review, which /partners has promised all along. It is an
+        // ordering and nothing more: a partner's report is reached sooner and
+        // judged by exactly the same rules. Within each group the queue stays in
+        // its original order, so nothing else about the list changes.
+        rows.sort((a, b) =>
+          (tally[b.reporter_tenant_id]?.isPartner ? 1 : 0)
+          - (tally[a.reporter_tenant_id]?.isPartner ? 1 : 0))
       }
+      setReports(rows)
       setSel(0)
     } catch (err) {
       console.error('Error fetching reports:', err)
@@ -187,7 +197,12 @@ export default function AdminReports() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري تحميل التقارير...</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   return (
@@ -246,7 +261,15 @@ export default function AdminReports() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>الشركة المُبلِّغة</div>
-                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A' }}>{current.reporter?.name || '—'}</div>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {current.reporter?.name || '—'}
+                          {h.isPartner && (
+                            <span title="تُراجَع تقاريرها أولاً — بنفس القواعد"
+                                  style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '3px 9px', fontSize: '11.5px', fontWeight: 800 }}>
+                              ★ شريك · أولوية مراجعة
+                            </span>
+                          )}
+                        </div>
                         {current.reporter?.cr_number && (
                           <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>سجل {current.reporter.cr_number}</div>
                         )}

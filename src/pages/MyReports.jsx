@@ -7,6 +7,7 @@ import { useSystemStatus } from '../hooks/useSystemStatus'
 import { canPerform } from '../utils/roles'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 export default function MyReports() {
   const { user } = useUser()
@@ -139,18 +140,12 @@ export default function MyReports() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '44px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>⏳</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#64748B' }}>جاري تحميل تقاريرك...</div>
-        </div>
-      </div>
+    (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
     )
   }
 
@@ -158,8 +153,6 @@ export default function MyReports() {
 
   return (
     <div>
-      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
-
       {/* Filters */}
       <div style={{ display: 'flex', gap: '9px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
         <LiveBadge connected={connected} liveAt={liveAt} />

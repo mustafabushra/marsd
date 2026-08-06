@@ -189,6 +189,77 @@ export default async function handler(req, res) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
 
+    // 3a) Inviting a COMPANY to take its own record — a different invitation
+    //     with the same delivery. Marsad's registry is mostly bulk-imported, so
+    //     most companies have never heard of their record and cannot be asked
+    //     for documents until somebody holds it.
+    //
+    //     The database side is invite_company(): it creates the empty tenant,
+    //     records the pending invite and refuses the cases that must not
+    //     proceed. This endpoint exists only because Clerk's secret cannot go to
+    //     the browser — so it authorizes, delegates, and sends the mail.
+    const companyId = String(body.company_id || '').trim()
+    if (companyId) {
+      const { data: caller, error: callerErr } = await supabase
+        .from('users').select('role').eq('id', callerId).single()
+      if (callerErr || caller?.role !== 'platform_admin') {
+        return res.status(403).json({ error: 'دعوة الشركات من صلاحيات إدارة مرصد' })
+      }
+
+      // Whether the tenant already existed decides what can be undone if the
+      // mail fails. Read before, because invite_company may create it.
+      const { data: priorTenant } = await supabase
+        .from('tenants').select('id').eq('company_id', companyId).maybeSingle()
+
+      // The identity does not travel with the call. This client holds the
+      // service role key, which is a JWT with no subject, so inside the function
+      // get_current_user_id() is null and is_platform_admin() is false — it
+      // refused the one caller that had already proved who it was.
+      //
+      // So the administrator verified above is named explicitly, and the
+      // function checks that name against the users table rather than trusting
+      // this endpoint. Holding the service key is not enough to invite anyone.
+      const { data: result, error: rpcErr } = await supabase.rpc('invite_company', {
+        p_company_id: companyId,
+        p_email: email,
+        p_note: typeof body.note === 'string' ? body.note : null,
+        p_actor_id: callerId,
+      })
+      if (rpcErr) return res.status(500).json({ error: rpcErr.message })
+      // The function answers with its own refusal rather than throwing.
+      if (!result?.ok) return res.status(409).json({ error: result?.reason || 'تعذّرت الدعوة' })
+
+      const origin = process.env.APP_URL || `https://${req.headers.host}`
+      await revokePendingClerkInvitations(email)
+      const resp = await clerkApi('/invitations', {
+        method: 'POST',
+        body: JSON.stringify({
+          email_address: email,
+          public_metadata: { tenant_id: result.tenant_id, role: 'company_admin' },
+          redirect_url: `${origin}/accept-invite`,
+          notify: true,
+          ignore_existing: true,
+        }),
+      })
+      const data = await resp.json().catch(() => ({}))
+
+      if (!resp.ok) {
+        // Nothing may survive an invitation that was never delivered — least of
+        // all an empty tenant, which would make the company read as claimed and
+        // silently stop every queue that chases it.
+        await supabase.from('pending_invites').delete().eq('id', result.invite_id)
+        if (!priorTenant?.id) {
+          await supabase.from('tenants').delete().eq('id', result.tenant_id)
+        }
+        const msg = data?.errors?.[0]?.long_message || data?.errors?.[0]?.message || 'تعذّر إرسال الدعوة'
+        return res.status(502).json({ error: msg })
+      }
+
+      return res.status(200).json({
+        emailSent: true, recorded: true, tenantId: result.tenant_id, email: result.email,
+      })
+    }
+
     // 3) Authorize: caller must be a company_admin, and we invite into HIS tenant.
     const { data: caller, error: callerErr } = await supabase
       .from('users').select('tenant_id, role').eq('id', callerId).single()

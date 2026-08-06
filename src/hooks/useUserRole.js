@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useUser } from '@clerk/react'
-import { getSupabase } from '../lib/api'
+import { useUserRecord } from './useUserRecord'
 
 /**
  * The signed-in user's role, from public.users — the only place that decides it.
@@ -13,11 +11,23 @@ import { getSupabase } from '../lib/api'
  * screens. Only the database enforces anything, so the database is what this
  * reads, and Clerk metadata is no longer consulted.
  *
- * The previous version fell back to 'owner' — a role that does not exist in the
+ * An earlier version fell back to 'owner' — a role that does not exist in the
  * schema — whenever the query failed, on the reasoning that it eased local
  * development. That is a permission check that grants permission when it cannot
  * tell: with RLS enabled a denied read is exactly the case it would hit. A role
- * that cannot be established is now null, and null grants nothing.
+ * that cannot be established is null, and null grants nothing.
+ *
+ * ============================================================================
+ * Why this is now a thin wrapper
+ * ============================================================================
+ * It ran its own `select role from users where id = …`, and useCompanyOnboarding
+ * ran `select tenant_id` against the same row as a second round trip, with its
+ * own loading gate. On login the two queued behind one another and each blanked
+ * the screen in turn — the wait after signing in was four fast requests in a
+ * line, not one slow one.
+ *
+ * useUserRecord fetches both columns once and shares the result. The shape
+ * returned here is unchanged, so nothing that reads a role had to change.
  */
 
 export const ROLES = {
@@ -28,47 +38,14 @@ export const ROLES = {
 }
 
 export function useUserRole() {
-  const { isLoaded, user } = useUser()
-  const [role, setRole] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { role, loading, error, refresh } = useUserRecord()
 
-  const load = useCallback(async () => {
-    if (!user?.id) {
-      setRole(null)
-      setLoading(false)
-      return
-    }
-    try {
-      const { data, error: dbError } = await getSupabase()
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-      if (dbError) throw dbError
-
-      setRole(data?.role || null)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to resolve user role:', err)
-      setError(err.message)
-      setRole(null)   // unknown is not privileged
-    } finally {
-      setLoading(false)
-    }
-  }, [user?.id])
-
-  useEffect(() => {
-    if (!isLoaded) return
-    load()
-  }, [isLoaded, load])
-
-  // A platform administrator runs Marsad. Company administration is a
-  // superset relationship, not a separate ladder: whoever may act on the
-  // platform may act within a company on it, which is what lets one account
-  // hold both jobs while the roles stay distinct.
+  // A platform administrator runs Marsad. Company administration is a superset
+  // relationship, not a separate ladder: whoever may act on the platform may act
+  // within a company on it, which is what lets one account hold both jobs while
+  // the roles stay distinct.
   const isPlatformAdmin = role === ROLES.PLATFORM_ADMIN
   const isCompanyAdmin = isPlatformAdmin || role === ROLES.COMPANY_ADMIN
 
-  return { role, loading, error, isPlatformAdmin, isCompanyAdmin, refresh: load }
+  return { role, loading, error, isPlatformAdmin, isCompanyAdmin, refresh }
 }

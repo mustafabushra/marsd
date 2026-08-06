@@ -1,4 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Suspense } from 'react'
+import DeferredSkeleton from './DeferredSkeleton'
+import { SkeletonPage } from './Skeleton'
 import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/react'
 import NotificationBell from './NotificationBell'
@@ -32,6 +35,19 @@ import {
 // and data changes. Naming it after one of its five contents hides the other
 // four.
 //
+// "إدارة الشركات" was "قائمة الشركات", which described the markup rather than
+// the work — and left two neighbouring entries whose names did not say how they
+// differed. They read one source, company_roster, through two lenses:
+//
+//   إدارة الشركات  — the registry as it stands. Who is listed, what the trust
+//                     score says, which accounts are suspended, and the actions
+//                     that change that.
+//   سجلّ الشركات    — the same companies ordered by what they are waiting on.
+//                     A queue, worked top to bottom until it is empty.
+//
+// Management goes first because it is the one you open when you already know
+// which company you want.
+//
 // Paths are still untouched. Only names and grouping move.
 
 const TOP_ITEMS = [
@@ -40,8 +56,8 @@ const TOP_ITEMS = [
 
 const GROUPS = [
   { key: 'companies', title: 'الشركات', items: [
+    { label: 'إدارة الشركات', path: '/admin/companies' },
     { label: 'سجلّ الشركات', path: '/admin/roster' },
-    { label: 'قائمة الشركات', path: '/admin/companies' },
     { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
   ] },
   { key: 'review', title: 'مركز المراجعة', items: [
@@ -66,6 +82,7 @@ const GROUPS = [
   { key: 'billing', title: 'الاشتراكات', items: [
     { label: 'الباقات', path: '/admin/plans' },
     { label: 'الاشتراكات', path: '/admin/subscriptions' },
+    { label: 'الشركاء', path: '/admin/partners' },
     { label: 'المدفوعات', path: '/admin/payments' },
   ] },
   { key: 'platform', title: 'المنصة', items: [
@@ -73,6 +90,7 @@ const GROUPS = [
     { label: 'المستخدمون', path: '/admin/users' },
     { label: 'حسابات الشركات', path: '/admin/tenants' },
     { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
+    { label: 'دليل الأنشطة', path: '/admin/activities' },
     { label: 'الإعدادات', path: '/admin/settings' },
     { header: 'المراقبة' },
     { label: 'السجلات', path: '/admin/logs', indent: true },
@@ -96,6 +114,8 @@ const SCREEN_LABELS = {
   '/admin/admin-users': 'مسؤولو المنصة',
   '/admin/plans': 'إدارة الباقات',
   '/admin/payments': 'المدفوعات والاشتراكات',
+  '/admin/partners': 'برنامج الشركاء',
+  '/admin/activities': 'دليل الأنشطة الاقتصادية',
   '/admin/settings': 'الإعدادات',
   '/admin/report-analytics': 'تحليلات التقارير',
   '/admin/tenant-analytics': 'تحليلات الشركات',
@@ -278,12 +298,41 @@ export default function AdminShell({ user }) {
       {/* Main */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 30 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Same three-column header as the company shell — `1fr auto 1fr` centres
+            the search by construction and pins each side to its own edge. Two
+            shells that put the same control in two different places is one
+            product that behaves like two. */}
+        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
             <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>{currentLabel}</div>
-            <span style={{ background: '#F5F3FF', color: '#7C3AED', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800 }}>وضع المسؤول</span>
+            <span style={{ background: '#F5F3FF', color: '#7C3AED', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800, flex: 'none' }}>وضع المسؤول</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+
+          {/* A keyboard shortcut nobody knows about is a shortcut nobody uses.
+              Clickable as well as advertised, because not everyone reaches for
+              the keyboard — and on a touch screen there is no Ctrl at all. */}
+          <button
+            onClick={() => window.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            title="ابحث أو نفّذ أمراً"
+            style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC',
+                     border: '1px solid #E2E8F0', borderRadius: '11px', padding: '12px 18px',
+                     cursor: 'pointer', fontFamily: 'inherit', color: '#64748B', fontSize: '14px',
+                     fontWeight: 600, width: 'min(520px, 100%)', minWidth: '340px' }}>
+            <span style={{ flex: 'none' }}>🔍</span>
+            <span style={{ flex: 1, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              ابحث عن شركة أو نفّذ أمراً…
+            </span>
+            <kbd style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '5px',
+                          padding: '1px 6px', fontSize: '10.5px', fontWeight: 800, direction: 'ltr',
+                          color: '#94A3B8', flex: 'none' }}>
+              Ctrl K
+            </kbd>
+          </button>
+
+          {/* justifySelf pins the bell and the avatar to the corner of the
+              header, whatever the title beside them does. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', justifySelf: 'end' }}>
             <NotificationBell />
             <UserButton
               afterSignOutUrl="/"
@@ -294,7 +343,13 @@ export default function AdminShell({ user }) {
 
         {/* Content */}
         <main id="main" style={{ padding: '28px 32px', flex: 1 }}>
-          <Outlet />
+          {/* The boundary lives here, not around <Routes>. Around the routes it
+              took the sidebar and header down on every navigation and rebuilt
+              them — the page appeared to reload when only its content had
+              changed. */}
+          <Suspense fallback={<DeferredSkeleton><SkeletonPage /></DeferredSkeleton>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

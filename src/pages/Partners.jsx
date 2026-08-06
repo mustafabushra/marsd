@@ -1,6 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/react'
+import { getSupabase } from '../lib/api'
+
+/**
+ * /partners — the partner programme, as it actually exists.
+ *
+ * This page used to render four partner companies from a hardcoded array of
+ * invented names, sectors and report counts, and its form called
+ * setSubmitted(true) and wrote nothing anywhere. A company could read the terms,
+ * apply, be thanked, and leave no trace — Marsad had no way to know anyone had
+ * ever asked.
+ *
+ * Both are real now. The list is whoever holds an active partner subscription,
+ * and applying records an application with a snapshot of the applicant's
+ * contribution at that moment.
+ *
+ * Applying requires being signed in as a company: the entry requirements are
+ * counts of contribution, and nobody without an account can have any. It also
+ * keeps the anonymous-write surface closed.
+ */
 
 export default function Partners() {
+  const navigate = useNavigate()
+  const { isSignedIn } = useUser()
   const [formData, setFormData] = useState({
     company: '',
     contact: '',
@@ -10,13 +33,32 @@ export default function Partners() {
   })
 
   const [submitted, setSubmitted] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [partners, setPartners] = useState([])
 
-  const partners = [
-    { name: 'شركة نجد للمقاولات', logo: 'ن', sector: 'مقاولات', reports: 450, joinDate: '2026-01-15', color: '#16A34A' },
-    { name: 'الرياض للتجارة', logo: 'ر', sector: 'تجارة', reports: 380, joinDate: '2026-02-20', color: '#1E2A52' },
-    { name: 'الخليج للخدمات', logo: 'خ', sector: 'خدمات', reports: 520, joinDate: '2025-11-10', color: '#16A34A' },
-    { name: 'الشرق للتوريد', logo: 'ش', sector: 'توريد', reports: 290, joinDate: '2026-03-05', color: '#1E2A52' },
-  ]
+  // Real partners, or an empty section. Showing invented ones was the whole
+  // problem: the page was evidence of a programme that did not exist.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await getSupabase().rpc('public_partners')
+        if (cancelled) return
+        // Shaped here so the cards below stay exactly as they were: the colour
+        // and the initial are presentation, not data worth storing.
+        setPartners((data || []).map((p, i) => ({
+          name: p.name,
+          sector: p.sector,
+          reports: p.reports_approved,
+          joinDate: p.partner_since,
+          logo: (p.name || '؟').charAt(0),
+          color: i % 2 ? '#1E2A52' : '#16A34A',
+        })))
+      } catch { /* the section simply does not render */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const requirements = [
     { number: '01', title: 'حد أدنى من الإسهام', desc: '1000+ شركة مضافة أو 500+ تقرير معتمد سنوياً' },
@@ -29,7 +71,10 @@ export default function Partners() {
     { title: 'اشتراك مجاني سنوي', desc: 'اشتراك مجاني كامل لمدة 12 شهر' },
     { title: 'شعار الشركة على المنصة', desc: 'ظهور شعار شركتك في صفحة الشركاء المختارة' },
     { title: 'تقارير غير محدود', desc: 'رفع عدد غير محدود من التقارير' },
-    { title: '100 بحث شهرياً', desc: '100 عملية بحث عن الشركات كل شهر' },
+    // What the plan actually grants is 100 *company reports opened* a month.
+    // Searching is unlimited and always was. Promising "100 searches" on a public
+    // page understates the benefit and misdescribes the limit at the same time.
+    { title: '100 تقرير شركة شهرياً', desc: 'فتح تقرير الثقة الكامل لـ100 شركة كل شهر — والبحث بلا حدود' },
     { title: 'أولوية في المراجعة', desc: 'أولوية عالية وسريعة في مراجعة التقارير' },
     { title: 'شارة الشراكة', desc: 'شارة "شريك مرصد المعتمد" على ملفك' },
   ]
@@ -41,10 +86,35 @@ export default function Partners() {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 4000)
+    setFormError('')
+
+    // The requirements are counts of contribution, so an applicant necessarily
+    // already has an account. Sending them to sign in is the honest answer, not
+    // a thank-you for a form that goes nowhere.
+    if (!isSignedIn) {
+      navigate('/login?next=/partners')
+      return
+    }
+
+    try {
+      setBusy(true)
+      const { data, error } = await getSupabase().rpc('apply_for_partnership', {
+        p_note: formData.message || null,
+        p_contact_name: formData.contact || null,
+        p_contact_email: formData.email || null,
+        p_contact_phone: formData.phone || null,
+      })
+      if (error) throw error
+      if (!data?.ok) { setFormError(data?.reason || 'تعذّر إرسال الطلب'); return }
+
+      setSubmitted(true)
+      setFormData({ company: '', contact: '', email: '', phone: '', message: '' })
+      setTimeout(() => setSubmitted(false), 6000)
+    } catch (err) {
+      setFormError(err?.message || 'تعذّر إرسال الطلب')
+    } finally { setBusy(false) }
   }
 
   return (
@@ -414,6 +484,12 @@ export default function Partners() {
             gridTemplateColumns: 'repeat(2, 1fr)',
             gap: '28px'
           }}>
+            {partners.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '15px', fontWeight: 700, lineHeight: 1.9 }}>
+                لم يُعتمد شركاء بعد.<br />
+                <span style={{ fontSize: '14px', fontWeight: 600 }}>الشروط أدناه، والتقديم مفتوح للشركات المسهمة في بناء السجل.</span>
+              </div>
+            )}
             {partners.map((partner, i) => (
               <div
                 key={i}
@@ -705,11 +781,18 @@ export default function Partners() {
               />
             </div>
 
+            {formError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '10px', padding: '13px 16px', marginBottom: '14px', fontSize: '14px', fontWeight: 700, lineHeight: 1.7 }}>
+                {formError}
+              </div>
+            )}
+
             <button
               type="submit"
+              disabled={busy}
               style={{
                 width: '100%',
-                background: '#16A34A',
+                background: busy ? '#86EFAC' : '#16A34A',
                 color: '#fff',
                 border: 0,
                 borderRadius: '10px',
@@ -722,7 +805,7 @@ export default function Partners() {
               onMouseEnter={e => e.target.style.opacity = '0.92'}
               onMouseLeave={e => e.target.style.opacity = '1'}
             >
-              إرسال الطلب
+              {busy ? 'جارٍ الإرسال…' : (isSignedIn ? 'إرسال الطلب' : 'سجّل الدخول للتقديم')}
             </button>
           </form>
         ) : (

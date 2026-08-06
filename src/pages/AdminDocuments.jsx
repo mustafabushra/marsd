@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { notifyTenant } from '../lib/notify'
+import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 
 /**
  * /admin/documents — Marsad verifies what companies supply, and records what
@@ -193,7 +194,12 @@ export default function AdminDocuments() {
   const flagged = companies.filter((c) => c.official_status && c.official_status !== 'none')
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', minHeight: '40vh', alignItems: 'center', color: '#64748B', fontWeight: 600 }}>جاري التحميل…</div>
+    return (
+      <>
+        <SkeletonPage stats={0} panels={0} />
+        <SkeletonTable rows={7} cols={4} />
+      </>
+    )
   }
 
   return (

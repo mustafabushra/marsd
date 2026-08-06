@@ -1,6 +1,8 @@
 import { useCallback, useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
+import DeferredSkeleton from '../components/DeferredSkeleton'
+import { SkeletonPage } from '../components/Skeleton'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 
@@ -91,7 +93,11 @@ export default function AdminSystemHealth() {
   })
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#64748B', fontWeight: 600 }}>جاري فحص النظام...</div>
+    return (
+      <DeferredSkeleton>
+        <SkeletonPage stats={4} panels={2} />
+      </DeferredSkeleton>
+    )
   }
 
   if (error || !health) {

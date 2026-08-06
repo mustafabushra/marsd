@@ -9,14 +9,19 @@
  * could not tell a broken stream from a correctly filtered one, which is the
  * only distinction that matters here.
  *
- * The discriminator is a table an anonymous caller may read. companies is public
- * by policy, so:
+ * The discriminator is a table an anonymous caller may read. That used to be
+ * companies — until 059 closed the registry to signed-out visitors, after which
+ * RLS filtered the stream correctly and this probe read that as "realtime is
+ * off". It had drifted into the exact mistake described above.
  *
- *   companies delivers, watchlist_items does not  → working, and RLS is holding
- *   neither delivers                              → realtime is off or blocked
- *   watchlist_items delivers                      → RLS is NOT applied to the
- *                                                   stream, and every company's
- *                                                   activity is visible to anyone
+ * plans is the control now: its select policy is `true` because the pricing page
+ * is public, and it is in the supabase_realtime publication.
+ *
+ *   plans delivers, watchlist_items does not  → working, and RLS is holding
+ *   neither delivers                          → realtime is off or blocked
+ *   watchlist_items delivers                  → RLS is NOT applied to the
+ *                                               stream, and every company's
+ *                                               activity is visible to anyone
  *
  * The third outcome is a security finding, not a performance one, which is why
  * this checks for it rather than only for absence.
@@ -43,7 +48,7 @@ const db = new pg.Client({
   ssl: { rejectUnauthorized: false },
 })
 
-const seen = { companies: 0, watchlist_items: 0 }
+const seen = { plans: 0, watchlist_items: 0 }
 
 const channel = sb.channel('probe-realtime')
 for (const table of Object.keys(seen)) {
@@ -67,20 +72,39 @@ if (status !== 'SUBSCRIBED') {
 await db.connect()
 
 // A no-op update still produces a change event; the point is the delivery path,
-// not the diff. Both statements are rolled back.
-await db.query('begin')
-await db.query('update public.companies set name = name where id = (select id from public.companies limit 1)')
-await db.query('update public.watchlist_items set list_name = list_name')
-await db.query('commit')
+// not the diff.
+const poke = async () => {
+  await db.query('begin')
+  await db.query('update public.plans set code = code')
+  await db.query('update public.watchlist_items set list_name = list_name')
+  await db.query('commit')
+}
 
-await new Promise((r) => setTimeout(r, 6000))
+// Wait for the event, not for the clock, and try twice.
+//
+// A fixed six-second sleep passed alone and failed inside the full suite. Waiting
+// on the condition fixed most of it and it still missed once in a long sequential
+// run — the socket is subscribed but the first batch does not arrive. Two
+// attempts separate a transient miss from a stream that is actually down, which
+// is the distinction this probe exists to make. A probe that cries wolf gets
+// ignored, and an ignored probe is worse than no probe.
+for (let attempt = 1; attempt <= 2 && seen.plans === 0; attempt++) {
+  if (attempt > 1) console.log('  … لم يصل شيء في المحاولة الأولى، إعادة المحاولة')
+  await poke()
+  for (let waited = 0; waited < 20000 && seen.plans === 0; waited += 500) {
+    await new Promise((r) => setTimeout(r, 500))
+  }
+}
+// A moment more, so a leak on the protected table has the same chance to show up
+// as the delivery it is being compared against.
+await new Promise((r) => setTimeout(r, 1500))
 
-console.log(`  أحداث companies (عام):        ${seen.companies}`)
+console.log(`  أحداث plans (عام):            ${seen.plans}`)
 console.log(`  أحداث watchlist_items (محميّ): ${seen.watchlist_items}`)
 console.log('')
 
 let failures = 0
-if (seen.companies > 0) {
+if (seen.plans > 0) {
   console.log('  ✅ البث يعمل من طرف إلى طرف')
 } else {
   console.log('  ❌ لا يصل شيء حتى من جدول عام — البث معطّل على المشروع')
