@@ -287,3 +287,205 @@ p {
     min-width: 0 !important;
   }
 }
+
+/* --- Touch targets ------------------------------------------------------- */
+/* Measured, not assumed: at 320–412px the sign-up button rendered 42px tall and
+   Clerk's social buttons 34px. 44px is the smallest a finger reliably hits, and
+   a control that needs a second attempt is a control that gets abandoned.
+   min-height rather than height, so a button with two lines of Arabic still
+   grows. */
+@media (max-width: 720px) {
+  button,
+  select,
+  [role="button"],
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+    min-height: 44px;
+  }
+
+  /* Clerk renders its own controls and does not take our styles; these are the
+     class names it ships. Without this the only way into the product is a row
+     of 34px buttons. */
+  .cl-socialButtonsBlockButton,
+  .cl-formButtonPrimary,
+  .cl-formFieldInput,
+  .cl-footerActionLink {
+    min-height: 44px !important;
+  }
+}
+
+/* --- A rule that was removed, and why -------------------------------------
+   `section { overflow-x: clip }` was added here to stop a 400px decorative
+   pattern reaching -80px on a 320px screen. It was wrong twice over.
+
+   The pattern was already inside a section carrying `position: relative;
+   overflow: hidden` — it was clipped all along, and what actually needed
+   fixing was the measurement: getBoundingClientRect reports a box whether or
+   not an ancestor clips it, so the audit was reporting something invisible.
+
+   Worse, the rule blinded both the reader and the audit. Any table or row that
+   genuinely overflowed inside a section would have been silently cut off —
+   content gone, no scrollbar, nothing to notice — and the audit, which skips
+   anything an ancestor clips, would have called the page clean. A fix that
+   hides the fault it was meant to reveal is worse than the fault.        */
+
+/* --- Dialogs on a phone --------------------------------------------------- */
+/* A dialog written as a centred card at a fixed width, or a side drawer at
+   480px, does not fit a 320px screen: it either overflows or shrinks its own
+   content into a column two words wide. On a phone the pattern that works is a
+   sheet — full width, anchored to the bottom, sized to its content up to most
+   of the screen, and scrolling inside itself rather than moving the page.
+
+   Matched on what React renders. Inline styles cannot carry a media query, and
+   these dialogs are inline-styled; a class on each would be the better shape
+   and is the next step, but this reaches all of them today. */
+@media (max-width: 720px) {
+  /* Side drawers: pinned to an edge, full height. */
+  [style*="position: fixed"][style*="top: 0"][style*="bottom: 0"] {
+    inset-inline: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    top: auto !important;
+    max-height: 88vh;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  /* Centred modals: the box inside a full-screen scrim. */
+  [style*="position: fixed"][style*="inset: 0"] > div:not(.marsad-scrim) {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh;
+    overflow-y: auto;
+    margin: auto 0 0 !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  /* The grab area at the top of a sheet: nothing to tap, but it tells a thumb
+     where the sheet begins. */
+  [style*="position: fixed"][style*="top: 0"][style*="bottom: 0"]::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 10px auto 2px;
+    border-radius: 999px;
+    background: #CBD5E1;
+  }
+}
+
+/* --- Tables become cards -------------------------------------------------- */
+/* A four-column table across 320px gives each column eighty pixels, and Arabic
+   does not wrap usefully in eighty. Sideways scrolling keeps the columns but
+   hides half the row behind a gesture nobody is told about.
+
+   So on a phone each row becomes a card: the header row is removed, the grid
+   collapses to one column, and every cell carries its own label. The label
+   comes from `data-label` on the cell — a table without them still reads, but
+   as a list of unlabelled values, which is why the ones users see most carry
+   them. */
+@media (max-width: 720px) {
+  .marsad-table {
+    overflow-x: visible !important;
+  }
+
+  .marsad-table > * {
+    min-width: 0 !important;
+  }
+
+  /* The header row: its labels move onto the cells. */
+  .marsad-table [data-table-head] {
+    display: none !important;
+  }
+
+  .marsad-table [data-table-row] {
+    display: block !important;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    margin: 0 0 10px;
+    padding: 14px 16px !important;
+    background: #fff;
+  }
+
+  .marsad-table [data-table-row] > * {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    text-align: start;
+  }
+
+  .marsad-table [data-table-row] > *:not(:last-child) {
+    border-bottom: 1px solid #F8FAFC;
+  }
+
+  .marsad-table [data-table-row] > *[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 12px;
+    font-weight: 800;
+    color: #94A3B8;
+  }
+}
+
+/* --- The visitor header on a phone ---------------------------------------- */
+/* Five nav links, a logo and two buttons across 320px. With `flex-wrap: wrap`
+   above they wrapped onto three lines inside a bar fixed at 70px, and the
+   overflow landed on top of the page heading — the exact overlap the wrapping
+   was added to prevent elsewhere. A screenshot showed it; no measurement of
+   width or overflow could have, because nothing was wider than the screen.
+
+   So the bar stops being a fixed height and becomes a stack: brand and account
+   buttons on one row, the links on a scrolling strip beneath. Every link stays
+   reachable, and nothing sits on top of anything. */
+@media (max-width: 900px) {
+  /* Every level has to be told it may be narrower than its contents. A flex
+     item defaults to `min-width: auto`, so the bar sized itself to the nav, the
+     nav sized itself to the bar, and the pair settled at 410px inside a 292px
+     box — pushing the whole document to 438px on every route. Fixing only the
+     nav did nothing, because the chain re-formed one level up. */
+  .marsad-navbar-inner > *,
+  .marsad-navbar-brand > * {
+    min-width: 0 !important;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .marsad-navbar-inner {
+    min-width: 0;
+    height: auto !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px;
+    padding: 12px 14px !important;
+  }
+
+  .marsad-navbar-brand {
+    min-width: 0;
+    justify-content: space-between;
+    gap: 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* One line, scrolled rather than wrapped: five wrapped links push the
+     account buttons down the page on every screen. */
+  .marsad-navbar-links {
+    /* Without `min-width: 0` a flex item never shrinks below its content, so an
+       `overflow-x: auto` strip simply grows to 410px and takes the page with it
+       — the whole document scrolled to 438px on every route. The scroll has to
+       happen inside the strip, and that needs permission to be narrower than
+       what it holds. */
+    min-width: 0 !important;
+    max-width: 100%;
+    width: 100%;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 18px !important;
+    padding-bottom: 2px;
+  }
+
+  .marsad-navbar-links::-webkit-scrollbar { display: none; }
+  .marsad-navbar-links > * { flex: none; white-space: nowrap; }
+}

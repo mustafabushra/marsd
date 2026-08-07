@@ -18,7 +18,7 @@ export default function ClerkNavBar() {
       background: '#fff',
       borderBottom: '1px solid #E2E8F0'
     }}>
-      <div style={{
+      <div className="marsad-navbar-inner" style={{
         maxWidth: '1200px',
         margin: '0 auto',
         padding: '0 28px',
@@ -28,7 +28,7 @@ export default function ClerkNavBar() {
         justifyContent: 'space-between'
       }}>
         {/* Logo & Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '38px' }}>
+        <div className="marsad-navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '38px' }}>
           <div
             onClick={() => navigate('/')}
             style={{ display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer' }}
@@ -47,7 +47,7 @@ export default function ClerkNavBar() {
             <span style={{ fontWeight: 900, fontSize: '23px', color: '#1E2A52', letterSpacing: '-0.5px' }}>مرصد</span>
           </div>
 
-          <nav style={{ display: 'flex', gap: '28px' }}>
+          <nav className="marsad-navbar-links" style={{ display: 'flex', gap: '28px' }}>
             {[
               { label: 'الرئيسية', path: '/' },
               { label: 'عن المنصة', path: '/about' },

@@ -178,9 +178,12 @@ export default function MyCompanies() {
           </button>
         </div>
       ) : (
-        <div style={{ ...card, overflowX: 'auto' }}>
+        <div className="marsad-table" style={{ ...card, overflowX: 'auto' }}>
+          {/* Six columns on a desktop, a card per company on a phone: the
+              stylesheet reads marsad-table with the data-attributes below. Six
+              columns across 320px is fifty pixels each. */}
           <div style={{ minWidth: '720px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 1fr 1fr 0.9fr', padding: '14px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12.5px', fontWeight: 800, color: '#64748B' }}>
+            <div data-table-head style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 1fr 1fr 0.9fr', padding: '14px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12.5px', fontWeight: 800, color: '#64748B' }}>
               <span>الشركة</span><span>السجل التجاري</span><span>القطاع</span><span>المدينة</span><span>تاريخ الإرسال</span><span>الحالة</span>
             </div>
             {items.map((r) => {
@@ -188,15 +191,16 @@ export default function MyCompanies() {
               return (
                 <div
                   key={r.id}
+                  data-table-row
                   onClick={() => r.exists && navigate(`/trust-report/${r.id}`)}
                   style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 1fr 1fr 0.9fr', padding: '14px 22px', borderBottom: '1px solid #F1F5F9', alignItems: 'center', cursor: r.exists ? 'pointer' : 'default', gap: '8px' }}
                 >
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{r.name}</span>
-                  <span style={{ fontSize: '13px', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{r.crNumber}</span>
-                  <span style={{ fontSize: '13px', color: '#64748B' }}>{r.sector}</span>
-                  <span style={{ fontSize: '13px', color: '#64748B' }}>{r.city}</span>
-                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.filedAt}</span>
-                  <span>
+                  <span data-label="الشركة" style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{r.name}</span>
+                  <span data-label="السجل التجاري" style={{ fontSize: '13px', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{r.crNumber}</span>
+                  <span data-label="القطاع" style={{ fontSize: '13px', color: '#64748B' }}>{r.sector}</span>
+                  <span data-label="المدينة" style={{ fontSize: '13px', color: '#64748B' }}>{r.city}</span>
+                  <span data-label="تاريخ الإرسال" style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.filedAt}</span>
+                  <span data-label="الحالة">
                     <span style={{ background: s.bg, color: s.fg, borderRadius: '7px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap' }}>{s.label}</span>
                   </span>
                 </div>

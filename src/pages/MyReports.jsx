@@ -183,10 +183,11 @@ export default function MyReports() {
         })}
       </div>
 
-      {/* Table.
-          `marsad-table` is what lets it scroll sideways on a phone instead of
-          squeezing four columns into 360px. A table stays readable by keeping
-          its columns; only forms and card grids are better stacked. */}
+      {/* Table on a desktop, cards on a phone.
+          `marsad-table` plus the data-attributes below are what the stylesheet
+          reads: under 720px the header row goes, each row becomes a card, and
+          every cell prints the label the header used to carry. Four columns of
+          Arabic across 320px gives each about eighty pixels. */}
       <div className="marsad-table" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: '48px 32px', textAlign: 'center' }}>
@@ -204,7 +205,12 @@ export default function MyReports() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr 1fr', padding: '15px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
+            {/* data-table-head / data-table-row / data-label are read by the
+                stylesheet: below 720px the header is removed, each row becomes
+                a card, and every cell prints its own label. A phone cannot show
+                four columns of Arabic, and scrolling sideways hides half the
+                row behind a gesture nobody is told about. */}
+            <div data-table-head style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr 1fr', padding: '15px 22px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
               <span>الشركة المُبلَّغ عنها</span>
               <span>تاريخ الإرسال</span>
               <span>قيمة التعامل</span>
@@ -213,6 +219,7 @@ export default function MyReports() {
             {filtered.map((r) => (
               <div
                 key={r.id}
+                data-table-row
                 onClick={() => handleOpenDrawer(r)}
                 style={{
                   display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr 1fr',
@@ -221,10 +228,10 @@ export default function MyReports() {
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = '#fff' }}>
-                <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{r.company}</span>
-                <span style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>{r.date}</span>
-                <span style={{ fontSize: '14px', color: '#334155', fontWeight: 700 }}>{(r.value || '').substring(0, 25)}{(r.value || '').length > 25 ? '…' : ''}</span>
-                <span><span style={{ background: r.st.bg, color: r.st.c, borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>{r.st.label}</span></span>
+                <span data-label="الشركة" style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{r.company}</span>
+                <span data-label="تاريخ الإرسال" style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>{r.date}</span>
+                <span data-label="قيمة التعامل" style={{ fontSize: '14px', color: '#334155', fontWeight: 700 }}>{(r.value || '').substring(0, 25)}{(r.value || '').length > 25 ? '…' : ''}</span>
+                <span data-label="الحالة"><span style={{ background: r.st.bg, color: r.st.c, borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>{r.st.label}</span></span>
               </div>
             ))}
           </>

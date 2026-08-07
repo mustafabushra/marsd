@@ -26,3 +26,4 @@ marsad-staging.bundle
 !.env.clerk.example
 !.env.docker.dev
 !.env.docker.prod
+mobile-shots/
