@@ -311,7 +311,7 @@ export default function AdminShell({ user }) {
             the search by construction and pins each side to its own edge. Two
             shells that put the same control in two different places is one
             product that behaves like two. */}
-        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', height: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
+        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', minHeight: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
           <div className="marsad-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
             {/* Shown only where the sidebar is an overlay. */}
             <button
@@ -334,7 +334,7 @@ export default function AdminShell({ user }) {
           {/* A keyboard shortcut nobody knows about is a shortcut nobody uses.
               Clickable as well as advertised, because not everyone reaches for
               the keyboard — and on a touch screen there is no Ctrl at all. */}
-          <button
+          <button className="marsad-command-button"
             onClick={() => window.dispatchEvent(
               new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
             title="ابحث أو نفّذ أمراً"

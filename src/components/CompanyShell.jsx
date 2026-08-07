@@ -250,7 +250,7 @@ export default function CompanyShell({ user, gate = false }) {
           background: '#fff',
           borderBottom: '1px solid #E2E8F0',
           padding: '0 32px',
-          height: '68px',
+          minHeight: '68px',
           // A three-column grid rather than a flex row.
           //
           // Flex splits what is left over, so the centre column is only truly
@@ -295,7 +295,7 @@ export default function CompanyShell({ user, gate = false }) {
 
               Still a button, not only a shortcut: there is no Ctrl on a phone,
               and a keyboard shortcut nobody is told about is one nobody uses. */}
-          <button
+          <button className="marsad-command-button"
             onClick={() => window.dispatchEvent(
               new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
             title="ابحث عن شركة أو نفّذ أمراً"

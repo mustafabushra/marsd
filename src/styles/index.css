@@ -294,7 +294,10 @@ p {
    a control that needs a second attempt is a control that gets abandoned.
    min-height rather than height, so a button with two lines of Arabic still
    grows. */
-@media (max-width: 720px) {
+/* 1024, not 720: a tablet is a touch device too, and at 768 and 820 the sign-up
+   button went back to 42px and Clerk's to 34. A finger is the same size on an
+   iPad. */
+@media (max-width: 1024px) {
   button,
   select,
   [role="button"],
@@ -488,4 +491,51 @@ p {
 
   .marsad-navbar-links::-webkit-scrollbar { display: none; }
   .marsad-navbar-links > * { flex: none; white-space: nowrap; }
+}
+
+/* --- The signed-in header on a phone -------------------------------------- */
+/* Reported from a real phone, with a screenshot: the bell, the avatar and the
+   command box were sitting on top of the page's own search field, and the
+   header text was cut.
+
+   Same shape as the visitor bar. A three-column grid — title / command box /
+   account — inside a bar fixed at 68px. Below 720px the grid collapses to one
+   column (the rule further up), the three rows need about 150px, and the bar
+   still claimed 68: everything past the first row landed on the content.
+   `height` became `min-height` in both shells; these rules make the row work.
+
+   The command box goes. It is a desktop affordance — it says «Ctrl K», and a
+   phone has no Ctrl — and every screen that needs search has its own field.
+   Removing it takes the title, the menu and the account back to one clean
+   row. */
+@media (max-width: 900px) {
+  #main + *, header {
+    row-gap: 0;
+  }
+
+  header .marsad-command-button { display: none !important; }
+
+  /* Two columns, not three: the menu and title on one side, the account on the
+     other. The stacked single column left the avatar under the title with a
+     gap the width of the screen. */
+  header[style*="grid-template-columns"] {
+    grid-template-columns: 1fr auto !important;
+    gap: 10px !important;
+    padding: 10px 14px !important;
+    min-height: 0 !important;
+  }
+}
+
+/* The overlay has to be above the header, which is sticky and carries its own
+   stacking context. Without this the bell and the avatar float over the open
+   menu — visible in the screenshot, and unreachable either way. */
+@media (max-width: 1024px) {
+  .marsad-sidebar { z-index: 120 !important; }
+  .marsad-scrim { z-index: 119 !important; }
+
+  /* 268px of a 320px screen leaves the page a sliver. The panel takes most of
+     the width and stops, so there is always somewhere to tap to close it. */
+  .marsad-sidebar {
+    width: min(300px, 86vw) !important;
+  }
 }

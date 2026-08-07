@@ -7,7 +7,9 @@
  * up with — all of which exist only after layout. So this opens a real Chromium
  * at each width and asks the page itself.
  *
- * Four widths, because those are the phones people actually hold:
+ * Seven widths: four phones, then 480, 768 and 820 — a large phone in landscape
+ * and the two tablet sizes, which are touch devices and were dropping back to
+ * 34px targets the moment the phone rules stopped applying.
  *   320  the narrowest still in use (iPhone SE, older Android)
  *   375  iPhone SE 2/3, iPhone 12 mini
  *   390  iPhone 12–15
@@ -28,7 +30,7 @@ import { mkdirSync } from 'node:fs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://localhost:4173'
 const SHOTS = process.argv.includes('--shots')
-const WIDTHS = [320, 375, 390, 412]
+const WIDTHS = [320, 375, 390, 412, 480, 768, 820]
 
 // Public routes: everything reachable without an account. The rest sit behind
 // Clerk, and a harness that fakes a session tests the fake.
@@ -305,5 +307,5 @@ for (const width of WIDTHS) {
 await browser.close()
 console.log(failures
   ? `  ❌ ${failures} من ${summary.length} فحص فيه مشكلة\n`
-  : `  ✅ ${summary.length} فحصاً على 4 عروض — لا تمرير أفقي، ولا خروج، ولا قص، ولا زر صغير\n`)
+  : `  ✅ ${summary.length} فحصاً على ${WIDTHS.length} عروض — لا تمرير أفقي، ولا خروج، ولا قص، ولا زر صغير\n`)
 process.exit(failures ? 1 : 0)
