@@ -184,8 +184,14 @@ export default function CompanyRegister() {
         lastName: user.lastName
       })
 
-      // Success - redirect to dashboard
-      navigate('/dashboard')
+      // Registered, not admitted.
+      //
+      // This went to /dashboard, which was honest while registration activated
+      // the account on the spot. It no longer does, and sending somebody to a
+      // dashboard they are not yet allowed to see would bounce them through
+      // CompanyStatusRouter to the waiting screen — arriving there as though
+      // something had gone wrong, rather than because their turn had not come.
+      navigate('/registration-pending', { replace: true })
     } catch (err) {
       const errorMsg = err.message || 'حدث خطأ غير متوقع'
       setErrorWithTimeout(errorMsg)

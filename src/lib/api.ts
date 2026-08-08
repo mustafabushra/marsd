@@ -676,9 +676,28 @@ export async function createTenantAndUser(userId: string, companyData: any) {
         officialEmail: companyData.email,
         unifiedNumber: companyData.unifiedNumber,
         source: COMPANY_SOURCE.COMMUNITY,
-        status: companyData.status,
+        // A new registration waits for a person to look at it.
+        //
+        // This was `approved: true` with whatever status the form supplied, so
+        // anyone who completed the sign-up form was inside the product a second
+        // later: filing reports, reading trust reports, appearing to the market
+        // as a verified account. Nobody at Marsad saw the commercial
+        // registration they uploaded before any of that.
+        //
+        // `/registration-pending` and `/account-pending` were both written and
+        // both routed, and neither could be reached, because nothing was ever
+        // pending. The screens were not missing — the state they describe was.
+        //
+        // The reviewer's side already exists: /admin/requests lists companies
+        // where `approved` is false and sets `approved: true, status: 'active'`
+        // on approval. So this is the half that was absent, not a new workflow.
+        //
+        // Existing accounts are untouched. Their companies are already approved,
+        // and suspending a working account is not something to do by side
+        // effect of a code change.
+        status: COMPANY_STATUS.PENDING,
         crFileUrl: companyData.crFileUrl || null,
-        approved: true,
+        approved: false,
       })])
       .select('id')
       .single()
