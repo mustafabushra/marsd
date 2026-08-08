@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser } from '@clerk/react'
+import PhoneHandoff from './PhoneHandoff'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
@@ -55,6 +56,8 @@ export default function CompanyDocumentsSection() {
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(null)
   const [openRow, setOpenRow] = useState(null)
+  // Which document, if any, is currently being handed off to a phone.
+  const [handoff, setHandoff] = useState(null)
   const [versions, setVersions] = useState([])
   const fileInput = useRef(null)
   const pendingType = useRef(null)
@@ -294,6 +297,24 @@ export default function CompanyDocumentsSection() {
                   {busy === i.doc_type ? '…' : ACTION[i.action] || 'عرض'}
                 </button>
 
+                {/* The same document, from the phone that is holding it.
+
+                    Offered only where an upload is what is being asked for.
+                    Next to «عرض» it would be an invitation to replace a
+                    document nobody asked to replace. */}
+                {!isView && (
+                  <button onClick={() => setHandoff(i)}
+                          title="امسح رمزاً بجوالك وارفع المستند من هناك"
+                          style={{
+                            padding: '8px 14px', borderRadius: '9px', fontSize: '13px',
+                            fontWeight: 800, border: '1.5px solid #E2E8F0', background: '#fff',
+                            color: '#1E2A52', cursor: 'pointer', fontFamily: 'inherit',
+                            whiteSpace: 'nowrap',
+                          }}>
+                    📱 من الجوال
+                  </button>
+                )}
+
                 {i.document_id && (
                   <button onClick={() => openPanel(i)}
                           style={{ background: 'none', border: 0, color: '#64748B', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -305,6 +326,32 @@ export default function CompanyDocumentsSection() {
           )
         })}
       </div>
+
+      {/* The handoff, in a dialog of its own.
+
+          Centred rather than a side panel: the QR code is the whole content and
+          a person is about to hold a phone up to it. The stylesheet turns a
+          fixed inset-0 overlay into a bottom sheet below 720px, which is right
+          for every other dialog and wrong for this one — but a phone showing a
+          QR code for its own camera is not a case that happens. */}
+      {handoff && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '20px' }}
+             onClick={(e) => { if (e.target === e.currentTarget) setHandoff(null) }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '380px', borderRadius: '18px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setHandoff(null)} aria-label="إغلاق"
+                      style={{ background: 'none', border: 0, fontSize: '22px', color: '#64748B', cursor: 'pointer', lineHeight: 1, minHeight: '44px', minWidth: '44px' }}>×</button>
+            </div>
+            <PhoneHandoff
+              docType={handoff.doc_type}
+              docLabel={handoff.label}
+              companyId={companyId}
+              onArrived={() => { load(); showToast('✅ وصل المستند من جوالك — ستراجعه إدارة مرصد') }}
+              onClose={() => setHandoff(null)}
+            />
+          </div>
+        </div>
+      )}
 
       {openRow && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', justifyContent: 'flex-start', zIndex: 200 }}

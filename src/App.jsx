@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound'
 import Unauthorized from './pages/Unauthorized'
 import Landing from './pages/Landing'
 const About = lazy(() => import('./pages/About'))
+const PhoneUpload = lazy(() => import('./pages/PhoneUpload'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Partners = lazy(() => import('./pages/Partners'))
 const FAQ = lazy(() => import('./pages/FAQ'))
@@ -148,6 +149,15 @@ function AppContent() {
           now, so a navigation inside them never reaches this. */}
       <Suspense fallback={<DeferredSkeleton><div style={{ padding: '28px 32px' }}><SkeletonPage /></div></DeferredSkeleton>}>
         <Routes>
+        {/* The phone half of the QR handoff.
+
+            Outside VisitorShell on purpose. Somebody scanned a code to do one
+            thing, on a phone, probably standing up — a navigation bar, a
+            «سجّل دخولك» prompt and a footer are all ways to leave a task they
+            have already committed to. Its authority is the token in the URL and
+            nothing else, and that token can buy exactly one upload. */}
+        <Route path="/u/:token" element={<PhoneUpload />} />
+
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>
           <Route path="/" element={<Landing />} />
