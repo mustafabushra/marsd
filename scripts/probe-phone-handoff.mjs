@@ -103,6 +103,30 @@ try {
   ok('زر «من الجوال» بجانب مستند ناقص', await button.count() > 0)
   if (!(await button.count())) throw new Error('لا زر — لا شيء بعده يعني شيئاً')
 
+  // Where the button belongs, and where it does not.
+  //
+  // It shows a QR code for a phone to scan. On a phone that asks somebody to
+  // point a camera at the screen in their hand. The whole feature exists
+  // because the document is on a *different* device from the one you are
+  // working on — so on the phone itself there is nothing to hand off to.
+  //
+  // A tablet keeps it: an iPad is a screen you sit in front of, and reaching
+  // for the phone in your pocket is exactly the case.
+  for (const [w, expected] of [[320, 0], [390, 0], [412, 0], [768, 1], [820, 1]]) {
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: 780 }, isMobile: w < 768, hasTouch: true,
+    })
+    const p2 = await ctx.newPage()
+    await p2.route('**/api/handoff-upload', apiRoute)
+    await signIn(p2, BASE)
+    await p2.goto(`${BASE}/profile`, { waitUntil: 'networkidle', timeout: 45000 })
+    await p2.waitForTimeout(1800)
+    const seen = await p2.locator('button:has-text("من الجوال"):visible').count()
+    ok(`${w}px — الزر ${expected ? 'ظاهر' : 'مخفي'}`,
+      expected ? seen > 0 : seen === 0, `وجدت ${seen}`)
+    await ctx.close()
+  }
+
   const before = (await db.query('select count(*)::int n from public.upload_handoffs')).rows[0].n
   await button.click()
   await desk.waitForTimeout(3000)

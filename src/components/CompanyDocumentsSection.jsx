@@ -304,6 +304,7 @@ export default function CompanyDocumentsSection() {
                     document nobody asked to replace. */}
                 {!isView && (
                   <button onClick={() => setHandoff(i)}
+                          className="marsad-desk-only"
                           title="امسح رمزاً بجوالك وارفع المستند من هناك"
                           style={{
                             padding: '8px 14px', borderRadius: '9px', fontSize: '13px',

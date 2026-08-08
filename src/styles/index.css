@@ -637,3 +637,20 @@ p {
     width: min(300px, 86vw) !important;
   }
 }
+
+/* --- Things that only make sense on a bigger screen ------------------------
+   «ارفع من جوالك» shows a QR code for a phone to scan. On a phone it asks
+   somebody to point a camera at the screen they are holding, which cannot be
+   done — the feature exists precisely because the document is on a *different*
+   device from the one you are working on.
+
+   Hidden below 720px, which is a phone. A tablet keeps it: an iPad is a big
+   screen you sit in front of, and reaching for the phone in your pocket to
+   photograph a paper is exactly the thing this is for.
+
+   `display: none`, not opacity or visibility — a button that is invisible but
+   still reachable by a keyboard or a screen reader is worse than one that is
+   simply not offered. */
+@media (max-width: 720px) {
+  .marsad-desk-only { display: none !important; }
+}
