@@ -77,6 +77,23 @@ export default async function handler(req, res) {
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
 
   try {
+    // Asked on arrival, before anything is shown. `peek` reads and counts
+    // nothing — it does not spend one of the three attempts a code is allowed,
+    // so scanning, hesitating and scanning again costs nothing.
+    if (action === 'check') {
+      const { data, error } = await sb.rpc('peek_upload_handoff', { p_token: token })
+      if (error) return fail(res, 400, error.message)
+
+      const row = Array.isArray(data) ? data[0] : data
+      if (!row) return fail(res, 400, 'رابط غير صالح')
+
+      return res.status(200).json({
+        companyName: row.company_name,
+        docLabel: row.doc_label,
+        expiresAt: row.expires_at,
+      })
+    }
+
     if (action === 'start') {
       const size = Number(body.size)
       const mime = String(body.mime || '')

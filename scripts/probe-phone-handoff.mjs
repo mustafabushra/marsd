@@ -55,6 +55,14 @@ async function apiRoute(route) {
     status, contentType: 'application/json', body: JSON.stringify(obj),
   })
   try {
+    if (body.action === 'check') {
+      const { rows: [r] } = await db.query(
+        'select * from public.peek_upload_handoff($1)', [body.token])
+      if (!r) return json(400, { error: 'رابط غير صالح' })
+      return json(200, {
+        companyName: r.company_name, docLabel: r.doc_label, expiresAt: r.expires_at,
+      })
+    }
     if (body.action === 'start') {
       const { rows: [r] } = await db.query(
         'select * from public.open_upload_handoff($1)', [body.token])
@@ -150,6 +158,27 @@ try {
 
   const tap = await phone.locator('button:has-text("التقاط")').first().boundingBox()
   ok('زر الالتقاط قابل للمس', tap && tap.height >= 44, tap ? `${Math.round(tap.height)}px` : 'غير موجود')
+
+  // Two ways in, not one.
+  //
+  // `capture` is not a hint on a phone — it removes the file picker and opens
+  // the camera. With it on the only input, a registration that is already a PDF
+  // in وثائق could not be sent at all: the page offered a photograph of nothing.
+  //
+  // Matched on the exact button, not on a substring. The old page had a single
+  // button reading «التقاط أو اختيار ملف», so a looser check passed against
+  // precisely the page it was written to catch.
+  ok('زرّان: كاميرا وملفات',
+    await phone.locator('button:has-text("التقاط بالكاميرا")').count() === 1
+    && await phone.locator('button:has-text("اختيار ملف من الجوال")').count() === 1,
+    'الكاميرا هي الخيار الوحيد')
+  const inputs = await phone.evaluate(() => [...document.querySelectorAll('input[type=file]')]
+    .map((i) => ({ capture: i.getAttribute('capture'), accept: i.accept })))
+  ok('مدخل للكاميرا وآخر بلا قيد',
+    inputs.length === 2 && inputs.some((i) => i.capture) && inputs.some((i) => !i.capture),
+    JSON.stringify(inputs))
+  ok('مدخل الملفات يقبل PDF',
+    inputs.some((i) => !i.capture && i.accept.includes('pdf')))
   ok('لا تمرير أفقي',
     await phone.evaluate(() => document.documentElement.scrollWidth <= 391))
 
@@ -176,17 +205,41 @@ try {
   await desk.waitForSelector('text=/وصل/', { timeout: 25000 }).catch(() => {})
   ok('اللابتوب يلاحظ بلا تحديث', await desk.locator('text=/وصل/').count() > 0)
 
+  // --- A dead link must look dead --------------------------------------------
+  //
+  // Reported from a real phone: the laptop said the code had expired, and
+  // scanning it afterwards still opened a working-looking upload page. The
+  // upload was refused — it always was — but the screen invited somebody to
+  // photograph a document and only then told them it was too late.
+  await db.query('begin')
+  await db.query(`select set_config('request.jwt.claims', $1, true)`,
+    [JSON.stringify({ sub: owner.created_by, role: 'authenticated' })])
+  const { rows: [dead] } = await db.query(
+    'select * from public.create_upload_handoff($1)', [owner.doc_type])
+  await db.query('commit')
+  await db.query(`update public.upload_handoffs set expires_at = now() - interval '1 minute'
+                   where token_hash = encode(digest($1, 'sha256'), 'hex')`, [dead.token])
+
+  await phone.goto(`${BASE}/u/${dead.token}`, { waitUntil: 'networkidle' })
+  await phone.waitForTimeout(1500)
+  ok('الرمز المنتهي يقول ذلك فوراً',
+    await phone.locator('text=/انتهت صلاحية/').count() > 0,
+    'الصفحة ما زالت تعرض نموذج رفع')
+  ok('ولا يعرض أي زر رفع',
+    (await phone.locator('button:has-text("التقاط")').count()) === 0
+    && (await phone.locator('button:has-text("اختيار ملف")').count()) === 0)
+  ok('ويشرح كيف يحصل على رمز جديد',
+    await phone.locator('text=/رمز جديد/').count() > 0)
+
   // --- The same link, twice --------------------------------------------------
+  // Once the document is filed the token is spent, and the page says so on
+  // arrival rather than when somebody tries to send a second file.
   await phone.goto(`${BASE}/u/${fresh.token}`, { waitUntil: 'networkidle' })
-  await phone.waitForTimeout(700)
-  await phone.setInputFiles('input[type="file"]', {
-    name: 'ثانية.pdf', mimeType: 'application/pdf', buffer: pdf,
-  })
-  await phone.waitForTimeout(4000)
-  ok('الرابط لا يعمل مرتين',
-    (await phone.locator('text=/استُخدم/').count()) > 0
-    && (await phone.locator('text=/وصل المستند/').count()) === 0,
-    'قَبِل رفعاً ثانياً')
+  await phone.waitForTimeout(1500)
+  ok('الرابط المستهلك يقول ذلك فوراً',
+    await phone.locator('text=/استُخدم/').count() > 0, 'ما زال يعرض نموذج رفع')
+  ok('ولا مدخل ملفات على الإطلاق',
+    (await phone.locator('input[type="file"]').count()) === 0)
 
 } catch (e) {
   fail += 1
