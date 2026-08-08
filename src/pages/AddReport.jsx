@@ -8,6 +8,7 @@ import { UNLIMITED } from '../lib/entitlements'
 import { titlesFor, groupsFor, buildDescription } from '../lib/reference/reportStatements'
 import { SkeletonPanel } from '../components/Skeleton'
 import ReportAttachments, { uploadReportFiles } from '../components/ReportAttachments'
+import Stepper from '../components/Stepper'
 
 const STEPS = [
   { n: 1, label: 'اختيار الشركة' },
@@ -399,21 +400,7 @@ export default function AddReport() {
 
   return (
     <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-      {/* Stepper */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-        {STEPS.map((w, idx) => {
-          const done = w.n < step, active = w.n === step
-          return (
-            <div key={w.n} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14px', flex: 'none', background: active || done ? '#16A34A' : '#E2E8F0', color: active || done ? '#fff' : '#94A3B8' }}>{done ? '✓' : String(w.n)}</div>
-                <span style={{ fontSize: '13.5px', fontWeight: active ? 800 : 600, color: active || done ? '#1E2A52' : '#94A3B8', whiteSpace: 'nowrap' }}>{w.label}</span>
-              </div>
-              {idx < STEPS.length - 1 && <div style={{ flex: 1, height: '2px', background: '#E2E8F0', margin: '0 10px', minWidth: '12px' }}></div>}
-            </div>
-          )
-        })}
-      </div>
+      <Stepper steps={STEPS} current={step} />
 
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', fontSize: '14px', color: '#B91C1C', fontWeight: 700 }}>{error}</div>

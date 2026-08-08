@@ -654,3 +654,18 @@ p {
 @media (max-width: 720px) {
   .marsad-desk-only { display: none !important; }
 }
+
+/* --- The wizard's position -------------------------------------------------
+   Two indicators, one shown at a time. See src/components/Stepper.jsx for why
+   the phone gets a different one rather than a smaller one.
+
+   The row is the default because it is what a desktop shows and what existed
+   first; the bar is the exception, turned on below 720px. Written this way so
+   that a browser which somehow applies neither rule still shows the row, not a
+   wizard with no position at all. */
+.marsad-stepper-compact { display: none; }
+
+@media (max-width: 720px) {
+  .marsad-stepper { display: none !important; }
+  .marsad-stepper-compact { display: block; }
+}

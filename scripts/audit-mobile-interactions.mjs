@@ -140,6 +140,43 @@ for (const width of PHONE) {
     }
   }
 
+  // The wizard's position indicator.
+  //
+  // Four circles, four labels and three connectors on a 320px screen: the
+  // labels alone are wider than the phone, so they wrapped under the circles,
+  // «تفاصيل التعامل» and «تأثير التقرير» ran into each other, and step four
+  // dropped to a line of its own. Nothing left the viewport and nothing was
+  // clipped by its own box, so the page audit called it clean — the same blind
+  // spot the header had, in a different shape.
+  //
+  // What is checked is not «does it fit» but «which of the two is showing»,
+  // because both fitting would still be wrong.
+  {
+    await page.goto(`${BASE}/add-report`, { waitUntil: 'networkidle', timeout: 45000 })
+    await page.waitForTimeout(900)
+    const st = await page.evaluate(() => {
+      const row = document.querySelector('.marsad-stepper')
+      const bar = document.querySelector('.marsad-stepper-compact')
+      const vis = (el) => !!el && getComputedStyle(el).display !== 'none'
+      return {
+        row: vis(row),
+        bar: vis(bar),
+        // How tall the whole indicator is. The broken version was three rows.
+        h: bar && vis(bar) ? Math.round(bar.getBoundingClientRect().height) : null,
+        count: bar ? /\d+\s*من\s*\d+/.test(bar.textContent || '') : false,
+      }
+    })
+    checks += 1
+    if (!st.row && st.bar && st.count && st.h !== null && st.h <= 64) {
+      console.log(`  ✅ ${width}px مؤشّر الخطوات شريط واحد ${st.h}px`)
+    } else {
+      bad += 1
+      console.log(`  ❌ ${width}px مؤشّر الخطوات — ${JSON.stringify(st)}`)
+    }
+    await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle', timeout: 45000 })
+    await page.waitForTimeout(600)
+  }
+
   // The side drawer.
   const toggle = page.locator('.marsad-nav-toggle').first()
   if (await toggle.count()) {
@@ -238,6 +275,8 @@ for (const width of PHONE) {
       sidebarShown: q('.marsad-sidebar') ? getComputedStyle(q('.marsad-sidebar')).transform : null,
       sidebarWidth: w(q('.marsad-sidebar')),
       toggleShown: q('.marsad-nav-toggle') ? getComputedStyle(q('.marsad-nav-toggle')).display : 'none',
+      stepperCompact: q('.marsad-stepper-compact')
+        ? getComputedStyle(q('.marsad-stepper-compact')).display : 'none',
       scrollWidth: document.documentElement.scrollWidth,
     }
   })
@@ -245,7 +284,10 @@ for (const width of PHONE) {
 
   // The drawer belongs to the phone. On a desktop the sidebar is in the flow,
   // untransformed, and the hamburger that opens it is not rendered at all.
-  const ok = desk.toggleShown === 'none'
+  // The bar belongs to the phone. On a desktop it must not render at all —
+  // two position indicators on one screen is worse than the layout it replaced.
+  const ok = desk.stepperCompact === 'none'
+    && desk.toggleShown === 'none'
     && (desk.sidebarShown === 'none' || desk.sidebarShown === 'matrix(1, 0, 0, 1, 0, 0)')
     && desk.avatar !== null && desk.avatar < 44
     && desk.scrollWidth <= 1441

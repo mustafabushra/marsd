@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useUser } from '@clerk/react'
 import * as XLSX from 'xlsx'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
+import Stepper from '../components/Stepper'
 
 const STEPS = [
   { n: 1, label: 'رفع الملف' },
@@ -148,21 +149,9 @@ export default function AdminBulkImport() {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      {/* Stepper */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '26px' }}>
-        {STEPS.map((w, idx) => {
-          const done = w.n < step, active = w.n === step
-          return (
-            <div key={w.n} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14px', flex: 'none', background: active || done ? P : '#E2E8F0', color: active || done ? '#fff' : '#94A3B8' }}>{done ? '✓' : String(w.n)}</div>
-                <span style={{ fontSize: '13.5px', fontWeight: active ? 800 : 600, color: active || done ? '#1E2A52' : '#94A3B8', whiteSpace: 'nowrap' }}>{w.label}</span>
-              </div>
-              {idx < STEPS.length - 1 && <div style={{ flex: 1, height: '2px', background: '#E2E8F0', margin: '0 10px', minWidth: '16px' }}></div>}
-            </div>
-          )
-        })}
-      </div>
+      {/* Purple here, green in AddReport: the admin panel keeps its own
+          accent, so the colour is passed rather than baked in. */}
+      <Stepper steps={STEPS} current={step} color={P} />
 
       {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', fontSize: '14px', color: '#B91C1C', fontWeight: 700 }}>{error}</div>}
 
