@@ -314,6 +314,50 @@ p {
   .cl-footerActionLink {
     min-height: 44px !important;
   }
+
+  /* The account avatar in the header.
+
+     It is a `button`, so the rule above should have reached it — but Clerk
+     sizes the trigger to the avatar with its own height, and a `min-height`
+     without `!important` loses. It measured 28px on every public page at all
+     seven widths: the smallest target in the product, and the one that opens
+     the account menu. The box grows to 44; the picture grows to 34 so the
+     target is a comfortable one rather than a large empty hit area around a
+     small face. */
+  .cl-userButtonTrigger {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cl-userButtonAvatarBox {
+    width: 34px !important;
+    height: 34px !important;
+  }
+}
+
+/* The notification panel, unhooked from the bell.
+
+   Anchored to the bell it is 360px wide starting wherever the bell happens to
+   sit, which on a 412px phone put its right edge at 434 — twenty-two pixels of
+   the panel, and the button inside it, off the screen. Which pixels are lost
+   depends on where the header puts the bell, so no amount of adjusting the
+   anchor fixes it for every width.
+
+   On a phone it stops being a dropdown and becomes a panel belonging to the
+   screen: fixed below the header, one comfortable margin either side. The
+   desktop dropdown above 720px is untouched. */
+@media (max-width: 720px) {
+  .marsad-notification-panel {
+    position: fixed !important;
+    top: 68px !important;
+    inset-inline: 12px !important;
+    width: auto !important;
+    max-height: calc(100vh - 84px);
+    overflow-y: auto;
+  }
 }
 
 /* --- A rule that was removed, and why -------------------------------------

@@ -122,7 +122,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div style={{
+        <div className="marsad-notification-panel" style={{
           // insetInlineEnd, not Start. In RTL, insetInlineStart resolves to right,
           // which pinned the panel's right edge to the bell and made it grow
           // leftwards — and the bell sits near the viewport's left edge, so the

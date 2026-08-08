@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Suspense, useState, useEffect } from 'react'
 import DeferredSkeleton from './DeferredSkeleton'
+import { useNavDrawer } from '../hooks/useNavDrawer'
 import { SkeletonPage } from './Skeleton'
 import { UserButton } from '@clerk/react'
 import NotificationBell from './NotificationBell'
@@ -148,7 +149,7 @@ export default function AdminShell({ user }) {
   // out of the flow and this opens it. Closed on every navigation: leaving it
   // over the page the user just asked for is how this pattern usually goes
   // wrong.
-  const [navOpen, setNavOpen] = useState(false)
+  const [navOpen, setNavOpen] = useNavDrawer()
   useEffect(() => { setNavOpen(false) }, [path])
 
   const isActive = (p) => (p === '/admin' ? path === '/admin' : path === p || path.startsWith(p + '/'))

@@ -27,14 +27,25 @@
 
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
+import { signIn } from './lib/sign-in.mjs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://localhost:4173'
 const SHOTS = process.argv.includes('--shots')
 const WIDTHS = [320, 375, 390, 412, 480, 768, 820]
 
-// Public routes: everything reachable without an account. The rest sit behind
-// Clerk, and a harness that fakes a session tests the fake.
-const ROUTES = ['/', '/about', '/pricing', '/partners', '/faq', '/contact', '/login', '/register']
+// Public routes: everything reachable without an account.
+const PUBLIC = ['/', '/about', '/pricing', '/partners', '/faq', '/contact', '/login', '/register']
+
+// The screens that matter most are behind Clerk, and the faults reported from a
+// real phone were on exactly those. `--auth` signs the browser in for real with
+// a sign-in token; without it these are skipped rather than guessed at.
+const PRIVATE = [
+  '/dashboard', '/search', '/my-reports', '/my-companies', '/add-report',
+  '/add-company', '/notifications', '/settings', '/billing',
+]
+
+const AUTH = process.argv.includes('--auth')
+const ROUTES = AUTH ? [...PUBLIC, ...PRIVATE] : PUBLIC
 
 if (SHOTS) mkdirSync('mobile-shots', { recursive: true })
 
@@ -261,6 +272,19 @@ for (const width of WIDTHS) {
     userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
   })
   const page = await ctx.newPage()
+
+  // One sign-in per viewport. Each context is a fresh browser profile, so the
+  // session does not carry across widths.
+  if (AUTH) {
+    try {
+      await signIn(page, BASE)
+    } catch (e) {
+      console.log(`  ❌ ${width}px — تعذّر تسجيل الدخول: ${e.message.slice(0, 80)}`)
+      await ctx.close()
+      failures += 1
+      continue
+    }
+  }
 
   for (const route of ROUTES) {
     let r
