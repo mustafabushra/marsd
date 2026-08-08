@@ -247,7 +247,7 @@ export default function CompanyShell({ user, gate = false }) {
       {/* Main */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <header style={{
+        <header className="marsad-appbar" style={{
           background: '#fff',
           borderBottom: '1px solid #E2E8F0',
           padding: '0 32px',
@@ -324,7 +324,7 @@ export default function CompanyShell({ user, gate = false }) {
 
           {/* justifySelf pins this to the far edge of the header, so the bell
               and the avatar sit in the corner whatever the title does. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', justifySelf: 'end' }}>
+          <div className="marsad-appbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '18px', justifySelf: 'end' }}>
             <NotificationBell />
             <UserButton
               afterSignOutUrl="/"

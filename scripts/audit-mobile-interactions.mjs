@@ -45,6 +45,28 @@ const SPILL = (vw) => {
     return false
   }
 
+  /**
+   * Already cut off by an ancestor, and so not on the screen at all.
+   *
+   * `getBoundingClientRect` reports where a box would be whether or not
+   * anything shows it. A round avatar clips its own contents, so a layer inside
+   * it that is wider than the circle is invisible and moves nothing — reporting
+   * it as «off the left edge» is reporting something that is not there, and a
+   * check that does that gets ignored, which is worse than not having it.
+   */
+  const clipped = (el) => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const o = getComputedStyle(p)
+      if (o.overflow === 'hidden' || o.overflowX === 'hidden' || o.overflow === 'clip') {
+        const pr = p.getBoundingClientRect()
+        const r = el.getBoundingClientRect()
+        if (r.left >= pr.left - 1 && r.right <= pr.right + 1) return false
+        return true
+      }
+    }
+    return false
+  }
+
   for (const el of document.querySelectorAll('body *')) {
     const cs = getComputedStyle(el)
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue
@@ -53,7 +75,7 @@ const SPILL = (vw) => {
     if (r.right <= vw + 1 && r.left >= -1) continue
 
     if (el.closest('.marsad-sidebar[data-open="false"]') || el.matches('.marsad-sidebar[data-open="false"]')) continue
-    if (inScrollableStrip(el)) continue
+    if (inScrollableStrip(el) || clipped(el)) continue
 
     // The skip link. It is parked ten thousand pixels away until a keyboard
     // focuses it, which is how a skip link is built — it exists for a screen
@@ -90,6 +112,34 @@ for (const width of PHONE) {
   await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle', timeout: 45000 })
   await page.waitForTimeout(500)
 
+  // The bar at the top, still a bar.
+  //
+  // This check exists because the audit passed a header that was 181px tall on
+  // a 780px phone. Nothing overflowed, nothing was clipped, no target was
+  // small — every question the audit knew how to ask had a good answer, and
+  // the page was wrong anyway. A phone app bar is one row. Three rows of it,
+  // with the bell and the avatar hanging over the article beneath, is the shape
+  // being wrong rather than the size, and «measures clean» had come to mean
+  // «the checks I wrote».
+  const bar = await page.evaluate(() => {
+    const h = document.querySelector('header')
+    const m = document.querySelector('#main')
+    if (!h || !m) return null
+    const hb = h.getBoundingClientRect()
+    const spill = [...h.querySelectorAll('*')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > hb.bottom + 1 }).length
+    return { h: Math.round(hb.height), overlapsMain: hb.bottom > m.getBoundingClientRect().top + 1, spill }
+  })
+  if (bar) {
+    checks += 1
+    if (bar.h > 64 || bar.overlapsMain || bar.spill) {
+      bad += 1
+      console.log(`  ❌ ${width}px الهدر ${bar.h}px${bar.spill ? ` و${bar.spill} عنصراً خارجه` : ''}${bar.overlapsMain ? ' ويغطي المحتوى' : ''}`)
+    } else {
+      console.log(`  ✅ ${width}px الهدر صف واحد ${bar.h}px`)
+    }
+  }
+
   // The side drawer.
   const toggle = page.locator('.marsad-nav-toggle').first()
   if (await toggle.count()) {
@@ -110,6 +160,35 @@ for (const width of PHONE) {
     // its centre — where a forced click lands — is underneath the drawer, and
     // the first version of this test spent thirty seconds clicking «إدارة
     // الباقة» and reporting a drawer that would not close.
+    // Nothing inside the drawer may leave the drawer.
+    //
+    // The account card did. A blanket `flex-wrap: wrap` reached the sidebar,
+    // which is a flex column — and a column told to wrap does not scroll, it
+    // starts a second column beside itself. The card landed 115px wide on top
+    // of the page. It was inside the viewport the whole time, so every check
+    // that watched the screen edges saw nothing.
+    const escaped = await page.evaluate(() => {
+      const side = document.querySelector('.marsad-sidebar[data-open="true"]')
+      if (!side) return null
+      const sb = side.getBoundingClientRect()
+      return [...side.querySelectorAll('*')]
+        .filter((e) => {
+          const r = e.getBoundingClientRect()
+          return r.width && r.height && (r.left < sb.left - 1 || r.right > sb.right + 1)
+        })
+        .map((e) => (e.textContent || '').trim().slice(0, 24))
+        .slice(0, 3)
+    })
+    if (escaped) {
+      checks += 1
+      if (escaped.length) {
+        bad += 1
+        console.log(`  ❌ ${width}px عناصر خرجت من القائمة: ${escaped.join(' | ')}`)
+      } else {
+        console.log(`  ✅ ${width}px كل محتوى القائمة داخلها`)
+      }
+    }
+
     await page.keyboard.press('Escape')
     await page.waitForTimeout(400)
     checks += 1

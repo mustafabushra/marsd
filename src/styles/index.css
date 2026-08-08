@@ -238,9 +238,28 @@ p {
 /* A flex row with a gap and no `flex-wrap` shrinks its children past reading
    rather than moving them to a second line. 174 of the 197 findings are this.
    Wrapping is the right default at this width for every one of them: a toolbar,
-   a set of chips, a header with actions. */
+   a set of chips, a header with actions.
+
+   Rows. Not columns.
+   -----------------
+   The first version of this rule said `[style*="display: flex"]` and nothing
+   more, and it did real damage in two places before anyone noticed, because
+   both faults measured clean.
+
+   The sidebar is a flex *column*. Told to wrap, a column that is taller than
+   the screen does not scroll — it starts a second column beside itself. The
+   account card was flung out of the drawer to sit 115px wide on top of the
+   page, which is the floating box in the report.
+
+   The header is a flex row, but one whose parts belong together. Wrapping put
+   the account group on its own line and then split the bell from the avatar:
+   three rows, 181px, a quarter of a phone screen.
+
+   A column must never wrap — there is no second line to move to, only a second
+   column. So the selector excludes anything that declares one, and `.marsad-nowrap`
+   stays available for rows that must hold their line. */
 @media (max-width: 720px) {
-  [style*="display: flex"] { flex-wrap: wrap; }
+  [style*="display: flex"]:not([style*="flex-direction: column"]) { flex-wrap: wrap; }
 
   /* Except where wrapping would separate a thing from its own label — an icon
      and the word beside it are one object. Opted into by name. */
@@ -335,6 +354,15 @@ p {
   .cl-userButtonAvatarBox {
     width: 34px !important;
     height: 34px !important;
+  }
+
+  /* Clerk layers the picture and its placeholder inside that box at their own
+     size. Resizing only the box left a 43px layer inside a 34px circle — cut
+     by the border radius, so invisible, but it is not tidy to leave a thing
+     hanging out of its container because something else happens to hide it. */
+  .cl-userButtonAvatarBox > * {
+    width: 100% !important;
+    height: 100% !important;
   }
 }
 
@@ -559,14 +587,40 @@ p {
 
   header .marsad-command-button { display: none !important; }
 
-  /* Two columns, not three: the menu and title on one side, the account on the
-     other. The stacked single column left the avatar under the title with a
-     gap the width of the screen. */
-  header[style*="grid-template-columns"] {
-    grid-template-columns: 1fr auto !important;
+  /* A phone app bar, not the desktop header squeezed.
+
+     The desktop header is a three-column grid — title, search, account — and
+     the first attempt kept that grid and forced it to two columns. It measured
+     clean: nothing overflowed, nothing was clipped, no target was small. It was
+     also 181px tall on a 780px phone, because the general `flex-wrap: wrap`
+     rule broke the account group onto its own line and then broke the bell off
+     the avatar. Three stacked rows, a quarter of the screen, with the bell and
+     the picture hanging over the page beneath. The audit had no check for «this
+     is the right size but the wrong shape», so it passed.
+
+     So the grid stops here. Below 900px the bar is one row: what you are
+     looking at on one side, the way back and the way out on the other. It is
+     56px, the height a phone app bar has been for fifteen years, and nothing in
+     it is allowed to wrap. Above 900px none of this applies and the desktop
+     header is exactly the grid it always was. */
+  .marsad-appbar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    justify-content: space-between;
     gap: 10px !important;
-    padding: 10px 14px !important;
-    min-height: 0 !important;
+    padding: 8px 14px !important;
+    min-height: 56px !important;
+  }
+
+  .marsad-appbar > * { min-width: 0; }
+
+  /* The bell and the avatar are one object. Wrapping between them puts the
+     unread count on a line of its own, which reads as a second notification. */
+  .marsad-appbar-actions {
+    flex-wrap: nowrap !important;
+    flex: none;
+    gap: 12px !important;
   }
 }
 

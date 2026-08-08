@@ -312,7 +312,7 @@ export default function AdminShell({ user }) {
             the search by construction and pins each side to its own edge. Two
             shells that put the same control in two different places is one
             product that behaves like two. */}
-        <header style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', minHeight: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
+        <header className="marsad-appbar" style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', minHeight: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
           <div className="marsad-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
             {/* Shown only where the sidebar is an overlay. */}
             <button
@@ -356,7 +356,7 @@ export default function AdminShell({ user }) {
 
           {/* justifySelf pins the bell and the avatar to the corner of the
               header, whatever the title beside them does. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', justifySelf: 'end' }}>
+          <div className="marsad-appbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '14px', justifySelf: 'end' }}>
             <NotificationBell />
             <UserButton
               afterSignOutUrl="/"
