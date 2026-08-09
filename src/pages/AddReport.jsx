@@ -101,6 +101,10 @@ export default function AddReport() {
   const [companies, setCompanies] = useState([])
   const [companiesLoading, setCompaniesLoading] = useState(true)
   const [companySearch, setCompanySearch] = useState(prefill.companyName || '')
+  // Companies the register has and Marsad does not. Fetched from the server
+  // rather than filtered locally: there are 1.9 million of them.
+  const [govMatches, setGovMatches] = useState([])
+  const [adopting, setAdopting] = useState(false)
   const [companyInfo, setCompanyInfo] = useState(null)
   const [ownCompanyId, setOwnCompanyId] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -173,9 +177,88 @@ export default function AddReport() {
   const selectedCompany = companies.find(c => c.id === form.companyId)
   const selectableCompanies = companies.filter(c => c.id !== ownCompanyId)
   const nq = companySearch.trim().replace(/\s+/g, ' ')
-  const filteredCompanies = nq
+  const localMatches = nq
     ? selectableCompanies.filter(c => (c.name || '').replace(/\s+/g, ' ').includes(nq) || (c.cr || '').includes(nq))
     : selectableCompanies
+
+  // The national register, for what Marsad does not have yet.
+  //
+  // The list above is the first thousand companies Marsad tracks, filtered in
+  // the browser. That was the whole world before the Ministry's register
+  // arrived; now it is a small corner of it, and somebody searching for a real
+  // company would find nothing and be invited to create one that already
+  // exists — a manual duplicate beside a verified government record, which is
+  // the worst thing that can happen to a registry.
+  const filteredCompanies = nq ? [...localMatches, ...govMatches] : localMatches
+
+  // --- Searching the register ------------------------------------------------
+  useEffect(() => {
+    const q = companySearch.trim()
+    if (q.length < 3) { setGovMatches([]); return undefined }
+
+    let cancelled = false
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await getSupabase()
+          .rpc('search_companies_unified', { p_query: q, p_limit: 15 })
+        if (cancelled) return
+        setGovMatches((data || [])
+          .filter((r) => r.origin === 'government')
+          .map((r) => ({
+            id: r.id,
+            government: true,
+            name: r.name,
+            cr: r.cr_number,
+            city: r.city || r.region || '',
+            sector: r.registration_type || '',
+            score: null,
+          })))
+      } catch {
+        // The register is coverage on top of Marsad's own list, not instead of
+        // it. An outage in one must not hide the other.
+        if (!cancelled) setGovMatches([])
+      }
+    }, 350)
+
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [companySearch])
+
+  /**
+   * Choose a company that is in the register but not yet in Marsad.
+   *
+   * It is created here, silently, from the Ministry's own data — verified, with
+   * its registration number and legal form, linked to the snapshot it came
+   * from. The person filling a report does not see a company form and does not
+   * type a field: they picked a company, and a company is what they get.
+   *
+   * A report has to point at a `companies` row — that is what the target column
+   * references and what a trust score is computed for. So «without creating a
+   * company» cannot be literal; what it means is «without asking anybody to
+   * create one», and that is what happens.
+   */
+  const chooseCompany = async (c) => {
+    if (!c.government) { setField('companyId', c.id); return }
+
+    setAdopting(true)
+    setError('')
+    try {
+      const { data, error: e } = await getSupabase()
+        .rpc('add_registry_company_to_marsad', { p_registry_id: c.id })
+
+      if (e) throw e
+      // Read back, not assumed. An RPC a policy filtered returns no error and
+      // no id, and a report pointing at nothing is discovered much later.
+      if (!data) throw new Error('تعذّر اختيار الشركة — حدّث الصفحة وأعد المحاولة')
+
+      setCompanies((list) => [...list, { ...c, id: data, government: false }])
+      setGovMatches((list) => list.filter((g) => g.id !== c.id))
+      setField('companyId', data)
+    } catch (err) {
+      setError(err.message || 'تعذّر اختيار الشركة')
+    } finally {
+      setAdopting(false)
+    }
+  }
 
   const goAddCompany = () => {
     const q = companySearch.trim()
@@ -435,12 +518,24 @@ export default function AddReport() {
               ) : filteredCompanies.slice(0, 40).map(c => {
                 const chosen = form.companyId === c.id
                 return (
-                  <div key={c.id} onClick={() => setField('companyId', c.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: chosen ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0', background: chosen ? '#F0FDF4' : '#fff', borderRadius: '12px', padding: '14px 16px', cursor: 'pointer' }}>
+                  <div key={c.id} onClick={() => !adopting && chooseCompany(c)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: chosen ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0', background: chosen ? '#F0FDF4' : '#fff', borderRadius: '12px', padding: '14px 16px', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#1E2A52', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flex: 'none' }}>{(c.name || '؟').charAt(0)}</div>
                       <div>
                         <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', textAlign: 'right' }}>{c.name}</div>
-                        <div style={{ fontSize: '13px', color: '#64748B', textAlign: 'right' }}>السجل: {c.cr || '—'} · {c.city || '—'}</div>
+                        <div style={{ fontSize: '13px', color: '#64748B', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '7px', justifyContent: 'flex-start' }}>
+                          <span>السجل: {c.cr || '—'} · {c.city || '—'}</span>
+                          {/* Where this one came from. Both are choosable and
+                              the report is identical either way — but somebody
+                              should know when they are pulling a company out of
+                              the national register rather than picking one
+                              Marsad already tracks. */}
+                          {c.government && (
+                            <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', padding: '2px 7px', fontSize: '10.5px', fontWeight: 800, flex: 'none' }}>
+                              🏛 السجل التجاري
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {chosen && <span style={{ color: '#16A34A', fontWeight: 900, fontSize: '18px' }}>✓</span>}
