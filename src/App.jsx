@@ -40,6 +40,7 @@ const Notifications = lazy(() => import('./pages/Notifications'))
 const ReportsAboutUs = lazy(() => import('./pages/ReportsAboutUs'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const AdminRequests = lazy(() => import('./pages/AdminRequests'))
+const AdminRequestQueue = lazy(() => import('./pages/AdminRequestQueue'))
 const AdminReports = lazy(() => import('./pages/AdminReports'))
 const AdminAddReport = lazy(() => import('./pages/AdminAddReport'))
 const AdminBulkImport = lazy(() => import('./pages/AdminBulkImport'))
@@ -210,6 +211,7 @@ function AppContent() {
         <Route element={<AdminShell user={user} />}>
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/requests" element={<AdminRoute><AdminRequests /></AdminRoute>} />
+          <Route path="/admin/company-requests" element={<AdminRoute><AdminRequestQueue /></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />
           <Route path="/admin/add-report" element={<AdminRoute><AdminAddReport /></AdminRoute>} />
           <Route path="/admin/bulk-import" element={<AdminRoute><AdminBulkImport /></AdminRoute>} />

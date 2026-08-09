@@ -62,6 +62,7 @@ const GROUPS = [
   ] },
   { key: 'review', title: 'مركز المراجعة', items: [
     { label: 'طلبات إضافة وتعديل', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
+    { label: 'طلبات الشركات', path: '/admin/company-requests' },
     { label: 'مراجعة التسجيل', path: '/admin/company-approval' },
     { label: 'طلبات الملكية', path: '/admin/claim-requests' },
     { label: 'التحقق من الشركات', path: '/admin/company-verification' },
@@ -109,6 +110,7 @@ const SCREEN_LABELS = {
   '/admin': 'لوحة تحكم الإدارة',
   '/admin/requests': 'مراجعة طلبات الشركات',
   '/admin/reports': 'مراجعة التقارير',
+  '/admin/company-requests': 'طلبات الشركات',
   '/admin/registry-import': 'استيراد من السجل التجاري',
   '/admin/add-report': 'إضافة تقرير باسم مرصد',
   '/admin/bulk-import': 'رفع دفعة شركات',
