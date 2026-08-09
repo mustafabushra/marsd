@@ -43,7 +43,7 @@ const BUCKET = 'company-documents'
  *
  * Returns the doc types that did not make it, so the caller can say which.
  */
-export async function uploadCompanyDocuments(files, { companyId, tenantId, userId }) {
+export async function uploadCompanyDocuments(files, { companyId, tenantId, userId, requestId = null }) {
   const supabase = getSupabase()
   const failed = []
 
@@ -66,6 +66,10 @@ export async function uploadCompanyDocuments(files, { companyId, tenantId, userI
           file_url: path,
           file_name: file.name,
           status: 'pending',
+          // Attached to the request when there is one. A document beside a
+          // company is a file somebody has to go and find the meaning of; a
+          // document on a request is part of what is being decided.
+          request_id: requestId,
         }])
         .select('id')
 

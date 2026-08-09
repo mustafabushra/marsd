@@ -4,6 +4,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase, smartCompanyDetection, ensureStorageBucket, buildCompanyInsert } from '../lib/api'
 import { COMPANY_STATUS, COMPANY_SOURCE, REQUEST_STATUS, USER_ROLE, USER_STATUS, TENANT_STATUS } from '../lib/enums'
 import { notifyAdmins } from '../lib/notify'
+import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
 
 const SAUDI_CITIES = [
   'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام',
@@ -40,7 +41,16 @@ export default function CompanyOnboarding() {
   })
 
   const [crFile, setCrFile] = useState(null)
+  // The rest of the required paperwork. Registering a company puts it in front
+  // of a reviewer, and one file out of four is not something anybody can verify.
+  const [docFiles, setDocFiles] = useState({})
+  const [docTypes, setDocTypes] = useState([])
   const [existingCompany, setExistingCompany] = useState(null)
+
+  // What is still missing, derived once so the button and its label cannot
+  // disagree about it.
+  const docsLeft = existingCompany ? 0 : docTypes.filter((t) => !docFiles[t.doc_type]).length
+  const ready = !!crFile && docsLeft === 0
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -147,6 +157,18 @@ export default function CompanyOnboarding() {
     // for it. CompanyRegister enforces the same rule on its own path.
     if (!crFile) {
       setError('❌ رفع السجل التجاري مطلوب')
+      return
+    }
+
+    // And the rest of them.
+    //
+    // `submit_company_request` refuses without these, so a submission that got
+    // this far would fail at the database with a message about missing
+    // documents — after the company had been created. Said here, before
+    // anything is written, and named so somebody knows which.
+    const missingDocs = docTypes.filter((t) => !docFiles[t.doc_type])
+    if (missingDocs.length) {
+      setError(`❌ مستندات ناقصة: ${missingDocs.map((t) => t.label).join('، ')}`)
       return
     }
 
@@ -298,145 +320,89 @@ export default function CompanyOnboarding() {
         // CASE A: New company — Complex flow, needs careful error handling
         // ============================================================
 
-        // ===== STEP 2: Create Company =====
-        console.log('🏢 [2/7] Creating company record...')
-        const companyTimer = createTimer()
-
-        const { data: newCompany, error: companyError } = await supabase
-          .from('companies')
-          .insert([buildCompanyInsert({
-            name: formData.name,
-            crNumber: formData.crNumber,
-            unifiedNumber: formData.unifiedNumber,
-            licenseNumber: formData.licenseNumber,
-            officialEmail: formData.officialEmail,
-            sector: formData.sector,
-            city: formData.city,
-            foundedYear: formData.foundedYear,
-            status: COMPANY_STATUS.PENDING,
-            source: COMPANY_SOURCE.COMMUNITY,
-            crFileUrl: crFileUrl,
-          })])
-          .select('id')
-          .single()
-
-        if (companyError) {
-          throw new Error(`فشل إنشاء الشركة: ${companyError.message}`)
-        }
-        if (!newCompany?.id) {
-          throw new Error('لم يتم الحصول على معرّف الشركة')
-        }
-
-        createdCompanyId = newCompany.id
-        companyTimer.log('Company creation')
-        console.log(`✅ Company created: ${newCompany.id}`)
-
-        // ===== STEP 3: Create Tenant =====
-        console.log('🏛️  [3/7] Creating tenant record...')
-        const tenantTimer = createTimer()
-
+        // The address the company account is keyed on. Its own official
+        // address where one was given, and the person's otherwise — a tenant
+        // without an e-mail cannot be written at all.
         const tenantEmail = formData.officialEmail || user.primaryEmailAddress?.emailAddress
         if (!tenantEmail) {
           throw new Error('البريد الإلكتروني للشركة غير متوفر')
         }
 
-        const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .insert([{
-            name: formData.name,
-            cr_number: formData.crNumber,
-            email: tenantEmail,
-            phone: formData.phone || null,
-            sector: formData.sector,
-            city: formData.city,
-            company_id: newCompany.id,
-            status: TENANT_STATUS.ACTIVE
-          }])
-          .select('id')
-          .single()
+        // ===== Registering the company =====
+        //
+        // One call. This wrote four rows from the browser as four separate
+        // requests — company, tenant, user link, registration request — and
+        // there is no transaction across four round trips. One of them did not
+        // land, and what it left was worse than a failure: an account with no
+        // tenant, sent to this form on every sign-in, and its own half-finished
+        // attempt holding its registration number so the form refused it as a
+        // duplicate. Locked out by itself.
+        //
+        // `register_company_for_current_user` commits all of it or none.
+        console.log('🏢 Registering company (single transaction)')
+        const { data: reg, error: regError } = await supabase
+          .rpc('register_company_for_current_user', {
+            p_name: formData.name,
+            p_cr_number: formData.crNumber,
+            p_email: tenantEmail,
+            p_phone: formData.phone || null,
+            p_city: formData.city || null,
+            p_sector: formData.sector || null,
+            p_unified_number: formData.unifiedNumber || null,
+            p_cr_file_url: crFileUrl,
+            p_founded_year: formData.foundedYear ? Number(formData.foundedYear) : null,
+          })
 
-        if (tenantError) {
-          throw new Error(`فشل إنشاء حساب الشركة: ${tenantError.message}`)
-        }
-        if (!tenantData?.id) {
-          throw new Error('لم يتم الحصول على معرّف الحساب')
-        }
+        if (regError) throw new Error(regError.message)
 
-        createdTenantId = tenantData.id
-        cleanupRequired = true // If something fails now, cleanup needed
-        tenantTimer.log('Tenant creation')
-        console.log(`✅ Tenant created: ${tenantData.id}`)
+        const created = Array.isArray(reg) ? reg[0] : reg
+        // Read back, not assumed. An RPC a policy filtered returns no error and
+        // no row, and «تم التسجيل» over nothing is what this whole change exists
+        // to stop.
+        if (!created?.company_id) throw new Error('لم يُسجَّل الطلب — حدّث الصفحة وأعد المحاولة')
 
-        // ===== STEP 4: Create User =====
-        console.log('👤 [4/7] Creating user record...')
-        const userTimer = createTimer()
+        createdCompanyId = created.company_id
+        createdTenantId = created.tenant_id
 
-        const { data: newUser, error: userError } = await supabase
-          .from('users')
-          .insert([{
-            id: user.id,
-            tenant_id: tenantData.id,
-            company_id: newCompany.id,
-            email: user.primaryEmailAddress?.emailAddress,
-            first_name: user.firstName || '',
-            last_name: user.lastName || '',
-            role: USER_ROLE.COMPANY_ADMIN,
-            status: USER_STATUS.ACTIVE
-          }])
-          .select('id')
-          .single()
+        // ===== The request, and its documents =====
+        //
+        // The documents attach to the request rather than floating beside the
+        // company, so a reviewer opens one thing and finds the company, what
+        // was entered, and every file that came with it.
+        const { data: requestId, error: reqError } = await supabase
+          .rpc('open_company_request', {
+            p_company_id: created.company_id,
+            p_kind: 'registration',
+          })
+        if (reqError) throw new Error(reqError.message)
 
-        if (userError) {
-          throw new Error(`فشل إنشاء سجل المستخدم: ${userError.message}`)
-        }
-
-        userTimer.log('User creation')
-        console.log(`✅ User created: ${newUser?.id}`)
-
-        // ===== STEP 5: Create Registration Request =====
-        console.log('📋 [5/7] Creating registration request...')
-        const regReqTimer = createTimer()
-
-        const { data: regRequest, error: regReqError } = await supabase
-          .from('registration_requests')
-          .insert([{
-            company_id: newCompany.id,
-            tenant_id: tenantData.id,
-            user_id: user.id,
-            cr_document_url: crFileUrl,
-            status: REQUEST_STATUS.PENDING
-          }])
-          .select('id')
-          .single()
-
-        if (regReqError) {
-          throw new Error(`فشل إنشاء طلب التسجيل: ${regReqError.message}`)
-        }
-
-        regReqTimer.log('Registration request creation')
-        console.log(`✅ Registration request created: ${regRequest?.id}`)
-
-        // ===== STEP 6: Send Admin Notification =====
-        console.log('🔔 [6/7] Sending admin notification...')
-        await notifyAdmins('company_registration_submitted', {
-          title: 'طلب تسجيل شركة جديد',
-          message: `${formData.name} — سجل ${formData.crNumber}`,
-          tenantId: tenantData?.id || null,
-          meta: {
-            company_id: newCompany.id,
-            company_name: formData.name,
-            cr_number: formData.crNumber,
-            registration_request_id: regRequest?.id,
-          },
+        const failedDocs = await uploadCompanyDocuments(docFiles, {
+          companyId: created.company_id,
+          tenantId: created.tenant_id,
+          userId: user.id,
+          requestId,
         })
 
-        // ===== STEP 7: Success =====
-        console.log('🎉 [7/7] Registration complete')
-        mainTimer.log('Total CASE A flow')
+        if (failedDocs.length) {
+          const names = failedDocs.map((k) => docTypes.find((t) => t.doc_type === k)?.label || k)
+          throw new Error(`تعذّر رفع: ${names.join('، ')} — أعد المحاولة`)
+        }
 
-        alert('✅ تم رفع بيانات شركتك بنجاح!\n\n⏳ سيتم مراجعة التسجيل من قبل فريق مرصد')
+        // ===== Handing it to Marsad =====
+        //
+        // The submit is what puts it in the queue, and it re-checks the
+        // documents in the database. The check in this file tells somebody
+        // early; that one is the rule.
+        const { error: submitError } = await supabase
+          .rpc('submit_company_request', { p_request_id: requestId })
+        if (submitError) throw new Error(submitError.message)
+
+        console.log('🎉 Registration complete')
+        mainTimer.log('Total registration flow')
+
         navigate('/registration-pending', { replace: true })
       }
+
 
     } catch (err) {
       console.error('❌ Onboarding error:', err.message)
@@ -701,6 +667,22 @@ export default function CompanyOnboarding() {
               )}
             </div>
 
+            {/* The rest of the paperwork.
+                Not shown for a claim: claiming an existing company is proving
+                you own it, and the company's own certificates are what the
+                claim is about — asking for all four here would be asking the
+                claimant to hold documents they may not have yet. */}
+            {!existingCompany && (
+              <div style={{ marginBottom: '18px' }}>
+                <RequiredCompanyDocuments
+                  files={docFiles}
+                  onChange={setDocFiles}
+                  onTypesLoaded={setDocTypes}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
                 type="button"
@@ -720,9 +702,9 @@ export default function CompanyOnboarding() {
               </button>
               <button
                 type="submit"
-                disabled={loading || !crFile}
+                disabled={loading || !ready}
                 style={{
-                  background: loading || !crFile ? '#CCCCCC' : '#16A34A',
+                  background: loading || !ready ? '#CCCCCC' : '#16A34A',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '10px',

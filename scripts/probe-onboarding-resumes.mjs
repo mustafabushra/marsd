@@ -173,6 +173,38 @@ try {
   const afterCount = (await c.query('select count(*)::int n from public.companies')).rows[0].n
   ok('والفشل لا يترك شركة يتيمة', before === afterCount, `${before} → ${afterCount}`)
 
+  // --- And the request that carries it -------------------------------------------
+  //
+  // Registration now opens a `company_requests` row and submits it, so the
+  // company arrives in a queue with a state rather than as a row somebody has
+  // to notice. Proven on the same fixture: the request exists, it is submitted,
+  // and its documents are attached to it rather than floating beside the
+  // company.
+  await asUser(uid2)
+  const { rows: [{ open_company_request: rq }] } = await c.query(
+    'select public.open_company_request($1, $2)',
+    [rescued.company_id, 'registration'])
+
+  const types = (await c.query(
+    'select doc_type, label from public.company_document_types() where required')).rows
+  for (const t of types) {
+    await c.query(
+      `insert into public.company_documents
+         (company_id, uploaded_by_tenant_id, uploaded_by_user_id, doc_type, file_url, file_name, status, request_id)
+       values ($1, $2, $3, $4, $5, $6, 'pending', $7)`,
+      [rescued.company_id, rescued.tenant_id, uid2, t.doc_type,
+       `${rescued.company_id}/${t.doc_type}.pdf`, `${t.label}.pdf`, rq])
+  }
+
+  const { rows: [{ submit_company_request: sent }] } = await c.query(
+    'select public.submit_company_request($1)', [rq])
+  ok('التسجيل يفتح طلباً ويُرسله', sent === 'submitted', `جاءت «${sent}»`)
+
+  ok('ومستنداته مربوطة بالطلب لا بالشركة وحدها',
+    (await c.query(
+      'select count(*)::int n from public.company_documents where request_id = $1', [rq]))
+      .rows[0].n === types.length)
+
   // --- Staff pass through -------------------------------------------------------
   await asUser(admin.id)
   ok('موظّف مرصد ليس «بلا شركة»', (await state()).state === 'staff',
