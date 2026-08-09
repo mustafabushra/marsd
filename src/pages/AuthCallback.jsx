@@ -120,7 +120,28 @@ export default function AuthCallback() {
         if (invite) {
           // Mark the invite accepted, then continue into the normal tenant /
           // company-status routing below using the freshly created record.
-          await supabase.from('pending_invites').update({ status: 'accepted' }).eq('id', invite.id)
+          //
+          // Read back, like every other write. An update RLS filters out
+          // returns no error and no rows, so this could not tell the difference
+          // between «accepted» and «silently refused» — and the difference
+          // shows up as an invitation that stays pending forever while the
+          // person it was sent to is already signed in and working. Whoever
+          // then re-sends it is told the address already has an invite.
+          const { data: accepted, error: acceptError } = await supabase
+            .from('pending_invites')
+            .update({ status: 'accepted' })
+            .eq('id', invite.id)
+            .select('id')
+
+          // Not fatal. The account exists and the person is signed in; refusing
+          // to let them through because a status column did not move would be
+          // the worse outcome. It is recorded so the row can be reconciled
+          // rather than discovered by someone wondering why an invitation is
+          // still open.
+          if (acceptError || !accepted?.length) {
+            console.warn('pending_invites: القبول لم يُسجَّل', invite.id, acceptError?.message)
+          }
+
           userData = newUser
         } else {
           // Brand-new user with no invite - collect company details first.
