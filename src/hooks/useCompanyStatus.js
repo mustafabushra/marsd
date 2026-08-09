@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useUserRecord } from './useUserRecord'
+import { COMPANY_STATUS } from '../lib/constants'
 
 /**
  * Hook: Resolve company status from database (source of truth)
@@ -23,6 +24,8 @@ export function useCompanyStatus() {
   const [tenantId, setTenantId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [companyName, setCompanyName] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState(null)
 
   useEffect(() => {
     if (!user?.id) {
@@ -37,71 +40,52 @@ export function useCompanyStatus() {
     // not any single slow request.
     if (recordLoading) return
 
+    /**
+     * One question, answered where the facts are.
+     *
+     * This walked three tables in the browser — the user's row, the tenant, the
+     * company — and assembled a status from them. Any one of the three coming
+     * back null read as «no company yet», which is how a half-finished
+     * registration became «start over».
+     *
+     * Reported: register a company, see «تحت المراجعة», sign out, sign in, and
+     * land back on the form. The account had a company and no tenant, because
+     * onboarding wrote four rows as four separate requests and one of them did
+     * not land — and the assembled answer could not tell that apart from having
+     * registered nothing.
+     *
+     * `my_registration_state()` decides it in the database, in one call, and
+     * returns a state rather than a status: `none`, `pending_review`,
+     * `approved`, `rejected`, `suspended`, `staff`.
+     */
     const resolveCompanyStatus = async () => {
       try {
-        const supabase = getSupabase()
+        setLoading(true)
+        const { data, error: e } = await getSupabase().rpc('my_registration_state')
+        if (e) throw e
 
-        const userData = { tenant_id: sharedTenantId }
+        const row = Array.isArray(data) ? data[0] : data
+        if (!row) throw new Error('تعذّر قراءة حالة الحساب')
 
-        if (!userData.tenant_id) {
-          // No tenant linked to this user — a new account, not a failure.
-          setStatus(null)
-          setLoading(false)
-          return
-        }
+        setCompanyId(row.company_id || null)
+        setTenantId(row.tenant_id || null)
+        setCompanyName(row.company_name || null)
+        setRejectionReason(row.rejection_reason || null)
 
-        setTenantId(userData.tenant_id)
-
-        // STEP 2: Get tenant data and company_id
-        const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .select('company_id')
-          .eq('id', userData.tenant_id)
-          .single()
-
-        if (tenantError) {
-          if (tenantError.code === 'PGRST116') {
-            // Tenant not found
-            setStatus(null)
-            setLoading(false)
-            return
-          }
-          throw tenantError
-        }
-
-        if (!tenantData?.company_id) {
-          // No company linked to tenant
-          setStatus(null)
-          setLoading(false)
-          return
-        }
-
-        setCompanyId(tenantData.company_id)
-
-        // STEP 3: Get company status from companies table
-        // This is the SOURCE OF TRUTH
-        const { data: companyData, error: companyError } = await supabase
-          .from('companies')
-          .select('status')
-          .eq('id', tenantData.company_id)
-          .single()
-
-        if (companyError) {
-          if (companyError.code === 'PGRST116') {
-            // Company not found
-            setStatus(null)
-            setLoading(false)
-            return
-          }
-          throw companyError
-        }
-
-        // Set status from company table (DATABASE IS SOURCE OF TRUTH)
-        setStatus(companyData.status)
+        // Mapped to the vocabulary the router already speaks, so nothing
+        // downstream has to learn a second one. `staff` and `anonymous` both
+        // resolve to null — neither is a company waiting on anything, and the
+        // router lets both through.
+        setStatus(
+          row.state === 'pending_review' ? COMPANY_STATUS.PENDING
+            : row.state === 'approved' ? COMPANY_STATUS.ACTIVE
+              : row.state === 'rejected' ? COMPANY_STATUS.REJECTED
+                : row.state === 'suspended' ? COMPANY_STATUS.SUSPENDED
+                  : null,
+        )
         setError(null)
       } catch (err) {
-        console.error('❌ Failed to resolve company status:', err)
-        setError(err.message)
+        setError(err.message || 'تعذّر قراءة حالة الحساب')
         setStatus(null)
       } finally {
         setLoading(false)
@@ -115,6 +99,8 @@ export function useCompanyStatus() {
     status,      // null | pending | approved | rejected | suspended
     companyId,
     tenantId,
+    companyName,
+    rejectionReason,
     loading,
     error
   }
