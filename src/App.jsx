@@ -41,6 +41,7 @@ const ReportsAboutUs = lazy(() => import('./pages/ReportsAboutUs'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const AdminRequests = lazy(() => import('./pages/AdminRequests'))
 const AdminReports = lazy(() => import('./pages/AdminReports'))
+const AdminAddReport = lazy(() => import('./pages/AdminAddReport'))
 const AdminBulkImport = lazy(() => import('./pages/AdminBulkImport'))
 const AdminCompaniesManagement = lazy(() => import('./pages/AdminCompaniesManagement'))
 const AdminUsers = lazy(() => import('./pages/AdminUsers'))
@@ -209,6 +210,7 @@ function AppContent() {
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/requests" element={<AdminRoute><AdminRequests /></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />
+          <Route path="/admin/add-report" element={<AdminRoute><AdminAddReport /></AdminRoute>} />
           <Route path="/admin/bulk-import" element={<AdminRoute><AdminBulkImport /></AdminRoute>} />
           <Route path="/admin/companies" element={<AdminRoute><AdminCompaniesManagement /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />

@@ -71,6 +71,7 @@ const GROUPS = [
   ] },
   { key: 'reports', title: 'التقارير', items: [
     { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
+    { label: 'إضافة تقرير', path: '/admin/add-report' },
     { label: 'مستودع التقارير', path: '/admin/knowledge-base/reports' },
     { label: 'الاعتراضات', path: '/admin/disputes' },
   ] },
@@ -107,6 +108,7 @@ const SCREEN_LABELS = {
   '/admin': 'لوحة تحكم الإدارة',
   '/admin/requests': 'مراجعة طلبات الشركات',
   '/admin/reports': 'مراجعة التقارير',
+  '/admin/add-report': 'إضافة تقرير باسم مرصد',
   '/admin/bulk-import': 'رفع دفعة شركات',
   '/admin/companies': 'إدارة الشركات',
   '/admin/users': 'إدارة المستخدمين',
