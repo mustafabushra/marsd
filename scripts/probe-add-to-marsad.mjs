@@ -96,6 +96,41 @@ try {
   ok('مصدرها رسمي ومعتمدة', co.source === 'official' && co.approved === true)
   ok('ومربوطة بسجلّها الحكومي', co.government_company_id === g.id)
 
+  // --- And the score says so ---------------------------------------------------
+  //
+  // Marking `verified` is not the point; the point is the twenty points the
+  // official layer gives for it. A flag nobody reads would pass a check on the
+  // flag and change nothing about the company.
+  const { rows: [ver] } = await c.query(
+    'select verified, verification_source from public.companies where id = $1', [id1])
+  ok('موثّقة', ver.verified === true)
+  ok('ومصدر التوثيق مسمّى', /وزارة التجارة/.test(ver.verification_source || ''),
+    `جاء «${ver.verification_source}»`)
+
+  const { rows: [{ trust_layer_official: withV }] } = await c.query(
+    'select public.trust_layer_official($1)', [id1])
+
+  // Un-verified as an administrator, which is the only role allowed to.
+  //
+  // `company_profile_guard_trigger` refuses a change to `verified` from anyone
+  // who is not a platform admin — a company must not be able to declare itself
+  // verified, and an anonymous caller must not either. Two versions of this
+  // probe were refused by it before the comparison was possible, which is the
+  // guard working rather than the flow failing.
+  const { rows: [admin] } = await c.query(
+    `select id from public.users where role = 'platform_admin' limit 1`)
+  await c.query('savepoint unverify')
+  await asUser(admin.id)
+  await c.query('update public.companies set verified = false where id = $1', [id1])
+  const { rows: [{ trust_layer_official: without }] } = await c.query(
+    'select public.trust_layer_official($1)', [id1])
+  await c.query('rollback to savepoint unverify')
+  await asUser(me.id)
+
+  ok('والطبقة الرسمية أعلى بسببه', Number(withV) > Number(without),
+    `${without} → ${withV} — التوثيق لا يُحتسب`)
+  console.log(`     الطبقة الرسمية: ${without} بلا توثيق · ${withV} بتوثيق الوزارة`)
+
   // --- Pressing it twice -------------------------------------------------------
   const { rows: [{ add_registry_company_to_marsad: id2 }] } = await c.query(
     'select public.add_registry_company_to_marsad($1)', [g.id])
