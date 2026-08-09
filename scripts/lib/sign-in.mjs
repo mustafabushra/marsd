@@ -111,9 +111,12 @@ export function prepareClerk() {
  * is an ordinary session — the app is not told how it was created. Nothing is
  * stubbed, so what the audit measures is still the product.
  */
-export async function signIn(page, base) {
+export async function signIn(page, base, { role } = {}) {
   await prepareClerk()
-  const userId = await ensureTestUser()
+  // The role is passed through rather than fixed. Admin screens sit behind
+  // AdminRoute, and a probe signed in as a company account measures the redirect
+  // it gets sent to instead of the page it came for.
+  const userId = await ensureTestUser(role ? { role } : undefined)
 
   const { createClerkClient } = await import('@clerk/backend')
   const ck = createClerkClient({ secretKey: CLERK_SECRET })

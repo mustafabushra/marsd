@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { getSupabase } from '../lib/api'
 import {
   PORTAL_URL, REGISTRY_COLUMNS, describeHeaders, fetchDatasetInfo, toCompany,
@@ -26,9 +25,10 @@ import {
  * ============================================================================
  * In batches, and resumable
  * ============================================================================
- * A quarter is hundreds of thousands of rows. One request would time out, and a
- * failure halfway would leave nobody knowing what had landed. Rows go up in
- * batches, the count is on screen while it happens, and stopping is allowed —
+ * A quarter is hundreds of thousands of rows. Reading it happens in a worker —
+ * doing it here killed the tab outright — and the rows go up in batches, because
+ * one request would time out and a failure halfway would leave nobody knowing
+ * what had landed. The count is on screen throughout, and stopping is allowed —
  * `cr_number` is unique, so re-running the same file updates what is there
  * instead of duplicating it, and an interrupted import is finished by importing
  * the same file again.
@@ -63,33 +63,69 @@ export default function AdminRegistryImport() {
   }, [])
 
   // --- Reading the sheet ------------------------------------------------------
-  const readFile = useCallback(async (file) => {
+  //
+  // In a worker. The first version read the file in this handler, and on a real
+  // quarter of the register — hundreds of thousands of rows — Chrome killed the
+  // tab before it finished: `RESULT_CODE_HUNG`. The upload was batched; the
+  // parse was not, and the parse is the larger half.
+  const [stage, setStage] = useState('')
+  const worker = useRef(null)
+
+  useEffect(() => () => worker.current?.terminate(), [])
+
+  const readFile = useCallback((file) => {
     setError('')
     setRows([])
+    setHeaders([])
     setFinished(false)
     setDone(0)
     setWritten(0)
+    setFileName(file.name)
+    setStage('جاري فتح الملف…')
 
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
       setError('نوع الملف غير مدعوم — Excel أو CSV')
+      setStage('')
       return
     }
 
-    try {
-      const buf = await file.arrayBuffer()
-      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      if (!ws) throw new Error('الملف لا يحتوي على أوراق')
+    worker.current?.terminate()
+    const w = new Worker(new URL('../lib/registryParser.worker.js', import.meta.url), { type: 'module' })
+    worker.current = w
 
-      const data = XLSX.utils.sheet_to_json(ws, { defval: null })
-      if (!data.length) throw new Error('الورقة الأولى فارغة')
+    // Rows arrive in chunks and are appended, so the count climbs while the
+    // file is still being read rather than appearing all at once at the end.
+    const collected = []
 
-      setHeaders(Object.keys(data[0]))
-      setRows(data)
-      setFileName(file.name)
-    } catch (e) {
-      setError(e.message || 'تعذّرت قراءة الملف')
+    w.onmessage = (e) => {
+      const msg = e.data
+      if (msg.type === 'stage') {
+        setStage(msg.stage === 'reading' ? 'جاري قراءة الملف…' : 'جاري تحويل الصفوف…')
+      } else if (msg.type === 'headers') {
+        setHeaders(msg.headers)
+      } else if (msg.type === 'total') {
+        setStage(`جاري تحضير ${msg.total.toLocaleString('ar-SA')} صف…`)
+      } else if (msg.type === 'rows') {
+        collected.push(...msg.rows)
+        setRows(collected.slice())
+      } else if (msg.type === 'done') {
+        setStage('')
+        w.terminate()
+        worker.current = null
+      } else if (msg.type === 'error') {
+        setError(msg.message)
+        setStage('')
+        w.terminate()
+        worker.current = null
+      }
     }
+
+    w.onerror = () => {
+      setError('تعذّرت قراءة الملف — قد يكون تالفاً أو أكبر من ذاكرة المتصفّح')
+      setStage('')
+    }
+
+    w.postMessage({ file })
   }, [])
 
   const { present, missing } = headers.length
@@ -220,13 +256,16 @@ export default function AdminRegistryImport() {
                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readFile(f) }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <button onClick={() => input.current?.click()} disabled={running}
+          <button onClick={() => input.current?.click()} disabled={running || !!stage}
                   style={{ minHeight: '46px', padding: '0 22px', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '11px', fontSize: '14.5px', fontWeight: 800, cursor: running ? 'default' : 'pointer', fontFamily: 'inherit', opacity: running ? 0.5 : 1 }}>
             اختيار الملف
           </button>
           {fileName && (
             <span style={{ fontSize: '13px', color: '#475569' }}>
-              {fileName} — <b>{rows.length.toLocaleString('ar-SA')}</b> صف
+              {fileName}
+              {stage
+                ? ` — ${stage}`
+                : <> — <b className="marsad-row-count">{rows.length.toLocaleString('ar-SA')}</b> صف</>}
             </span>
           )}
         </div>
