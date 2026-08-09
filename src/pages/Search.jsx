@@ -17,6 +17,9 @@ export default function Search() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autocomplete, setAutocomplete] = useState([])
+  // A government record somebody asked to bring into Marsad. Nothing is created
+  // by searching or by looking — only by this.
+  const [adding, setAdding] = useState(null)
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [toast, setToast] = useState('')
   const autocompleteRef = useRef(null)
@@ -236,13 +239,89 @@ export default function Search() {
         return b.score - a.score
       })
 
-      setCompanies(formatted)
-      showToastMessage(`✅ تم العثور على ${formatted.length} شركة`)
+      // --- And what the national register has that Marsad does not ------------
+      //
+      // Appended, never merged into the ranking above: Marsad's own companies
+      // have reports and a score and stay first, which is what somebody
+      // searching Marsad is usually looking for. A government row is a company
+      // that exists; a Marsad row is a company there is something to say about.
+      //
+      // Failing here does not fail the search. The Marsad results are the
+      // product; the register is coverage on top of it, and an outage in one
+      // should not hide the other.
+      let official = []
+      try {
+        const { data: gov } = await getSupabase()
+          .rpc('search_companies_unified', { p_query: q, p_limit: 30 })
+
+        official = (gov || [])
+          .filter((r) => r.origin === 'government')
+          .map((r) => ({
+            id: r.id,
+            government: true,
+            name: r.name,
+            sector: r.registration_type || '—',
+            city: r.city || r.region || '—',
+            crNumber: r.cr_number,
+            unifiedNumber: r.unified_number,
+            snapshot: r.snapshot_period,
+            // No score, and none implied. A gauge reading «—» beside a real one
+            // invites the reading that this company scored badly rather than
+            // that nobody has said anything about it.
+            scoreText: '—',
+            score: 0,
+            gaugeBg: 'conic-gradient(#E2E8F0 0% 100%)',
+            riskLabel: 'بيانات حكومية',
+            color: '#1D4ED8',
+            bg: '#EFF6FF',
+            hasData: false,
+            reports: 0,
+          }))
+      } catch (govError) {
+        console.warn('السجل الحكومي غير متاح:', govError?.message)
+      }
+
+      setCompanies([...formatted, ...official])
+      showToastMessage(official.length
+        ? `✅ ${formatted.length} في مرصد · ${official.length} في السجل الحكومي`
+        : `✅ تم العثور على ${formatted.length} شركة`)
     } catch (err) {
       setError(err.message || 'فشل البحث')
       showToastMessage('❌ حدث خطأ أثناء البحث')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Bring a government record into Marsad.
+   *
+   * The only thing that creates a company. Searching does not, and neither does
+   * looking at one — a million registrations must not become a million rows
+   * nobody asked about.
+   */
+  async function addFromRegistry(row) {
+    setAdding(row.id)
+    try {
+      const { data, error: e } = await getSupabase()
+        .rpc('add_registry_company_to_marsad', { p_registry_id: row.id })
+
+      if (e) throw e
+      // Read back, not assumed. An RPC a policy filtered returns no error and
+      // no id, and «تمت الإضافة» over a company that does not exist is the
+      // failure discovered weeks later.
+      if (!data) throw new Error('لم تُضف الشركة — تحقّق من صلاحيتك')
+
+      showToastMessage('✅ أُضيفت إلى مرصد')
+      // The row is Marsad's now: it carries a company id, a report can be filed
+      // against it, and it stops offering to be added again.
+      setCompanies((list) => list.map((c) => (c.id === row.id
+        ? { ...c, id: data, government: false, hasData: false, riskLabel: 'بيانات غير كافية', color: '#94A3B8', bg: '#F1F5F9' }
+        : c)))
+    } catch (err) {
+      showToastMessage(`❌ ${err.message || 'تعذّرت الإضافة'}`)
+    } finally {
+      setAdding(null)
     }
   }
 
@@ -449,11 +528,26 @@ export default function Search() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>● {c.riskLabel}</span>
-                <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{c.reports} تقرير</span>
+                <span style={{ background: c.bg, color: c.color, borderRadius: '999px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>
+                  {c.government ? '🏛' : '●'} {c.riskLabel}
+                </span>
+                <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>
+                  {/* The registration number, for a company nobody has reported
+                      on yet — it is the only thing about it worth showing, and
+                      «0 تقرير» beside a government record reads as an absence
+                      of trust rather than an absence of history. */}
+                  {c.government ? c.crNumber : `${c.reports} تقرير`}
+                </span>
               </div>
 
-              {c.hasData ? (
+              {c.government ? (
+                <button
+                  onClick={() => addFromRegistry(c)}
+                  disabled={adding === c.id}
+                  style={{ marginTop: 'auto', width: '100%', background: '#1D4ED8', color: '#fff', border: 0, borderRadius: '10px', padding: '11px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {adding === c.id ? 'جاري الإضافة…' : 'إضافة إلى مرصد'}
+                </button>
+              ) : c.hasData ? (
                 <button
                   onClick={() => handleViewReport(c.id)}
                   style={{ marginTop: 'auto', width: '100%', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '10px', padding: '11px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
