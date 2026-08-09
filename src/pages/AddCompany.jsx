@@ -81,6 +81,10 @@ export default function AddCompany() {
   // there is a company id to name their folder after.
   const [docFiles, setDocFiles] = useState({})
   const [docTypes, setDocTypes] = useState([])
+  // Which fields the Ministry filled. Kept so the form can say so, and so the
+  // documents it would otherwise demand are not demanded of a record the
+  // Ministry itself published.
+  const [fromRegistry, setFromRegistry] = useState(null)
 
   // The "أخرى…" escape hatch and the pill-based activity picker are gone. Every
   // list field is now a searchable select that accepts a value outside its list
@@ -168,7 +172,16 @@ export default function AddCompany() {
     }
     // Also enforced by trg_company_requires_cr_doc, which is what actually binds
     // — this only spares the person a round trip and a database message.
-    if (!crFile) {
+    // A record the Ministry published is its own evidence.
+    //
+    // The requirement exists so a reviewer has something to check a person's
+    // claim against. A row from the national register is not a claim — it is
+    // the authority that issues registrations saying this one exists, and there
+    // is no scan to give: the open data file carries fields, not documents.
+    // `add_registry_company_to_marsad` already exempts it; this form did not,
+    // so the same company was accepted through one door and refused at the
+    // other.
+    if (!crFile && !fromRegistry) {
       setError('صورة السجل التجاري مطلوبة — أرفقها قبل الإرسال')
       return
     }
@@ -177,7 +190,7 @@ export default function AddCompany() {
     // The alternative was accepting it with one document and chasing the rest
     // from a company that has no account and no reason to answer — which is how
     // the registry filled with records a reviewer could not verify.
-    const missing = docTypes.filter((t) => !docFiles[t.doc_type])
+    const missing = fromRegistry ? [] : docTypes.filter((t) => !docFiles[t.doc_type])
     if (missing.length) {
       setError(`مستندات ناقصة: ${missing.map((t) => t.label).join('، ')}`)
       return
@@ -395,13 +408,20 @@ export default function AddCompany() {
             ? String(row.registration_date).slice(0, 10) : ''),
       }
     })
+    setFromRegistry({
+      cr: row.cr_number,
+      fields: new Set([
+        'companyName', 'registryNumber', 'unifiedNumber', 'entityType', 'companyType',
+        'crType', 'crStatus', 'capital', 'region', 'city', 'foundingDate',
+      ]),
+    })
     setError('')
   }
 
   // How much is still missing, derived once so the button, its title and its
   // label cannot disagree about it.
-  const docsLeft = docTypes.filter((t) => !docFiles[t.doc_type]).length
-  const ready = !!crFile && docsLeft === 0
+  const docsLeft = fromRegistry ? 0 : docTypes.filter((t) => !docFiles[t.doc_type]).length
+  const ready = !!fromRegistry || (!!crFile && docsLeft === 0)
 
   return (
     <div style={{ maxWidth: '820px', margin: '0 auto' }}>
@@ -511,10 +531,28 @@ export default function AddCompany() {
 
                   { name: 'activities', label: 'أنشطة السجل التجاري', type: 'activities', full: true },
                   { name: 'managers', label: 'المديرون', type: 'managers', full: true },
-                ].map(f => {
+                ]
+                  // Filled fields first.
+                  //
+                  // The list below is written in the order somebody copying
+                  // from a paper certificate moves down it, which is right when
+                  // they are typing. When the Ministry has already answered
+                  // eleven of them, that same order scatters the eleven among
+                  // the blanks and the form reads as barely started.
+                  //
+                  // `sort` is stable, so within each group the deliberate order
+                  // survives — this lifts a block, it does not reshuffle.
+                  .slice()
+                  .sort((a, b) => {
+                    if (!fromRegistry) return 0
+                    return (fromRegistry.fields.has(b.name) ? 1 : 0)
+                         - (fromRegistry.fields.has(a.name) ? 1 : 0)
+                  })
+                  .map(f => {
                   if (f.onlyWhen && !f.onlyWhen(formData)) return null
                   const baseInput = { width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', fontSize: '15px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }
                   const fromImport = imported[f.name]
+                  const fromGov = fromRegistry?.fields.has(f.name) && String(formData[f.name] || '').trim()
                   return (
                     <div key={f.name} style={f.full ? { gridColumn: '1/3' } : undefined}>
                       <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
@@ -522,6 +560,15 @@ export default function AddCompany() {
                         {fromImport && (
                           <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '6px', padding: '2px 7px', fontSize: '10.5px', fontWeight: 800 }}>
                             من المستند
+                          </span>
+                        )}
+                        {/* Where a value came from is worth saying. A reviewer
+                            needs to know which fields carry the Ministry's word
+                            and which carry somebody's typing, and so does the
+                            person filling the rest. */}
+                        {fromGov && !fromImport && (
+                          <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', padding: '2px 7px', fontSize: '10.5px', fontWeight: 800 }}>
+                            🏛 من السجل التجاري
                           </span>
                         )}
                       </label>
@@ -575,8 +622,20 @@ export default function AddCompany() {
                 })}
                 <div style={{ gridColumn: '1/3' }}>
                   <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>
-                    السجل التجاري <span style={{ color: '#B91C1C' }}>*</span>
-                    <span style={{ fontWeight: 600, color: '#64748B' }}> — مطلوب لإضافة الشركة</span>
+                    السجل التجاري
+                    {/* The asterisk is a promise about what will be refused.
+                        For a record the Ministry published nothing is refused,
+                        and leaving it there would be the form contradicting
+                        itself in the same screen. */}
+                    {!fromRegistry && (
+                      <>
+                        <span style={{ color: '#B91C1C' }}> *</span>
+                        <span style={{ fontWeight: 600, color: '#64748B' }}> — مطلوب لإضافة الشركة</span>
+                      </>
+                    )}
+                    {fromRegistry && (
+                      <span style={{ fontWeight: 600, color: '#64748B' }}> — اختياري</span>
+                    )}
                   </label>
                   {crFile ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1.5px solid #BBF7D0', background: '#F0FDF4', borderRadius: '12px', padding: '14px 16px' }}>
@@ -600,6 +659,19 @@ export default function AddCompany() {
                 {/* Disabled rather than failing on click: the document is the one
                     requirement a person cannot satisfy by retyping, and finding
                     that out after pressing send is the wrong moment. */}
+                {/* Not asked of a record the Ministry published. The block
+                    still appears for a company somebody is entering by hand,
+                    which is where the requirement means something. */}
+                {fromRegistry ? (
+                  <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '13px', padding: '15px', marginBottom: '16px', fontSize: '13px', color: '#1E3A8A', lineHeight: 1.95 }}>
+                    🏛 بيانات هذه الشركة من السجل التجاري الرسمي — لا حاجة لإرفاق
+                    مستندات.
+                    <br />
+                    <span style={{ color: '#3B5BA9' }}>
+                      يمكنك إضافة أي مستند لاحقاً من صفحة الشركة.
+                    </span>
+                  </div>
+                ) : (
                 <div style={{ marginBottom: '16px' }}>
                   <RequiredCompanyDocuments
                     files={docFiles}
@@ -608,14 +680,16 @@ export default function AddCompany() {
                     disabled={submitting}
                   />
                 </div>
+                )}
 
                 <button onClick={handleSubmit} disabled={submitting || !ready}
-                        title={docsLeft ? `ناقص ${docsLeft} مستند` : (!crFile ? 'أرفق صورة السجل التجاري أولاً' : '')}
+                        title={fromRegistry ? '' : docsLeft ? `ناقص ${docsLeft} مستند` : (!crFile ? 'أرفق صورة السجل التجاري أولاً' : '')}
                         style={{ background: submitting || !ready ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting || !ready ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                   {/* The label says what is missing rather than «إرسال» greyed
                       out with no reason. A disabled button that does not
                       explain itself is a dead end somebody stares at. */}
                   {submitting ? 'جاري الإرسال...'
+                    : fromRegistry ? 'إرسال طلب الإضافة'
                     : !crFile ? 'أرفق السجل التجاري للإرسال'
                     : docsLeft ? `ناقص ${docsLeft} مستند`
                     : 'إرسال طلب الإضافة'}

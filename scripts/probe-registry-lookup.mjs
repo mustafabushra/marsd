@@ -108,6 +108,24 @@ try {
   ok('وحالة السجل «نشط»', !!values['نشط'],
     'تُرك فارغاً — والمستخدم سيعيد إدخاله من نفس المستند')
 
+  // --- The contradiction between two doors ---------------------------------
+  //
+  // `add_registry_company_to_marsad` exempts an official record from the
+  // commercial-registration-scan requirement — the Ministry is the document.
+  // This form demanded it anyway, so the same company was accepted through one
+  // door and refused at the other.
+  ok('لا يُطلب إرفاق مستندات لسجل رسمي',
+    await page.locator('text=/لا حاجة لإرفاق مستندات/').count() > 0,
+    'ما زال يطلبها — تناقض مع المسار الآخر')
+  ok('والسجل التجاري صار اختيارياً',
+    await page.locator('text=/السجل التجاري — اختياري/').count() > 0)
+  ok('وزر الإرسال جاهز بلا مرفقات',
+    await page.locator('button:has-text("إرسال طلب الإضافة")').isEnabled())
+
+  // --- Where each value came from ---------------------------------------------
+  const badges = await page.locator('text=/من السجل التجاري/').count()
+  ok('الحقول المملوءة معلَّمة بمصدرها', badges >= 10, `${badges} شارة`)
+
   // And a way past it.
   ok('يوجد طريق للمتابعة يدوياً',
     await page.locator('button:has-text("متابعة الإدخال يدوياً")').count() > 0)
