@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
+import RegistryLookup from '../components/RegistryLookup'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
@@ -349,6 +350,38 @@ export default function AddCompany() {
     }
   }
 
+  /**
+   * Fill the form from a government record.
+   *
+   * Only the empty fields. Somebody who has already typed a name and then
+   * pastes a registration number should not watch their own words replaced by
+   * the Ministry's — the register is better evidence, but it is not a reason to
+   * overwrite what a person deliberately entered.
+   */
+  function fillFromRegistry(row) {
+    setFormData((d) => {
+      const take = (current, incoming) => (String(current || '').trim() ? current : (incoming ?? ''))
+      return {
+        ...d,
+        companyName: take(d.companyName, row.name),
+        registryNumber: take(d.registryNumber, row.cr_number),
+        unifiedNumber: take(d.unifiedNumber, row.unified_number),
+        entityType: take(d.entityType, row.legal_entity),
+        crType: take(d.crType, row.registration_type),
+        capital: take(d.capital, row.capital != null ? String(row.capital) : ''),
+        region: take(d.region, row.region),
+        city: take(d.city, row.city),
+        // Only a real date. The Ministry's CSV has carried values like
+        // «12:22.7» — Excel's idea of a date after a round trip — and putting
+        // one of those into a date field is worse than leaving it empty.
+        foundingDate: take(d.foundingDate,
+          /^\d{4}-\d{2}-\d{2}/.test(String(row.registration_date || '')) 
+            ? String(row.registration_date).slice(0, 10) : ''),
+      }
+    })
+    setError('')
+  }
+
   // How much is still missing, derived once so the button, its title and its
   // label cannot disagree about it.
   const docsLeft = docTypes.filter((t) => !docFiles[t.doc_type]).length
@@ -358,6 +391,16 @@ export default function AddCompany() {
     <div style={{ maxWidth: '820px', margin: '0 auto' }}>
         {!submitted ? (
           <>
+            {/* Asked while the number is being typed, not after the form is
+                filled. Now that Marsad holds the national register, most
+                companies somebody thinks to add are already in it — and
+                learning that at the end wastes everything they entered. */}
+            <RegistryLookup
+              crNumber={formData.registryNumber}
+              unifiedNumber={formData.unifiedNumber}
+              onFill={fillFromRegistry}
+            />
+
             <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '14px', padding: '16px 20px', marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center' }}>
               <span style={{ fontSize: '20px' }}>🏢</span>
               <div>
