@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import {
-  PORTAL_URL, REGISTRY_COLUMNS, describeHeaders, fetchDatasetInfo, toCompany,
+  DATASET_ID, PORTAL_URL, REGISTRY_COLUMNS, describeHeaders, fetchDatasetInfo,
 } from '../lib/registryDataset'
 
 /**
@@ -70,6 +70,10 @@ export default function AdminRegistryImport() {
   // tab before it finished: `RESULT_CODE_HUNG`. The upload was batched; the
   // parse was not, and the parse is the larger half.
   const [stage, setStage] = useState('')
+  // Which publication these rows belong to. Taken from the dataset's own title
+  // so a row can always be traced to the quarter it was published in — Q3 is a
+  // different snapshot, not an update to Q2.
+  const snapshot = info?.titleAr || 'غير محدّد'
   const worker = useRef(null)
 
   useEffect(() => () => worker.current?.terminate(), [])
@@ -177,24 +181,20 @@ export default function AdminRegistryImport() {
 
         if (companies.length) {
           const { data, error: e } = await supabase
-            .from('companies')
+            .from('government_company_registry')
             .upsert(companies.map((c) => ({
+              dataset_id: DATASET_ID,
+              snapshot_period: snapshot,
               cr_number: c.crNumber,
               name: c.name,
               unified_number: c.unifiedNumber,
-              cr_type: c.crType,
-              entity_type: c.entityType,
+              registration_type: c.crType,
+              legal_entity: c.entityType,
               capital: c.capital,
               region: c.region,
               city: c.city,
-              founding_date: c.foundingDate,
-              // The Ministry issues these. They are not somebody's submission,
-              // and they do not queue for a review that could not read a
-              // million of them anyway.
-              source: 'official',
-              approved: true,
-              status: 'active',
-            })), { onConflict: 'cr_number' })
+              registration_date: c.foundingDate,
+            })), { onConflict: 'dataset_id,cr_number' })
             .select('id')
 
           // Read back, not assumed. An upsert RLS filters out returns no error
@@ -216,7 +216,7 @@ export default function AdminRegistryImport() {
     } finally {
       setRunning(false)
     }
-  }, [total, done, written])
+  }, [total, done, written, snapshot])
 
   const pct = total ? Math.round((done / total) * 100) : 0
 
@@ -229,7 +229,8 @@ export default function AdminRegistryImport() {
       </h1>
       <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 20px', lineHeight: 1.9 }}>
         السجلات التجارية القائمة، كما تنشرها وزارة التجارة على بوابة البيانات
-        المفتوحة. تُدخَل كبيانات رسمية بلا مراجعة، ويُحدَّث الموجود بدل تكراره.
+        المفتوحة. تُحفَظ كسجل حكومي مستقل — <b>ولا تصير شركات في مرصد</b> إلا
+        حين يطلب أحد ذلك من صفحة البحث.
       </p>
 
       {/* --- Provenance --- */}
