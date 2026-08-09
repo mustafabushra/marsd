@@ -88,11 +88,25 @@ try {
   })
 
   ok('الاسم مُلئ', !!values['مصنع الفحص للبلاستيك'])
-  ok('الكيان القانوني التفصيلي مُلئ', !!values['شركة ذات مسؤولية محدودة'],
-    Object.keys(values).join(' | ').slice(0, 90))
+  // The expected values are the option list's own, not the file's wording.
+  // «شركة ذات مسؤولية محدودة» in the register becomes «شركة» + «ذات مسؤولية
+  // محدودة» in the form, and «رئيسي» becomes «سجل رئيسي» — which is the
+  // vocabulary doing its job. The first version of this probe asserted the raw
+  // strings and failed against a form that was filled correctly.
+  const shown = Object.keys(values).join(' | ')
   ok('رأس المال مُلئ', !!values['750000'])
   ok('المدينة مُلئت', !!values['الدمام'])
   ok('تاريخ القيد مُلئ', !!values['2018-05-12'])
+
+  // «شركة ذات مسؤولية محدودة» answers two questions, and both fields take one.
+  ok('نوع المنشأة مُلئ', !!values['شركة'], shown)
+  ok('ونوع الشركة التفصيلي', !!values['ذات مسؤولية محدودة'], shown)
+  ok('ونوع السجل', !!values['سجل رئيسي'], shown)
+
+  // Every row in «السجلات التجارية القائمة» is an active registration. That is
+  // a fact about the publication, not a guess about the company.
+  ok('وحالة السجل «نشط»', !!values['نشط'],
+    'تُرك فارغاً — والمستخدم سيعيد إدخاله من نفس المستند')
 
   // And a way past it.
   ok('يوجد طريق للمتابعة يدوياً',

@@ -359,6 +359,10 @@ export default function AddCompany() {
    * overwrite what a person deliberately entered.
    */
   function fillFromRegistry(row) {
+    // Split once, outside the updater: a state updater can run twice in React
+    // strict mode, and work that is not idempotent does not belong in one.
+    const split = splitEntityType(row.legal_entity || '')
+
     setFormData((d) => {
       const take = (current, incoming) => (String(current || '').trim() ? current : (incoming ?? ''))
       return {
@@ -366,8 +370,20 @@ export default function AddCompany() {
         companyName: take(d.companyName, row.name),
         registryNumber: take(d.registryNumber, row.cr_number),
         unifiedNumber: take(d.unifiedNumber, row.unified_number),
-        entityType: take(d.entityType, row.legal_entity),
-        crType: take(d.crType, row.registration_type),
+        // «شركة ذات مسؤولية محدودة» is two answers to two questions: the kind
+        // of entity, and the company form. `splitEntityType` already knows how
+        // to separate them — and knows that «مؤسسة فردية» must not come back as
+        // «شركة» just because the phrase is long. Writing that logic a second
+        // time here would give the two places a chance to disagree.
+        entityType: take(d.entityType, split.entityType),
+        companyType: take(d.companyType, split.companyType),
+        crType: take(d.crType, matchOption('crType', row.registration_type) || row.registration_type),
+
+        // Every row in this dataset is an active registration — «السجلات
+        // التجارية القائمة» is what it publishes. That is a fact about the
+        // publication, not a guess about the company, so it is filled in rather
+        // than left for somebody to re-enter from the same document.
+        crStatus: take(d.crStatus, 'نشط'),
         capital: take(d.capital, row.capital != null ? String(row.capital) : ''),
         region: take(d.region, row.region),
         city: take(d.city, row.city),
