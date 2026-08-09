@@ -40,7 +40,8 @@ export default function AdminRegistryImport() {
   const [info, setInfo] = useState(null)
   const [infoError, setInfoError] = useState('')
 
-  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [atExcelLimit, setAtExcelLimit] = useState(false)
   const [headers, setHeaders] = useState([])
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
@@ -75,7 +76,8 @@ export default function AdminRegistryImport() {
 
   const readFile = useCallback((file) => {
     setError('')
-    setRows([])
+    setTotal(0)
+    setAtExcelLimit(false)
     setHeaders([])
     setFinished(false)
     setDone(0)
@@ -95,28 +97,22 @@ export default function AdminRegistryImport() {
 
     // Rows arrive in chunks and are appended, so the count climbs while the
     // file is still being read rather than appearing all at once at the end.
-    const collected = []
-
     w.onmessage = (e) => {
       const msg = e.data
       if (msg.type === 'stage') {
         setStage(msg.stage === 'reading' ? 'جاري قراءة الملف…' : 'جاري تحويل الصفوف…')
-      } else if (msg.type === 'headers') {
+      } else if (msg.type === 'ready') {
+        // Headers and a count. The rows themselves stay in the worker — a
+        // million of them crossing to this thread is two full copies in memory
+        // and a React state update per chunk, which is how the tab died the
+        // second time.
         setHeaders(msg.headers)
-      } else if (msg.type === 'total') {
-        setStage(`جاري تحضير ${msg.total.toLocaleString('ar-SA')} صف…`)
-      } else if (msg.type === 'rows') {
-        collected.push(...msg.rows)
-        setRows(collected.slice())
-      } else if (msg.type === 'done') {
+        setTotal(msg.total)
+        setAtExcelLimit(!!msg.atExcelLimit)
         setStage('')
-        w.terminate()
-        worker.current = null
       } else if (msg.type === 'error') {
         setError(msg.message)
         setStage('')
-        w.terminate()
-        worker.current = null
       }
     }
 
@@ -125,7 +121,7 @@ export default function AdminRegistryImport() {
       setStage('')
     }
 
-    w.postMessage({ file })
+    w.postMessage({ type: 'read', file })
   }, [])
 
   const { present, missing } = headers.length
@@ -137,48 +133,68 @@ export default function AdminRegistryImport() {
   const hasCr = present.some((c) => c.field === 'crNumber')
 
   // --- Sending it ---------------------------------------------------------------
+  //
+  // One batch in memory at a time, whatever the file holds. The page asks the
+  // worker for rows `from…from+BATCH`, already mapped, uploads them, and asks
+  // for the next — so a million-row file costs the same as a thousand-row one
+  // and nothing is ever copied twice.
   const run = useCallback(async () => {
+    const w = worker.current
+    if (!w) { setError('أعد اختيار الملف'); return }
+
     setRunning(true)
     setFinished(false)
     setError('')
     stop.current = false
 
     const supabase = getSupabase()
-    let sent = 0
-    let saved = 0
+    let saved = written
+    let readAny = 0
+
+    /** Ask the worker for one batch. */
+    const askFor = (from) => new Promise((resolve, reject) => {
+      const onMessage = (e) => {
+        if (e.data?.type !== 'batch') return
+        w.removeEventListener('message', onMessage)
+        resolve(e.data)
+      }
+      w.addEventListener('message', onMessage)
+      // A worker that has been terminated never answers, and a promise that
+      // never settles is a progress bar that stops with no explanation.
+      setTimeout(() => {
+        w.removeEventListener('message', onMessage)
+        reject(new Error('لم يستجب قارئ الملف — أعد اختيار الملف'))
+      }, 60000)
+      w.postMessage({ type: 'batch', from, size: BATCH })
+    })
 
     try {
-      for (let i = 0; i < rows.length; i += BATCH) {
+      for (let from = done; from < total; from += BATCH) {
         if (stop.current) break
 
-        const batch = rows.slice(i, i + BATCH)
-          .map(toCompany)
-          // A row without a registration number has no identity in this
-          // registry and nothing to match on later. Dropped, and counted as
-          // read so the numbers on screen still add up.
-          .filter((c) => c.crNumber && c.name)
-          .map((c) => ({
-            cr_number: c.crNumber,
-            name: c.name,
-            unified_number: c.unifiedNumber,
-            cr_type: c.crType,
-            entity_type: c.entityType,
-            capital: c.capital,
-            region: c.region,
-            city: c.city,
-            founding_date: c.foundingDate,
-            // The Ministry issues these. They are not somebody's submission,
-            // and they do not queue for a review that could not read a hundred
-            // thousand of them anyway.
-            source: 'official',
-            approved: true,
-            status: 'active',
-          }))
+        const { companies, read } = await askFor(from)
+        readAny += read
 
-        if (batch.length) {
+        if (companies.length) {
           const { data, error: e } = await supabase
             .from('companies')
-            .upsert(batch, { onConflict: 'cr_number' })
+            .upsert(companies.map((c) => ({
+              cr_number: c.crNumber,
+              name: c.name,
+              unified_number: c.unifiedNumber,
+              cr_type: c.crType,
+              entity_type: c.entityType,
+              capital: c.capital,
+              region: c.region,
+              city: c.city,
+              founding_date: c.foundingDate,
+              // The Ministry issues these. They are not somebody's submission,
+              // and they do not queue for a review that could not read a
+              // million of them anyway.
+              source: 'official',
+              approved: true,
+              status: 'active',
+            })), { onConflict: 'cr_number' })
             .select('id')
 
           // Read back, not assumed. An upsert RLS filters out returns no error
@@ -188,25 +204,21 @@ export default function AdminRegistryImport() {
           saved += data?.length || 0
         }
 
-        sent += batch.length
-        setDone(Math.min(i + BATCH, rows.length))
+        setDone(Math.min(from + BATCH, total))
         setWritten(saved)
-
-        // Let the screen paint. Without this the tab freezes for the length of
-        // the import and the progress nobody can see is worth nothing.
         await new Promise((r) => setTimeout(r, 0))
       }
 
       setFinished(!stop.current)
-      if (sent === 0) setError('لم يُقرأ أي صف صالح — تحقّق من أن الملف هو ملف السجلات التجارية')
+      if (readAny === 0) setError('لم يُقرأ أي صف صالح — تحقّق من أن الملف هو ملف السجلات التجارية')
     } catch (e) {
       setError(e.message || 'تعذّر إتمام الاستيراد')
     } finally {
       setRunning(false)
     }
-  }, [rows])
+  }, [total, done, written])
 
-  const pct = rows.length ? Math.round((done / rows.length) * 100) : 0
+  const pct = total ? Math.round((done / total) * 100) : 0
 
   const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px', marginBottom: '18px' }
 
@@ -265,7 +277,7 @@ export default function AdminRegistryImport() {
               {fileName}
               {stage
                 ? ` — ${stage}`
-                : <> — <b className="marsad-row-count">{rows.length.toLocaleString('ar-SA')}</b> صف</>}
+                : <> — <b className="marsad-row-count">{total.toLocaleString('ar-SA')}</b> صف</>}
             </span>
           )}
         </div>
@@ -289,6 +301,25 @@ export default function AdminRegistryImport() {
           </div>
         )}
 
+        {/* Excel's ceiling, not a coincidence.
+
+            1,048,576 is the maximum number of rows a worksheet can hold. A file
+            that lands exactly there was almost certainly cut off when it was
+            saved, and importing it silently leaves out whatever came after —
+            which surfaces months later as companies that are simply not in the
+            registry, with nothing to explain why. */}
+        {atExcelLimit && (
+          <div style={{ marginTop: '14px', background: '#FFFBEB', border: '1px solid #FDE68A', color: '#B45309', borderRadius: '11px', padding: '13px', fontSize: '13px', fontWeight: 700, lineHeight: 1.9 }}>
+            ⚠️ الملف يحتوي {total.toLocaleString('ar-SA')} صف — وهو الحدّ الأقصى
+            لصفوف Excel. على الأرجح أن الملف الأصلي أكبر وقُطع عند الحفظ.
+            <br />
+            <span style={{ fontWeight: 600 }}>
+              يمكنك الاستيراد الآن، لكن ما بعد هذا الصف لن يدخل. الأفضل تنزيل
+              الملف بصيغة CSV إن كانت متاحة، أو تقسيمه.
+            </span>
+          </div>
+        )}
+
         {headers.length > 0 && !hasCr && (
           <div style={{ marginTop: '14px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '11px', padding: '12px', fontSize: '13px', fontWeight: 700, lineHeight: 1.85 }}>
             لا يوجد عمود «رقم السجل» — هذا ليس ملف السجلات التجارية.
@@ -303,12 +334,12 @@ export default function AdminRegistryImport() {
       </div>
 
       {/* --- Running --- */}
-      {rows.length > 0 && hasCr && (
+      {total > 0 && hasCr && (
         <div style={card}>
           {running || done > 0 ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '9px' }}>
-                <span>{done.toLocaleString('ar-SA')} من {rows.length.toLocaleString('ar-SA')}</span>
+                <span>{done.toLocaleString('ar-SA')} من {total.toLocaleString('ar-SA')}</span>
                 <span>{pct}%</span>
               </div>
               <div style={{ height: '8px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
