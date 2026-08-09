@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/react'
+import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
@@ -75,6 +76,10 @@ export default function AddCompany() {
   const [managers, setManagers] = useState([])       // ['اسم']
 
   const [crFile, setCrFile] = useState(null) // { name, url(base64) }
+  // The documents the checklist marks required, held as File objects until
+  // there is a company id to name their folder after.
+  const [docFiles, setDocFiles] = useState({})
+  const [docTypes, setDocTypes] = useState([])
 
   // The "أخرى…" escape hatch and the pill-based activity picker are gone. Every
   // list field is now a searchable select that accepts a value outside its list
@@ -164,6 +169,16 @@ export default function AddCompany() {
     // — this only spares the person a round trip and a database message.
     if (!crFile) {
       setError('صورة السجل التجاري مطلوبة — أرفقها قبل الإرسال')
+      return
+    }
+    // A company arrives complete or it does not arrive.
+    //
+    // The alternative was accepting it with one document and chasing the rest
+    // from a company that has no account and no reason to answer — which is how
+    // the registry filled with records a reviewer could not verify.
+    const missing = docTypes.filter((t) => !docFiles[t.doc_type])
+    if (missing.length) {
+      setError(`مستندات ناقصة: ${missing.map((t) => t.label).join('، ')}`)
       return
     }
     setSubmitting(true)
@@ -298,6 +313,23 @@ export default function AddCompany() {
         }])
       }
 
+      // The documents, now that the folder has a name.
+      //
+      // After the audit entry rather than before: if a file fails to reach
+      // storage the company is still recorded and still reviewable, and the
+      // person is told which one to send again. Losing the whole submission
+      // over one upload would be the worse trade.
+      if (user?.id) {
+        const { data: me } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+        const failed = await uploadCompanyDocuments(docFiles, {
+          companyId: company.id, tenantId: me?.tenant_id || null, userId: user.id,
+        })
+        if (failed.length) {
+          const names = failed.map((k) => docTypes.find((t) => t.doc_type === k)?.label || k)
+          setError(`أُضيفت الشركة، لكن تعذّر رفع: ${names.join('، ')} — أرسلها من صفحة الشركة`)
+        }
+      }
+
       // No credit is awarded here. It used to be, on the reasoning that a
       // contributor should not wait on a review queue — which ignored what the
       // reward buys: forty junk entries would reach the monthly ceiling of 200
@@ -316,6 +348,11 @@ export default function AddCompany() {
       setSubmitting(false)
     }
   }
+
+  // How much is still missing, derived once so the button, its title and its
+  // label cannot disagree about it.
+  const docsLeft = docTypes.filter((t) => !docFiles[t.doc_type]).length
+  const ready = !!crFile && docsLeft === 0
 
   return (
     <div style={{ maxWidth: '820px', margin: '0 auto' }}>
@@ -504,10 +541,25 @@ export default function AddCompany() {
                 {/* Disabled rather than failing on click: the document is the one
                     requirement a person cannot satisfy by retyping, and finding
                     that out after pressing send is the wrong moment. */}
-                <button onClick={handleSubmit} disabled={submitting || !crFile}
-                        title={!crFile ? 'أرفق صورة السجل التجاري أولاً' : ''}
-                        style={{ background: submitting || !crFile ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting || !crFile ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-                  {submitting ? 'جاري الإرسال...' : (crFile ? 'إرسال طلب الإضافة' : 'أرفق السجل التجاري للإرسال')}
+                <div style={{ marginBottom: '16px' }}>
+                  <RequiredCompanyDocuments
+                    files={docFiles}
+                    onChange={setDocFiles}
+                    onTypesLoaded={setDocTypes}
+                    disabled={submitting}
+                  />
+                </div>
+
+                <button onClick={handleSubmit} disabled={submitting || !ready}
+                        title={docsLeft ? `ناقص ${docsLeft} مستند` : (!crFile ? 'أرفق صورة السجل التجاري أولاً' : '')}
+                        style={{ background: submitting || !ready ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting || !ready ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {/* The label says what is missing rather than «إرسال» greyed
+                      out with no reason. A disabled button that does not
+                      explain itself is a dead end somebody stares at. */}
+                  {submitting ? 'جاري الإرسال...'
+                    : !crFile ? 'أرفق السجل التجاري للإرسال'
+                    : docsLeft ? `ناقص ${docsLeft} مستند`
+                    : 'إرسال طلب الإضافة'}
                 </button>
                 <button onClick={() => navigate('/search')} disabled={submitting} style={{ background: '#fff', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '13px 28px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
               </div>
