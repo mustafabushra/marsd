@@ -74,6 +74,9 @@ export default function AdminRegistryImport() {
   // so a row can always be traced to the quarter it was published in — Q3 is a
   // different snapshot, not an update to Q2.
   const snapshot = info?.titleAr || 'غير محدّد'
+  // The portal gives a publication date; without it the import date is the
+  // best evidence there is, and it is at least monotonic per file.
+  const snapshotAt = (info?.updatedAt || new Date().toISOString()).slice(0, 10)
   const worker = useRef(null)
 
   useEffect(() => () => worker.current?.terminate(), [])
@@ -185,6 +188,10 @@ export default function AdminRegistryImport() {
             .upsert(companies.map((c) => ({
               dataset_id: DATASET_ID,
               snapshot_period: snapshot,
+              // The quarter the data describes, not the day we loaded it.
+              // Search shows the most recent publication of each company, and
+              // catching up on a missed quarter must not make it look newest.
+              snapshot_at: snapshotAt,
               cr_number: c.crNumber,
               name: c.name,
               unified_number: c.unifiedNumber,
@@ -216,7 +223,7 @@ export default function AdminRegistryImport() {
     } finally {
       setRunning(false)
     }
-  }, [total, done, written, snapshot])
+  }, [total, done, written, snapshot, snapshotAt])
 
   const pct = total ? Math.round((done / total) * 100) : 0
 
