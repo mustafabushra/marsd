@@ -88,6 +88,7 @@ const GROUPS = [
   ] },
   { key: 'platform', title: 'المنصة', items: [
     { label: 'الاستيراد الجماعي', path: '/admin/bulk-import' },
+    { label: '⚡ استيراد من السجل التجاري', path: '/admin/registry-import' },
     { label: 'المستخدمون', path: '/admin/users' },
     { label: 'حسابات الشركات', path: '/admin/tenants' },
     { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
@@ -108,6 +109,7 @@ const SCREEN_LABELS = {
   '/admin': 'لوحة تحكم الإدارة',
   '/admin/requests': 'مراجعة طلبات الشركات',
   '/admin/reports': 'مراجعة التقارير',
+  '/admin/registry-import': 'استيراد من السجل التجاري',
   '/admin/add-report': 'إضافة تقرير باسم مرصد',
   '/admin/bulk-import': 'رفع دفعة شركات',
   '/admin/companies': 'إدارة الشركات',
