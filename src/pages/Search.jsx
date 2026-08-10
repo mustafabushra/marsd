@@ -215,8 +215,11 @@ export default function Search() {
         status: c.registration_status,
       }))
 
-      // Show only published companies — hide suspended / pending / rejected (unapproved)
-      formatted = formatted.filter(c => c.status === 'active' || c.status === 'approved')
+      // Visibility is decided in the database, by `status = 'active'`, and the
+      // 'approved' half of this filter was a synonym that no longer exists.
+      // Filtering again here would only hide a disagreement between the two
+      // rules instead of surfacing it.
+      formatted = formatted.filter(c => c.status === 'active')
 
       // Client-side filters (the KB RPC only handles source/status).
       const looseMatch = (val, f) => {

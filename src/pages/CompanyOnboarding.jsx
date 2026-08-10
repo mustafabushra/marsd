@@ -366,15 +366,17 @@ export default function CompanyOnboarding() {
 
         // ===== The request, and its documents =====
         //
+        // The request arrives with the company: `register_company_for_current_user`
+        // opens it in the same transaction. Opening it from here was a second
+        // write from a second place, and a browser closed between the two calls
+        // left a company with an account and no request — invisible to the queue
+        // and unable to be resumed.
+        //
         // The documents attach to the request rather than floating beside the
         // company, so a reviewer opens one thing and finds the company, what
         // was entered, and every file that came with it.
-        const { data: requestId, error: reqError } = await supabase
-          .rpc('open_company_request', {
-            p_company_id: created.company_id,
-            p_kind: 'registration',
-          })
-        if (reqError) throw new Error(reqError.message)
+        const requestId = created.request_id
+        if (!requestId) throw new Error('لم يُفتح الطلب — حدّث الصفحة وأعد المحاولة')
 
         const failedDocs = await uploadCompanyDocuments(docFiles, {
           companyId: created.company_id,

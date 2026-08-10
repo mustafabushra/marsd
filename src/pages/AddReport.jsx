@@ -134,13 +134,15 @@ export default function AddReport() {
 
   const fetchCompanies = async () => {
     try {
-      // Companies available for reporting = approved and not suspended (registry-published)
+      // One rule for whether a company exists to the product: status = 'active'.
+      // This asked `approved` while the search asked `status`, and the two are
+      // separate columns nothing kept in agreement — so a company could be
+      // reportable and unfindable, or the reverse.
       const supabase = getSupabase()
       const { data } = await supabase
         .from('companies')
         .select('id, name, cr_number, sector, city, trust_scores ( score )')
-        .eq('approved', true)
-        .neq('status', 'suspended')
+        .eq('status', 'active')
         .order('name', { ascending: true })
         .limit(1000)
       setCompanies((data || []).map(c => ({
