@@ -151,6 +151,27 @@ try {
     () => c.query('select public.decide_company_request($1, false, null)', [reqId]),
     'سبب الرفض مطلوب')
 
+  // Approval now has five conditions. Documents arriving is not documents being
+  // read, so the reviewer verifies each one and the company file is completed
+  // before «قبول» is even offered — which is the point of the change.
+  await refuses('والقبول بلا تدقيق مرفوض',
+    () => c.query('select public.decide_company_request($1, true, null)', [reqId]),
+    'دُقّقت')
+
+  const { rows: docRows } = await c.query(
+    `select id from public.company_documents where company_id = $1 and superseded_at is null`, [co.id])
+  for (const d of docRows) {
+    await c.query('select public.review_document($1, true, null)', [d.id])
+  }
+  await c.query(
+    `update public.companies set city = 'الرياض', sector = 'مقاولات', official_email = $2 where id = $1`,
+    [co.id, `req.${stamp}@example.com`])
+
+  const { rows: [{ company_request_readiness: ready }] } = await c.query(
+    'select public.company_request_readiness($1)', [reqId])
+  ok('والـchecklist يقول جاهز قبل الزرّ', ready.ready === true,
+    JSON.stringify(ready.checks?.filter?.((x) => !x.ok)))
+
   await c.query('select public.decide_company_request($1, true, $2)', [reqId, 'مطابقة'])
   ok('القبول يُغلق الطلب', await statusOf(reqId) === 'approved')
 
@@ -170,9 +191,17 @@ try {
     'select event, from_status, to_status from public.company_request_events where request_id = $1 order by created_at',
     [reqId])
   const seq = events.map((e) => e.event)
+  // «submitted» twice said nothing about which arrival was which. The event
+  // vocabulary now separates them, so the timeline reads as the story it is.
   ok('كل خطوة على خطّ زمني واحد',
-    seq.join(' → ') === 'created → submitted → clarification_requested → submitted → approved',
+    seq.join(' → ') === 'created → submitted → clarification_requested → resubmitted → approved',
     seq.join(' → '))
+
+  const { rows: unknown } = await c.query(
+    `select e.event from public.company_request_events e
+      where e.request_id = $1
+        and e.event not in (select t.event from public.request_event_types() t)`, [reqId])
+  ok('ولا حدث خارج القاموس', unknown.length === 0, unknown.map((u) => u.event).join('، '))
 
   ok('والملاحظة محفوظة مع طلب التوضيح',
     (await c.query(
