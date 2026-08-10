@@ -44,10 +44,32 @@ const DOC_STATE = {
   reupload_required: { t: '🔄 إعادة رفع', fg: '#B45309' },
 }
 
+// The words the request workflow uses, in Arabic, in one place. A screen that
+// spells a status differently from the queue is a screen that describes a
+// different system.
+const REQUEST_KIND = {
+  registration: 'تسجيل شركة',
+  claim: 'مطالبة بملكية',
+  data_update: 'تصحيح بيانات',
+  document_review: 'مراجعة مستندات',
+}
+
+const REQUEST_STATE = {
+  draft: 'مسودّة',
+  submitted: 'جديد',
+  under_review: 'قيد المراجعة',
+  clarification_needed: 'بانتظار الشركة',
+  resubmitted: 'رُدّ عليه',
+  approved: 'مقبول',
+  rejected: 'مرفوض',
+  withdrawn: 'مسحوب',
+}
+
 const TABS = [
   { v: 'overview', t: 'نظرة عامة' },
   { v: 'data', t: 'البيانات الأساسية' },
   { v: 'documents', t: 'المستندات' },
+  { v: 'account', t: 'الحساب والطلبات' },
   { v: 'reports', t: 'التقارير' },
   { v: 'clarifications', t: 'طلبات التوضيح' },
   { v: 'score', t: 'مؤشر الثقة' },
@@ -115,6 +137,10 @@ export default function AdminCompanyFile() {
   const [full, setFull] = useState(null)
   const [docs, setDocs] = useState([])
   const [history, setHistory] = useState([])
+  // Who sent each file, and everything about this company that lives outside
+  // the company row: the account, its users, the subscription, the requests.
+  const [sent, setSent] = useState([])
+  const [context, setContext] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -135,16 +161,20 @@ export default function AdminCompanyFile() {
       const sb = getSupabase()
       // One round of calls, all of them RPCs written for earlier screens — so no
       // figure here can disagree with the same figure shown elsewhere.
-      const [a, b, c, d] = await Promise.all([
+      const [a, b, c, d, e, f] = await Promise.all([
         sb.rpc('company_review_file', { p_company_id: id }),
         sb.rpc('company_report_full', { p_company_id: id }),
         sb.rpc('company_document_checklist', { p_company_id: id }),
         sb.rpc('company_score_history', { p_company_id: id, p_limit: 24 }),
+        sb.rpc('admin_company_documents', { p_company_id: id }),
+        sb.rpc('admin_company_context', { p_company_id: id }),
       ])
       setFile(a.data || null)
       setFull(b.data || null)
       setDocs(Array.isArray(c.data) ? c.data : [])
       setHistory(Array.isArray(d.data) ? d.data : [])
+      setSent(Array.isArray(e.data) ? e.data : [])
+      setContext(f.data || null)
     } catch (err) {
       setError(err.message || 'تعذّر تحميل ملف الشركة')
     } finally {
@@ -419,6 +449,20 @@ export default function AdminCompanyFile() {
                     <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>
                       {d.file_name || 'لم يُرفع'}{d.expires_at && ` · ينتهي ${fmt(d.expires_at)}`}
                     </div>
+                    {/* Who sent it, and when. Stored on every row since the
+                        documents work landed, and shown on no screen — so «who
+                        gave us this» was a question only the database could
+                        answer. */}
+                    {(() => {
+                      const s = sent.find((x) => x.doc_type === d.doc_type)
+                      if (!s) return null
+                      return (
+                        <div style={{ fontSize: '11.5px', color: '#1D4ED8', marginTop: '3px' }}>
+                          سلّمه {s.uploaded_by_tenant || s.uploaded_by || '—'} · {fmt(s.uploaded_at)}
+                          {s.versions > 1 ? ` · النسخة ${s.versions}` : ''}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: 800, color: st.fg, whiteSpace: 'nowrap' }}>{st.t}</span>
                 </div>
@@ -431,6 +475,99 @@ export default function AdminCompanyFile() {
           </button>
         </div>
       )}
+
+      {tab === 'account' && (
+        <>
+          {/* Where this record came from.
+              A company the Ministry published and one somebody typed are
+              different claims, and a reviewer should not have to guess which is
+              in front of them. */}
+          <div style={card}>
+            <h2 style={h3}>المصدر</h2>
+            <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: 2.1 }}>
+              {context?.origin?.from_registry
+                ? '🏛 من السجل التجاري — وزارة التجارة'
+                : 'أُدخلت يدوياً'}
+              {context?.origin?.snapshot ? ` · ${context.origin.snapshot}` : ''}
+              <br />
+              {context?.origin?.verified
+                ? `موثّقة — ${context.origin.verification_source || 'مصدر غير مسمّى'}`
+                : 'غير موثّقة'}
+            </div>
+          </div>
+
+          <div style={card}>
+            <h2 style={h3}>الحساب</h2>
+            {context?.tenant ? (
+              <>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                  {context.tenant.name}
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.9 }}>
+                  {context.tenant.email}
+                  {context.tenant.phone ? ` · ${context.tenant.phone}` : ''}
+                  {` · ${context.tenant.status}`}
+                </div>
+
+                <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {(context.users || []).map((u) => (
+                    <div key={u.email} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '10px 12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px' }}>
+                      <span style={{ color: '#0F172A', fontWeight: 700 }}>{u.email}</span>
+                      <span style={{ color: '#64748B', flex: 'none' }}>{u.role}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '14px', fontSize: '13px', color: '#334155' }}>
+                  الاشتراك: <b>{context.subscription?.plan || '—'}</b>
+                  {context.subscription?.status ? ` · ${context.subscription.status}` : ''}
+                </div>
+              </>
+            ) : (
+              /* A company with no account is the normal case for a registry
+                 record nobody has claimed — said plainly rather than shown as an
+                 empty panel somebody reads as a loading failure. */
+              <div style={{ fontSize: '13.5px', color: '#64748B', lineHeight: 1.9 }}>
+                لا حساب مرتبط بهذه الشركة — لم يُطالب بها أحد بعد.
+              </div>
+            )}
+          </div>
+
+          <div style={card}>
+            <h2 style={h3}>الطلبات</h2>
+            {(context?.requests || []).length === 0 ? (
+              <div style={{ fontSize: '13.5px', color: '#64748B' }}>لا طلبات</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {context.requests.map((r) => (
+                  <div key={r.id}
+                       onClick={() => navigate('/admin/company-requests')}
+                       style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', padding: '12px 14px', border: '1px solid #E2E8F0', borderRadius: '10px', cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
+                        {REQUEST_KIND[r.kind] || r.kind}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px' }}>
+                        {r.submitted_at ? `أُرسل ${fmt(r.submitted_at)}` : 'لم يُرسل بعد'}
+                        {r.reviewed_at ? ` · وقرّر ${fmt(r.reviewed_at)}` : ''}
+                      </div>
+                      {r.decision_reason && (
+                        <div style={{ fontSize: '11.5px', color: '#B45309', marginTop: '3px' }}>
+                          {r.decision_reason}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#334155', whiteSpace: 'nowrap' }}>
+                      {REQUEST_STATE[r.status] || r.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
 
       {tab === 'reports' && (
         <div style={card}>
