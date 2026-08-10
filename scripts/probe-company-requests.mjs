@@ -193,9 +193,19 @@ try {
   const seq = events.map((e) => e.event)
   // «submitted» twice said nothing about which arrival was which. The event
   // vocabulary now separates them, so the timeline reads as the story it is.
+  //
+  // Document verifications land here too: a registration that took three days
+  // because a file came back twice cannot be explained by the decision alone.
+  // The lifecycle is checked as its own sequence so the two do not mask each
+  // other.
+  const life = seq.filter((e) => !e.startsWith('document_'))
   ok('كل خطوة على خطّ زمني واحد',
-    seq.join(' → ') === 'created → submitted → clarification_requested → resubmitted → approved',
+    life.join(' → ') === 'created → submitted → clarification_requested → resubmitted → approved',
     seq.join(' → '))
+
+  ok('وتدقيق كل مستند مسجَّل فيه',
+    seq.filter((e) => e === 'document_verified').length === docRows.length,
+    `${seq.filter((e) => e === 'document_verified').length} من ${docRows.length}`)
 
   const { rows: unknown } = await c.query(
     `select e.event from public.company_request_events e

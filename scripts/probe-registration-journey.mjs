@@ -206,9 +206,18 @@ try {
   const { rows: ev } = await db.query(
     `select e.event from public.company_request_events e where e.request_id=$1 order by e.created_at`,
     [made.request])
+  // The lifecycle, separately from the document verifications that now land on
+  // the same timeline — a registration that took three days because a file came
+  // back twice cannot be explained by the decision entry alone.
+  const seq = ev.map((x) => x.event)
   ok('والرحلة كلها على خطّ زمني واحد',
-    ev.map((x) => x.event).join(' → ') === 'created → submitted → assigned → approved',
-    ev.map((x) => x.event).join(' → '))
+    seq.filter((e) => !e.startsWith('document_')).join(' → ')
+      === 'created → submitted → assigned → approved',
+    seq.join(' → '))
+
+  ok('وتدقيق المستندات مسجَّل فيه',
+    seq.filter((e) => e === 'document_verified').length === docs.length,
+    `${seq.filter((e) => e === 'document_verified').length} من ${docs.length}`)
 
 } catch (e) {
   fail += 1
