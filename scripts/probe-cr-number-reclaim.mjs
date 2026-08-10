@@ -205,6 +205,48 @@ try {
   ok('والكنس لا يمسّ الشركة النشطة',
     !swept2.some((x) => x.company_id === a4.company_id), `حرّر ${swept2.length}`)
 
+  // ===== The scheduled sweep, which is the one that will actually run =====
+  // pg_cron has no JWT, so the admin check cannot be what protects it. What
+  // protects it is that no application role can execute it at all.
+  const CR5 = `75${Date.now().toString().slice(-7)}`
+  const a5 = await abandon(CR5, { ageDays: 40 })
+
+  for (const fn of ['cron_expire_abandoned_registrations()',
+                    `reclaim_registration_internal('${a5.company_id}')`]) {
+    await db.query('begin')
+    await db.query('set local role authenticated')
+    let denied = false
+    try { await db.query(`select public.${fn}`) }
+    catch (e) { denied = /permission denied/.test(e.message) }
+    await db.query('rollback')
+    ok(`لا يصل إليها دور التطبيق — ${fn.split('(')[0]}`, denied)
+  }
+
+  const { rows: [ran] } = await db.query('select public.cron_expire_abandoned_registrations() n')
+  ok('والكنس المجدول يحرّر المهجور', ran.n >= 1, `حرّر ${ran.n}`)
+
+  const { rows: [entry] } = await db.query(
+    `select actor_id, actor_role, meta from public.audit_logs
+      where action = 'registration_number_reclaimed' and entity_id = $1
+      order by created_at desc limit 1`, [a5.company_id])
+  ok('ويكتب في سجلّ التدقيق رقم السجل والشركة',
+    entry?.meta?.cr_number === CR5 && entry?.meta?.company_id === a5.company_id,
+    JSON.stringify(entry?.meta)?.slice(0, 120))
+  ok('ومصدره system/cleanup بلا فاعل بشري',
+    entry?.actor_id === null && entry?.actor_role === 'system/cleanup',
+    `actor=${entry?.actor_id} role=${entry?.actor_role}`)
+
+  const { rows: [heartbeat] } = await db.query(
+    `select meta from public.audit_logs where action = 'registration_cleanup_ran'
+      order by created_at desc limit 1`)
+  ok('وكل تشغيلة تترك أثراً ولو لم تحرّر شيئاً', heartbeat?.meta?.released !== undefined,
+    JSON.stringify(heartbeat?.meta))
+
+  const { rows: [job] } = await db.query(
+    `select schedule, active from cron.job where jobname = 'marsad-reclaim-abandoned-registrations'`)
+  ok('والمهمة مجدولة ونشطة', job?.active === true && job?.schedule === '15 0 * * *',
+    `${job?.schedule} · نشط=${job?.active}`)
+
 } catch (e) {
   fail += 1
   console.log(`  ❌ توقّف: ${e.message.slice(0, 200)}`)
