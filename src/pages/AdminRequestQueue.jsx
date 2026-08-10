@@ -40,6 +40,20 @@ const KINDS = {
 
 const toneOf = (s) => STATES.find((x) => x.v === s) || { t: s, tone: '#64748B', bg: '#F1F5F9' }
 
+// How a request stands against the promise made to it when it arrived. The
+// clock stops while the company owes us something, so «paused» is not late —
+// the delay is theirs and counting it against Marsad would make the number
+// useless for the thing it exists to measure.
+const SLA = {
+  late_response:   { t: '🔴 لم يُستلَم',   fg: '#B91C1C' },
+  late_resolution: { t: '🟠 متأخّر',       fg: '#C2410C' },
+  due_soon:        { t: '🟡 يستحق قريباً', fg: '#B45309' },
+  paused:          { t: '⏸ بانتظارهم',    fg: '#64748B' },
+  ok:              { t: '',                fg: '#64748B' },
+  draft:           { t: '',                fg: '#94A3B8' },
+  closed:          { t: '',                fg: '#94A3B8' },
+}
+
 export default function AdminRequestQueue() {
   const [filter, setFilter] = useState('submitted')
   const [rows, setRows] = useState([])
@@ -84,6 +98,29 @@ export default function AdminRequestQueue() {
     } catch (e) {
       setError(e.message || 'تعذّر فتح الطلب')
       setOpen(null)
+    }
+  }
+
+  /** How long ago, in words. */
+  const fmtSince = (at) => {
+    const h = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 3600000))
+    if (h < 1) return 'أقل من ساعة'
+    if (h < 24) return `${h} ساعة`
+    return `${Math.round(h / 24)} يوم`
+  }
+
+  /** Take the request. Nobody decides a request that is not theirs. */
+  const takeIt = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const { error: e } = await getSupabase().rpc('assign_company_request', { p_request_id: open })
+      if (e) throw e
+      await openRequest(open)
+    } catch (e) {
+      setError(e.message || 'تعذّر استلام الطلب')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -235,9 +272,12 @@ export default function AdminRequestQueue() {
                   <span style={{ color: '#94A3B8', flex: 'none', fontSize: '12px' }}>
                     {String(e.at).slice(0, 16).replace('T', ' ')}
                   </span>
+                  {/* The Arabic comes from `request_event_types()` with the
+                      row. This printed `e.event` raw, so an Arabic review page
+                      read «created» and «submitted». */}
                   <span>
-                    <b>{e.event}</b>
-                    {e.actor ? ` · ${e.actor}` : ''}
+                    <b>{e.ar || e.event}</b>
+                    {e.actor ? ` · ${e.actor}` : (e.actor_type === 'staff' ? ' · مرصد' : '')}
                     {e.note ? <div style={{ color: '#B45309' }}>{e.note}</div> : null}
                   </span>
                 </div>
@@ -247,6 +287,39 @@ export default function AdminRequestQueue() {
             {/* --- The decision --- */}
             {!['approved', 'rejected', 'withdrawn'].includes(req?.status) && (
               <div style={card}>
+                {/* Who is holding this, and whether it can be decided at all.
+                    «4/4 وصلت» is not «4/4 قُرئت», and the database refuses an
+                    approval on the second count — so the reviewer is told
+                    before the button rather than after the refusal. */}
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
+                  {req?.assigned_to ? (
+                    <span style={{ background: '#EFF6FF', color: '#1D4ED8', borderRadius: '999px', padding: '5px 13px', fontSize: '12.5px', fontWeight: 800 }}>
+                      مع {req.assigned_to}{req.assigned_at ? ` · منذ ${fmtSince(req.assigned_at)}` : ''}
+                    </span>
+                  ) : (
+                    <button onClick={takeIt} disabled={busy}
+                            style={{ minHeight: '38px', padding: '0 18px', background: '#0F172A', color: '#fff', border: 0, borderRadius: '999px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      استلام الطلب
+                    </button>
+                  )}
+                  {req?.resolution_due_at && (
+                    <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700 }}>
+                      المهلة: {String(req.resolution_due_at).slice(0, 16).replace('T', ' ')}
+                    </span>
+                  )}
+                </div>
+
+                {d.readiness && (
+                  <div style={{ background: d.readiness.ready ? '#F0FDF4' : '#FFFBEB', border: `1px solid ${d.readiness.ready ? '#BBF7D0' : '#FDE68A'}`, borderRadius: '10px', padding: '13px', marginBottom: '14px' }}>
+                    {(d.readiness.checks || []).map((c) => (
+                      <div key={c.key} style={{ fontSize: '13px', color: c.ok ? '#15803D' : '#B45309', lineHeight: 2, fontWeight: 700 }}>
+                        {c.ok ? '✓' : '✗'} {c.label}
+                        {!c.ok && c.detail ? <span style={{ fontWeight: 500 }}> — {c.detail}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div style={label}>القرار</div>
                 <textarea
                   value={note}
@@ -256,8 +329,9 @@ export default function AdminRequestQueue() {
                   style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #E2E8F0', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical', marginBottom: '12px' }}
                 />
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <button onClick={() => act('approve')} disabled={busy}
-                          style={{ minHeight: '44px', padding: '0 22px', background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button onClick={() => act('approve')} disabled={busy || d.readiness?.ready === false}
+                          title={d.readiness?.ready === false ? 'شروط القبول غير مستوفاة' : undefined}
+                          style={{ minHeight: '44px', padding: '0 22px', background: d.readiness?.ready === false ? '#CBD5E1' : '#16A34A', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: d.readiness?.ready === false ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                     قبول
                   </button>
                   <button onClick={() => act('clarify')} disabled={busy}
@@ -351,9 +425,33 @@ export default function AdminRequestQueue() {
               {r.documents_ready}/{r.documents_total} مستند
             </span>
 
+            {/* Arrived is not read. A reviewer scanning the queue needs to know
+                which of these can actually be decided, and four files sitting
+                unopened look identical to four that were checked. */}
+            {r.documents_total > 0 && (
+              <span style={{
+                background: r.documents_verified >= r.documents_total ? '#F0FDF4' : '#F1F5F9',
+                color: r.documents_verified >= r.documents_total ? '#15803D' : '#64748B',
+                borderRadius: '999px', padding: '5px 12px', fontSize: '12px', fontWeight: 800, flex: 'none',
+              }}>
+                {r.documents_verified}/{r.documents_total} مُدقَّق
+              </span>
+            )}
+
+            {/* Who holds it. Unclaimed is the state that quietly loses requests. */}
+            <span style={{
+              background: r.assigned_to_email ? '#EFF6FF' : '#FEF2F2',
+              color: r.assigned_to_email ? '#1D4ED8' : '#B91C1C',
+              borderRadius: '999px', padding: '5px 12px', fontSize: '12px', fontWeight: 800, flex: 'none',
+              maxWidth: '190px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {r.assigned_to_email || 'غير مُسنَد'}
+            </span>
+
             {/* What a queue is actually about, and it was nowhere in the product. */}
             {r.submitted_at && (
-              <span style={{ fontSize: '12.5px', color: r.waiting_days > 3 ? '#B91C1C' : '#64748B', fontWeight: 800, flex: 'none' }}>
+              <span style={{ fontSize: '12.5px', color: SLA[r.sla_state]?.fg || '#64748B', fontWeight: 800, flex: 'none' }}>
+                {SLA[r.sla_state]?.t ?? ''}{SLA[r.sla_state]?.t ? ' · ' : ''}
                 {r.waiting_days === 0 ? 'اليوم' : `منذ ${r.waiting_days} يوم`}
               </span>
             )}
