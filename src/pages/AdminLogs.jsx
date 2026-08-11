@@ -126,9 +126,19 @@ export default function AdminLogs() {
 
       const ids = [...new Set((data ?? []).map((l) => l.actor_id).filter(Boolean))]
       if (ids.length) {
-        const { data: people } = await supabase
-          .from('users').select('id, email, full_name').in('id', ids)
-        setActors(Object.fromEntries((people ?? []).map((u) => [u.id, u.full_name || u.email])))
+        // public.users has first_name and last_name; there is no full_name.
+        // Asking for it made PostgREST refuse the whole request with 42703, so
+        // the lookup returned nothing and every entry in the audit log was
+        // attributed to a raw Clerk id instead of a person. The error was
+        // swallowed — `data` was destructured without `error` — which is why a
+        // log nobody could read still looked like it was working.
+        const { data: people, error: peopleErr } = await supabase
+          .from('users').select('id, email, first_name, last_name').in('id', ids)
+        if (peopleErr) throw peopleErr
+        setActors(Object.fromEntries((people ?? []).map((u) => {
+          const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+          return [u.id, name || u.email]
+        })))
       }
     } catch (e) {
       setError(e.message || 'تعذّر تحميل السجل')

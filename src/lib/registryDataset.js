@@ -27,7 +27,6 @@
 export const DATASET_ID = 'ed041830-933d-4b93-aab2-c3b78822b22f'
 export const PORTAL_URL = `https://open.data.gov.sa/data/datasets/resource/${DATASET_ID}`
 
-const API = 'https://open.data.gov.sa/data/api'
 
 /**
  * The ten columns the Ministry publishes, mapped to what Marsad stores.
@@ -138,23 +137,33 @@ export function describeHeaders(headers) {
  * difference is what makes `source: 'official'` an honest claim.
  */
 export async function fetchDatasetInfo(signal) {
-  const r = await fetch(`${API}/datasets?version=-1&dataset=${DATASET_ID}`, {
+  // Through the server, not straight at the portal.
+  //
+  // This called open.data.gov.sa directly. The portal sends no
+  // Access-Control-Allow-Origin, so the browser refused the request every time,
+  // in every environment, from the day it was written — and because the caller
+  // treats the failure as non-fatal, the import kept working and the label
+  // simply never appeared. `source: 'official'` was a claim with nothing behind
+  // it. A server has no origin to be checked, and gets the real record.
+  const r = await fetch(`/api/registry-source?dataset=${DATASET_ID}`, {
     headers: { Accept: 'application/json' },
     signal,
   })
-  if (!r.ok) throw new Error('تعذّر الوصول إلى بوابة البيانات المفتوحة')
-
-  // The portal answers an unknown path with its own HTML page and a 200, so a
-  // successful status proves nothing on its own. Six invented endpoints
-  // returned exactly that while looking like success.
-  const type = r.headers.get('content-type') || ''
-  if (!type.includes('json')) throw new Error('البوابة ردّت بصفحة بدل بيانات')
+  if (!r.ok) {
+    const why = await r.json().catch(() => null)
+    throw new Error(why?.error || 'تعذّر الوصول إلى بوابة البيانات المفتوحة')
+  }
 
   const d = await r.json()
+  // Unverified means the portal answered without naming the dataset. That is
+  // reported as such rather than shown as provenance, because a label nobody
+  // confirmed is worse than no label.
+  if (!d.verified) throw new Error('لم تؤكّد البوابة هوية هذه المجموعة')
+
   return {
     titleAr: d.titleAr || null,
-    providerAr: d.providerNameAr || null,
+    providerAr: d.providerAr || null,
     updatedAt: d.updatedAt || null,
-    frequency: d.updateFrequency || null,
+    frequency: d.frequency || null,
   }
 }

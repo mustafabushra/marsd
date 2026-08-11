@@ -96,20 +96,18 @@ try {
   const lg = await go('/admin/logs')
   ok('السجلات تفتح', lg.length > 300)
 
-  // open.data.gov.sa is called from the browser for the dataset's provenance
-  // and is blocked by CORS every time — the label it feeds has therefore never
-  // once appeared. The page treats it as non-fatal and carries on, so it is not
-  // a crash, but it is noise the console cannot be rid of from the client side.
-  // It is separated rather than ignored: lumping it in would let the next real
-  // error hide behind a known one. The fix is a server-side proxy; see the
-  // release notes.
-  const PORTAL = /open\.data\.gov\.sa|net::ERR_FAILED|status of 400/
-  const appErrs = errs.filter((e) => !PORTAL.test(e))
-  const portalErrs = errs.filter((e) => PORTAL.test(e))
+  // A request cancelled on unmount is not a failure. Every screen here aborts
+  // its in-flight fetches in a cleanup, and React runs effects twice in
+  // development, so ERR_ABORTED is the expected sound of that working. The
+  // direct call to open.data.gov.sa that used to be here is gone — it goes
+  // through /api/registry-source now — so a portal error appearing again means
+  // something regressed, and it is named rather than counted.
+  const ABORTED = /ERR_ABORTED/
+  const appErrs = errs.filter((e) => !ABORTED.test(e))
   ok('console نظيف من أخطاء التطبيق', appErrs.length === 0, appErrs.slice(0, 3).join(' | '))
-  if (portalErrs.length) {
-    console.log(`  ⚠️  ${portalErrs.length} خطأ من بوابة البيانات المفتوحة (CORS) — معروف، غير قاتل، يحتاج وسيطاً على الخادم`)
-  }
+  ok('ولا طلب مباشر إلى بوابة البيانات المفتوحة',
+    !errs.some((e) => /open\.data\.gov\.sa/.test(e)),
+    errs.filter((e) => /open\.data\.gov\.sa/.test(e))[0])
   await ctx.close()
 
   // ===== Who may enter =====
