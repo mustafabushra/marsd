@@ -9,6 +9,7 @@ import { useClerkOrganization } from '../hooks/useClerkOrganization'
 import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import { useUserRole } from '../hooks/useUserRole'
 import { useEntitlements } from '../hooks/useEntitlements'
+import SupportDialog from './SupportDialog'
 import {
   DashboardIcon,
   SearchIcon,
@@ -38,6 +39,7 @@ export default function CompanyShell({ user, gate = false }) {
   // over the page the user just asked for is how this pattern usually goes
   // wrong.
   const [navOpen, setNavOpen] = useNavDrawer()
+  const [supportOpen, setSupportOpen] = useState(false)
   useEffect(() => { setNavOpen(false) }, [location.pathname])
   const { organizationName, userRole } = useClerkOrganization()
   const { needsOnboarding, loading } = useCompanyOnboarding()
@@ -210,6 +212,33 @@ export default function CompanyShell({ user, gate = false }) {
           })}
         </nav>
 
+        {/* Reporting a problem is not a page, so it is not a nav entry.
+            It opens over whatever the person is already looking at, because the
+            thing they want to describe is on that screen — sending them to a
+            form somewhere else means they have to remember it, and the
+            screenshot they would have attached is the screen they just left. */}
+        <button
+          onClick={() => setSupportOpen(true)}
+          style={{
+            background: 'transparent', border: '1px solid rgba(255,255,255,.14)',
+            color: '#CBD5E1', padding: '11px 15px', fontSize: '13.5px', fontWeight: 700,
+            textAlign: 'right', cursor: 'pointer', borderRadius: '11px', marginTop: '10px',
+            display: 'flex', alignItems: 'center', gap: '10px', fontFamily: 'inherit',
+            transition: 'all .2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,.08)'
+            e.currentTarget.style.color = '#fff'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = '#CBD5E1'
+          }}
+        >
+          <span style={{ flex: 'none', fontSize: '15px' }}>🛟</span>
+          الدعم الفني
+        </button>
+
         {/* The box at the foot of the sidebar.
             For a company it is the plan; for Marsad staff neither the company
             name nor the plan exists, and the way back to the panel did not
@@ -349,6 +378,10 @@ export default function CompanyShell({ user, gate = false }) {
           </Suspense>
         </main>
       </div>
+
+      {/* Outside <main>, so it is not unmounted by a navigation happening
+          underneath it and does not inherit the content padding. */}
+      <SupportDialog open={supportOpen} onClose={() => setSupportOpen(false)} />
     </div>
   )
 }

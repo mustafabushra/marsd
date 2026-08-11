@@ -135,6 +135,11 @@ export async function signIn(page, base, { role } = {}) {
 
   if (status !== 'complete') throw new Error(`Clerk sign-in stopped at "${status}"`)
   await page.waitForFunction(() => !!window.Clerk?.user, null, { timeout: 30000 })
+
+  // Returned so a probe can look up what the signed-in account did without
+  // guessing at the id or matching on the test email. Additive — this used to
+  // return undefined, so no existing caller changes.
+  return userId
 }
 
 /** Remove the audit account and its row. Leaves the borrowed tenant alone. */
