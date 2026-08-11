@@ -35,6 +35,16 @@ const REVIEW = {
   approved:               { t: 'معتمدة',              bg: '#ECFDF5', fg: '#15803D' },
 }
 
+// Where a company stands in Marsad. Separate from `official_status`, which is
+// where it stands at the Ministry — the header shows both, never merged.
+const MARSAD_STATE = {
+  pending:   { t: 'بانتظار الاعتماد', bg: '#FFFBEB', fg: '#B45309' },
+  active:    { t: 'نشطة',             bg: '#ECFDF5', fg: '#15803D' },
+  approved:  { t: 'نشطة',             bg: '#ECFDF5', fg: '#15803D' },
+  rejected:  { t: 'مرفوضة',           bg: '#FEF2F2', fg: '#B91C1C' },
+  suspended: { t: 'معلّقة',            bg: '#FEF2F2', fg: '#B91C1C' },
+}
+
 const DOC_STATE = {
   verified: { t: '✅ معتمد', fg: '#15803D' },
   pending:  { t: '⏳ قيد المراجعة', fg: '#B45309' },
@@ -297,7 +307,12 @@ export default function AdminCompanyFile() {
   const ident = full?.identity || {}
   const beh = full?.behaviour || {}
   const q = full?.quality || {}
-  const rv = REVIEW[file.review_status] || REVIEW.approved
+  // `companies.status` is the state of a company in Marsad. This read
+  // `review_status` with `|| REVIEW.approved` behind it, so a company whose
+  // registration was still new displayed «معتمدة» — a deprecated column saying
+  // yes on behalf of the one that says pending. `review_status` is derived from
+  // `status` by trigger now and is on its way out; the badge stops asking it.
+  const rv = MARSAD_STATE[file.status] || MARSAD_STATE.pending
   const openClar = (file.clarifications || []).filter((c) => c.status === 'open')
 
   return (
