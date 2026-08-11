@@ -198,8 +198,20 @@ export default async function handler (req, res) {
     res.setHeader('Cache-Control', 'private, no-store')
     return res.status(200).send(Buffer.from(pdf))
   } catch (e) {
-    console.error('trust-report-pdf failed:', e)
-    return res.status(500).json({ error: 'تعذّر إصدار التقرير' })
+    // Say which step failed. «تعذّر إصدار التقرير» on its own is unactionable —
+    // a missing Chromium, a missing environment variable and a database refusal
+    // all read identically, and the person seeing it cannot tell you which.
+    // None of these strings carry a secret or a row.
+    const raw = String(e?.message || e)
+    const stage = /executablePath|Executable doesn't exist|libnss|browserType|Chromium/i.test(raw)
+      ? 'المتصفّح غير متاح على الخادم'
+      : /supabaseKey|SUPABASE|fetch failed|getaddrinfo/i.test(raw)
+        ? 'تعذّر الوصول إلى قاعدة البيانات'
+        : /Timeout|timed out/i.test(raw)
+          ? 'انتهت مهلة الإصدار'
+          : 'تعذّر إصدار التقرير'
+    console.error('trust-report-pdf failed:', raw)
+    return res.status(500).json({ error: stage, detail: raw.slice(0, 200) })
   } finally {
     await browser?.close().catch(() => {})
   }

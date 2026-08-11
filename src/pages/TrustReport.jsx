@@ -470,7 +470,15 @@ export default function TrustReport() {
       })
       if (!r.ok) {
         const why = await r.json().catch(() => null)
-        throw new Error(why?.error || 'تعذّر إصدار التقرير')
+        throw new Error(why?.error || `تعذّر إصدار التقرير (${r.status})`)
+      }
+      // A 200 is not proof of a PDF. A static build — `vite preview`, or any
+      // server handing unmatched paths to index.html — answers /api/… with the
+      // app itself: 200, text/html, and `blob()` cheerfully saves the page as
+      // a .pdf that no reader can open. The type is the check.
+      const type = r.headers.get('content-type') || ''
+      if (!type.includes('pdf')) {
+        throw new Error('هذه النسخة لا تشغّل خدمة إصدار التقارير — شغّل npm run dev أو افتح الموقع المنشور')
       }
       const blob = await r.blob()
       const href = URL.createObjectURL(blob)
