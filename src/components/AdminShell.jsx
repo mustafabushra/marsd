@@ -50,9 +50,15 @@ import {
 //
 // Paths are still untouched. Only names and grouping move.
 
+// مركز العمل had a route and no way in. It was reachable only by typing the
+// URL, which means the one screen that answers «what should I do next» was
+// invisible to anyone who did not already know it existed. It sits beside
+// مركز القيادة because they are the same job split in two: the command centre
+// says what the state of things is, the work centre is the queue you work.
 const TOP_ITEMS = [
   { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
   { label: 'مركز القيادة', icon: DashboardIcon, path: '/admin/command-center' },
+  { label: 'مركز العمل', icon: DashboardIcon, path: '/admin/work' },
 ]
 
 const GROUPS = [
