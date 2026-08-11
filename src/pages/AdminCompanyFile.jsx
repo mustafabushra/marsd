@@ -82,9 +82,82 @@ const TABS = [
   { v: 'account', t: 'الحساب والطلبات' },
   { v: 'reports', t: 'التقارير' },
   { v: 'clarifications', t: 'طلبات التوضيح' },
+  { v: 'disputes', t: 'الاعتراضات' },
   { v: 'score', t: 'مؤشر الثقة' },
+  { v: 'timeline', t: 'الخطّ الزمني' },
+  { v: 'audit', t: 'سجل التدقيق' },
   { v: 'activity', t: 'سجل النشاط' },
 ]
+
+// The three tabs added last load on demand and own their own state. The rest of
+// this page arrives in one call; these do not join it, because a company with
+// 252 audit rows should not pay for them on a page nobody opened that tab on —
+// and a failing audit query must not blank the documents beside it.
+function useLazyTab (active, fn, deps) {
+  const [state, set] = useState({ data: null, loading: false, error: '', loaded: false })
+
+  const load = useCallback(async () => {
+    set((x) => ({ ...x, loading: true, error: '' }))
+    try {
+      const data = await fn(getSupabase())
+      set({ data, loading: false, error: '', loaded: true })
+    } catch (e) {
+      set({ data: null, loading: false, error: e.message || 'تعذّر التحميل', loaded: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+
+  useEffect(() => { if (active) load() }, [active, load])
+  return { ...state, reload: load }
+}
+
+/** Skeleton rows, so a tab does not jump when its data lands. */
+function TabSkeleton ({ n = 4 }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} style={{
+          height: '52px', background: '#F1F5F9', borderRadius: '8px', marginBottom: '10px',
+        }} />
+      ))}
+    </div>
+  )
+}
+
+function TabError ({ what, message, onRetry }) {
+  return (
+    <div role="alert" style={{ fontSize: '13.5px', color: '#B45309', lineHeight: 1.9 }}>
+      تعذّر تحميل {what}
+      <div style={{ color: '#94A3B8', fontSize: '12.5px' }}>{String(message).slice(0, 140)}</div>
+      <button onClick={onRetry} style={{
+        marginTop: '10px', minHeight: '36px', padding: '0 16px', background: '#fff',
+        border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '13px',
+        fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: '#334155',
+      }}>إعادة المحاولة</button>
+    </div>
+  )
+}
+
+const relTime = (t) => {
+  if (!t) return '—'
+  const m = Math.max(0, Math.round((Date.now() - new Date(t).getTime()) / 60000))
+  if (m < 1) return 'الآن'
+  if (m < 60) return `منذ ${m} دقيقة`
+  const h = Math.round(m / 60)
+  if (h < 24) return `منذ ${h} ساعة`
+  return `منذ ${Math.round(h / 24)} يوم`
+}
+
+/** Today / yesterday / the date — the timeline's own grouping. */
+const dayLabel = (t) => {
+  const d = new Date(t)
+  const today = new Date()
+  const y = new Date(today); y.setDate(y.getDate() - 1)
+  const same = (a, b) => a.toDateString() === b.toDateString()
+  if (same(d, today)) return 'اليوم'
+  if (same(d, y)) return 'أمس'
+  return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
 // Exactly the fields admin_update_company accepts. approved, verified, status,
 // review_status and official_status are absent on purpose — each has its own
@@ -160,6 +233,28 @@ export default function AdminCompanyFile() {
   // on it. A control room you can only read from is a report.
   const [asking, setAsking] = useState(false)
   const [form, setForm] = useState({ type: 'information', reason: '', details: '', docs: [], days: 14 })
+  const [auditPage, setAuditPage] = useState(0)
+  const [auditOpen, setAuditOpen] = useState(null)
+
+  const disputes = useLazyTab(tab === 'disputes', async (sb) => {
+    const { data, error } = await sb.rpc('admin_company_disputes', { p_company_id: id })
+    if (error) throw error
+    return data
+  }, [id, tab === 'disputes'])
+
+  const timeline = useLazyTab(tab === 'timeline', async (sb) => {
+    const { data, error } = await sb.rpc('admin_company_timeline', { p_company_id: id, p_limit: 80 })
+    if (error) throw error
+    return data || []
+  }, [id, tab === 'timeline'])
+
+  const audit = useLazyTab(tab === 'audit', async (sb) => {
+    const { data, error } = await sb.rpc('admin_company_audit',
+      { p_company_id: id, p_limit: 25, p_offset: auditPage * 25 })
+    if (error) throw error
+    return data || []
+  }, [id, tab === 'audit', auditPage])
+
   const [statusForm, setStatusForm] = useState(null)
   // Reading a wrong sector and being unable to fix it is the same dead end as
   // reading a needed clarification and being unable to ask for one.
@@ -370,12 +465,18 @@ export default function AdminCompanyFile() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+      {/* A real tablist. The labels here repeat names that also exist in the
+          navigation — «الاعتراضات» is both a tab and a sidebar entry — so a test
+          that matches by accessible name alone clicks the wrong one and leaves
+          the page. Giving the row its role makes the tabs addressable as tabs. */}
+      <div role="tablist" aria-label="أقسام ملفّ الشركة"
+        style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
         {TABS.map((t) => {
           const badge = t.v === 'clarifications' ? openClar.length
             : t.v === 'documents' ? docs.filter((d) => d.state === 'pending').length : 0
           return (
-            <button key={t.v} onClick={() => setTab(t.v)} style={{
+            <button key={t.v} role="tab" aria-selected={tab === t.v}
+              onClick={() => setTab(t.v)} style={{
               padding: '9px 16px', borderRadius: '9px', fontSize: '13px', fontWeight: 800,
               cursor: 'pointer', fontFamily: 'inherit',
               background: tab === t.v ? '#1E2A52' : '#fff',
@@ -680,6 +781,244 @@ export default function AdminCompanyFile() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== Disputes ===== */}
+      {tab === 'disputes' && (
+        <div style={card}>
+          <div style={label}>الاعتراضات</div>
+          {disputes.loading ? <TabSkeleton />
+            : disputes.error ? <TabError what="الاعتراضات" message={disputes.error} onRetry={disputes.reload} />
+              : !disputes.data?.items?.length ? (
+                <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
+                  <b style={{ color: '#0F172A' }}>لا توجد اعتراضات</b>
+                  <div>لم تُسجَّل أي اعتراضات على هذه الشركة حتى الآن.</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                    {[
+                      ['مفتوحة', disputes.data.summary.open, '#B91C1C', '#FEF2F2'],
+                      ['قُبلت', disputes.data.summary.upheld, '#15803D', '#F0FDF4'],
+                      ['رُفضت', disputes.data.summary.rejected, '#475569', '#F8FAFC'],
+                      ['سُحبت', disputes.data.summary.withdrawn, '#475569', '#F8FAFC'],
+                    ].map((row) => (
+                      <span key={row[0]} style={{
+                        background: row[3], color: row[2], borderRadius: '999px', padding: '5px 13px',
+                        fontSize: '12.5px', fontWeight: 800,
+                      }}>{row[0]} {row[1]}</span>
+                    ))}
+                  </div>
+
+                  {disputes.data.items.map((d) => (
+                    <div key={d.id} style={{
+                      padding: '13px 0', borderTop: '1px solid #F1F5F9',
+                      display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
+                    }}>
+                      <div style={{ minWidth: 0, flex: '1 1 260px' }}>
+                        <div style={{
+                          fontSize: '12.5px', fontWeight: 800,
+                          color: d.status === 'open' ? '#B91C1C' : '#475569',
+                        }}>
+                          {d.status === 'open' ? '🔴' : '•'} {d.status_label}
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginTop: '3px' }}>
+                          اعتراض على تقرير{d.report_title ? ' — ' + d.report_title : ''}
+                        </div>
+                        <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '3px', lineHeight: 1.9 }}>
+                          {d.reason}
+                          <div>
+                            {d.raised_by ? d.raised_by + ' · ' : ''}أُنشئ {fmt(d.created_at)} · آخر تحديث {relTime(d.updated_at)}
+                          </div>
+                          {d.resolution_note && <div style={{ color: '#15803D' }}>القرار: {d.resolution_note}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+        </div>
+      )}
+
+      {/* ===== Timeline — the story, not the columns ===== */}
+      {tab === 'timeline' && (
+        <div style={card}>
+          <div style={label}>الخطّ الزمني</div>
+          {timeline.loading ? <TabSkeleton n={6} />
+            : timeline.error ? <TabError what="الخطّ الزمني" message={timeline.error} onRetry={timeline.reload} />
+              : !timeline.data?.length ? (
+                <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
+                  <b style={{ color: '#0F172A' }}>لا يوجد نشاط بعد</b>
+                  <div>ستظهر هنا الأحداث المهمّة المرتبطة بهذه الشركة.</div>
+                </div>
+              ) : timeline.data.map((e, i) => {
+                const showDay = i === 0 || dayLabel(e.at) !== dayLabel(timeline.data[i - 1].at)
+                return (
+                  <div key={i}>
+                    {showDay && (
+                      <div style={{
+                        fontSize: '12.5px', fontWeight: 800, color: '#94A3B8',
+                        margin: i ? '18px 0 6px' : '0 0 6px',
+                      }}>{dayLabel(e.at)}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: '11px', padding: '9px 0' }}>
+                      <span style={{ flex: 'none', fontSize: '15px' }}>{e.icon}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{e.title}</div>
+                        {e.detail && (
+                          <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.9 }}>{e.detail}</div>
+                        )}
+                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>
+                          {String(e.at).slice(11, 16)}{e.actor ? ' · ' + e.actor : ''}
+                        </div>
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+        </div>
+      )}
+
+      {/* ===== Audit — raw on purpose ===== */}
+      {tab === 'audit' && (
+        <div style={card}>
+          <div style={label}>سجل التدقيق</div>
+          <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px' }}>
+            من غيّر أي حقل، ومن أي قيمة إلى أي قيمة، ولماذا. القيم كما كُتبت.
+          </p>
+          {audit.loading ? <TabSkeleton n={5} />
+            : audit.error ? <TabError what="سجل التدقيق" message={audit.error} onRetry={audit.reload} />
+              : !audit.data?.length ? (
+                <div style={{ fontSize: '14px', color: '#64748B' }}>لا توجد تغييرات مسجّلة.</div>
+              ) : (
+                <>
+                  {audit.data.map((r) => (
+                    <button key={r.id} onClick={() => setAuditOpen(r)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'right', padding: '13px 0',
+                        borderTop: '1px solid #F1F5F9', background: 'none', border: 0,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                      <div style={{ fontSize: '12px', color: '#94A3B8' }}>{fmt(r.at)}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
+                        {r.actor || 'النظام'}
+                        <span style={{ fontWeight: 400, color: '#64748B' }}> · {r.action_ar}</span>
+                      </div>
+                      {(r.changes || []).slice(0, 3).map((c, j) => (
+                        <div key={j} style={{ fontSize: '12.5px', color: '#334155', marginTop: '3px' }}>
+                          <code style={{ color: '#64748B' }}>{c.field}</code>
+                          {' '}
+                          <span style={{ color: '#B91C1C' }}>{JSON.stringify(c.before)}</span>
+                          {' ← '}
+                          <span style={{ color: '#15803D' }}>{JSON.stringify(c.after)}</span>
+                        </div>
+                      ))}
+                      {(r.changes || []).length > 3 && (
+                        <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '3px' }}>
+                          و{r.changes.length - 3} حقلاً آخر
+                        </div>
+                      )}
+                      {r.reason && (
+                        <div style={{ fontSize: '12.5px', color: '#B45309', marginTop: '3px' }}>
+                          السبب: {r.reason}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    gap: '10px', marginTop: '16px', flexWrap: 'wrap',
+                  }}>
+                    <span style={{ fontSize: '12.5px', color: '#64748B' }}>
+                      {auditPage * 25 + 1}–{auditPage * 25 + audit.data.length} من {audit.data[0]?.total ?? 0}
+                    </span>
+                    <span style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => setAuditPage((n) => Math.max(0, n - 1))}
+                        disabled={auditPage === 0}
+                        style={{
+                          minHeight: '36px', padding: '0 14px', background: '#fff', color: '#334155',
+                          border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '13px',
+                          fontWeight: 700, fontFamily: 'inherit',
+                          cursor: auditPage === 0 ? 'not-allowed' : 'pointer',
+                        }}>السابق</button>
+                      <button onClick={() => setAuditPage((n) => n + 1)}
+                        disabled={(auditPage + 1) * 25 >= Number(audit.data[0]?.total ?? 0)}
+                        style={{
+                          minHeight: '36px', padding: '0 14px', background: '#fff', color: '#334155',
+                          border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '13px',
+                          fontWeight: 700, fontFamily: 'inherit',
+                          cursor: (auditPage + 1) * 25 >= Number(audit.data[0]?.total ?? 0) ? 'not-allowed' : 'pointer',
+                        }}>التالي</button>
+                    </span>
+                  </div>
+                </>
+              )}
+        </div>
+      )}
+
+      {/* ===== Audit detail — a drawer, not a page ===== */}
+      {auditOpen && (
+        <div role="dialog" aria-modal="true" aria-label="تفاصيل التغيير"
+          onClick={(ev) => ev.target === ev.currentTarget && setAuditOpen(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 60,
+            display: 'flex', justifyContent: 'flex-start',
+          }}>
+          <div style={{
+            background: '#fff', width: 'min(460px, 100%)', height: '100%',
+            overflowY: 'auto', padding: '24px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                تفاصيل التغيير
+              </h2>
+              <button onClick={() => setAuditOpen(null)} aria-label="إغلاق"
+                style={{ background: 'none', border: 0, fontSize: '20px', cursor: 'pointer', color: '#64748B' }}>×</button>
+            </div>
+
+            <dl style={{ margin: '18px 0 0', fontSize: '13.5px', lineHeight: 2.2 }}>
+              {[
+                ['الفاعل', auditOpen.actor || 'النظام'],
+                ['الدور', auditOpen.actor_role || '—'],
+                ['التاريخ والوقت', fmt(auditOpen.at)],
+                ['العملية', auditOpen.action_ar],
+                ['المفتاح الخام', auditOpen.action],
+                ['السبب', auditOpen.reason || 'لم يُسجَّل'],
+              ].map((row) => (
+                <div key={row[0]} style={{
+                  display: 'flex', justifyContent: 'space-between', gap: '12px',
+                  borderBottom: '1px solid #F1F5F9',
+                }}>
+                  <dt style={{ color: '#64748B' }}>{row[0]}</dt>
+                  <dd style={{
+                    margin: 0, fontWeight: 700, color: '#0F172A', textAlign: 'left',
+                    minWidth: 0, wordBreak: 'break-word',
+                  }}>{row[1]}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div style={{ ...label, marginTop: '20px' }}>الحقول المتغيّرة</div>
+            {/* Raw, deliberately. A value that has been translated is a value
+                that cannot be used as evidence. */}
+            {(auditOpen.changes || []).length === 0
+              ? <div style={{ fontSize: '13px', color: '#94A3B8' }}>لا حقول متغيّرة مسجّلة.</div>
+              : auditOpen.changes.map((c, i) => (
+                <div key={i} style={{
+                  border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', marginBottom: '10px',
+                }}>
+                  <code style={{ fontSize: '12.5px', color: '#334155', fontWeight: 700 }}>{c.field}</code>
+                  <div style={{ fontSize: '12.5px', marginTop: '6px', wordBreak: 'break-word' }}>
+                    <div style={{ color: '#94A3B8' }}>قبل</div>
+                    <div style={{ color: '#B91C1C' }}>{String(JSON.stringify(c.before) ?? '—').slice(0, 400)}</div>
+                    <div style={{ color: '#94A3B8', marginTop: '6px' }}>بعد</div>
+                    <div style={{ color: '#15803D' }}>{String(JSON.stringify(c.after) ?? '—').slice(0, 400)}</div>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}
