@@ -52,6 +52,7 @@ import {
 
 const TOP_ITEMS = [
   { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
+  { label: 'مركز القيادة', icon: DashboardIcon, path: '/admin/command-center' },
 ]
 
 const GROUPS = [

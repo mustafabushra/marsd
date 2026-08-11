@@ -669,3 +669,12 @@ p {
   .marsad-stepper { display: none !important; }
   .marsad-stepper-compact { display: block; }
 }
+
+/* Command Center — the operational grid.
+   An inline style cannot carry a media query, and every layout in this
+   codebase is inline, so the two-column sections collapse here. Below
+   1100px a 2fr/1fr split leaves the health column too narrow to read a
+   check label without wrapping every line. */
+@media (max-width: 1100px) {
+  .marsad-cc-grid { grid-template-columns: 1fr !important; }
+}

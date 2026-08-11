@@ -45,6 +45,8 @@ const file = args.find((a) => !a.startsWith('--'))
 // `indexOf` returns -1 when the flag is absent, and `args[-1 + 1]` is the file
 // path — which Postgres then rejects as «invalid input syntax for type uuid»,
 // naming the path and explaining nothing.
+const reportAt = args.indexOf('--report')
+const reportPath = (reportAt > -1 && args[reportAt + 1]) || null
 const datasetAt = args.indexOf('--dataset')
 const dataset = (datasetAt > -1 && args[datasetAt + 1]) || DATASET_ID
 const dryRun = args.includes('--dry-run')
@@ -181,9 +183,13 @@ try {
   await pipeline(
     Readable.from((async function* lines() {
       for await (const r of readRows()) {
-        // A row with no registration number has no identity in this register
-        // and nothing to match on later.
-        if (!r.crNumber || !r.name) { skipped += 1; continue }
+        // A row needs an identity and a name. It does not need a *registration
+        // number*: 438,067 of the Ministry's 1.9 million rows carry only a
+        // unified number — recent main registrations issued under the regime
+        // where الرقم الموحد is the identifier. The first version of this line
+        // demanded `crNumber` and silently dropped every one of them, which is
+        // 23% of the national register lost to a rule about a column.
+        if ((!r.crNumber && !r.unifiedNumber) || !r.name) { skipped += 1; continue }
         read += 1
         yield [
           field(dataset), field(period), field(snapshotAt),
@@ -204,36 +210,27 @@ try {
   console.log(`  ${staged.n.toLocaleString('ar-SA')} صف وصل في ${Math.round((Date.now() - tCopy) / 1000)} ثانية`)
   if (skipped) console.log(`  ${skipped.toLocaleString('ar-SA')} صف بلا رقم سجل أو اسم — تُرك`)
 
-  // The merge, in one statement.
+  // The merge, in one statement — a plain insert.
   //
-  // `distinct on` because a file can carry the same registration twice and
-  // `on conflict` cannot update a row it inserted in the same command — which
-  // fails as «ON CONFLICT DO UPDATE command cannot affect row a second time»,
-  // an error that names nothing a reader can act on.
+  // It used to be `distinct on (cr_number) … on conflict do update`, which
+  // sorted 1.9 million rows to protect against duplicates the file does not
+  // have, and died with «Connection terminated unexpectedly» after thirty-six
+  // minutes. Both identifiers are unique across the source, and a generation
+  // always writes a fresh `dataset_id`, so there is nothing to conflict with.
+  //
+  // Uniqueness is still enforced — by the two indexes on the table. If a future
+  // file does carry a duplicate, this fails loudly on that row instead of
+  // silently collapsing two companies into one, which is the better failure.
   console.log('  جاري الدمج…')
   const tMerge = Date.now()
   const { rowCount } = await c.query(`
     insert into public.government_company_registry
       (dataset_id, snapshot_period, snapshot_at, cr_number, name, unified_number,
        registration_type, legal_entity, legal_entity_2, capital, region, city, registration_date)
-    select distinct on (cr_number)
-       dataset_id, snapshot_period, snapshot_at, cr_number, name, unified_number,
+    select dataset_id, snapshot_period, snapshot_at,
+       nullif(btrim(cr_number), ''), name, nullif(btrim(unified_number), ''),
        registration_type, legal_entity, legal_entity_2, capital, region, city, registration_date
-      from ${STAGING}
-     order by cr_number
-    on conflict (dataset_id, cr_number) do update set
-       name = excluded.name,
-       unified_number = excluded.unified_number,
-       registration_type = excluded.registration_type,
-       legal_entity = excluded.legal_entity,
-       legal_entity_2 = excluded.legal_entity_2,
-       capital = excluded.capital,
-       region = excluded.region,
-       city = excluded.city,
-       registration_date = excluded.registration_date,
-       snapshot_period = excluded.snapshot_period,
-       snapshot_at = excluded.snapshot_at,
-       imported_at = now()`)
+      from ${STAGING}`)
 
   await c.query(`drop table if exists ${STAGING}`)
   await c.query('commit')
