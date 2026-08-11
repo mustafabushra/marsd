@@ -41,8 +41,14 @@ import { verifyToken } from '@clerk/backend'
 import { createClient } from '@supabase/supabase-js'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import TrustReportDocument from '../src/reports/TrustReportDocument.jsx'
-import { documentShell } from '../src/reports/documentShell.js'
+// The precompiled template, not the .jsx source.
+//
+// Importing the source meant the function's ability to start depended on the
+// platform transpiling JSX and understanding `import … with { type: 'json' }`.
+// Neither is Node; both fail at module load, before the handler runs — which is
+// why every request returned FUNCTION_INVOCATION_FAILED, including ones this
+// file rejects on its second line. Built by scripts/build-report-template.mjs.
+import { TrustReportDocument, documentShell } from './_report/document.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

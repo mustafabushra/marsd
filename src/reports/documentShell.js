@@ -1,4 +1,4 @@
-import fonts from './fonts/tajawal.json' with { type: 'json' }
+import fonts from './fonts/tajawal.json'
 
 /**
  * The page the document is printed onto.

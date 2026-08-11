@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build-report-template.mjs && vite build",
     "preview": "vite preview",
     "check:enums": "node scripts/check-enum-drift.mjs",
-    "lint": "eslint src api scripts"
+    "lint": "eslint src api scripts",
+    "build:report": "node scripts/build-report-template.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
