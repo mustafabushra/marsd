@@ -61,8 +61,8 @@ try {
   await page.waitForTimeout(2500)
 
   console.log('\n─── فتح النافذة ───')
-  const openBtn = page.getByRole('button', { name: 'الدعم الفني' })
-  ok('زرّ الدعم الفني ظاهر في كل شاشات الشركات', await openBtn.count() === 1)
+  const openBtn = page.getByRole('button', { name: 'الإبلاغ عن مشكلة' })
+  ok('الزرّ العائم ظاهر في كل شاشات الشركات', await openBtn.count() === 1)
   await openBtn.click()
   const dlg = page.getByRole('dialog', { name: 'الإبلاغ عن مشكلة' })
   await dlg.waitFor({ state: 'visible', timeout: 10000 })

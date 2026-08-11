@@ -53,7 +53,7 @@ try {
   await signIn(p1, BASE, { role: 'company_admin' })
   await p1.goto(`${BASE}/search`, { waitUntil: 'domcontentloaded', timeout: 40000 })
   await p1.waitForTimeout(2500)
-  await p1.getByRole('button', { name: 'الدعم الفني' }).click()
+  await p1.getByRole('button', { name: 'الإبلاغ عن مشكلة' }).click()
   const dlg = p1.getByRole('dialog', { name: 'الإبلاغ عن مشكلة' })
   await dlg.waitFor({ state: 'visible', timeout: 10000 })
   await dlg.locator('#sup-kind').selectOption('technical')

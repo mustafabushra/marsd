@@ -181,7 +181,11 @@ export default function SupportDialog ({ open, onClose }) {
       role="dialog" aria-modal="true" aria-label="الإبلاغ عن مشكلة"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 90,
+        // Above the mobile drawer, which is 120 with its scrim at 119. This was
+        // 90, so opening the dialog while the menu was open put the dialog
+        // behind the menu — unreachable, and invisible to any test that opened
+        // it at desktop width and resized afterwards.
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 130,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px',
       }}>
       <div ref={panel} tabIndex={-1} dir="rtl" style={{

@@ -678,3 +678,17 @@ p {
 @media (max-width: 1100px) {
   .marsad-cc-grid { grid-template-columns: 1fr !important; }
 }
+
+/* --- The support launcher ------------------------------------------------ */
+/* «الدعم الفني» floats over every company screen. On a 360px phone the pill
+   with its label eats a third of the width and sits over content the person is
+   trying to read, so below 520px it collapses to the ring alone. The button
+   keeps its aria-label, so it does not become an unnamed circle. */
+@media (max-width: 520px) {
+  .marsad-support-fab-label { display: none; }
+  .marsad-support-fab {
+    padding: 14px !important;
+    inset-inline-end: 16px !important;
+    bottom: 16px !important;
+  }
+}
