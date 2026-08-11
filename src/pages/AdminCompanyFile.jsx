@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { SkeletonPage } from '../components/Skeleton'
+import DocumentViewer from '../components/DocumentViewer'
 
 /**
  * /admin/company/:id — one company, everything about it.
@@ -235,6 +236,9 @@ export default function AdminCompanyFile() {
   const [form, setForm] = useState({ type: 'information', reason: '', details: '', docs: [], days: 14 })
   const [auditPage, setAuditPage] = useState(0)
   const [auditOpen, setAuditOpen] = useState(null)
+  const [viewing, setViewing] = useState(null)
+  const [rejecting, setRejecting] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   const disputes = useLazyTab(tab === 'disputes', async (sb) => {
     const { data, error } = await sb.rpc('admin_company_disputes', { p_company_id: id })
@@ -291,6 +295,36 @@ export default function AdminCompanyFile() {
   useLiveData(load, { tables: ['companies', 'company_documents', 'clarification_requests', 'reports'] })
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4000) }
+
+  /**
+   * Verify or reject a document without leaving the file.
+   *
+   * Through `review_document`, which is the same call /admin/documents makes —
+   * the permission check, the trust-score recompute and the audit entry all
+   * live inside it. A second implementation here would be a second place for
+   * the rules to drift, and the rule that matters is the one the database
+   * enforces.
+   *
+   * A rejection carries a reason because the company is shown it and has to
+   * know what to send instead.
+   */
+  const reviewDoc = async (documentId, approve, reason) => {
+    try {
+      setBusy(true)
+      const { error: e } = await getSupabase().rpc('review_document', {
+        p_document_id: documentId,
+        p_approve: approve,
+        p_reason: reason?.trim() || null,
+      })
+      if (e) throw e
+      showToast(approve ? '✅ وُثّق المستند' : '✅ رُفض المستند وأُبلغت الشركة')
+      setRejecting(null)
+      setRejectReason('')
+      load()
+    } catch (err) {
+      showToast('❌ ' + (err?.message || 'تعذّر حفظ القرار'))
+    } finally { setBusy(false) }
+  }
 
   const askClarification = async () => {
     if (!form.reason.trim()) { showToast('❌ السبب مطلوب'); return }
@@ -484,8 +518,16 @@ export default function AdminCompanyFile() {
               border: tab === t.v ? 0 : '1.5px solid #E2E8F0',
             }}>
               {t.t}
+              {/* aria-hidden because the count is a visual cue, not part of the
+                  tab's name. Without it the accessible name of the documents
+                  tab is «المستندات1» — a screen reader reads the digit as part
+                  of the word, and an exact-name locator stops matching the
+                  moment a badge appears. That is a race, not a constant: the
+                  tab is named one thing before the counts land and another
+                  after, so a test passes or fails on how fast the data
+                  arrives. The number is in the tab's own panel either way. */}
               {badge > 0 && (
-                <span style={{ background: '#DC2626', color: '#fff', borderRadius: '999px', padding: '1px 7px', fontSize: '11px', marginInlineStart: '7px' }}>{badge}</span>
+                <span aria-hidden="true" style={{ background: '#DC2626', color: '#fff', borderRadius: '999px', padding: '1px 7px', fontSize: '11px', marginInlineStart: '7px' }}>{badge}</span>
               )}
             </button>
           )
@@ -580,14 +622,56 @@ export default function AdminCompanyFile() {
                       )
                     })()}
                   </div>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: st.fg, whiteSpace: 'nowrap' }}>{st.t}</span>
+                  {/* The document and the decision about it, together.
+                      Verifying used to mean downloading the file, reading it in
+                      another window, coming back, and clicking a button on a row
+                      whose contents you were now recalling from memory.
+                      Everything that makes a verification worth anything — does
+                      the name match, is the number the one on file, has it
+                      expired — was being done against a window that is not this
+                      one. */}
+                  {(() => {
+                    const s = sent.find((x) => x.doc_type === d.doc_type)
+                    return (
+                      <div style={{ display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: st.fg, whiteSpace: 'nowrap' }}>{st.t}</span>
+                        {s?.file_url && (
+                          <>
+                            <button onClick={() => setViewing({ key: s.file_url, name: s.file_name, title: d.label })}
+                              style={{
+                                padding: '6px 13px', borderRadius: '8px', border: '1.5px solid #E2E8F0',
+                                background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                              }}>عرض المستند</button>
+                            {s.status !== 'verified' && (
+                              <button onClick={() => reviewDoc(s.id, true)} disabled={busy}
+                                style={{
+                                  padding: '6px 13px', borderRadius: '8px', border: 0,
+                                  background: busy ? '#86EFAC' : '#15803D', color: '#fff',
+                                  fontSize: '12.5px', fontWeight: 800,
+                                  cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                                }}>توثيق</button>
+                            )}
+                            {s.status !== 'rejected' && (
+                              <button onClick={() => setRejecting({ id: s.id, label: d.label })} disabled={busy}
+                                style={{
+                                  padding: '6px 13px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                                  background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                                  cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                                }}>رفض</button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })}
           </div>
           <button onClick={() => navigate('/admin/documents')}
                   style={{ marginTop: '16px', padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-            فتح طابور التوثيق
+            طابور التوثيق لكل الشركات
           </button>
         </div>
       )}
@@ -1202,6 +1286,57 @@ export default function AdminCompanyFile() {
           </div>
         </div>
       )}
+
+      {/* Rejecting says why. The company is shown this line and has to know
+          what to send instead, so «مرفوض» on its own is not a decision it can
+          act on. */}
+      {rejecting && (
+        <div role="dialog" aria-modal="true" aria-label="سبب الرفض"
+          onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) setRejecting(null) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 150,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+          }}>
+          <div style={{ ...card, width: 'min(500px, 100%)' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>رفض المستند</h2>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
+              {rejecting.label} — سيُعرض السبب على الشركة.
+            </p>
+            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+              rows={4} placeholder="ما الخطأ في المستند، وما المطلوب بدلاً منه؟"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '11px 13px',
+                border: '1.5px solid #E2E8F0', borderRadius: '10px', background: '#F8FAFC',
+                fontSize: '14px', fontFamily: 'inherit', lineHeight: 1.9, resize: 'vertical',
+              }} />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <button onClick={() => reviewDoc(rejecting.id, false, rejectReason)}
+                disabled={busy || rejectReason.trim().length < 5}
+                style={{
+                  padding: '10px 20px', borderRadius: '9px', border: 0,
+                  background: rejectReason.trim().length < 5 || busy ? '#CBD5E1' : '#B91C1C',
+                  color: '#fff', fontSize: '13px', fontWeight: 800,
+                  cursor: rejectReason.trim().length < 5 || busy ? 'default' : 'pointer',
+                  fontFamily: 'inherit',
+                }}>تأكيد الرفض</button>
+              <button onClick={() => { setRejecting(null); setRejectReason('') }} disabled={busy}
+                style={{
+                  padding: '10px 20px', borderRadius: '9px', border: '1.5px solid #E2E8F0',
+                  background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DocumentViewer
+        open={!!viewing}
+        docKey={viewing?.key}
+        fileName={viewing?.name}
+        title={viewing?.title}
+        onClose={() => setViewing(null)}
+      />
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', insetInlineStart: '24px', background: '#0F172A', color: '#fff', padding: '13px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, zIndex: 300 }}>{toast}</div>
