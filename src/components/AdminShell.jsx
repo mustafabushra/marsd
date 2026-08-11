@@ -104,6 +104,7 @@ const GROUPS = [
     { label: 'المستخدمون', path: '/admin/users' },
     { label: 'حسابات الشركات', path: '/admin/tenants' },
     { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
+    { label: 'الدعم الفني', path: '/admin/support' },
     { label: 'دليل الأنشطة', path: '/admin/activities' },
     { label: 'الإعدادات', path: '/admin/settings' },
     { header: 'المراقبة' },
@@ -151,6 +152,8 @@ const SCREEN_LABELS = {
   '/admin/integrations': 'التكاملات (قيد التطوير)',
   '/admin/email-templates': 'نماذج البريد (قيد التطوير)',
   '/admin/system-health': 'حالة النظام',
+  '/admin/data-management': 'إدارة بيانات السجل التجاري',
+  '/admin/support': 'بلاغات الدعم الفني',
 }
 
 export default function AdminShell({ user }) {
