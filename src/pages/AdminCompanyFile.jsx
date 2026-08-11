@@ -254,6 +254,12 @@ export default function AdminCompanyFile() {
     return data || []
   }, [id, tab === 'timeline'])
 
+  const claims = useLazyTab(tab === 'account', async (sb) => {
+    const { data, error } = await sb.rpc('admin_company_claims', { p_company_id: id })
+    if (error) throw error
+    return data || []
+  }, [id, tab === 'account'])
+
   const audit = useLazyTab(tab === 'audit', async (sb) => {
     const { data, error } = await sb.rpc('admin_company_audit',
       { p_company_id: id, p_limit: 25, p_offset: auditPage * 25 })
@@ -346,6 +352,18 @@ export default function AdminCompanyFile() {
     'set_company_verification',
     { p_company_id: id, p_verified: verified, p_reason: reason?.trim() || null },
     verified ? '✅ وُثّقت الشركة' : '✅ سُحب التوثيق',
+  )
+
+  const decideClaim = (claimId, approve, reason) => runDecision(
+    'decide_claim_request',
+    { p_claim_id: claimId, p_approve: approve, p_reason: reason?.trim() || null },
+    approve ? '✅ قُبلت الملكية وأُبلغ مقدّم الطلب' : '✅ رُفض الطلب وأُبلغ مقدّمه',
+  )
+
+  const resolveDispute = (disputeId, upheld, note) => runDecision(
+    'resolve_dispute',
+    { p_dispute_id: disputeId, p_upheld: upheld, p_note: note?.trim() || null },
+    upheld ? '✅ قُبل الاعتراض' : '✅ رُفض الاعتراض',
   )
 
   const reviewDoc = async (documentId, approve, reason) => {
@@ -596,7 +614,11 @@ export default function AdminCompanyFile() {
                       fontSize: '12.5px', fontWeight: 800,
                       cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
                     }}>قبول التسجيل</button>
-                    <button onClick={() => setDeciding({ kind: 'registration' })} disabled={busy} style={{
+                    <button onClick={() => setDeciding({
+                      title: 'رفض التسجيل',
+                      placeholder: 'ما الذي ينقص التسجيل، وما المطلوب لإعادة التقديم؟',
+                      run: (why) => decideRegistration(false, why),
+                    })} disabled={busy} style={{
                       padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
                       background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
                       cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
@@ -613,7 +635,11 @@ export default function AdminCompanyFile() {
                   borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800,
                 }}>{ident.verified ? `موثّقة · ${fmt(ident.verified_at)}` : 'غير موثّقة'}</span>
                 {ident.verified ? (
-                  <button onClick={() => setDeciding({ kind: 'verification' })} disabled={busy} style={{
+                  <button onClick={() => setDeciding({
+                    title: 'سحب التوثيق',
+                    placeholder: 'لماذا لم تعد الشركة مستوفية لشروط التوثيق؟',
+                    run: (why) => setVerification(false, why),
+                  })} disabled={busy} style={{
                     padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
                     background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
                     cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
@@ -772,6 +798,63 @@ export default function AdminCompanyFile() {
 
       {tab === 'account' && (
         <>
+          {/* Who is asking to own this company.
+              The claims queue is its own screen and stays one — it is how the
+              work is found across every company. This is the one screen where
+              «who says this is theirs» is a question about the company in front
+              of you, and the evidence for answering it is on this page. */}
+          <div style={{ ...card, marginBottom: '16px' }}>
+            <h2 style={h3}>طلبات الملكية</h2>
+            {claims.loading ? <TabSkeleton n={2} />
+              : claims.error ? <TabError what="طلبات الملكية" message={claims.error} onRetry={claims.reload} />
+                : !claims.data?.length ? (
+                  <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
+                    <b style={{ color: '#0F172A' }}>لا طلبات ملكية</b>
+                    <div>لم يطلب أحد ملكية هذه الشركة.</div>
+                  </div>
+                ) : claims.data.map((cl, i) => (
+                  <div key={cl.id} style={{ borderTop: i ? '1px solid #F1F5F9' : 0, padding: '13px 0' }}>
+                    <div style={{ display: 'flex', gap: '9px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{
+                        background: cl.status === 'pending' ? '#FEF3C7' : cl.status === 'approved' ? '#ECFDF5' : '#F1F5F9',
+                        color: cl.status === 'pending' ? '#B45309' : cl.status === 'approved' ? '#15803D' : '#475569',
+                        borderRadius: '999px', padding: '3px 11px', fontSize: '11.5px', fontWeight: 800,
+                      }}>{cl.status === 'pending' ? 'بانتظار القرار' : cl.status === 'approved' ? 'مقبول' : 'مرفوض'}</span>
+                      <b style={{ fontSize: '14px', color: '#0F172A' }}>{cl.user_name || cl.user_email || '—'}</b>
+                      <span style={{ fontSize: '12px', color: '#94A3B8' }}>{fmt(cl.created_at)}</span>
+                    </div>
+                    {cl.user_name && cl.user_email && (
+                      <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '3px' }}>{cl.user_email}</div>
+                    )}
+                    {cl.rejection_reason && (
+                      <div style={{ fontSize: '12.5px', color: '#B91C1C', marginTop: '4px', lineHeight: 1.9 }}>
+                        السبب: {cl.rejection_reason}
+                      </div>
+                    )}
+                    {cl.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                        <button onClick={() => decideClaim(cl.id, true)} disabled={busy} style={{
+                          padding: '7px 16px', borderRadius: '8px', border: 0,
+                          background: busy ? '#86EFAC' : '#15803D', color: '#fff',
+                          fontSize: '12.5px', fontWeight: 800,
+                          cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                        }}>قبول الملكية</button>
+                        <button onClick={() => setDeciding({
+                          title: 'رفض طلب الملكية',
+                          note: 'سيُعرض السبب على مقدّم الطلب.',
+                          placeholder: 'ما الذي ينقص لإثبات الملكية؟',
+                          run: (why) => decideClaim(cl.id, false, why),
+                        })} disabled={busy} style={{
+                          padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                          background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                          cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                        }}>رفض</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+          </div>
+
           {/* Where this record came from.
               A company the Ministry published and one somebody typed are
               different claims, and a reviewer should not have to guess which is
@@ -1012,6 +1095,35 @@ export default function AdminCompanyFile() {
                           </div>
                           {d.resolution_note && <div style={{ color: '#15803D' }}>القرار: {d.resolution_note}</div>}
                         </div>
+                        {/* Decided here, through resolve_dispute — the same
+                            call /admin/disputes makes. An open objection is
+                            about a report on this company, and this is the page
+                            that shows the report. */}
+                        {d.status === 'open' && (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                            <button onClick={() => setDeciding({
+                              title: 'قبول الاعتراض',
+                              note: 'سيُعرض القرار على الشركة وصاحب التقرير.',
+                              placeholder: 'على أي أساس قُبل الاعتراض؟',
+                              run: (why) => resolveDispute(d.id, true, why),
+                            })} disabled={busy} style={{
+                              padding: '7px 16px', borderRadius: '8px', border: 0,
+                              background: busy ? '#86EFAC' : '#15803D', color: '#fff',
+                              fontSize: '12.5px', fontWeight: 800,
+                              cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                            }}>قبول الاعتراض</button>
+                            <button onClick={() => setDeciding({
+                              title: 'رفض الاعتراض',
+                              note: 'سيُعرض القرار على الشركة.',
+                              placeholder: 'لماذا يبقى التقرير كما هو؟',
+                              run: (why) => resolveDispute(d.id, false, why),
+                            })} disabled={busy} style={{
+                              padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                              background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                              cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                            }}>رفض الاعتراض</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1436,16 +1548,14 @@ export default function AdminCompanyFile() {
           }}>
           <div style={{ ...card, width: 'min(500px, 100%)' }}>
             <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>
-              {deciding.kind === 'registration' ? 'رفض التسجيل' : 'سحب التوثيق'}
+              {deciding.title}
             </h2>
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
-              سيُعرض السبب على الشركة.
+              {deciding.note || 'سيُعرض السبب على الشركة.'}
             </p>
             <textarea value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
               rows={4}
-              placeholder={deciding.kind === 'registration'
-                ? 'ما الذي ينقص التسجيل، وما المطلوب لإعادة التقديم؟'
-                : 'لماذا لم تعد الشركة مستوفية لشروط التوثيق؟'}
+              placeholder={deciding.placeholder}
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '11px 13px',
                 border: '1.5px solid #E2E8F0', borderRadius: '10px', background: '#F8FAFC',
@@ -1453,9 +1563,7 @@ export default function AdminCompanyFile() {
               }} />
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => (deciding.kind === 'registration'
-                  ? decideRegistration(false, decideReason)
-                  : setVerification(false, decideReason))}
+                onClick={() => deciding.run(decideReason)}
                 disabled={busy || decideReason.trim().length < 5}
                 style={{
                   padding: '10px 20px', borderRadius: '9px', border: 0,
