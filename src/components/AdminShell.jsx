@@ -95,6 +95,10 @@ const GROUPS = [
     { label: 'المدفوعات', path: '/admin/payments' },
   ] },
   { key: 'platform', title: 'المنصة', items: [
+    // إدارة البيانات goes above the two importers because it is where you look
+    // to find out what the register currently is, and the importers are how you
+    // change it. Reading before writing.
+    { label: 'إدارة البيانات', path: '/admin/data-management' },
     { label: 'الاستيراد الجماعي', path: '/admin/bulk-import' },
     { label: '⚡ استيراد من السجل التجاري', path: '/admin/registry-import' },
     { label: 'المستخدمون', path: '/admin/users' },
