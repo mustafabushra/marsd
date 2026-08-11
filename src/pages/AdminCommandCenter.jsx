@@ -237,7 +237,7 @@ export default function AdminCommandCenter () {
     })),
     ...(failedJob ? [{
       key: 'import_failed', text: 'مهمّة استيراد فاشلة',
-      detail: failedJob.failure_reason, to: '/admin/data',
+      detail: failedJob.failure_reason, to: '/admin/registry-import',
     }] : []),
   ]
 
@@ -403,7 +403,7 @@ export default function AdminCommandCenter () {
           // the product rests on are still holding.
           { k: 'health', t: 'صحّة النموذج', tone: healthBad ? 'critical' : 'done',
             n: healthBad, sub: healthBad ? 'يحتاج مراجعة' : 'سليم',
-            to: '/admin/system', st: health },
+            to: '/admin/system-health', st: health },
         ].map((c) => {
           const tone = TONE[c.tone]
           return (
