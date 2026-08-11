@@ -239,6 +239,8 @@ export default function AdminCompanyFile() {
   const [viewing, setViewing] = useState(null)
   const [rejecting, setRejecting] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [deciding, setDeciding] = useState(null)
+  const [decideReason, setDecideReason] = useState('')
 
   const disputes = useLazyTab(tab === 'disputes', async (sb) => {
     const { data, error } = await sb.rpc('admin_company_disputes', { p_company_id: id })
@@ -308,6 +310,44 @@ export default function AdminCompanyFile() {
    * A rejection carries a reason because the company is shown it and has to
    * know what to send instead.
    */
+  /**
+   * Registration and the verification badge, decided here.
+   *
+   * Both go through functions added for this — decide_company_registration and
+   * set_company_verification. The screens they came from wrote to `companies`
+   * from the browser and then inserted their own audit row afterwards, in a
+   * separate try that logged a warning and carried on when it failed; a company
+   * could change state with nobody recorded as having changed it. In the
+   * function the write, the audit entry and the notification are one
+   * transaction behind one permission check, and the permission is checked by
+   * the database rather than by which screen you managed to open.
+   */
+  const runDecision = async (fn, args, okMsg) => {
+    try {
+      setBusy(true)
+      const { error: e } = await getSupabase().rpc(fn, args)
+      if (e) throw e
+      showToast(okMsg)
+      setDeciding(null)
+      setDecideReason('')
+      load()
+    } catch (err) {
+      showToast('❌ ' + (err?.message || 'تعذّر حفظ القرار'))
+    } finally { setBusy(false) }
+  }
+
+  const decideRegistration = (approve, reason) => runDecision(
+    'decide_company_registration',
+    { p_company_id: id, p_approve: approve, p_reason: reason?.trim() || null },
+    approve ? '✅ قُبل التسجيل وأُبلغت الشركة' : '✅ رُفض التسجيل وأُبلغت الشركة',
+  )
+
+  const setVerification = (verified, reason) => runDecision(
+    'set_company_verification',
+    { p_company_id: id, p_verified: verified, p_reason: reason?.trim() || null },
+    verified ? '✅ وُثّقت الشركة' : '✅ سُحب التوثيق',
+  )
+
   const reviewDoc = async (documentId, approve, reason) => {
     try {
       setBusy(true)
@@ -536,6 +576,60 @@ export default function AdminCompanyFile() {
 
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* The two decisions that used to live on two other screens.
+              Approving a registration was on /admin/company-approval and the
+              badge on /admin/company-verification, so deciding either meant
+              leaving the one page that shows the documents, the reports and
+              the history the decision rests on. The queues still exist and are
+              still how the work is found; this is where it is done. */}
+          <div style={card}>
+            <h2 style={h3}>القرارات</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ ...lbl, minWidth: '78px' }}>التسجيل</span>
+                <span style={{ background: rv.bg, color: rv.fg, borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800 }}>{rv.t}</span>
+                {file.status === 'pending' && (
+                  <>
+                    <button onClick={() => decideRegistration(true)} disabled={busy} style={{
+                      padding: '7px 16px', borderRadius: '8px', border: 0,
+                      background: busy ? '#86EFAC' : '#15803D', color: '#fff',
+                      fontSize: '12.5px', fontWeight: 800,
+                      cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                    }}>قبول التسجيل</button>
+                    <button onClick={() => setDeciding({ kind: 'registration' })} disabled={busy} style={{
+                      padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                      background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                      cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                    }}>رفض التسجيل</button>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: '14px' }}>
+                <span style={{ ...lbl, minWidth: '78px' }}>التوثيق</span>
+                <span style={{
+                  background: ident.verified ? '#ECFDF5' : '#F1F5F9',
+                  color: ident.verified ? '#15803D' : '#475569',
+                  borderRadius: '999px', padding: '4px 12px', fontSize: '12.5px', fontWeight: 800,
+                }}>{ident.verified ? `موثّقة · ${fmt(ident.verified_at)}` : 'غير موثّقة'}</span>
+                {ident.verified ? (
+                  <button onClick={() => setDeciding({ kind: 'verification' })} disabled={busy} style={{
+                    padding: '7px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                    background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                    cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>سحب التوثيق</button>
+                ) : (
+                  <button onClick={() => setVerification(true)} disabled={busy} style={{
+                    padding: '7px 16px', borderRadius: '8px', border: 0,
+                    background: busy ? '#86EFAC' : '#15803D', color: '#fff',
+                    fontSize: '12.5px', fontWeight: 800,
+                    cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>توثيق الشركة</button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div style={card}>
             <h2 style={h3}>السلوك التجاري</h2>
             <Grid>
@@ -1320,6 +1414,57 @@ export default function AdminCompanyFile() {
                   fontFamily: 'inherit',
                 }}>تأكيد الرفض</button>
               <button onClick={() => { setRejecting(null); setRejectReason('') }} disabled={busy}
+                style={{
+                  padding: '10px 20px', borderRadius: '9px', border: '1.5px solid #E2E8F0',
+                  background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refusing a registration or taking a badge back is shown to the company
+          and has to say why. Same shape as the document rejection above,
+          because it is the same act. */}
+      {deciding && (
+        <div role="dialog" aria-modal="true" aria-label="سبب القرار"
+          onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) setDeciding(null) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 150,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+          }}>
+          <div style={{ ...card, width: 'min(500px, 100%)' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>
+              {deciding.kind === 'registration' ? 'رفض التسجيل' : 'سحب التوثيق'}
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
+              سيُعرض السبب على الشركة.
+            </p>
+            <textarea value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
+              rows={4}
+              placeholder={deciding.kind === 'registration'
+                ? 'ما الذي ينقص التسجيل، وما المطلوب لإعادة التقديم؟'
+                : 'لماذا لم تعد الشركة مستوفية لشروط التوثيق؟'}
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '11px 13px',
+                border: '1.5px solid #E2E8F0', borderRadius: '10px', background: '#F8FAFC',
+                fontSize: '14px', fontFamily: 'inherit', lineHeight: 1.9, resize: 'vertical',
+              }} />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => (deciding.kind === 'registration'
+                  ? decideRegistration(false, decideReason)
+                  : setVerification(false, decideReason))}
+                disabled={busy || decideReason.trim().length < 5}
+                style={{
+                  padding: '10px 20px', borderRadius: '9px', border: 0,
+                  background: decideReason.trim().length < 5 || busy ? '#CBD5E1' : '#B91C1C',
+                  color: '#fff', fontSize: '13px', fontWeight: 800,
+                  cursor: decideReason.trim().length < 5 || busy ? 'default' : 'pointer',
+                  fontFamily: 'inherit',
+                }}>تأكيد</button>
+              <button onClick={() => { setDeciding(null); setDecideReason('') }} disabled={busy}
                 style={{
                   padding: '10px 20px', borderRadius: '9px', border: '1.5px solid #E2E8F0',
                   background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800,
