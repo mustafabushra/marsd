@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '@clerk/react'
 import { openCompanyReport, getCompanyKnowledgeBase, getCompanyReportsTimeline, getCompanyReportsSummary } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
 import ReportHeader from '../components/report/ReportHeader'
@@ -447,6 +448,46 @@ export default function TrustReport() {
   // refusal can also be "الشركة غير موجودة" or a failure to reach the meter at
   // all, and showing «بلغت حد عمليات البحث» for either of those is a lie the
   // reader cannot check.
+  const { getToken } = useAuth()
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState('')
+
+  /**
+   * Ask the server for the PDF and hand it to the browser as a download.
+   *
+   * The session token goes with the request because the endpoint verifies it
+   * and then reads Supabase *as this user* — so the paper can never contain
+   * anything the reader could not already see on this screen.
+   */
+  const downloadPdf = async () => {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    setPdfError('')
+    try {
+      const token = await getToken()
+      const r = await fetch(`/api/trust-report-pdf?company=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!r.ok) {
+        const why = await r.json().catch(() => null)
+        throw new Error(why?.error || 'تعذّر إصدار التقرير')
+      }
+      const blob = await r.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = `مرصد-${(company?.name || 'تقرير').replace(/[\\/:*?"<>|]/g, '')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+    } catch (e) {
+      setPdfError(e?.message || 'تعذّر إصدار التقرير')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   const [blockedReason, setBlockedReason] = useState('')
   const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -800,17 +841,26 @@ export default function TrustReport() {
         connected={connected}
         liveAt={liveAt}
         actions={<>
-          {/* The browser's own print-to-PDF rather than a PDF library. Arabic in
-              jsPDF means embedding a font and hand-shaping the text, and it
-              still breaks on ligatures; the browser already renders this page
-              correctly in RTL and every browser can save the result as PDF. */}
+          {/* Rendered by Chromium on the server, from one A4 template.
+              This called window.print(), which hands the job to the reader's
+              machine — their paper size, their margins, their «headers and
+              footers» checkbox, their scale. Two people asking for the same
+              report got two different papers and neither was the one Marsad
+              designed. The engine is still a browser, which was the right call;
+              what changed is whose. */}
           <button
-            onClick={() => window.print()}
-            style={{ background: '#16A34A', color: '#fff', border: 0, borderRadius: '10px',
-                     padding: '11px 18px', fontSize: '14px', fontWeight: 800,
-                     cursor: 'pointer', fontFamily: 'inherit' }}>
-            ⬇ تحميل PDF
+            onClick={downloadPdf}
+            disabled={pdfBusy}
+            style={{ background: pdfBusy ? '#86EFAC' : '#16A34A', color: '#fff', border: 0,
+                     borderRadius: '10px', padding: '11px 18px', fontSize: '14px', fontWeight: 800,
+                     cursor: pdfBusy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+            {pdfBusy ? '… جارٍ الإصدار' : '⬇ تحميل PDF'}
           </button>
+          {pdfError && (
+            <span role="alert" style={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 700 }}>
+              {pdfError}
+            </span>
+          )}
           <button
             onClick={() => navigate('/watchlist')}
             style={{ background: '#fff', color: '#1E2A52', border: '1.5px solid #E2E8F0',
