@@ -788,7 +788,7 @@ export default function AdminCompanyFile() {
       {/* ===== Disputes ===== */}
       {tab === 'disputes' && (
         <div style={card}>
-          <div style={label}>الاعتراضات</div>
+          <h2 style={h3}>الاعتراضات</h2>
           {disputes.loading ? <TabSkeleton />
             : disputes.error ? <TabError what="الاعتراضات" message={disputes.error} onRetry={disputes.reload} />
               : !disputes.data?.items?.length ? (
@@ -845,7 +845,7 @@ export default function AdminCompanyFile() {
       {/* ===== Timeline — the story, not the columns ===== */}
       {tab === 'timeline' && (
         <div style={card}>
-          <div style={label}>الخطّ الزمني</div>
+          <h2 style={h3}>الخطّ الزمني</h2>
           {timeline.loading ? <TabSkeleton n={6} />
             : timeline.error ? <TabError what="الخطّ الزمني" message={timeline.error} onRetry={timeline.reload} />
               : !timeline.data?.length ? (
@@ -884,7 +884,7 @@ export default function AdminCompanyFile() {
       {/* ===== Audit — raw on purpose ===== */}
       {tab === 'audit' && (
         <div style={card}>
-          <div style={label}>سجل التدقيق</div>
+          <h2 style={{ ...h3, marginBottom: '4px' }}>سجل التدقيق</h2>
           <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px' }}>
             من غيّر أي حقل، ومن أي قيمة إلى أي قيمة، ولماذا. القيم كما كُتبت.
           </p>
@@ -1001,7 +1001,7 @@ export default function AdminCompanyFile() {
               ))}
             </dl>
 
-            <div style={{ ...label, marginTop: '20px' }}>الحقول المتغيّرة</div>
+            <div style={{ ...lbl, marginTop: '20px' }}>الحقول المتغيّرة</div>
             {/* Raw, deliberately. A value that has been translated is a value
                 that cannot be used as evidence. */}
             {(auditOpen.changes || []).length === 0
