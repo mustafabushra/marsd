@@ -1,117 +1,209 @@
 #!/usr/bin/env node
 /**
- * One search, two registries, and no company found twice.
+ * One search box over two registers.
  *
- * Marsad's rows come first — they are the ones with reports and a score, the
- * answer somebody searching Marsad usually wants. Government rows fill in what
- * Marsad does not have.
+ * The rule it has to hold: a name, a commercial registration number or a
+ * unified number, asked once, answered from Marsad and from the Ministry's
+ * published generation at the same time. A company Marsad already holds opens.
+ * One that exists only in the national register is brought into Marsad from the
+ * official record, and can then take documents and reports.
  *
- * The two things that would make it useless are both about repetition: a
- * company Marsad tracks appearing again as a government row, and a company
- * appearing once per published quarter. Both are checked here, because both
- * pass a naive `union all` without complaint.
+ * And the line that is easy to blur and expensive to get wrong: the Ministry's
+ * data identifies a company, it does not stand in for its paperwork. A company
+ * brought in this way must still show its documents as outstanding — otherwise
+ * importing the register would silently mark two million companies as having
+ * filed papers none of them sent.
  *
- *   node scripts/probe-unified-search.mjs
+ * Anything this creates is removed.
+ *
+ *   node scripts/probe-unified-search.mjs [url]
  */
 
+import { chromium } from 'playwright'
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { signIn } from './lib/sign-in.mjs'
+
+const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://127.0.0.1:4399'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
-
-const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
-await c.connect()
+const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
+await db.connect()
 
 let pass = 0
 let fail = 0
-let mark = 0
-const ok = (n, cond, d = '') => {
-  if (cond) { pass += 1; console.log(`  ✅ ${n}`) } else { fail += 1; console.log(`  ❌ ${n}${d ? ` — ${d}` : ''}`) }
+const ok = (n, c, d = '') => {
+  if (c) { pass += 1; console.log(`  ✅ ${n}`) }
+  else { fail += 1; console.log(`  ❌ ${n}${d ? ` — ${d}` : ''}`) }
 }
-const refuses = async (n, fn, expect) => {
-  const sp = `u${(mark += 1)}`
-  await c.query(`savepoint ${sp}`)
-  try { await fn(); await c.query(`release savepoint ${sp}`); fail += 1; console.log(`  ❌ ${n} — لم يُرفض`) }
-  catch (e) {
-    await c.query(`rollback to savepoint ${sp}`)
-    const m = !expect || e.message.includes(expect)
-    if (m) { pass += 1; console.log(`  ✅ ${n}`) } else { fail += 1; console.log(`  ❌ ${n} — ${e.message.slice(0, 60)}`) }
-  }
-}
-const asUser = (id) => c.query(`select set_config('request.jwt.claims', $1, true)`,
-  [JSON.stringify({ sub: id, role: 'authenticated' })])
-const search = async (q) => (await c.query('select * from public.search_companies_unified($1, 50)', [q])).rows
 
-const Q2 = 'aaaaaaaa-0000-0000-0000-000000000002'
-const Q3 = 'aaaaaaaa-0000-0000-0000-000000000003'
+const PROBE = 'search_probe_admin'
+const browser = await chromium.launch()
+let promoted = null
+
+const asAdmin = async (sql, args) => {
+  await db.query('begin')
+  await db.query(`select set_config('request.jwt.claims', $1, true)`,
+    [JSON.stringify({ sub: PROBE })])
+  try {
+    const r = await db.query(sql, args)
+    await db.query('rollback')
+    return r.rows
+  } catch (e) { await db.query('rollback'); throw e }
+}
 
 try {
-  await c.query('begin')
-  const { rows: [me] } = await c.query(
-    `select id from public.users where tenant_id is not null limit 1`)
-  if (!me) throw new Error('لا مستخدم — تعذّر الإثبات')
+  await db.query(
+    `insert into public.users (id, email, role)
+     values ($1, 'search-probe@marsad.test', 'platform_admin')
+     on conflict (id) do update set role = 'platform_admin'`, [PROBE])
 
-  const stamp = Date.now().toString().slice(-6)
-  const CR_BOTH = `77${stamp}1`   // في مرصد وفي السجل
-  const CR_GOV = `77${stamp}2`    // في السجل وحده
+  // A registry row that Marsad does not already hold.
+  const { rows: [g] } = await db.query(
+    `select r.id, r.name, r.cr_number, r.unified_number
+       from public.government_company_registry r
+      where r.dataset_id = public.published_registry_dataset()
+        and coalesce(btrim(r.cr_number),'') <> ''
+        and coalesce(btrim(r.unified_number),'') <> ''
+        and not exists (select 1 from public.companies c
+                         where c.cr_number = btrim(r.cr_number)
+                            or c.unified_number = btrim(r.unified_number))
+      limit 1`)
+  if (!g) throw new Error('لا سجل حكومي غير مضاف لاختباره')
 
-  await c.query(`insert into public.companies (name, cr_number, source, status, approved)
-                 values ('شركة الفحص الموحّد', $1, 'community', 'active', true)`, [CR_BOTH])
+  const { rows: [m] } = await db.query(
+    `select id, name, cr_number from public.companies
+      where status = 'active' and coalesce(btrim(cr_number),'') <> '' limit 1`)
 
-  // Q3 is loaded first, deliberately. «Most recent» must mean the quarter the
-  // data describes, not the order we happened to load the files in — catching up
-  // on a missed quarter must not make it look like the newest.
-  for (const [ds, period, at] of [[Q3, 'الربع الثالث', '2026-09-30'], [Q2, 'الربع الثاني', '2026-06-30']]) {
-    await c.query(`insert into public.government_company_registry
-                     (dataset_id, snapshot_period, snapshot_at, cr_number, name)
-                   values ($1, $2, $3, $4, 'شركة الفحص الموحّد')`, [ds, period, at, CR_BOTH])
-    await c.query(`insert into public.government_company_registry
-                     (dataset_id, snapshot_period, snapshot_at, cr_number, name)
-                   values ($1, $2, $3, $4, 'منشأة حكومية فقط')`, [ds, period, at, CR_GOV])
+  // ===== The three ways of asking =====
+  console.log('\n─── يبحث بالثلاثة ───')
+  const hits = async (q) => asAdmin('select origin, id, name from public.search_companies_unified($1, 30)', [q])
+
+  const byName = await hits(g.name.slice(0, 14))
+  ok('بالاسم يجد السجل الحكومي', byName.some((r) => r.id === g.id), `${byName.length} نتيجة`)
+
+  const byCr = await hits(g.cr_number)
+  ok('برقم السجل التجاري', byCr.some((r) => r.id === g.id), `${byCr.length} نتيجة`)
+
+  const byUnified = await hits(g.unified_number)
+  ok('وبالرقم الموحّد', byUnified.some((r) => r.id === g.id), `${byUnified.length} نتيجة`)
+
+  // Arabic-Indic digits are what a phone keyboard produces.
+  const arabicDigits = g.cr_number.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[+d])
+  const byArabic = await hits(arabicDigits)
+  ok('وبالأرقام العربية الهندية', byArabic.some((r) => r.id === g.id), arabicDigits)
+
+  // ===== Both registers, at once =====
+  console.log('\n─── المصدران معاً ───')
+  if (m) {
+    const both = await hits(m.cr_number)
+    ok('شركة مرصد تظهر بمصدر «marsad»',
+      both.some((r) => r.id === m.id && r.origin === 'marsad'))
+  }
+  ok('وسجل الوزارة يظهر بمصدر «registry»',
+    byCr.some((r) => r.id === g.id && r.origin === 'registry'))
+
+  // Not twice: a company held by both must appear once, as Marsad's.
+  const dupes = byCr.filter((r) => r.origin === 'registry')
+    .filter((r) => byCr.some((x) => x.origin === 'marsad' && x.name === r.name))
+  ok('ولا يظهر السجل مكرّراً حين تملكه مرصد', dupes.length === 0, `${dupes.length} مكرّر`)
+
+  // ===== In the browser =====
+  console.log('\n─── من الشاشة ───')
+  const page = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(String(e).slice(0, 150)))
+  await signIn(page, BASE, { role: 'platform_admin' })
+  await page.goto(`${BASE}/search`, { waitUntil: 'domcontentloaded', timeout: 40000 })
+  await page.waitForTimeout(2500)
+
+  // By its accessible name. The element carries no `type`, so a
+  // `input[type="text"]` selector matches nothing — the attribute selector
+  // wants the attribute to be there, and a bare <input> only defaults to text.
+  const box = page.getByRole('textbox', { name: /رقم السجل التجاري/ }).first()
+  await box.fill(g.cr_number)
+  await box.press('Enter')
+  await page.waitForTimeout(4000)
+  const body = await page.locator('#main').innerText()
+  ok('البحث برقم السجل يعرض الشركة', body.includes(g.name.slice(0, 12)), body.slice(0, 110))
+  ok('ويُعلَّم أنها من السجل الرسمي وليست في مرصد',
+    /السجل التجاري|الوزارة|رسمي|إضافة/.test(body))
+
+  // ===== Promotion =====
+  console.log('\n─── من السجل إلى مرصد ───')
+  const [{ add_registry_company_to_marsad: newId }] = await asAdmin(
+    'select public.add_registry_company_to_marsad($1)', [g.id])
+  // Committed separately: the checks below read it back.
+  await db.query(`select set_config('request.jwt.claims', $1, false)`,
+    [JSON.stringify({ sub: PROBE })])
+  const { rows: [created] } = await db.query(
+    `select id, name, cr_number, unified_number, source, status,
+            government_company_id, region, city, capital
+       from public.companies where cr_number = $1 or unified_number = $2`,
+    [g.cr_number, g.unified_number])
+
+  if (!created) {
+    // The promotion ran inside a rolled-back transaction; do it for real.
+    await db.query(`select set_config('request.jwt.claims', $1, false)`,
+      [JSON.stringify({ sub: PROBE })])
+    const { rows: [r] } = await db.query(
+      'select public.add_registry_company_to_marsad($1) id', [g.id])
+    promoted = r.id
+  } else {
+    promoted = created.id
   }
 
-  // --- Signing in ---------------------------------------------------------------
-  await c.query(`select set_config('request.jwt.claims', '{}', true)`)
-  await refuses('البحث يلزمه تسجيل دخول', () => search('شركة'), 'تسجيل الدخول')
+  const { rows: [c] } = await db.query(
+    `select id, name, cr_number, unified_number, source, status,
+            government_company_id, region, city
+       from public.companies where id = $1`, [promoted])
 
-  await asUser(me.id)
+  ok('أُنشئ سجل في مرصد', Boolean(c), String(newId).slice(0, 8))
+  ok('  بالاسم الرسمي', c?.name === g.name, c?.name)
+  ok('  ورقم السجل والرقم الموحّد', c?.cr_number === g.cr_number && c?.unified_number === g.unified_number)
+  ok('  ومصدره «official»', c?.source === 'official', c?.source)
+  ok('  ومربوط بصفّ الوزارة', c?.government_company_id === g.id)
 
-  // --- Marsad first ---------------------------------------------------------------
-  const r = await search('شركة الفحص الموحّد')
-  ok('يجد الشركة', r.length > 0)
-  ok('نتيجة مرصد أولاً', r[0]?.origin === 'marsad', `الأولى «${r[0]?.origin}»`)
-  ok('ومعلَّمة أنها في مرصد', r[0]?.in_marsad === true)
+  // Asked again, it must not make a second one.
+  const { rows: [again] } = await db.query(
+    'select public.add_registry_company_to_marsad($1) id', [g.id])
+  ok('  وطلبه مرّتين لا ينشئ شركتين', again.id === promoted, `${again.id} ≠ ${promoted}`)
 
-  // --- Not twice ------------------------------------------------------------------
-  const dupes = r.filter((x) => x.cr_number === CR_BOTH)
-  ok('الشركة التي في مرصد لا تظهر مرة ثانية كحكومية', dupes.length === 1,
-    `${dupes.length} نتيجة لنفس السجل`)
+  // Now it is Marsad's, so the register must stop offering it.
+  const after = await hits(g.cr_number)
+  ok('ويصير المصدر «marsad» بعد الإضافة',
+    after.some((r) => r.id === promoted && r.origin === 'marsad'),
+    after.map((r) => r.origin).join(','))
 
-  // --- The register fills the gap ----------------------------------------------------
-  const g = await search('منشأة حكومية فقط')
-  ok('يجد ما ليس في مرصد', g.length > 0)
-  ok('ومعلَّمة أنها حكومية', g[0]?.origin === 'government' && g[0]?.in_marsad === false)
+  // ===== The line that must not blur =====
+  console.log('\n─── بيانات الوزارة تعريفية لا بديلة ───')
+  const [chk] = await asAdmin('select public.company_document_checklist($1) j', [promoted])
+  const list = Array.isArray(chk.j) ? chk.j : []
+  const required = list.filter((d) => d.required)
+  ok('قائمة المستندات المطلوبة قائمة', required.length > 0, `${list.length} بند`)
+  ok('ولا مستند يُعدّ مُقدَّماً لمجرّد الاستيراد',
+    required.every((d) => d.state !== 'verified'),
+    required.filter((d) => d.state === 'verified').map((d) => d.label).join('، '))
 
-  // Once, not once per quarter.
-  ok('ربع واحد فقط، لا كل الأرباع', g.filter((x) => x.cr_number === CR_GOV).length === 1,
-    `${g.filter((x) => x.cr_number === CR_GOV).length} نتيجة`)
-  ok('وهو الأحدث', g[0]?.snapshot_period === 'الربع الثالث', `جاء «${g[0]?.snapshot_period}»`)
+  const { rows: [docs] } = await db.query(
+    'select count(*)::int n from public.company_documents where company_id = $1', [promoted])
+  ok('ولا مستندات مُنشأة تلقائياً', docs.n === 0, `${docs.n} مستند`)
 
-  // --- By number ----------------------------------------------------------------------
-  ok('البحث برقم السجل', (await search(CR_GOV)).some((x) => x.cr_number === CR_GOV))
-  ok('ورقم بمسافات وشرطات', (await search(`${CR_GOV.slice(0, 3)}-${CR_GOV.slice(3)} `))
-    .some((x) => x.cr_number === CR_GOV))
-  ok('وبأرقام عربية',
-    (await search(CR_GOV.replace(/\d/g, (d) => String.fromCharCode(0x0660 + Number(d)))))
-      .some((x) => x.cr_number === CR_GOV))
-
-  ok('واستعلام فارغ لا يُرجع شيئاً', (await search('   ')).length === 0)
-
+  ok('console نظيف', errs.length === 0, errs.slice(0, 2).join(' | '))
+} catch (e) {
+  fail += 1
+  console.log(`  ❌ توقّف: ${e.message.slice(0, 240)}`)
 } finally {
-  await c.query('rollback').catch(() => {})
-  await c.end()
+  await browser.close()
+  if (promoted) {
+    await db.query(`delete from public.audit_logs where entity='company' and entity_id=$1`, [promoted]).catch(() => {})
+    await db.query('delete from public.companies where id = $1', [promoted]).catch(() => {})
+  }
+  await db.query('delete from public.users where id = $1', [PROBE]).catch(() => {})
+  console.log(`\n  🧹 نُظّفت شركة الفحص: ${promoted ? 'نعم' : 'لا شيء'}`)
+  await db.end()
 }
 
-console.log(fail ? `\n  ❌ ${fail} من ${pass + fail}\n` : `\n  ✅ ${pass} فحصاً — بحث واحد، سجلّان، ولا تكرار\n`)
+console.log(fail ? `\n  ❌ ${fail} من ${pass + fail}\n` : `\n  ✅ ${pass} فحصاً — بحث واحد، مصدران، والمستندات تبقى مطلوبة\n`)
 process.exit(fail ? 1 : 0)

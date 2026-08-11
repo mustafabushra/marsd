@@ -204,8 +204,12 @@ export default function AddReport() {
         const { data } = await getSupabase()
           .rpc('search_companies_unified', { p_query: q, p_limit: 15 })
         if (cancelled) return
+        // `registry`, not `government` — the word search_companies_unified
+        // returns. Same mismatch as /search carried: the filter matched
+        // nothing, so a reporter could never reach a company that exists only
+        // in the national register, which is most of them.
         setGovMatches((data || [])
-          .filter((r) => r.origin === 'government')
+          .filter((r) => r.origin === 'registry')
           .map((r) => ({
             id: r.id,
             government: true,

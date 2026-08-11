@@ -257,8 +257,15 @@ export default function Search() {
         const { data: gov } = await getSupabase()
           .rpc('search_companies_unified', { p_query: q, p_limit: 30 })
 
+        // `registry`, which is the word search_companies_unified actually
+        // returns. This read `government`, matched nothing, and left `official`
+        // empty on every search ever run — so the national register, 503
+        // published rows of it, has never once appeared in these results. The
+        // failure is silent by construction: an empty array is what "no
+        // government matches" looks like, and the toast falls through to
+        // «تم العثور على N شركة» without ever mentioning a register.
         official = (gov || [])
-          .filter((r) => r.origin === 'government')
+          .filter((r) => r.origin === 'registry')
           .map((r) => ({
             id: r.id,
             government: true,
@@ -398,7 +405,12 @@ export default function Search() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => query.length > 0 && setShowAutocomplete(true)}
-              placeholder="ابحث بالاسم أو رقم السجل التجاري"
+              // The unified number has been searchable since search_companies_unified
+              // landed — it matches cr_number or unified_number against the digits
+              // in the query — and the box never said so. A capability nobody is
+              // told about is one nobody uses.
+              placeholder="ابحث بالاسم أو رقم السجل التجاري أو الرقم الموحّد"
+              aria-label="ابحث بالاسم أو رقم السجل التجاري أو الرقم الموحّد"
               style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15.5px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }}
             />
 
