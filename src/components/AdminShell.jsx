@@ -25,15 +25,17 @@ import {
 // company, or clear a queue, or check a batch of paperwork. Those are three
 // different jobs and the menu should name them.
 //
-// Documents get their own entry rather than sitting under Companies. The work is
-// document-shaped: you verify a hundred of them without opening a hundred
-// companies, and burying that inside a company section makes a daily operational
-// queue look like a per-company detail.
+// Documents used to get their own top-level entry, on the reasoning that the
+// work is document-shaped — you verify a hundred without opening a hundred
+// companies. That reasoning still holds and the screen is unchanged; what
+// changed is that it now sits with the other seven queues instead of alone,
+// because "a queue of things waiting for a decision" describes it exactly, and
+// a section of one was a section that only added a line to the menu.
 //
-// "مركز المراجعة" rather than "طلبات الشركات", because what waits for a decision
-// is not only additions — it is ownership claims, verifications, registrations
-// and data changes. Naming it after one of its five contents hides the other
-// four.
+// "المراجعة" rather than "مركز المراجعة", because there is one مركز in this
+// menu and it is مركز العمل. Two things called a centre, one of which is a
+// heading over a list and the other a screen, is the ambiguity this pass exists
+// to remove.
 //
 // "إدارة الشركات" was "قائمة الشركات", which described the markup rather than
 // the work — and left two neighbouring entries whose names did not say how they
@@ -55,10 +57,18 @@ import {
 // invisible to anyone who did not already know it existed. It sits beside
 // مركز القيادة because they are the same job split in two: the command centre
 // says what the state of things is, the work centre is the queue you work.
+// The two screens a day is worked from lead, and the charts follow them.
+//
+// «لوحة التحكم» sat first and «مركز القيادة» second, which read as two names
+// for one thing and made people ask which was the real one. They answer
+// different questions — the charts answer «how are we doing», the command
+// centre answers «is anything wrong and where do I go» — and the names did not
+// say that. «المؤشرات» does, and it goes below the two screens that are opened
+// every morning rather than above them.
 const TOP_ITEMS = [
-  { label: 'لوحة التحكم', icon: DashboardIcon, path: '/admin' },
   { label: 'مركز القيادة', icon: DashboardIcon, path: '/admin/command-center' },
   { label: 'مركز العمل', icon: DashboardIcon, path: '/admin/work' },
+  { label: 'المؤشرات', icon: DashboardIcon, path: '/admin' },
 ]
 
 const GROUPS = [
@@ -67,21 +77,39 @@ const GROUPS = [
     { label: 'سجلّ الشركات', path: '/admin/roster' },
     { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
   ] },
-  { key: 'review', title: 'مركز المراجعة', items: [
-    { label: 'طلبات إضافة وتعديل', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626' },
-    { label: 'طلبات الشركات', path: '/admin/company-requests' },
-    { label: 'مراجعة التسجيل', path: '/admin/company-approval' },
-    { label: 'طلبات الملكية', path: '/admin/claim-requests' },
-    { label: 'التحقق من الشركات', path: '/admin/company-verification' },
+
+  // The eight queues, gathered and labelled as what they are.
+  //
+  // مركز العمل exists to be one queue over all of them — admin_work_items
+  // returns the six kinds in one shape. But it was added beside these rather
+  // than in front of them, and the menu gave no sign of the relationship:
+  // seven top-level entries, the same request visible in two of them, and
+  // nothing saying which to open. That is the confusion, and it is a menu
+  // problem rather than a code one — every one of these screens works, and
+  // each is where its own decision is made, with the evidence.
+  //
+  // So nothing is removed. They are indented under a line that names the
+  // relationship: work from مركز العمل, come here for one kind on its own.
+  { key: 'review', title: 'المراجعة', items: [
+    { header: 'كلّها تجتمع في «مركز العمل»' },
+    { label: 'مراجعة التسجيل', path: '/admin/company-approval', indent: true },
+    { label: 'طلبات الشركات', path: '/admin/company-requests', indent: true },
+    { label: 'طلبات الملكية', path: '/admin/claim-requests', indent: true },
+    { label: 'التحقق من الشركات', path: '/admin/company-verification', indent: true },
+    { label: 'المستندات والحالة الرسمية', path: '/admin/documents', indent: true },
+    { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B', indent: true },
+    { label: 'الاعتراضات', path: '/admin/disputes', indent: true },
+    // Renamed. «طلبات إضافة وتعديل» beside «طلبات الشركات» were two vague
+    // names over two different tables, and reading either one told you nothing
+    // about which held what. This one is company_data_requests: a person on the
+    // search page asking Marsad to add or correct a company that is already
+    // listed. The other is a company's own request about itself.
+    { label: 'طلبات تصحيح من المستخدمين', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626', indent: true },
   ] },
-  { key: 'documents', title: 'المستندات', items: [
-    { label: 'المستندات والحالة الرسمية', path: '/admin/documents' },
-  ] },
+
   { key: 'reports', title: 'التقارير', items: [
-    { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B' },
     { label: 'إضافة تقرير', path: '/admin/add-report' },
     { label: 'مستودع التقارير', path: '/admin/knowledge-base/reports' },
-    { label: 'الاعتراضات', path: '/admin/disputes' },
   ] },
   { key: 'analytics', title: 'التحليلات', items: [
     { label: 'تحليلات الشركات', path: '/admin/tenant-analytics' },
@@ -119,10 +147,10 @@ const GROUPS = [
 ]
 
 const SCREEN_LABELS = {
-  '/admin': 'لوحة تحكم الإدارة',
-  '/admin/requests': 'مراجعة طلبات الشركات',
+  '/admin': 'المؤشرات',
+  '/admin/requests': 'طلبات تصحيح بيانات من المستخدمين',
   '/admin/reports': 'مراجعة التقارير',
-  '/admin/company-requests': 'طلبات الشركات',
+  '/admin/company-requests': 'طلبات الشركات — تسجيل وملكية وتصحيح',
   '/admin/registry-import': 'استيراد من السجل التجاري',
   '/admin/add-report': 'إضافة تقرير باسم مرصد',
   '/admin/bulk-import': 'رفع دفعة شركات',
