@@ -631,6 +631,13 @@ export default function CompanyOnboarding() {
                       crNumber: marsadMatch.cr_number || prev.crNumber,
                     }))
                     setIdentified(true)
+                    // Straight to the document. A claim does not need the data
+                    // form: Marsad already holds this company's name, sector,
+                    // city and the rest — that is what «مسجّلة بالفعل» means.
+                    // Asking the claimant to retype it invites a second version
+                    // of facts we already have, and step one would reject them
+                    // for leaving sector or city blank.
+                    setStep(2)
                   }}
                   style={{
                     width: '100%', marginTop: '14px', padding: '12px',
@@ -1004,7 +1011,9 @@ export default function CompanyOnboarding() {
                 </div>
               ) : (
                 <div style={{ fontSize: '13px', color: '#475569', fontWeight: 600, lineHeight: 1.9 }}>
-                  لم نجد هذه الشركة في السجل المنشور — أكمل بياناتها يدوياً وستراجعها إدارة مرصد.
+                  {existingCompany
+                    ? 'هذه الشركة مسجّلة في مرصد — أرفق سجلها التجاري لإثبات صفتك.'
+                    : 'لم نجد هذه الشركة في السجل المنشور — أكمل بياناتها يدوياً وستراجعها إدارة مرصد.'}
                   <button type="button" onClick={() => setIdentified(false)}
                     style={{
                       background: 'none', border: 0, color: '#1E2A52', fontWeight: 800,
@@ -1067,6 +1076,55 @@ export default function CompanyOnboarding() {
                 you own it, and the company's own certificates are what the
                 claim is about — asking for all four here would be asking the
                 claimant to hold documents they may not have yet. */}
+            {/* Claiming: one document, the registration certificate.
+                The four-certificate checklist is not shown — claiming is
+                proving the company is yours, and its certificates are what the
+                claim is about. It writes into the same docFiles entry the
+                checklist uses, so `crFile` still has one source. */}
+            {existingCompany && (
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{
+                  fontSize: '14px', fontWeight: 700, color: '#334155',
+                  display: 'block', marginBottom: '8px',
+                }}>سجل الشركة التجاري *</label>
+                <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 10px', lineHeight: 1.9 }}>
+                  أرفق السجل التجاري لإثبات صفتك في «{existingCompany.name}». تراجعه إدارة مرصد.
+                </p>
+                <input
+                  id="claim-cr-file"
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!f) return
+                    if (f.size > 15 * 1024 * 1024) {
+                      setError('❌ حجم الملف كبير جداً. الحد الأقصى 15 ميجابايت'); return
+                    }
+                    if (!['application/pdf', 'image/png', 'image/jpeg'].includes(f.type)) {
+                      setError('❌ نوع الملف غير مدعوم. استخدم PDF أو صورة فقط'); return
+                    }
+                    setError('')
+                    setDocFiles((prev) => ({ ...prev, commercial_registration: f }))
+                  }}
+                />
+                <label htmlFor="claim-cr-file" style={{
+                  display: 'block', border: `2px dashed ${crFile ? '#A7F3D0' : '#CBD5E1'}`,
+                  background: crFile ? '#F0FDF4' : '#F8FAFC',
+                  borderRadius: '12px', padding: '22px', textAlign: 'center', cursor: 'pointer',
+                }}>
+                  <div style={{ fontSize: '26px', marginBottom: '6px' }}>{crFile ? '✔' : '📄'}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: crFile ? '#15803D' : '#0F172A' }}>
+                    {crFile ? crFile.name : 'اضغط أو اسحب الملف'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+                    PDF أو صورة — الحد الأقصى 15 ميجابايت
+                  </div>
+                </label>
+              </div>
+            )}
+
             {!existingCompany && (
               <div style={{ marginBottom: '18px' }}>
                 <RequiredCompanyDocuments

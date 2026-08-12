@@ -94,10 +94,19 @@ try {
     await claimBtn.click()
     await page.waitForTimeout(2000)
     const after = await page.locator('body').innerText()
-    ok('والضغط ينقل إلى مسار الملكية', /رفع السجل التجاري|وجدنا شركتك|مستندات|التالي|إرسال/.test(after),
-      after.slice(0, 100))
-    ok('ولا يطالب بالمستندات الأربعة في مسار الملكية',
+    // Straight to the document: the company's data is already Marsad's, so the
+    // form is not shown again.
+    ok('والضغط ينقل إلى خطوة المستند مباشرة', /الخطوة 2 من 2/.test(after), after.slice(0, 110))
+    ok('ولا يطلب إعادة كتابة بيانات الشركة',
+      !/القطاع \*/.test(after) && !/الكيان القانوني/.test(after), 'أعاد عرض نموذج البيانات')
+    ok('ويسمّي الشركة التي تُطالب بها', after.includes(mine.name.slice(0, 10)))
+    // The regression that removing the duplicate upload introduced.
+    ok('وفيه حقل رفع للسجل التجاري',
+      (await page.locator('#claim-cr-file').count()) === 1, 'لا حقل رفع في مسار الملكية')
+    ok('ولا يطالب بالمستندات الأربعة',
       !/مستندات الشركة/.test(after), 'طلب الشهادات في مطالبة ملكية')
+    ok('ولا يقول إنه لم يجد الشركة', !/لم نجد هذه الشركة/.test(after),
+      'يناقض ما قاله قبل سطر')
   }
 
   console.log('\n─── المخرج اليدوي ───')
