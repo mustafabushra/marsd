@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { notifyTenant } from '../lib/notify'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { docLabel } from '../lib/enums'
 
 /**
  * /admin/documents — Marsad verifies what companies supply, and records what
@@ -17,16 +19,6 @@ import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
  * screen just does not blur them together.
  */
 
-const DOC_LABEL = {
-  commercial_registration: 'السجل التجاري',
-  tax_certificate: 'الشهادة الضريبية',
-  national_address: 'العنوان الوطني',
-  chamber_membership: 'عضوية الغرفة التجارية',
-  license: 'ترخيص النشاط',
-  bank_letter: 'خطاب بنكي',
-  other: 'مستند آخر',
-}
-
 const OFFICIAL_STATUS = [
   { v: 'none', t: 'لا شيء مسجَّل', fg: '#475569' },
   { v: 'insolvency', t: 'تعثّر مالي', fg: '#B45309' },
@@ -35,6 +27,21 @@ const OFFICIAL_STATUS = [
   { v: 'bankruptcy', t: 'إفلاس', fg: '#B91C1C' },
   { v: 'struck_off', t: 'شطب السجل', fg: '#B91C1C' },
 ]
+
+// The state the overview computed, said in the row itself.
+//
+// `superseded` never appears in TABS because you cannot filter to it, but it
+// does come back inside «الكل» — so a row could arrive with a state the screen
+// had no word for.
+const STATE_LABEL = {
+  pending:           { t: 'بانتظار التوثيق', fg: '#B45309', bg: '#FFFBEB' },
+  reupload_required: { t: 'مطلوب إعادة رفع', fg: '#C2410C', bg: '#FFF7ED' },
+  expiring:          { t: 'تنتهي قريباً',     fg: '#B45309', bg: '#FFFBEB' },
+  expired:           { t: 'منتهية',           fg: '#B91C1C', bg: '#FEF2F2' },
+  rejected:          { t: 'مرفوضة',           fg: '#B91C1C', bg: '#FEF2F2' },
+  verified:          { t: 'موثّقة',            fg: '#15803D', bg: '#F0FDF4' },
+  superseded:        { t: 'استُبدلت',          fg: '#475569', bg: '#F8FAFC' },
+}
 
 const TABS = [
   { v: 'pending',           t: 'بانتظار التوثيق' },
@@ -56,7 +63,20 @@ export default function AdminDocuments() {
   // The screen only ever queried status = 'pending', so a verified document left
   // the queue and left Marsad's view with it — nobody could answer "which
   // registrations expire this month" or "what did we reject and why".
-  const [tab, setTab] = useState('pending')
+  // Three sidebar entries point here with `?tab=` — قيد الفحص, منتهية, مرفوضة.
+  // Anything not in TABS falls back rather than selecting a tab that does not
+  // exist and rendering an empty table with no explanation.
+  const [params] = useSearchParams()
+  const wanted = params.get('tab')
+  const [tab, setTab] = useState(
+    TABS.some((t) => t.v === wanted) ? wanted : 'pending')
+
+  // Moving between two of those links does not remount this screen, so the
+  // initialiser above runs once and never again. Without this, pressing
+  // «المستندات المنتهية» from «قيد الفحص» changes the URL and nothing else.
+  useEffect(() => {
+    setTab(TABS.some((t) => t.v === wanted) ? wanted : 'pending')
+  }, [wanted])
   const [counts, setCounts] = useState({})
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3500) }
@@ -132,8 +152,8 @@ export default function AdminDocuments() {
           await notifyTenant(t.id, approve ? 'document_verified' : 'document_rejected', {
             title: approve ? 'وُثِّق مستندك' : 'لم يُقبل مستندك',
             message: approve
-              ? `${DOC_LABEL[doc.doc_type] || doc.doc_type} — وارتفع مؤشر ثقتك`
-              : `${DOC_LABEL[doc.doc_type] || doc.doc_type} — ${reason}`,
+              ? `${docLabel(doc.doc_type)} — وارتفع مؤشر ثقتك`
+              : `${docLabel(doc.doc_type)} — ${reason}`,
             meta: { document_id: id, doc_type: doc.doc_type },
           })
         }
@@ -231,9 +251,15 @@ export default function AdminDocuments() {
               border: tab === t.v ? 0 : '1.5px solid #E2E8F0',
             }}>
               {t.t}
-              {counts[t.v] != null && (
-                <span style={{ opacity: 0.7, marginInlineStart: '6px' }}>{counts[t.v]}</span>
-              )}
+              {/* Always a number. `counts` only carries keys for states that
+                  exist, so an empty tab used to show nothing at all — which
+                  reads as «لم يُحسب» rather than «صفر». «الكل» never had a key
+                  of its own and is summed here. */}
+              <span style={{ opacity: 0.7, marginInlineStart: '6px' }}>
+                {t.v === 'all'
+                  ? Object.values(counts).reduce((a, n) => a + Number(n || 0), 0)
+                  : (counts[t.v] || 0)}
+              </span>
             </button>
           ))}
         </div>
@@ -247,13 +273,53 @@ export default function AdminDocuments() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {pending.map((d) => (
               <div key={d.id} style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ minWidth: '230px' }}>
-                  <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>
-                    {d.companies?.name || 'شركة'} — {DOC_LABEL[d.doc_type] || d.doc_type}
+                <div style={{ minWidth: '260px', flex: '1 1 320px' }}>
+                  {/* The company leads. Which company this belongs to is the
+                      first thing a reviewer needs and it was the one thing the
+                      row never said. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '14.5px', fontWeight: 800, color: '#0F172A' }}>
+                      {d.company_name || 'شركة بلا اسم مسجَّل'}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>
+                      {d.cr_number ? `س.ت ${d.cr_number}` : 'بلا رقم سجل'}
+                    </span>
+                    {STATE_LABEL[d.state] && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 800, borderRadius: '999px',
+                        padding: '2px 9px', background: STATE_LABEL[d.state].bg,
+                        color: STATE_LABEL[d.state].fg,
+                      }}>{STATE_LABEL[d.state].t}</span>
+                    )}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-                    س.ت {d.companies?.cr_number || '—'} · {d.file_name || '—'} · {new Date(d.created_at).toLocaleDateString('ar-SA')}
+
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#334155', marginTop: '7px' }}>
+                    📄 {docLabel(d.doc_type)}
                   </div>
+
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px' }}>
+                    {d.file_name || 'بلا اسم ملف'} · رُفع {new Date(d.created_at).toLocaleDateString('ar-SA')}
+                  </div>
+
+                  {/* Why it is in this tab. The overview already returns all of
+                      this and the row discarded it, so «مرفوضة» gave no reason
+                      and «منتهية» gave no date. */}
+                  {d.state === 'rejected' && d.rejection_reason && (
+                    <div style={{ fontSize: '12.5px', color: '#B91C1C', marginTop: '6px', fontWeight: 700 }}>
+                      سبب الرفض: {d.rejection_reason}
+                    </div>
+                  )}
+                  {(d.state === 'expired' || d.state === 'expiring') && d.expires_at && (
+                    <div style={{ fontSize: '12.5px', color: d.state === 'expired' ? '#B91C1C' : '#B45309', marginTop: '6px', fontWeight: 700 }}>
+                      {d.state === 'expired' ? 'انتهت في' : 'تنتهي في'} {new Date(d.expires_at).toLocaleDateString('ar-SA')}
+                    </div>
+                  )}
+                  {d.state === 'verified' && d.verified_at && (
+                    <div style={{ fontSize: '12.5px', color: '#15803D', marginTop: '6px', fontWeight: 700 }}>
+                      وُثِّق {new Date(d.verified_at).toLocaleDateString('ar-SA')}
+                      {d.reviewer ? ` — بواسطة ${d.reviewer}` : ''}
+                    </div>
+                  )}
                   {d.note && <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '6px' }}>ملاحظة: {d.note}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '9px', alignItems: 'center' }}>
@@ -261,7 +327,10 @@ export default function AdminDocuments() {
                           style={{ fontSize: '13px', fontWeight: 800, color: '#1E2A52', padding: '8px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
                     فتح المستند
                   </button>
-                  {tab === 'pending' && (<>
+                  {/* Gated on what the document is, not on which tab you are
+                      standing in. Under «الكل» a pending document used to show
+                      no decision at all. */}
+                  {(d.state === 'pending' || d.state === 'reupload_required') && (<>
                   <button onClick={() => review(d.id, true)} disabled={busy === d.id}
                           style={{ padding: '9px 18px', background: '#15803D', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     ✓ توثيق

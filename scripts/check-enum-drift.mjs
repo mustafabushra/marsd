@@ -70,6 +70,10 @@ const CONSTRAINT_TO_ENUM = {
   users_status_check: 'USER_STATUS_VALUES',
   claim_requests_status_check: 'REQUEST_STATUS_VALUES',
   registration_requests_status_check: 'REQUEST_STATUS_VALUES',
+  // لم يكن مغطّى — ولهذا مرّ الانحراف بصمت: خريطة أنواع المستندات في شاشة
+  // الإدارة كانت تنقص ستة أنواع وتحتفظ بنوع أُعيد تسميته، فظهر المفتاح
+  // الإنجليزي الخام للمراجع وفي إشعارات الشركات.
+  company_documents_type_check: 'DOC_TYPE_VALUES',
 }
 
 /** يستخرج القيم من تعريف CHECK مثل: CHECK (((source)::text = ANY ((ARRAY['a','b'])::text[]))) */

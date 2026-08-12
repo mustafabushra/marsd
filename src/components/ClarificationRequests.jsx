@@ -3,6 +3,7 @@ import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
+import { docLabel } from '../lib/enums'
 
 /**
  * Where a company answers what Marsad asked it.
@@ -17,20 +18,6 @@ import { notifyAdmins } from '../lib/notify'
  * the reason the company's application is not moving, and burying that below
  * anything else would repeat the mistake the notification was already making.
  */
-
-const DOC_LABEL = {
-  commercial_registration: 'السجل التجاري',
-  articles_of_incorporation: 'عقد التأسيس',
-  vat_certificate: 'شهادة ضريبة القيمة المضافة',
-  zakat_certificate: 'شهادة الزكاة',
-  gosi_certificate: 'شهادة التأمينات الاجتماعية',
-  municipal_license: 'الرخصة البلدية',
-  national_address: 'العنوان الوطني',
-  chamber_membership: 'عضوية الغرفة التجارية',
-  owner_id: 'هوية المالك أو المفوَّض',
-  license: 'ترخيص النشاط',
-  bank_letter: 'خطاب بنكي',
-}
 
 const TYPE_LABEL = {
   information: 'معلومات ناقصة',
@@ -247,7 +234,7 @@ export default function ClarificationRequests() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                     {r.documents.map((d) => (
                       <span key={d} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '999px', padding: '5px 13px', fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>
-                        {DOC_LABEL[d] || d}
+                        {docLabel(d)}
                       </span>
                     ))}
                   </div>

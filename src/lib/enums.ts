@@ -66,6 +66,58 @@ export type CompanySource = (typeof COMPANY_SOURCE)[keyof typeof COMPANY_SOURCE]
 export const COMPANY_SOURCE_VALUES = Object.values(COMPANY_SOURCE) as CompanySource[]
 
 // ---------------------------------------------------------------------------
+// company_documents.doc_type
+//
+// المصدر: company_documents_type_check في migration 075_document_lifecycle.sql
+//
+// هذا الحقل تحديداً كان مكتوباً مرّتين بيد مختلفة: خريطة في
+// ClarificationRequests.jsx وخريطة أقصر في AdminDocuments.jsx. الثانية كانت
+// تنقص ستة أنواع، وتحتفظ بـ `tax_certificate` الذي أُعيد تسميته إلى
+// `vat_certificate` في نفس الـ migration — فكانت شاشة الإدارة تعرض المفتاح
+// الإنجليزي الخام لكل مستند لا تعرفه. الخريطة هنا هي الوحيدة.
+// ---------------------------------------------------------------------------
+export const DOC_TYPE = {
+  COMMERCIAL_REGISTRATION: 'commercial_registration',
+  ARTICLES_OF_INCORPORATION: 'articles_of_incorporation',
+  VAT_CERTIFICATE: 'vat_certificate',
+  ZAKAT_CERTIFICATE: 'zakat_certificate',
+  GOSI_CERTIFICATE: 'gosi_certificate',
+  MUNICIPAL_LICENSE: 'municipal_license',
+  NATIONAL_ADDRESS: 'national_address',
+  CHAMBER_MEMBERSHIP: 'chamber_membership',
+  LICENSE: 'license',
+  BANK_LETTER: 'bank_letter',
+  OWNER_ID: 'owner_id',
+  OTHER: 'other',
+} as const
+export type DocType = (typeof DOC_TYPE)[keyof typeof DOC_TYPE]
+export const DOC_TYPE_VALUES = Object.values(DOC_TYPE) as DocType[]
+
+export const DOC_TYPE_LABEL: Record<DocType, string> = {
+  commercial_registration: 'السجل التجاري',
+  articles_of_incorporation: 'عقد التأسيس',
+  vat_certificate: 'شهادة ضريبة القيمة المضافة',
+  zakat_certificate: 'شهادة الزكاة',
+  gosi_certificate: 'شهادة التأمينات الاجتماعية',
+  municipal_license: 'الرخصة البلدية',
+  national_address: 'العنوان الوطني',
+  chamber_membership: 'عضوية الغرفة التجارية',
+  license: 'ترخيص النشاط',
+  bank_letter: 'خطاب بنكي',
+  owner_id: 'هوية المالك أو المفوَّض',
+  other: 'مستند آخر',
+}
+
+/**
+ * اسم عربي للمستند — ولو وصل نوع لا نعرفه.
+ *
+ * الرجوع للمفتاح الخام هو ما جعل العطل صامتاً: الشاشة تبني وتعمل وتعرض
+ * `articles_of_incorporation` للمراجع. الآن يظهر أنه نوع غير معروف صراحةً.
+ */
+export const docLabel = (t?: string | null): string =>
+  (t && DOC_TYPE_LABEL[t as DocType]) || (t ? `نوع غير معروف (${t})` : 'مستند')
+
+// ---------------------------------------------------------------------------
 // tenants.status
 // ---------------------------------------------------------------------------
 export const TENANT_STATUS = {
