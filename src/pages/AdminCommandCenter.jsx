@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
+import { Card } from '../ui'
 
 /**
  * What needs me, what is late, what broke, what is running.
@@ -726,7 +727,7 @@ export default function AdminCommandCenter () {
             position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 60,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
           }}>
-          <div style={{ ...card, maxWidth: '620px', width: '100%', maxHeight: '86vh', overflowY: 'auto' }}>
+          <Card style={{ maxWidth: '620px', width: '100%', maxHeight: '86vh', overflowY: 'auto' }}>
             <h2 style={{ ...titleStyle, fontSize: '20px' }}>نشر مجموعة السجل التجاري</h2>
             <p style={noteStyle}>
               النشر يبدّل السجل الذي يقرأه المنتج كلّه. هذه أرقامه قبل التنفيذ.
@@ -773,7 +774,7 @@ export default function AdminCommandCenter () {
                 إلغاء
               </button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

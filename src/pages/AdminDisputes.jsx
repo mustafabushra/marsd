@@ -6,6 +6,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/disputes — a company has objected to something published about it.
@@ -191,12 +192,12 @@ export default function AdminDisputes() {
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
+        <Card style={{ padding: '44px', textAlign: 'center' }}>
           <div style={{ fontSize: '38px', marginBottom: '10px' }}>{tab === 'open' ? '✓' : '📭'}</div>
           <p style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, margin: 0 }}>
             {tab === 'open' ? 'لا توجد اعتراضات تنتظر قراراً' : 'لا شيء في هذه الفئة'}
           </p>
-        </div>
+        </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {rows.map((d) => {

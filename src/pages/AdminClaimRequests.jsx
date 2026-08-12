@@ -5,6 +5,7 @@ import { notifyUser } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/claim-requests — someone says a company in the registry is theirs.
@@ -236,10 +237,10 @@ export default function AdminClaimRequests() {
       )}
 
       {requests.length === 0 ? (
-        <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
+        <Card style={{ padding: '44px', textAlign: 'center' }}>
           <div style={{ fontSize: '38px', marginBottom: '10px' }}>📭</div>
           <p style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, margin: 0 }}>لا توجد طلبات ملكية معلّقة</p>
-        </div>
+        </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {requests.map((r) => {

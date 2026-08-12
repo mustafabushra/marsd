@@ -4,6 +4,7 @@ import { notifyTenant } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/partners — the partner programme, which the public site has been
@@ -277,11 +278,11 @@ export default function AdminPartners() {
       </div>
 
       {shown.length > 0 && filter === 'eligible' && (
-        <div style={{ ...card, marginTop: '16px', background: '#FFFBEB', borderColor: '#FDE68A' }}>
+        <Card style={{ marginTop: '16px', background: '#FFFBEB', borderColor: '#FDE68A' }}>
           <div style={{ fontSize: '13.5px', color: '#92400E', fontWeight: 700, lineHeight: 1.8 }}>
             هذه شركات تستوفي الشروط المعلنة ولم تتقدّم. عيّنها مباشرة — لا تحتاج طلباً منها.
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Decision */}

@@ -6,6 +6,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import DeferredSkeleton from '../components/DeferredSkeleton'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/subscriptions — every company's plan, and the only place any of them
@@ -275,7 +276,7 @@ export default function AdminSubscriptions() {
         <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>⚠️ {error}</div>
       )}
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         {shown.length === 0 ? (
           <div style={{ padding: '44px', textAlign: 'center', color: '#64748B', fontSize: '14px', fontWeight: 600 }}>
             {rows.length === 0 ? 'لا توجد كيانات' : 'لا نتائج مطابقة'}
@@ -455,7 +456,7 @@ export default function AdminSubscriptions() {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
+import { Card } from '../ui'
 
 /**
  * /admin/data-export — taking the data out.
@@ -23,7 +24,6 @@ import { StatTile, STATUS_COLOR } from '../components/Charts'
  * platform's own log.
  */
 
-const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px' }
 
 // Only what exists. Columns are named rather than selected with '*' so an export
 // cannot silently start carrying a column added later for another purpose.
@@ -228,7 +228,7 @@ export default function AdminDataExport() {
         <StatTile label="الصيغة" value={format.toUpperCase()} sub={format === 'csv' ? 'يفتح في Excel' : 'للمعالجة البرمجية'} />
       </div>
 
-      <div style={{ ...card, padding: '22px', marginBottom: '16px' }}>
+      <Card style={{ padding: '22px', marginBottom: '16px' }}>
         <h2 style={{ fontSize: '15.5px', fontWeight: 900, color: '#0F172A', margin: '0 0 16px', textAlign: 'right' }}>ما الذي يُصدَّر</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '11px' }}>
           {DATASETS.map((d) => (
@@ -249,9 +249,9 @@ export default function AdminDataExport() {
             </label>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <div style={{ ...card, padding: '22px', marginBottom: '16px' }}>
+      <Card style={{ padding: '22px', marginBottom: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: '20px' }}>
           <div>
             <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#334155', marginBottom: '9px', textAlign: 'right' }}>الصيغة</div>
@@ -285,9 +285,9 @@ export default function AdminDataExport() {
         <p style={{ fontSize: '12.5px', color: '#64748B', margin: '11px 2px 0', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
           ملف لكل مجموعة. ملفات CSV تحمل علامة ترميز حتى تفتح العربية سليمة في Excel.
         </p>
-      </div>
+      </Card>
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>آخر عمليات التصدير</h2>
         </div>
@@ -308,7 +308,7 @@ export default function AdminDataExport() {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

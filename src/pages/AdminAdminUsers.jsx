@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/admin-users — who works for Marsad.
@@ -176,7 +177,7 @@ export default function AdminAdminUsers() {
       )}
 
       {grantOpen && (
-        <div style={{ ...card, padding: '22px', marginBottom: '18px' }}>
+        <Card style={{ padding: '22px', marginBottom: '18px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>منح دور على مستوى المنصة</h2>
           <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
             الحسابات تُنشأ بالتسجيل العادي — مرصد لا يحتفظ بكلمات المرور. ابحث عن حساب قائم بالبريد ثم امنحه الدور.
@@ -204,10 +205,10 @@ export default function AdminAdminUsers() {
           {query.trim().length >= 3 && !searching && results.length === 0 && (
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, textAlign: 'right' }}>لا حساب مطابق — أو أنه يحمل دوراً على المنصة بالفعل.</div>
           )}
-        </div>
+        </Card>
       )}
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
           <span>الاسم</span><span>البريد</span><span>الدور</span><span>الحالة</span><span>الإجراءات</span>
         </div>
@@ -239,7 +240,7 @@ export default function AdminAdminUsers() {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

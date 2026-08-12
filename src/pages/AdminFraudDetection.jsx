@@ -6,6 +6,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/fraud-detection — who contributes to Marsad, and what their
@@ -187,7 +188,7 @@ export default function AdminFraudDetection() {
         </button>
       </div>
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12.5px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
           <span>الشركة</span><span>تقاريرها</span><span>شركات أضافتها</span><span>الحالة</span><span>الإجراء</span>
         </div>
@@ -325,7 +326,7 @@ export default function AdminFraudDetection() {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

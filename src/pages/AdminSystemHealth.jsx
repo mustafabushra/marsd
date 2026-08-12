@@ -5,6 +5,7 @@ import DeferredSkeleton from '../components/DeferredSkeleton'
 import { SkeletonPage } from '../components/Skeleton'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
+import { Card } from '../ui'
 
 /**
  * /admin/system-health — what is actually true about the platform right now.
@@ -102,12 +103,12 @@ export default function AdminSystemHealth() {
 
   if (error || !health) {
     return (
-      <div style={{ ...card, padding: '30px', textAlign: 'right' }}>
+      <Card style={{ padding: '30px', textAlign: 'right' }}>
         <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', margin: '0 0 10px' }}>حالة النظام</h1>
         <div style={{ padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>
           ⚠️ {error || 'لا توجد بيانات'}
         </div>
-      </div>
+      </Card>
     )
   }
 
@@ -193,7 +194,7 @@ export default function AdminSystemHealth() {
       </div>
 
       <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 12px', textAlign: 'right' }}>آخر نشاط</h2>
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         {[
           ['آخر تقرير', activity.last_report],
           ['آخر تسجيل دخول', activity.last_login],
@@ -207,7 +208,7 @@ export default function AdminSystemHealth() {
             </span>
           </div>
         ))}
-      </div>
+      </Card>
     </div>
   )
 }

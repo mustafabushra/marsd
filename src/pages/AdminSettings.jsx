@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/settings — the settings the platform actually reads.
@@ -254,9 +255,9 @@ export default function AdminSettings() {
       </div>
 
       {rows.length === 0 && (
-        <div style={{ ...card, padding: '30px', textAlign: 'center', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', fontSize: '14px', lineHeight: 1.9 }}>
+        <Card style={{ padding: '30px', textAlign: 'center', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', fontSize: '14px', lineHeight: 1.9 }}>
           لا توجد إعدادات في قاعدة البيانات. شغّل الهجرة <code style={{ direction: 'ltr', display: 'inline-block' }}>011_plans_entitlements.sql</code>.
-        </div>
+        </Card>
       )}
 
       <div style={{ display: 'grid', gap: '14px' }}>

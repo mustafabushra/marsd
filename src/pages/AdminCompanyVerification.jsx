@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { notifyTenant } from '../lib/notify'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/company-verification — deciding which companies carry the badge.
@@ -189,7 +190,7 @@ export default function AdminCompanyVerification() {
         ))}
       </div>
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
           <span>الشركة</span><span>السجل التجاري</span><span>المصدر</span><span>اكتمال البيانات</span><span>الإجراء</span>
         </div>
@@ -273,7 +274,7 @@ export default function AdminCompanyVerification() {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

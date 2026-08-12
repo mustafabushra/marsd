@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { Card } from '../ui'
 
 /**
  * The queue, and one request opened.
@@ -173,10 +174,10 @@ export default function AdminRequestQueue() {
         </button>
 
         {!d ? (
-          <div style={{ ...card, color: '#94A3B8' }}>جاري التحميل…</div>
+          <Card style={{ color: '#94A3B8' }}>جاري التحميل…</Card>
         ) : (
           <>
-            <div style={card}>
+            <Card>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>
@@ -206,10 +207,10 @@ export default function AdminRequestQueue() {
                   )}
                 </div>
               </div>
-            </div>
+            </Card>
 
             {/* --- Documents --- */}
-            <div style={card}>
+            <Card>
               <div style={label}>المستندات — {docs.length} من {required.length} مطلوبة</div>
               {docs.length === 0 ? (
                 <div style={{ fontSize: '13px', color: '#94A3B8' }}>لا مستندات</div>
@@ -234,11 +235,11 @@ export default function AdminRequestQueue() {
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* --- The account --- */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div style={card}>
+              <Card>
                 <div style={label}>الحساب</div>
                 <div style={{ fontSize: '13px', color: '#334155', lineHeight: 2 }}>
                   {d.tenant?.name || '—'}
@@ -250,9 +251,9 @@ export default function AdminRequestQueue() {
                     {u.email} · {u.role}
                   </div>
                 ))}
-              </div>
+              </Card>
 
-              <div style={card}>
+              <Card>
                 <div style={label}>مؤشّر الثقة والتقارير</div>
                 <div style={{ fontSize: '13px', color: '#334155', lineHeight: 2 }}>
                   الدرجة: {d.trust_score?.score ?? '—'}
@@ -261,11 +262,11 @@ export default function AdminRequestQueue() {
                   <br />
                   الاشتراك: {d.subscription?.plan || '—'}
                 </div>
-              </div>
+              </Card>
             </div>
 
             {/* --- Timeline --- */}
-            <div style={card}>
+            <Card>
               <div style={label}>الخطّ الزمني</div>
               {(d.timeline || []).map((e, i) => (
                 <div key={i} style={{ display: 'flex', gap: '11px', paddingBottom: '11px', fontSize: '13px', color: '#334155', lineHeight: 1.9 }}>
@@ -282,11 +283,11 @@ export default function AdminRequestQueue() {
                   </span>
                 </div>
               ))}
-            </div>
+            </Card>
 
             {/* --- The decision --- */}
             {!['approved', 'rejected', 'withdrawn'].includes(req?.status) && (
-              <div style={card}>
+              <Card>
                 {/* Who is holding this, and whether it can be decided at all.
                     «4/4 وصلت» is not «4/4 قُرئت», and the database refuses an
                     approval on the second count — so the reviewer is told
@@ -347,7 +348,7 @@ export default function AdminRequestQueue() {
                   الرفض وطلب التوضيح يحتاجان سبباً — قرار لا يستطيع أحد التصرّف
                   حياله سيعود إليك ثانية.
                 </div>
-              </div>
+              </Card>
             )}
 
             {error && (
@@ -397,11 +398,11 @@ export default function AdminRequestQueue() {
       )}
 
       {loading ? (
-        <div style={{ ...card, color: '#94A3B8' }}>جاري التحميل…</div>
+        <Card style={{ color: '#94A3B8' }}>جاري التحميل…</Card>
       ) : rows.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#94A3B8', padding: '40px' }}>
+        <Card style={{ textAlign: 'center', color: '#94A3B8', padding: '40px' }}>
           لا طلبات في هذه الحالة
-        </div>
+        </Card>
       ) : (
         rows.map((r) => (
           <div key={r.id} onClick={() => openRequest(r.id)}

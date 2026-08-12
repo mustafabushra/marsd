@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/users — every account on Marsad.
@@ -148,7 +149,7 @@ export default function AdminUsers() {
         </select>
       </div>
 
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
           <span>الاسم</span><span>البريد</span><span>الشركة</span><span>الدور</span><span>الحالة</span><span>الإجراء</span>
         </div>
@@ -195,7 +196,7 @@ export default function AdminUsers() {
             </div>
           )
         })}
-      </div>
+      </Card>
 
       {pages > 1 && (
         <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
+import { Card } from '../ui'
 
 /**
  * Load the national economic activity directory (ISIC4).
@@ -187,7 +188,7 @@ export default function AdminActivities() {
       </p>
 
       {stats && (
-        <div style={{ ...card, display: 'flex', gap: '26px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <Card style={{ display: 'flex', gap: '26px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: '27px', fontWeight: 900, color: '#0F172A' }}>{stats.total}</div>
             <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700 }}>نشاط في الدليل</div>
@@ -206,11 +207,11 @@ export default function AdminActivities() {
               ولذلك يكتب المستخدمون النشاط يدوياً.
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {corrections && corrections.total > 0 && (
-        <div style={card}>
+        <Card>
           <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>
             أين يخطئ الاستخراج
           </h2>
@@ -256,10 +257,10 @@ export default function AdminActivities() {
               ))}
             </div>
           </details>
-        </div>
+        </Card>
       )}
 
-      <div style={card}>
+      <Card>
         <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>رفع القائمة</h2>
         <div style={{ fontSize: '13px', color: '#475569', lineHeight: 2, marginBottom: '14px' }}>
           <div>سطر لكل نشاط: <strong>الكود</strong> ثم فاصلة أو Tab ثم <strong>الاسم</strong>.</div>
@@ -320,7 +321,7 @@ export default function AdminActivities() {
                 }}>
           {busy ? 'يرفع…' : `ارفع ${preview?.rows.length ?? 0} نشاط`}
         </button>
-      </div>
+      </Card>
     </div>
   )
 }

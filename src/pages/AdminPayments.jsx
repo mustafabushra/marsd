@@ -6,6 +6,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/payments — activating a plan a company has paid for.
@@ -241,12 +242,12 @@ export default function AdminPayments() {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ ...card, padding: '44px', textAlign: 'center' }}>
+        <Card style={{ padding: '44px', textAlign: 'center' }}>
           <div style={{ fontSize: '38px', marginBottom: '10px' }}>{tab === 'pending' ? '✓' : '📭'}</div>
           <p style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, margin: 0 }}>
             {tab === 'pending' ? 'لا توجد طلبات ترقية تنتظر التفعيل' : 'لا توجد طلبات سابقة'}
           </p>
-        </div>
+        </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {rows.map((r) => {

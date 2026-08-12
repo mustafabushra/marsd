@@ -4,6 +4,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, BarList, TrendLine, StatusBar, STATUS_COLOR, SERIES } from '../components/Charts'
 import { SkeletonPage } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/tenant-analytics — the companies on Marsad, in aggregate.
@@ -167,7 +168,7 @@ export default function AdminTenantAnalytics() {
 
       {/* The table view. It is also the relief the palette requires: every number
           above is legible here without depending on a colour being told apart. */}
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: COLS, padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: 800, color: '#64748B', textAlign: 'right' }}>
           <span>الشركة</span><span>الباقة</span><span>المستخدمون</span><span>التقارير</span><span>النقاط</span><span>آخر دخول</span>
         </div>
@@ -191,7 +192,7 @@ export default function AdminTenantAnalytics() {
             </span>
           </div>
         ))}
-      </div>
+      </Card>
     </div>
   )
 }

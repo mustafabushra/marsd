@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import {
   DATASET_ID, PORTAL_URL, REGISTRY_COLUMNS, describeHeaders, fetchDatasetInfo,
 } from '../lib/registryDataset'
+import { Card } from '../ui'
 
 /**
  * ⚡ استيراد من السجل التجاري
@@ -241,7 +242,7 @@ export default function AdminRegistryImport() {
       </p>
 
       {/* --- Provenance --- */}
-      <div style={card}>
+      <Card>
         <div style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A', marginBottom: '10px' }}>
           مصدر البيانات
         </div>
@@ -268,10 +269,10 @@ export default function AdminRegistryImport() {
             فتح صفحة البيانات ↗
           </a>
         </div>
-      </div>
+      </Card>
 
       {/* --- The file --- */}
-      <div style={card}>
+      <Card>
         <input ref={input} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readFile(f) }} />
 
@@ -339,11 +340,11 @@ export default function AdminRegistryImport() {
             أعمدة غير موجودة في الملف وستُترك فارغة: {missing.map((c) => c.label).join('، ')}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* --- Running --- */}
       {total > 0 && hasCr && (
-        <div style={card}>
+        <Card>
           {running || done > 0 ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '9px' }}>
@@ -378,7 +379,7 @@ export default function AdminRegistryImport() {
             الإيقاف آمن. رقم السجل فريد، فإعادة رفع نفس الملف تُكمل ما لم يصل
             ولا تُكرّر ما وصل.
           </div>
-        </div>
+        </Card>
       )}
 
       {error && (

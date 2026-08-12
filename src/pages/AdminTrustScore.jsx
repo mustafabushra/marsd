@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/trust-score — the model behind the number, and what it currently says.
@@ -179,15 +180,15 @@ export default function AdminTrustScore() {
             </div>
           )
         })}
-        <div style={{ ...card, padding: '18px' }}>
+        <Card style={{ padding: '18px' }}>
           <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '6px', textAlign: 'right' }}>متوسط الدرجة المُقيَّمة</div>
           <div style={{ fontSize: '28px', fontWeight: 900, color: '#1E2A52', textAlign: 'right' }}>{avg}</div>
-        </div>
+        </Card>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.05fr', gap: '18px', alignItems: 'start' }}>
         {/* The model */}
-        <div style={{ ...card, padding: '24px' }}>
+        <Card style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px', textAlign: 'right' }}>المعاملات</h2>
           <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 18px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>
             الدرجة = الأساس + (نسبة السداد في موعده × وزنها) − (نسبة التعثّر × وزنها) − خصم التأخير
@@ -226,10 +227,10 @@ export default function AdminTrustScore() {
               الحفظ يُعيد احتساب درجات كل الشركات فوراً — الدرجات المعروضة الآن ستتغيّر.
             </p>
           )}
-        </div>
+        </Card>
 
         {/* What it produces */}
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <Card style={{ overflow: 'hidden' }}>
           <div style={{ padding: '18px 20px 14px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: 0, textAlign: 'right' }}>الدرجات الحالية</h2>
             <p style={{ fontSize: '12.5px', color: '#64748B', margin: '4px 0 0', fontWeight: 600, textAlign: 'right' }}>{scores.length} شركة مُحتسبة</p>
@@ -249,7 +250,7 @@ export default function AdminTrustScore() {
               )
             })}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   )

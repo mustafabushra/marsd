@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getSupabase } from '../lib/api'
 import { Skeleton, SkeletonTable } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * The platform's memory, made readable.
@@ -172,7 +173,7 @@ export default function AdminLogs() {
         كل إجراء تم على المنصة — من فعله، ومتى، وعلى ماذا. لا يُعدَّل ولا يُحذف.
       </p>
 
-      <div style={{ ...card, padding: '16px', marginBottom: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <Card style={{ padding: '16px', marginBottom: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={action} onChange={(e) => setAction(e.target.value)} style={input}>
           <option value="">كل الإجراءات</option>
           {Object.entries(ACTION_LABELS).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
@@ -201,7 +202,7 @@ export default function AdminLogs() {
             مسح الفلاتر
           </button>
         )}
-      </div>
+      </Card>
 
       <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '10px' }}>
         {loading ? <Skeleton w={90} h={13} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : `${total} عملية`}
@@ -215,9 +216,9 @@ export default function AdminLogs() {
       )}
 
       {!loading && !logs.length && !error && (
-        <div style={{ ...card, padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
+        <Card style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
           لا عمليات تطابق هذه الفلاتر.
-        </div>
+        </Card>
       )}
 
       <div style={{ display: 'grid', gap: '8px' }}>

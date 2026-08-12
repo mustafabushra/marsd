@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
+import { Card } from '../ui'
 
 /**
  * One queue over everything that needs a person.
@@ -188,7 +189,7 @@ export default function AdminWorkCenter () {
         ))}
       </div>
 
-      <div style={card}>
+      <Card>
         {loading ? (
           <div aria-hidden="true">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -255,7 +256,7 @@ export default function AdminWorkCenter () {
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

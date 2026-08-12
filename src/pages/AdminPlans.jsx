@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
+import { Card } from '../ui'
 
 /**
  * /admin/plans — the control surface for what every plan allows.
@@ -187,9 +188,9 @@ export default function AdminPlans() {
       </div>
 
       {plans.length === 0 && (
-        <div style={{ ...card, padding: '30px', textAlign: 'center', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', fontSize: '14px', lineHeight: 1.9 }}>
+        <Card style={{ padding: '30px', textAlign: 'center', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', fontSize: '14px', lineHeight: 1.9 }}>
           لا توجد باقات في قاعدة البيانات. شغّل الهجرة <code style={{ direction: 'ltr', display: 'inline-block' }}>011_plans_entitlements.sql</code> لبذر الباقات الأربع.
-        </div>
+        </Card>
       )}
 
       <div style={{ display: 'grid', gap: '14px' }}>
