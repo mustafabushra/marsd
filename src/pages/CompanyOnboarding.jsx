@@ -40,7 +40,10 @@ export default function CompanyOnboarding() {
     phone: '',
   })
 
-  const [crFile, setCrFile] = useState(null)
+  // The commercial registration is one of the four required documents, not a
+  // field beside them. This screen showed its own dropzone *and* the checklist
+  // that already contains it, so the same paper was asked for twice and the
+  // form could hold two different files for one document. One source.
   // The rest of the required paperwork. Registering a company puts it in front
   // of a reviewer, and one file out of four is not something anybody can verify.
   const [docFiles, setDocFiles] = useState({})
@@ -50,30 +53,11 @@ export default function CompanyOnboarding() {
   // What is still missing, derived once so the button and its label cannot
   // disagree about it.
   const docsLeft = existingCompany ? 0 : docTypes.filter((t) => !docFiles[t.doc_type]).length
+  const crFile = docFiles.commercial_registration || null
   const ready = !!crFile && docsLeft === 0
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png']
-    if (!allowedTypes.includes(file.type)) {
-      setError('❌ نوع الملف غير مدعوم. استخدم PDF أو صورة فقط')
-      return
-    }
-
-    const maxSize = 15 * 1024 * 1024
-    if (file.size > maxSize) {
-      setError(`❌ حجم الملف كبير جداً. الحد الأقصى 15 ميجابايت`)
-      return
-    }
-
-    setCrFile(file)
-    setError('')
   }
 
   // Step 1: Collect basic info and search for existing company
@@ -607,68 +591,6 @@ export default function CompanyOnboarding() {
               </div>
             )}
 
-            <label style={{
-              fontSize: '14px',
-              fontWeight: 700,
-              color: '#334155',
-              display: 'block',
-              marginBottom: '8px'
-            }}>
-              رفع السجل التجاري *
-            </label>
-            <div style={{
-              border: '2px dashed #E2E8F0',
-              borderRadius: '12px',
-              padding: '24px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              background: crFile ? '#F0FDF4' : '#F8FAFC',
-              marginBottom: '24px'
-            }}>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                id="cr-file-input"
-              />
-              {crFile ? (
-                <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>✅</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#15803D', marginBottom: '6px' }}>
-                    {crFile.name}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setCrFile(null)}
-                    style={{
-                      marginTop: '10px',
-                      background: '#FEE2E2',
-                      color: '#DC2626',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    حذف الملف
-                  </button>
-                </div>
-              ) : (
-                <label htmlFor="cr-file-input" style={{ cursor: 'pointer', display: 'block' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>
-                    اضغط أو اسحب الملف
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    PDF أو صورة — الحد الأقصى 15 ميجابايت
-                  </div>
-                </label>
-              )}
-            </div>
-
             {/* The rest of the paperwork.
                 Not shown for a claim: claiming an existing company is proving
                 you own it, and the company's own certificates are what the
@@ -688,7 +610,7 @@ export default function CompanyOnboarding() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
                 type="button"
-                onClick={() => { setStep(1); setExistingCompany(null); setCrFile(null) }}
+                onClick={() => { setStep(1); setExistingCompany(null); setDocFiles({}) }}
                 style={{
                   background: '#F1F5F9',
                   color: '#0F172A',
