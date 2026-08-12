@@ -16,6 +16,13 @@ const PAYMENT_LABELS = { full: 'تم السداد', partial: 'سداد جزئي'
 // at 1000 rows and reports success, which is the failure mode this avoids.
 const QUEUE_LIMIT = 500
 
+// الطابور صار يحمل حالتين، فلا بدّ أن تقول الشاشة أيّهما هذا. «قيد المراجعة»
+// كانت مكتوبة ثابتة فوق كل تقرير، وهي كذبة على تقرير طُلبت معلوماته.
+const REPORT_STATE = {
+  pending_review: { t: 'بانتظار المراجعة', fg: '#B45309', bg: '#FFFBEB' },
+  request_info:   { t: 'بانتظار معلومات',  fg: '#1E2A52', bg: '#EEF2F8' },
+}
+
 export default function AdminReports() {
   const { user } = useUser()
   const [reports, setReports] = useState([])
@@ -40,7 +47,14 @@ export default function AdminReports() {
                  title, category, description, notes, would_recommend,
                  companies:target_company_id ( name, cr_number ),
                  reporter:reporter_tenant_id ( id, name, cr_number )`)
-        .eq('status', 'pending_review')
+        // كلا الحالتين، لا pending_review وحدها.
+        //
+        // مركز العمل يعدّ ('pending_review','request_info') بوصفهما تقريراً
+        // مفتوحاً — راجع rep في migration 148 — بينما هذه الشاشة كانت تُصفّي
+        // على الأولى فقط. فتقرير طُلبت معلوماته يختفي من الشاشة الوحيدة التي
+        // تُراجَع فيها التقارير، ويبقى محسوباً في كل عدّاد: البلاطة تقول «١»
+        // وتُفتح الشاشة فارغة. هذا عطل صامت — يبني وينجح ولا يُرجع شيئاً.
+        .in('status', ['pending_review', 'request_info'])
         .order('submitted_at', { ascending: false })
         // An explicit ceiling. Without one PostgREST applies its own at 1000 rows
         // and returns 200 without saying it truncated, so a queue past that point
@@ -233,6 +247,13 @@ export default function AdminReports() {
                   <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-GB') : '—'}</span>
                   <span style={{ fontSize: '13px', fontWeight: 800, color: '#334155' }}>{dealValue(r)}</span>
                 </div>
+                {REPORT_STATE[r.status] && (
+                  <span style={{
+                    display: 'inline-block', marginTop: '7px', borderRadius: '999px',
+                    padding: '2px 9px', fontSize: '11px', fontWeight: 800,
+                    background: REPORT_STATE[r.status].bg, color: REPORT_STATE[r.status].fg,
+                  }}>{REPORT_STATE[r.status].t}</span>
+                )}
               </div>
             ))}
           </div>
@@ -246,7 +267,11 @@ export default function AdminReports() {
                   <h2 style={{ fontSize: '21px', fontWeight: 900, color: '#0F172A', margin: 0 }}>{current.companies?.name || 'شركة'}</h2>
                   {current.title && <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '5px' }}>{current.title}{current.category ? ` · ${CATEGORY_LABELS[current.category] || current.category}` : ''}</div>}
                 </div>
-                <span style={{ background: '#FFFBEB', color: '#B45309', borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: 800 }}>قيد المراجعة</span>
+                <span style={{
+                  background: (REPORT_STATE[current.status] || REPORT_STATE.pending_review).bg,
+                  color: (REPORT_STATE[current.status] || REPORT_STATE.pending_review).fg,
+                  borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: 800,
+                }}>{(REPORT_STATE[current.status] || REPORT_STATE.pending_review).t}</span>
               </div>
 
               {/* Who is making the claim, and what their submissions have been

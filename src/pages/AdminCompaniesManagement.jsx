@@ -151,6 +151,10 @@ export default function AdminCompaniesManagement() {
     flagged: rows.filter((r) => r.official_status && r.official_status !== 'none').length,
     unclaimed: rows.filter((r) => !r.claimed_by).length,
     weak: rows.filter((r) => r.trust_score == null).length,
+    // «تنبيهات الثقة» في مركز الإجراءات تعدّ هذه الشركات بعينها، وكانت تفتح
+    // شاشة مؤشر الثقة المرتّبة تنازلياً — أي أن المعدودات في آخرها. هذا الفلتر
+    // هو وجهتها الآن، فيعرض ما عُدّ لا شيئاً آخر.
+    low_trust: rows.filter((r) => r.trust_score != null && Number(r.trust_score) < 50).length,
     broken: rows.filter((r) => (r.quality_issues || []).length > 0).length,
   }), [rows])
 
@@ -162,6 +166,7 @@ export default function AdminCompaniesManagement() {
       if (filter === 'flagged' && (!r.official_status || r.official_status === 'none')) return false
       if (filter === 'unclaimed' && r.claimed_by) return false
       if (filter === 'weak' && r.trust_score != null) return false
+      if (filter === 'low_trust' && !(r.trust_score != null && Number(r.trust_score) < 50)) return false
       if (filter === 'broken' && !(r.quality_issues || []).length) return false
       if (!q) return true
       return (r.name || '').toLowerCase().includes(q)
@@ -335,6 +340,7 @@ export default function AdminCompaniesManagement() {
     { key: 'suspended', label: 'موقوفة', value: stats.suspended, color: '#DC2626' },
     { key: 'broken', label: 'بيانات غير سليمة', value: stats.broken, color: '#DC2626' },
     { key: 'unclaimed', label: 'غير مطالَب بها', value: stats.unclaimed, color: '#64748B' },
+    { key: 'low_trust', label: 'مؤشر ثقة منخفض', value: stats.low_trust, color: '#DC2626' },
     { key: 'weak', label: 'بلا مؤشر', value: stats.weak, color: '#F59E0B' },
   ]
 

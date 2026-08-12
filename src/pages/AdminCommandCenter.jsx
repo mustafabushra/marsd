@@ -56,17 +56,24 @@ const OFFICIAL_LABEL = {
   bankruptcy: 'إفلاس', struck_off: 'شطب السجل',
 }
 
-// The six tiles, in the order the design puts them. `k` indexes into
-// by_kind; `trust` is the one that comes from elsewhere.
-// اللون هنا يقول درجة الإلحاح، لا يميّز البلاطات عن بعضها:
-// أحمر لِما هو غير سليم، برتقالي لِما ينتظر قراراً، كحلي للإجراء الرسمي.
+// البلاطة رقم يُضغط. فإن عدّت من مصدر وفتحت شاشة تقرأ مصدراً آخر، فهي تكذب —
+// وهذا ما كان يحدث: «١ تقرير للمراجعة» تفتح /admin/reports التي تُصفّي على
+// pending_review وحدها، والتقرير الوحيد حالته request_info، فتُفتح الشاشة
+// فارغة. ومثلها «١ طلب انضمام» تعدّ company_requests وتفتح شاشة تقرأ
+// companies.status.
+//
+// القاعدة الآن: وجهة كل بلاطة تقرأ نفس ما عدّته.
+//   - أنواع الطابور الأربعة → مركز العمل مُصفّى بالنوع، وهو حرفياً
+//     admin_work_items، أي نفس دالة العدّ.
+//   - المستندات → documents_overview، وهي مصدر الشاشة نفسها.
+//   - الثقة → فلتر في سجلّ الشركات يعرض الشركات المعدودة عينها.
 const TILES = [
-  { key: 'report_review',   t: 'تقارير للمراجعة', tone: 'red',    icon: '📄', to: '/admin/reports' },
-  { key: 'trust',           t: 'تنبيهات الثقة',   tone: 'red',    icon: '📉', to: '/admin/trust-score' },
-  { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/company-approval' },
-  { key: 'claim',           t: 'طلبات ملكية',     tone: 'orange', icon: '🛡', to: '/admin/claim-requests' },
+  { key: 'report_review',   t: 'تقارير للمراجعة', tone: 'red',    icon: '📄', to: '/admin/work?kind=report_review' },
+  { key: 'trust',           t: 'تنبيهات الثقة',   tone: 'red',    icon: '📉', to: '/admin/companies?filter=low_trust' },
+  { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/work?kind=registration' },
+  { key: 'claim',           t: 'طلبات ملكية',     tone: 'orange', icon: '🛡', to: '/admin/work?kind=claim' },
   { key: 'document_review', t: 'تحقق مستندات',    tone: 'orange', icon: '🗂', to: '/admin/documents?tab=pending' },
-  { key: 'dispute',         t: 'اعتراضات نشطة',   tone: 'navy',   icon: '⚖', to: '/admin/disputes' },
+  { key: 'dispute',         t: 'اعتراضات نشطة',   tone: 'navy',   icon: '⚖', to: '/admin/work?kind=dispute' },
 ]
 
 const RED_TXT = '#B91C1C'
@@ -153,16 +160,24 @@ const rosterSummary = async (sb) => {
   }
 }
 
-/** Pending documents, grouped by company, so a card can show its evidence. */
+/**
+ * المستندات المنتظرة — مجمّعة بالشركة للأدلة، ومعدودة للبلاطة.
+ *
+ * البلاطة كانت تقرأ by_kind.document_review، وهو عدّ صفوف في
+ * company_requests من نوع «طلب مراجعة مستند» — لا عدّ المستندات نفسها. فكانت
+ * تقول صفراً بينما خمسة مستندات تنتظر التوثيق في company_documents. الرقم
+ * والشاشة الآن من documents_overview كلاهما.
+ */
 const pendingDocs = async (sb) => {
   const { data, error } = await sb.rpc('documents_overview', { p_state: 'pending' })
   if (error) throw error
+  const items = data?.items || []
   const by = {}
-  for (const d of (data?.items || [])) {
+  for (const d of items) {
     if (!d.company_id) continue
     ;(by[d.company_id] = by[d.company_id] || []).push(d)
   }
-  return by
+  return { by, total: items.length }
 }
 
 const shell = { ...card, padding: '22px' }
@@ -223,9 +238,12 @@ export default function AdminCommandCenter () {
   const shown = onlyUrgent ? urgent : all
   const openTotal = counts.data?.all ?? all.length
 
-  const tileValue = (key) => key === 'trust'
-    ? (roster.data?.lowTrust ?? null)
-    : (byKind[key] || 0)
+  // كل بلاطة من المصدر الذي تفتحه وجهتها — لا من by_kind دائماً.
+  const tileValue = (key) => {
+    if (key === 'trust') return roster.data?.lowTrust ?? null
+    if (key === 'document_review') return docs.data?.total ?? null
+    return byKind[key] || 0
+  }
 
   /** Take a request. The database checks the same permission again. */
   const takeIt = async (id) => {
@@ -309,7 +327,9 @@ export default function AdminCommandCenter () {
       }}>
         {TILES.map((tile) => {
           const v = tileValue(tile.key)
-          const dead = tile.key === 'trust' ? roster.error : counts.error
+          const dead = tile.key === 'trust' ? roster.error
+            : tile.key === 'document_review' ? docs.error
+              : counts.error
           const c = TINT[tile.tone]
           return (
             <button key={tile.key} onClick={() => navigate(tile.to)}
@@ -389,7 +409,7 @@ export default function AdminCommandCenter () {
                   {shown.map((i) => {
                     const tone = TONE[i.priority] || TONE.normal
                     const late = ['late_response', 'late_resolution'].includes(i.sla_state)
-                    const evidence = (docs.data || {})[i.company_id] || []
+                    const evidence = (docs.data?.by || {})[i.company_id] || []
                     return (
                       <article key={`${i.kind}-${i.item_id}`} style={{
                         border: `1px solid ${S[200]}`, borderRadius: '12px', padding: '16px',
