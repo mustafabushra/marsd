@@ -38,7 +38,31 @@ export default function CompanyOnboarding() {
     city: '',
     foundedYear: new Date().getFullYear(),
     phone: '',
+    // The rest of the official identity. /admin/add-company has collected
+    // these all along and a company registering itself was asked for four —
+    // so what Marsad knows about a company somebody else added was fuller than
+    // what it knows about one that signed up. Every one is a real column.
+    nameEn: '',
+    entityType: '',
+    crType: '',
+    crStatus: '',
+    crExpiryDate: '',
+    foundingDate: '',
+    capital: '',
+    region: '',
+    nationalAddress: '',
+    website: '',
   })
+
+  // Filled from the Ministry's published generation, and not asked for twice.
+  const [registryMatch, setRegistryMatch] = useState(null)
+  const [lookupBusy, setLookupBusy] = useState(false)
+  const [lookupNote, setLookupNote] = useState('')
+
+  const fromRegistry = (field) => Boolean(registryMatch) && [
+    'name', 'crNumber', 'unifiedNumber', 'entityType', 'region', 'city',
+    'foundingDate', 'capital', 'crType',
+  ].includes(field)
 
   // The commercial registration is one of the four required documents, not a
   // field beside them. This screen showed its own dropzone *and* the checklist
@@ -58,6 +82,46 @@ export default function CompanyOnboarding() {
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  /**
+   * Fill the official identity from the register instead of asking for it.
+   *
+   * search_companies_unified answers a name, a CR number or a unified number
+   * against Marsad and the published Ministry generation at once — the same
+   * call /search and /add-report make. Nothing new is asked of the database.
+   */
+  const lookupRegistry = async () => {
+    const q = (formData.crNumber || formData.name || '').trim()
+    if (!q) { setLookupNote('اكتب رقم السجل أو اسم الشركة أولاً'); return }
+    setLookupBusy(true); setLookupNote('')
+    try {
+      const { data, error: e } = await getSupabase()
+        .rpc('search_companies_unified', { p_query: q, p_limit: 5 })
+      if (e) throw e
+      const hit = (data || []).find((r) => r.origin === 'registry')
+      if (!hit) {
+        setRegistryMatch(null)
+        setLookupNote('لم نجد الشركة في السجل المنشور — أكمل البيانات يدوياً')
+        return
+      }
+      setRegistryMatch(hit)
+      setFormData((prev) => ({
+        ...prev,
+        name: hit.name || prev.name,
+        crNumber: hit.cr_number || prev.crNumber,
+        unifiedNumber: hit.unified_number || prev.unifiedNumber,
+        entityType: hit.legal_entity || prev.entityType,
+        crType: hit.registration_type || prev.crType,
+        region: hit.region || prev.region,
+        city: hit.city || prev.city,
+        capital: hit.capital != null ? String(hit.capital) : prev.capital,
+        foundingDate: hit.registration_date || prev.foundingDate,
+      }))
+      setLookupNote('')
+    } catch (err) {
+      setLookupNote(err?.message || 'تعذّر الوصول إلى السجل التجاري')
+    } finally { setLookupBusy(false) }
   }
 
   // Step 1: Collect basic info and search for existing company
@@ -335,6 +399,20 @@ export default function CompanyOnboarding() {
             p_unified_number: formData.unifiedNumber || null,
             p_cr_file_url: crFileUrl,
             p_founded_year: formData.foundedYear ? Number(formData.foundedYear) : null,
+            // The rest of the identity, so the file opens complete rather than
+            // waiting for an operator to read it off the certificate. Blank
+            // stays null — the function coalesces, so an empty field never
+            // erases what the register already said.
+            p_name_en: formData.nameEn || null,
+            p_entity_type: formData.entityType || null,
+            p_cr_type: formData.crType || null,
+            p_cr_status: formData.crStatus || null,
+            p_cr_expiry_date: formData.crExpiryDate || null,
+            p_founding_date: formData.foundingDate || null,
+            p_capital: formData.capital ? Number(formData.capital) : null,
+            p_region: formData.region || null,
+            p_national_address: formData.nationalAddress || null,
+            p_website: formData.website || null,
           })
 
         if (regError) throw new Error(regError.message)
@@ -465,6 +543,7 @@ export default function CompanyOnboarding() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
+                  readOnly={fromRegistry('name')}
                   placeholder="مثال: شركة نجد"
                   style={{
                     width: '100%',
@@ -484,6 +563,7 @@ export default function CompanyOnboarding() {
                   type="text"
                   value={formData.crNumber}
                   onChange={(e) => handleChange('crNumber', e.target.value)}
+                  readOnly={fromRegistry('crNumber')}
                   placeholder="1234567890"
                   style={{
                     width: '100%',
@@ -542,6 +622,264 @@ export default function CompanyOnboarding() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  الرقم الموحّد
+                </label>
+                <input
+                  type="text"
+                  value={formData.unifiedNumber}
+                  onChange={(e) => handleChange('unifiedNumber', e.target.value)}
+                  readOnly={fromRegistry('unifiedNumber')}
+                  placeholder="٧٠٠٠٠٠٠٠٠٠"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('unifiedNumber') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('unifiedNumber') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  الكيان القانوني
+                </label>
+                <input
+                  type="text"
+                  value={formData.entityType}
+                  onChange={(e) => handleChange('entityType', e.target.value)}
+                  readOnly={fromRegistry('entityType')}
+                  placeholder="مؤسسة فردية / شركة ذات مسؤولية محدودة"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('entityType') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('entityType') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  نوع السجل
+                </label>
+                <input
+                  type="text"
+                  value={formData.crType}
+                  onChange={(e) => handleChange('crType', e.target.value)}
+                  readOnly={fromRegistry('crType')}
+                  placeholder="رئيسي / فرعي"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('crType') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('crType') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  المنطقة
+                </label>
+                <input
+                  type="text"
+                  value={formData.region}
+                  onChange={(e) => handleChange('region', e.target.value)}
+                  readOnly={fromRegistry('region')}
+                  placeholder="منطقة الرياض"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('region') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('region') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  رأس المال
+                </label>
+                <input
+                  type="number"
+                  value={formData.capital}
+                  onChange={(e) => handleChange('capital', e.target.value)}
+                  readOnly={fromRegistry('capital')}
+                  placeholder="٥٠٠٠٠"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('capital') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('capital') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  تاريخ إنشاء السجل
+                </label>
+                <input
+                  type="date"
+                  value={formData.foundingDate}
+                  onChange={(e) => handleChange('foundingDate', e.target.value)}
+                  readOnly={fromRegistry('foundingDate')}
+                  placeholder=""
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('foundingDate') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('foundingDate') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  انتهاء السجل
+                </label>
+                <input
+                  type="date"
+                  value={formData.crExpiryDate}
+                  onChange={(e) => handleChange('crExpiryDate', e.target.value)}
+                  readOnly={fromRegistry('crExpiryDate')}
+                  placeholder=""
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('crExpiryDate') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('crExpiryDate') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  الاسم بالإنجليزية
+                </label>
+                <input
+                  type="text"
+                  value={formData.nameEn}
+                  onChange={(e) => handleChange('nameEn', e.target.value)}
+                  readOnly={fromRegistry('nameEn')}
+                  placeholder="Future Co."
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('nameEn') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('nameEn') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  العنوان الوطني
+                </label>
+                <input
+                  type="text"
+                  value={formData.nationalAddress}
+                  onChange={(e) => handleChange('nationalAddress', e.target.value)}
+                  readOnly={fromRegistry('nationalAddress')}
+                  placeholder="الرمز البريدي والمبنى"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('nationalAddress') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('nationalAddress') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  الموقع الإلكتروني
+                </label>
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => handleChange('website', e.target.value)}
+                  readOnly={fromRegistry('website')}
+                  placeholder="https://"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('website') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('website') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  البريد الرسمي
+                </label>
+                <input
+                  type="email"
+                  value={formData.officialEmail}
+                  onChange={(e) => handleChange('officialEmail', e.target.value)}
+                  readOnly={fromRegistry('officialEmail')}
+                  placeholder="info@company.sa"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('officialEmail') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('officialEmail') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  الهاتف
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  readOnly={fromRegistry('phone')}
+                  placeholder="+9665…"
+                  style={{
+                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+                    padding: '10px 12px', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                    background: fromRegistry('phone') ? '#F8FAFC' : '#fff',
+                    color: fromRegistry('phone') ? '#475569' : '#0F172A',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Fill it from the register rather than asking twice. */}
+            <div style={{
+              background: registryMatch ? '#F0FDF4' : '#F8FAFC',
+              border: `1.5px solid ${registryMatch ? '#A7F3D0' : '#E2E8F0'}`,
+              borderRadius: '12px', padding: '14px', marginBottom: '16px',
+            }}>
+              {registryMatch ? (
+                <div style={{ fontSize: '13px', color: '#15803D', fontWeight: 700, lineHeight: 1.9 }}>
+                  ✔ عُثر على الشركة في السجل التجاري — وزارة التجارة
+                  <div style={{ color: '#334155', fontWeight: 600, marginTop: '4px' }}>
+                    الحقول الرسمية مُعبّأة من السجل ومقفلة. أكمل ما لا تنشره الوزارة فقط.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={lookupRegistry} disabled={lookupBusy}
+                    style={{
+                      padding: '9px 18px', borderRadius: '9px', border: 0,
+                      background: lookupBusy ? '#93C5FD' : '#1E2A52', color: '#fff',
+                      fontSize: '13px', fontWeight: 800,
+                      cursor: lookupBusy ? 'default' : 'pointer', fontFamily: 'inherit',
+                    }}>{lookupBusy ? '… جارٍ البحث' : 'جلب البيانات من السجل التجاري'}</button>
+                  <span style={{ fontSize: '12.5px', color: lookupNote ? '#B45309' : '#64748B', fontWeight: 600, lineHeight: 1.8 }}>
+                    {lookupNote || 'اكتب رقم السجل ثم اجلب بياناتك الرسمية بدل إدخالها يدوياً'}
+                  </span>
+                </div>
+              )}
             </div>
 
             <button
