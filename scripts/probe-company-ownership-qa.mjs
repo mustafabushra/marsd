@@ -31,8 +31,16 @@ const ok = (q, n, c, d = '') => {
 
 const made = { users: [], companies: [], tenants: [] }
 
+/**
+ * As PostgREST would: the `authenticated` role, not the owner.
+ *
+ * This connects as postgres, which carries rolbypassrls — so setting only the
+ * jwt claim tests triggers and SECURITY DEFINER checks while skipping every
+ * row-level policy. `set local role` is what makes the policies apply.
+ */
 const asUser = async (uid, fn) => {
   await db.query('begin')
+  await db.query('set local role authenticated')
   await db.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: uid })])
   try { return await fn() } finally { await db.query('rollback').catch(() => {}) }
 }
