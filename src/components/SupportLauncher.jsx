@@ -41,6 +41,7 @@ export default function SupportLauncher () {
         onClick={() => setOpen(true)}
         aria-label="الإبلاغ عن مشكلة"
         className="marsad-support-fab"
+        data-tour="support-fab"
         style={{
           position: 'fixed',
           insetInlineEnd: '22px',

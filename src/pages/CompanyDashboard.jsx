@@ -173,14 +173,14 @@ export default function CompanyDashboard() {
       <ProfileCompletion />
       <div style={{ marginBottom: '22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
+          <h1 data-tour="dash-greeting" style={{ fontSize: '25px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px 0', textAlign: 'right' }}>أهلاً، {companyName} 👋</h1>
           <p style={{ fontSize: '15px', color: '#64748B', margin: 0, textAlign: 'right' }}>نظرة سريعة على نشاطك ومساهماتك في المنصة</p>
         </div>
         <LiveBadge connected={connected} liveAt={liveAt} />
       </div>
 
       {/* KPIs Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '18px', marginBottom: '18px' }}>
+      <div data-tour="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '18px', marginBottom: '18px' }}>
         {kpis.map((k, i) => (
           <div key={i} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
@@ -199,7 +199,7 @@ export default function CompanyDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '18px' }}>
         {/* Activity */}
         <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px' }}>
-          <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>نشاط حديث</h2>
+          <h2 data-tour="dash-activity" style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 18px 0', textAlign: 'right' }}>نشاط حديث</h2>
           {activity.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '28px 12px', color: '#64748B' }}>
               <div style={{ fontSize: '34px', marginBottom: '8px' }}>🔔</div>
@@ -238,7 +238,7 @@ export default function CompanyDashboard() {
 
           {/* Quick Actions */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px 0', textAlign: 'right' }}>إجراءات سريعة</h2>
+            <h2 data-tour="dash-quick-actions" style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px 0', textAlign: 'right' }}>إجراءات سريعة</h2>
             {/* flex-start, not space-between.
                 Two of these buttons hold an icon and a label as separate flex
                 items and the third holds one string, so space-between spread the

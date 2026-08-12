@@ -692,3 +692,12 @@ p {
     bottom: 16px !important;
   }
 }
+
+/* --- The guided tour ------------------------------------------------------ */
+/* «جولة تعريفية» sits in a header that already carries a command box, a bell
+   and an avatar. Below 900px the label goes and the compass stands alone; the
+   button keeps its title attribute, so it is still named for anyone who hovers
+   or reads it aloud. */
+@media (max-width: 900px) {
+  .marsad-tour-label { display: none; }
+}

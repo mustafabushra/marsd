@@ -10,6 +10,7 @@ import { useCompanyOnboarding } from '../hooks/useCompanyOnboarding'
 import { useUserRole } from '../hooks/useUserRole'
 import { useEntitlements } from '../hooks/useEntitlements'
 import SupportLauncher from './SupportLauncher'
+import TourLauncher from './tour/TourLauncher'
 import {
   DashboardIcon,
   SearchIcon,
@@ -23,6 +24,16 @@ import {
   SettingsIcon,
   BellIcon
 } from './icons'
+
+// Anchors for the guided tour, kept next to the navigation they name so a
+// renamed route cannot leave a step pointing at nothing. Only the entries the
+// tour actually mentions are here; the rest render without the attribute.
+const NAV_TOUR_ID = {
+  '/search': 'nav-search',
+  '/add-report': 'nav-add-report',
+  '/reports-about-us': 'nav-reports-about-us',
+  '/watchlist': 'nav-watchlist',
+}
 
 /**
  * `gate` — CompanyStatusRouter has not yet decided whether this person belongs
@@ -174,6 +185,7 @@ export default function CompanyShell({ user, gate = false }) {
             return (
               <button
                 key={item.path}
+                data-tour={NAV_TOUR_ID[item.path]}
                 onClick={() => navigate(item.path)}
                 style={{
                   background: isActive ? '#16A34A' : 'transparent',
@@ -297,7 +309,7 @@ export default function CompanyShell({ user, gate = false }) {
 
               Still a button, not only a shortcut: there is no Ctrl on a phone,
               and a keyboard shortcut nobody is told about is one nobody uses. */}
-          <button className="marsad-command-button"
+          <button className="marsad-command-button" data-tour="hdr-command"
             onClick={() => window.dispatchEvent(
               new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
             title="ابحث عن شركة أو نفّذ أمراً"
@@ -318,7 +330,7 @@ export default function CompanyShell({ user, gate = false }) {
             <span style={{ flex: 1, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               ابحث عن شركة أو نفّذ أمراً…
             </span>
-            <kbd style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '5px', padding: '1px 6px', fontSize: '10.5px', fontWeight: 800, direction: 'ltr', color: '#94A3B8', flex: 'none' }}>
+            <kbd data-tour-kbd="" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '5px', padding: '1px 6px', fontSize: '10.5px', fontWeight: 800, direction: 'ltr', color: '#94A3B8', flex: 'none' }}>
               Ctrl K
             </kbd>
           </button>
@@ -326,7 +338,10 @@ export default function CompanyShell({ user, gate = false }) {
           {/* justifySelf pins this to the far edge of the header, so the bell
               and the avatar sit in the corner whatever the title does. */}
           <div className="marsad-appbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '18px', justifySelf: 'end' }}>
-            <NotificationBell />
+            <TourLauncher />
+            <span data-tour="hdr-notifications" style={{ display: 'inline-flex' }}>
+              <NotificationBell />
+            </span>
             <UserButton
               afterSignOutUrl="/"
               appearance={{
