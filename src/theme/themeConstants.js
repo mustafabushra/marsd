@@ -18,6 +18,21 @@ export const COLORS = {
   greenLight: '#86EFAC',
   greenVeryLight: '#4ADE80',
 
+  // Danger / red — 206 hand-written occurrences before this existed here.
+  danger: '#B91C1C',
+  dangerLight: '#FEF2F2',
+  dangerBorder: '#FECACA',
+
+  // Warning / amber — 118, same story.
+  warning: '#B45309',
+  warningLight: '#FFFBEB',
+  warningBorder: '#FDE68A',
+
+  // Info / blue
+  info: '#1D4ED8',
+  infoLight: '#EFF6FF',
+  infoBorder: '#BFDBFE',
+
   // Backgrounds
   bgLight: '#F8FAFC',
   bgVeryLight: '#F1F5F9',

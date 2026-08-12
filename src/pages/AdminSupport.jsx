@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPanel } from '../components/Skeleton'
+import { PageTitle, Pill, EmptyState, ErrorState } from '../ui'
 
 /**
  * /admin/support — the other half of «الإبلاغ عن مشكلة».
@@ -26,6 +27,12 @@ const KIND = {
   billing: 'الاشتراك أو الدفع',
   suggestion: 'اقتراح',
   other: 'ملاحظات عامة',
+}
+
+// The tone each status carries, named once. The colours themselves live in the
+// theme now rather than being retyped per screen.
+const PILL_TONE = {
+  open: 'danger', in_progress: 'warning', resolved: 'success', closed: 'neutral',
 }
 
 const STATUS = {
@@ -128,10 +135,7 @@ export default function AdminSupport () {
 
   return (
     <div>
-      <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>الدعم الفني</h1>
-      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px', lineHeight: 1.9 }}>
-        البلاغات الواردة من الشركات عبر «الإبلاغ عن مشكلة».
-      </p>
+      <PageTitle note="البلاغات الواردة من الشركات عبر «الإبلاغ عن مشكلة».">الدعم الفني</PageTitle>
 
       {toast && (
         <div role="status" style={{
@@ -157,20 +161,9 @@ export default function AdminSupport () {
       <div style={card}>
         {list.loading ? <SkeletonPanel rows={5} title={false} />
           : list.error ? (
-            <div style={{ padding: '10px 0' }}>
-              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#B91C1C' }}>تعذّر تحميل البلاغات</div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', margin: '5px 0 10px' }}>{list.error}</div>
-              <button onClick={load} style={{
-                padding: '7px 15px', borderRadius: '8px', border: '1.5px solid #E2E8F0',
-                background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}>إعادة المحاولة</button>
-            </div>
+            <ErrorState what="البلاغات" message={list.error} onRetry={load} />
           ) : !list.data?.length ? (
-            <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
-              <b style={{ color: '#0F172A' }}>لا بلاغات في هذا النطاق</b>
-              <div>لم يصل أي بلاغ مطابق.</div>
-            </div>
+            <EmptyState title="لا بلاغات في هذا النطاق">لم يصل أي بلاغ مطابق.</EmptyState>
           ) : list.data.map((t, i) => (
             <button key={t.id} onClick={() => show(t)} style={{
               display: 'block', width: '100%', textAlign: 'right', padding: '14px 0',
@@ -178,10 +171,7 @@ export default function AdminSupport () {
               cursor: 'pointer', fontFamily: 'inherit',
             }}>
               <div style={{ display: 'flex', gap: '9px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{
-                  background: st(t.status).bg, color: st(t.status).fg, borderRadius: '999px',
-                  padding: '3px 11px', fontSize: '11.5px', fontWeight: 800,
-                }}>{st(t.status).t}</span>
+                <Pill tone={PILL_TONE[t.status] || 'neutral'}>{st(t.status).t}</Pill>
                 <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#1E2A52' }}>{KIND[t.kind] || t.kind}</span>
                 <span style={{ fontSize: '12px', color: '#94A3B8' }}>{dt(t.created_at)}</span>
               </div>
