@@ -87,6 +87,17 @@ try {
     t = await page.locator('body').innerText()
     ok('يمنع التسجيل المكرّر قبل الكتابة', /مسجّلة في مرصد بالفعل/.test(t), t.slice(0, 90))
     ok('ولا يفتح النموذج', !/الكيان القانوني/.test(t))
+    // The point of the message: it has to lead somewhere.
+    ok('ويسمّي الشركة التي وجدها', t.includes(mine.name.slice(0, 10)), mine.name.slice(0, 20))
+    const claimBtn = page.getByRole('button', { name: /تقديم طلب ملكية/ })
+    ok('ويعرض طريقاً لتقديم طلب الملكية', await claimBtn.count() === 1)
+    await claimBtn.click()
+    await page.waitForTimeout(2000)
+    const after = await page.locator('body').innerText()
+    ok('والضغط ينقل إلى مسار الملكية', /رفع السجل التجاري|وجدنا شركتك|مستندات|التالي|إرسال/.test(after),
+      after.slice(0, 100))
+    ok('ولا يطالب بالمستندات الأربعة في مسار الملكية',
+      !/مستندات الشركة/.test(after), 'طلب الشهادات في مطالبة ملكية')
   }
 
   console.log('\n─── المخرج اليدوي ───')

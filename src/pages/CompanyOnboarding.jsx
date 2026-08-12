@@ -67,6 +67,10 @@ export default function CompanyOnboarding() {
   // already filled from the register, or an empty one — and either way the
   // person knows which before typing anything.
   const [identified, setIdentified] = useState(false)
+  // A company the number matched that Marsad already holds. Registering it
+  // again is not the act — claiming it is — so this is offered rather than
+  // refused.
+  const [marsadMatch, setMarsadMatch] = useState(null)
   const [registryMatch, setRegistryMatch] = useState(null)
   const [lookupBusy, setLookupBusy] = useState(false)
   const [lookupNote, setLookupNote] = useState('')
@@ -106,16 +110,20 @@ export default function CompanyOnboarding() {
   const lookupRegistry = async () => {
     const q = (formData.crNumber || formData.name || '').trim()
     if (!q) { setLookupNote('اكتب رقم السجل أو اسم الشركة أولاً'); return }
-    setLookupBusy(true); setLookupNote('')
+    setLookupBusy(true); setLookupNote(''); setMarsadMatch(null)
     try {
       const { data, error: e } = await getSupabase()
         .rpc('search_companies_unified', { p_query: q, p_limit: 5 })
       if (e) throw e
       const mine = (data || []).find((r) => r.origin === 'marsad')
       if (mine) {
-        // Said before anything is typed, not after.
-        setLookupNote('هذه الشركة مسجّلة في مرصد بالفعل — إن كانت شركتك فقدّم طلب ملكية بدل تسجيل جديد')
+        // Not a dead end. Telling somebody to file an ownership claim without
+        // giving them a way to file one is the same defect as a button with no
+        // handler — and the claim flow is right here, three lines below, in the
+        // branch that runs when `existingCompany` is set.
+        setMarsadMatch(mine)
         setRegistryMatch(null)
+        setLookupNote('')
         return
       }
       const hit = (data || []).find((r) => r.origin === 'registry')
@@ -585,6 +593,51 @@ export default function CompanyOnboarding() {
                 fontSize: '13px', color: '#B45309', fontWeight: 700,
                 marginTop: '10px', lineHeight: 1.9,
               }}>{lookupNote}</div>
+            )}
+
+            {/* Found in Marsad. The act is a claim, and here is the way to make
+                one — the flow already exists, it just had no entrance from
+                here. The four certificates are not asked for: claiming is
+                proving the company is yours, and its own paperwork is what the
+                claim is about. */}
+            {marsadMatch && (
+              <div style={{
+                marginTop: '14px', background: '#EFF6FF', border: '1.5px solid #BFDBFE',
+                borderRadius: '12px', padding: '16px',
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#1E3A8A' }}>
+                  هذه الشركة مسجّلة في مرصد بالفعل
+                </div>
+                <div style={{ fontSize: '13.5px', color: '#0F172A', fontWeight: 700, marginTop: '6px' }}>
+                  {marsadMatch.name}
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '2px' }}>
+                  رقم السجل: {marsadMatch.cr_number}
+                </div>
+                <p style={{ fontSize: '13px', color: '#334155', margin: '10px 0 0', lineHeight: 1.9 }}>
+                  إن كانت شركتك، فالمطلوب طلب ملكية لا تسجيل جديد. أرفق سجلها التجاري
+                  في الخطوة التالية وتراجعه إدارة مرصد.
+                </p>
+                <button type="button"
+                  onClick={() => {
+                    setExistingCompany({
+                      id: marsadMatch.id,
+                      name: marsadMatch.name,
+                      cr_number: marsadMatch.cr_number,
+                    })
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: marsadMatch.name || prev.name,
+                      crNumber: marsadMatch.cr_number || prev.crNumber,
+                    }))
+                    setIdentified(true)
+                  }}
+                  style={{
+                    width: '100%', marginTop: '14px', padding: '12px',
+                    borderRadius: '10px', border: 0, background: '#1E2A52', color: '#fff',
+                    fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>تقديم طلب ملكية لهذه الشركة</button>
+              </div>
             )}
 
             <button type="button" onClick={lookupRegistry} disabled={lookupBusy}
