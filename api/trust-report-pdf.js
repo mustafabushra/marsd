@@ -119,12 +119,33 @@ export default async function handler (req, res) {
   const token = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
   if (!token) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })
 
+  // A key that is not there is not an invalid session, and saying so sends the
+  // reader to look at their login instead of at the deployment.
+  const secretKey = process.env.CLERK_SECRET_KEY
+  if (!secretKey) {
+    return res.status(500).json({
+      error: 'مفتاح Clerk غير مضبوط على الخادم',
+      detail: 'CLERK_SECRET_KEY missing from the function environment',
+    })
+  }
+
   let userId
   try {
-    const claims = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY })
+    const claims = await verifyToken(token, { secretKey })
     userId = claims?.sub
-  } catch {
-    return res.status(401).json({ error: 'جلسة غير صالحة' })
+  } catch (e) {
+    // Clerk's own words. «جلسة غير صالحة» alone cannot distinguish an expired
+    // token from a key belonging to a different Clerk instance — and the second
+    // is what a development publishable key in the browser plus a production
+    // secret on the server produces, on every request, forever.
+    const why = String(e?.message || e)
+    return res.status(401).json({
+      error: /expired/i.test(why) ? 'انتهت صلاحية الجلسة — أعد تحميل الصفحة'
+        : /issuer|instance|kid|key/i.test(why) ? 'مفتاح Clerk على الخادم لا يطابق الذي أصدر الجلسة'
+          : 'جلسة غير صالحة',
+      detail: why.slice(0, 240),
+      keyKind: secretKey.startsWith('sk_test') ? 'test' : secretKey.startsWith('sk_live') ? 'live' : 'unknown',
+    })
   }
   if (!userId) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })
 
