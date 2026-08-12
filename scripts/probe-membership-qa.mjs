@@ -84,17 +84,17 @@ try {
 
   // ===== Asking =====
   console.log('\n─── طلب الانضمام ───')
-  let r = await as(ASKER, 'select public.request_to_join_company($1, $2) id', [tenId, 'أعمل في القسم المالي'])
+  let r = await as(ASKER, 'select public.request_to_join_company($1, $2) id', [coId, 'أعمل في القسم المالي'])
   ok('عضو بلا شركة يستطيع طلب الانضمام', r.ok, r.err)
   const reqId = r.rows?.[0]?.id
 
-  r = await as(ASKER, 'select public.request_to_join_company($1, null) id', [tenId])
+  r = await as(ASKER, 'select public.request_to_join_company($1, null) id', [coId])
   const { rows: [dup] } = await db.query(
     `select count(*)::int n from public.join_requests
       where tenant_id = $1 and user_id = $2 and status = 'pending'`, [tenId, ASKER])
   ok('وطلبه مرّتين لا ينشئ طلبين', dup.n === 1, `${dup.n} طلباً`)
 
-  r = await as(ADMIN, 'select public.request_to_join_company($1, null) id', [tenId])
+  r = await as(ADMIN, 'select public.request_to_join_company($1, null) id', [coId])
   ok('وعضو الشركة لا يطلب الانضمام إليها', !r.ok && /بالفعل|أخرى/.test(r.err || ''), r.err?.slice(0, 60))
 
   // ===== The admin's queue =====

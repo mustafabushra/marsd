@@ -31,6 +31,11 @@ export default function CompanyUsers() {
   const { entitlements, limitOf } = useEntitlements()
   const [users, setUsers] = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
+  // People asking to be let in. The mirror of an invite: an invite is the
+  // company reaching out, this is somebody knocking — and until now nobody
+  // could hear it.
+  const [joinRequests, setJoinRequests] = useState([])
+  const [joinBusy, setJoinBusy] = useState('')
   const [tenantId, setTenantId] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -105,6 +110,9 @@ export default function CompanyUsers() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
       setPendingInvites(invites || [])
+
+      const { data: joins } = await supabase.rpc('company_join_requests')
+      setJoinRequests(Array.isArray(joins) ? joins.filter((j) => j.status === 'pending') : [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -309,6 +317,19 @@ export default function CompanyUsers() {
     } finally { setBusyId(null) }
   }
 
+  const decideJoin = async (id, approve, role) => {
+    try {
+      setJoinBusy(id)
+      const { error: e } = await getSupabase().rpc('decide_join_request', {
+        p_request_id: id, p_approve: approve, p_role: role || 'company_member', p_note: null,
+      })
+      if (e) throw e
+      await loadUsers()
+    } catch (err) {
+      setError(err.message || 'تعذّر حفظ القرار')
+    } finally { setJoinBusy('') }
+  }
+
   if (loading) {
     return (
       <>
@@ -326,6 +347,67 @@ export default function CompanyUsers() {
 
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '13px 16px', marginBottom: '16px', color: '#B91C1C', fontSize: '14px', fontWeight: 700 }}>⚠️ {error}</div>
+      )}
+
+      {/* Somebody asking to be let in.
+          Above the roster on purpose: a request nobody sees is a person
+          waiting, and this is the only screen where it can be answered. */}
+      {isAdmin && joinRequests.length > 0 && (
+        <div style={{
+          background: '#fff', border: '1.5px solid #FDE68A', borderRadius: '14px',
+          padding: '18px', marginBottom: '18px',
+        }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>
+            طلبات انضمام ({joinRequests.length})
+          </h2>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
+            أشخاص يطلبون الانضمام إلى شركتك. القرار لك — وبقبولهم يصبحون أعضاء فوراً.
+          </p>
+          {joinRequests.map((j, i) => (
+            <div key={j.id} style={{
+              borderTop: i ? '1px solid #F1F5F9' : 0, padding: '13px 0',
+              display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
+            }}>
+              <div style={{ minWidth: 0, flex: '1 1 240px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                  {j.user_name || j.user_email || '—'}
+                </div>
+                {j.user_name && j.user_email && (
+                  <div style={{ fontSize: '12.5px', color: '#64748B' }}>{j.user_email}</div>
+                )}
+                {j.message && (
+                  <div style={{ fontSize: '12.5px', color: '#334155', marginTop: '4px', lineHeight: 1.9 }}>
+                    «{j.message}»
+                  </div>
+                )}
+                <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>
+                  {new Date(j.created_at).toLocaleDateString('ar-SA')}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <button onClick={() => decideJoin(j.id, true, 'company_member')} disabled={joinBusy === j.id}
+                  style={{
+                    padding: '8px 16px', borderRadius: '8px', border: 0,
+                    background: joinBusy === j.id ? '#86EFAC' : '#16A34A', color: '#fff',
+                    fontSize: '12.5px', fontWeight: 800,
+                    cursor: joinBusy === j.id ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>قبول كعضو</button>
+                <button onClick={() => decideJoin(j.id, true, 'company_admin')} disabled={joinBusy === j.id}
+                  style={{
+                    padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #E2E8F0',
+                    background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
+                    cursor: joinBusy === j.id ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>قبول كمسؤول</button>
+                <button onClick={() => decideJoin(j.id, false)} disabled={joinBusy === j.id}
+                  style={{
+                    padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #FECACA',
+                    background: '#fff', color: '#B91C1C', fontSize: '12.5px', fontWeight: 800,
+                    cursor: joinBusy === j.id ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>رفض</button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>

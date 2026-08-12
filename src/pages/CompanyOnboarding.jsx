@@ -71,6 +71,14 @@ export default function CompanyOnboarding() {
   // again is not the act — claiming it is — so this is offered rather than
   // refused.
   const [marsadMatch, setMarsadMatch] = useState(null)
+  // What the database says this person may do about that company — join it,
+  // claim it, or neither. Asked rather than inferred: working it out in the
+  // browser would mean reading the membership of a company you do not belong
+  // to, which RLS refuses.
+  const [access, setAccess] = useState(null)
+  const [joinBusy, setJoinBusy] = useState(false)
+  const [joinDone, setJoinDone] = useState(false)
+  const [joinNote, setJoinNote] = useState('')
   const [registryMatch, setRegistryMatch] = useState(null)
   const [lookupBusy, setLookupBusy] = useState(false)
   const [lookupNote, setLookupNote] = useState('')
@@ -107,10 +115,27 @@ export default function CompanyOnboarding() {
    * against Marsad and the published Ministry generation at once — the same
    * call /search and /add-report make. Nothing new is asked of the database.
    */
+  /** Ask this company's admin to let you in. */
+  const requestJoin = async () => {
+    if (!marsadMatch || joinBusy) return
+    setJoinBusy(true); setJoinNote('')
+    try {
+      const { error: e } = await getSupabase().rpc('request_to_join_company', {
+        p_company_id: marsadMatch.id,
+        p_message: joinNote || null,
+      })
+      if (e) throw e
+      setJoinDone(true)
+    } catch (err) {
+      setJoinNote(err?.message || 'تعذّر إرسال الطلب')
+    } finally { setJoinBusy(false) }
+  }
+
   const lookupRegistry = async () => {
     const q = (formData.crNumber || formData.name || '').trim()
     if (!q) { setLookupNote('اكتب رقم السجل أو اسم الشركة أولاً'); return }
     setLookupBusy(true); setLookupNote(''); setMarsadMatch(null)
+    setAccess(null); setJoinDone(false); setJoinNote('')
     try {
       const { data, error: e } = await getSupabase()
         .rpc('search_companies_unified', { p_query: q, p_limit: 5 })
@@ -124,6 +149,9 @@ export default function CompanyOnboarding() {
         setMarsadMatch(mine)
         setRegistryMatch(null)
         setLookupNote('')
+        const { data: opts } = await getSupabase()
+          .rpc('company_access_options', { p_company_id: mine.id })
+        setAccess(opts || null)
         return
       }
       const hit = (data || []).find((r) => r.origin === 'registry')
@@ -618,6 +646,59 @@ export default function CompanyOnboarding() {
                   إن كانت شركتك، فالمطلوب طلب ملكية لا تسجيل جديد. أرفق سجلها التجاري
                   في الخطوة التالية وتراجعه إدارة مرصد.
                 </p>
+                {/* Two different acts, and the database says which are
+                    available. Joining asks «does this person work here», which
+                    the company's own admin answers. Claiming asks «is this
+                    company yours», which Marsad answers from documents. */}
+                {joinDone ? (
+                  <div style={{
+                    marginTop: '14px', background: '#ECFDF5', border: '1px solid #A7F3D0',
+                    borderRadius: '10px', padding: '14px', fontSize: '13.5px',
+                    color: '#15803D', fontWeight: 700, lineHeight: 1.9,
+                  }}>
+                    ✔ أُرسل طلب الانضمام إلى مسؤول الشركة. ستصلك النتيجة في إشعاراتك.
+                  </div>
+                ) : access?.pending_request ? (
+                  <div style={{
+                    marginTop: '14px', background: '#FFFBEB', border: '1px solid #FDE68A',
+                    borderRadius: '10px', padding: '14px', fontSize: '13.5px',
+                    color: '#92400E', fontWeight: 700, lineHeight: 1.9,
+                  }}>
+                    لديك طلب انضمام مفتوح لهذه الشركة — بانتظار قرار مسؤولها.
+                  </div>
+                ) : access?.has_members ? (
+                  <div style={{ marginTop: '14px' }}>
+                    <label htmlFor="join-note" style={{
+                      fontSize: '12.5px', fontWeight: 700, color: '#334155',
+                      display: 'block', marginBottom: '6px',
+                    }}>تعريف بنفسك لمسؤول الشركة (اختياري)</label>
+                    <input
+                      id="join-note"
+                      type="text"
+                      value={joinNote}
+                      onChange={(e) => setJoinNote(e.target.value)}
+                      placeholder="مثال: أعمل في القسم المالي"
+                      style={{
+                        width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '9px',
+                        padding: '10px 12px', fontSize: '13.5px', outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button type="button" onClick={requestJoin} disabled={joinBusy}
+                      style={{
+                        width: '100%', marginTop: '10px', padding: '12px',
+                        borderRadius: '10px', border: 0,
+                        background: joinBusy ? '#93C5FD' : '#16A34A', color: '#fff',
+                        fontSize: '14px', fontWeight: 800,
+                        cursor: joinBusy ? 'default' : 'pointer', fontFamily: 'inherit',
+                      }}>{joinBusy ? '… جارٍ الإرسال' : 'طلب الانضمام إلى هذه الشركة'}</button>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '8px', lineHeight: 1.8 }}>
+                      يقرّره مسؤول الشركة نفسه. وإن كنت أنت صاحبها ولا تصل إلى حسابها،
+                      فقدّم طلب ملكية بدلاً من ذلك:
+                    </div>
+                  </div>
+                ) : null}
+
                 <button type="button"
                   onClick={() => {
                     setExistingCompany({
@@ -640,8 +721,11 @@ export default function CompanyOnboarding() {
                     setStep(2)
                   }}
                   style={{
-                    width: '100%', marginTop: '14px', padding: '12px',
-                    borderRadius: '10px', border: 0, background: '#1E2A52', color: '#fff',
+                    width: '100%', marginTop: access?.has_members ? '8px' : '14px',
+                    padding: '12px', borderRadius: '10px',
+                    border: access?.has_members ? '1.5px solid #CBD5E1' : 0,
+                    background: access?.has_members ? '#fff' : '#1E2A52',
+                    color: access?.has_members ? '#1E2A52' : '#fff',
                     fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
                   }}>تقديم طلب ملكية لهذه الشركة</button>
               </div>
