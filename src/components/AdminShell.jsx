@@ -7,15 +7,9 @@ import { UserButton } from '@clerk/react'
 import NotificationBell from './NotificationBell'
 import { getSupabase } from '../lib/api'
 import { useEntitlements } from '../hooks/useEntitlements'
-import {
-  DashboardIcon,
-  DocumentIcon,
-  ListIcon,
-  UploadIcon,
-  BuildingIcon,
-  UsersIcon,
-  LogIcon,
-} from './icons'
+// Only the two leading entries carry an icon. The grouped items below never
+// did — six more were imported for a menu that no longer exists.
+import { DashboardIcon } from './icons'
 
 // Grouped by the work, not by the kind of screen.
 //
@@ -52,102 +46,141 @@ import {
 //
 // Paths are still untouched. Only names and grouping move.
 
-// مركز العمل had a route and no way in. It was reachable only by typing the
-// URL, which means the one screen that answers «what should I do next» was
-// invisible to anyone who did not already know it existed. It sits beside
-// مركز القيادة because they are the same job split in two: the command centre
-// says what the state of things is, the work centre is the queue you work.
-// The two screens a day is worked from lead, and the charts follow them.
+// Two screens lead, and only two.
 //
-// «لوحة التحكم» sat first and «مركز القيادة» second, which read as two names
-// for one thing and made people ask which was the real one. They answer
-// different questions — the charts answer «how are we doing», the command
-// centre answers «is anything wrong and where do I go» — and the names did not
-// say that. «المؤشرات» does, and it goes below the two screens that are opened
-// every morning rather than above them.
+// مركز القيادة says whether anything is wrong and where to go; مركز العمل is
+// the queue you work. That is the whole of a day, and everything below is
+// opened on purpose rather than out of habit.
+//
+// المؤشرات used to sit here as a third. It answers «how are we doing» — a
+// question worth asking weekly, not one you open the panel to ask — and a
+// third permanent entry beside two daily ones invites the question of which
+// of the three is the real starting point. It moves down to التحليلات, beside
+// the other screens that answer that same question at other scales.
 const TOP_ITEMS = [
-  { label: 'مركز القيادة', icon: DashboardIcon, path: '/admin/command-center' },
-  { label: 'مركز العمل', icon: DashboardIcon, path: '/admin/work' },
-  { label: 'المؤشرات', icon: DashboardIcon, path: '/admin' },
+  { label: 'مركز القيادة', icon: DashboardIcon, path: '/admin/command-center', badgeKey: 'urgent', badgeBg: '#DC2626' },
 ]
 
+// One section heading, over the five groups that are the supervisory work.
+//
+// التحليلات and below are not under it: they are how the platform is run, not
+// what is being watched. A heading that covers everything names nothing.
 const GROUPS = [
-  { key: 'companies', title: 'الشركات', items: [
-    { label: 'إدارة الشركات', path: '/admin/companies' },
-    { label: 'سجلّ الشركات', path: '/admin/roster' },
-    { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies' },
+  { key: 'companies', section: 'الكيانات والرقابة', title: 'الشركات',
+    badgeKey: 'unclaimed', badgeWord: 'غير مطالب بها', badgeBg: '#F59E0B', items: [
+    { label: 'كل الشركات', path: '/admin/companies' },
+    { label: 'طلبات الشركات', path: '/admin/company-requests' },
+    // The registry screen already filters on claimed_by; this is that filter as
+    // a link rather than a thing you have to know to press.
+    { label: 'الشركات غير المطالب بها', path: '/admin/companies?filter=unclaimed' },
+    { label: 'البحث الموحد', path: '/admin/roster' },
   ] },
 
-  // The eight queues, gathered and labelled as what they are.
+  // The queues, gathered and labelled as what they are.
   //
   // مركز العمل exists to be one queue over all of them — admin_work_items
-  // returns the six kinds in one shape. But it was added beside these rather
-  // than in front of them, and the menu gave no sign of the relationship:
-  // seven top-level entries, the same request visible in two of them, and
-  // nothing saying which to open. That is the confusion, and it is a menu
-  // problem rather than a code one — every one of these screens works, and
-  // each is where its own decision is made, with the evidence.
+  // returns every kind in one shape. But it was added beside these rather than
+  // in front of them, and the menu gave no sign of the relationship: several
+  // top-level entries, the same request visible in two of them, and nothing
+  // saying which to open. That is a menu problem rather than a code one —
+  // every one of these screens works, and each is where its own decision is
+  // made, with the evidence.
   //
   // So nothing is removed. They are indented under a line that names the
   // relationship: work from مركز العمل, come here for one kind on its own.
-  { key: 'review', title: 'المراجعة', items: [
-    { header: 'كلّها تجتمع في «مركز العمل»' },
-    { label: 'مراجعة التسجيل', path: '/admin/company-approval', indent: true },
-    { label: 'طلبات الشركات', path: '/admin/company-requests', indent: true },
-    { label: 'طلبات الملكية', path: '/admin/claim-requests', indent: true },
-    { label: 'التحقق من الشركات', path: '/admin/company-verification', indent: true },
-    { label: 'المستندات والحالة الرسمية', path: '/admin/documents', indent: true },
-    { label: 'مراجعة التقارير', path: '/admin/reports', badgeKey: 'reviews', badgeBg: '#F59E0B', indent: true },
-    { label: 'الاعتراضات', path: '/admin/disputes', indent: true },
-    // Renamed. «طلبات إضافة وتعديل» beside «طلبات الشركات» were two vague
-    // names over two different tables, and reading either one told you nothing
-    // about which held what. This one is company_data_requests: a person on the
-    // search page asking Marsad to add or correct a company that is already
-    // listed. The other is a company's own request about itself.
-    { label: 'طلبات تصحيح من المستخدمين', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626', indent: true },
+  //
+  // التحقق من الشركات was in that indented block and did not belong there. The
+  // block promises that everything under it also appears in مركز العمل, and
+  // this screen does not — because it is not a queue of requests at all.
+  // Nobody asks to be verified; Marsad decides to audit, in bulk, and grants
+  // or withdraws the badge. A promise that is true of seven entries and false
+  // of the eighth is worse than no promise, so it gets its own line saying
+  // what it actually is. The individual decision still lives in Company 360;
+  // this is the screen for doing many at once.
+  { key: 'review', title: 'المراجعة', badgeKey: 'pending', badgeWord: 'معلق', badgeBg: '#F59E0B', items: [
+    { label: 'صندوق المراجعة', path: '/admin/work' },
+    { label: 'طلبات الانضمام', path: '/admin/company-approval' },
+    { label: 'طلبات الملكية', path: '/admin/claim-requests' },
+    { label: 'التحقق من الشركات', path: '/admin/company-verification' },
   ] },
 
-  { key: 'reports', title: 'التقارير', items: [
-    { label: 'إضافة تقرير', path: '/admin/add-report' },
-    { label: 'مستودع التقارير', path: '/admin/knowledge-base/reports' },
+  { key: 'reports', title: 'التقارير', badgeKey: 'reviews', badgeWord: 'قيد المراجعة', badgeBg: '#F59E0B', items: [
+    { label: 'التقارير', path: '/admin/reports' },
+    // The one queue, narrowed to this kind — `?kind=` is read by مركز العمل.
+    { label: 'تقارير قيد المراجعة', path: '/admin/work?kind=report_review' },
+    { label: 'الاعتراضات', path: '/admin/disputes' },
+    { label: 'مستودع الأدلة', path: '/admin/knowledge-base/reports' },
+  ] },
+
+  // The document screen's own tabs, as links. `?tab=` matches TABS in
+  // AdminDocuments exactly — pending / expired / rejected.
+  { key: 'documents', title: 'المستندات', badgeKey: 'docs', badgeWord: 'تنبيه', badgeBg: '#F59E0B', items: [
+    { label: 'المستندات', path: '/admin/documents' },
+    { label: 'المستندات قيد الفحص', path: '/admin/documents?tab=pending' },
+    { label: 'المستندات المنتهية', path: '/admin/documents?tab=expired' },
+    { label: 'المستندات المرفوضة', path: '/admin/documents?tab=rejected' },
+  ] },
+
+  { key: 'watch', title: 'المراقبة', badgeKey: 'trust', badgeWord: 'تنبيه ثقة', badgeBg: '#DC2626', items: [
+    { label: 'قوائم المراقبة', path: '/admin/fraud-detection' },
+    { label: 'تنبيهات مؤشر الثقة', path: '/admin/trust-score' },
+    { label: 'تغييرات الشركات', path: '/admin/data-management' },
   ] },
   { key: 'analytics', title: 'التحليلات', items: [
+    { label: 'مؤشر الثقة', path: '/admin/trust-score' },
     { label: 'تحليلات الشركات', path: '/admin/tenant-analytics' },
     { label: 'تحليلات التقارير', path: '/admin/report-analytics' },
-    { label: 'مؤشر الثقة', path: '/admin/trust-score' },
   ] },
-  { key: 'billing', title: 'الاشتراكات', items: [
-    { label: 'الباقات', path: '/admin/plans' },
-    { label: 'الاشتراكات', path: '/admin/subscriptions' },
-    { label: 'الشركاء', path: '/admin/partners' },
-    { label: 'المدفوعات', path: '/admin/payments' },
-  ] },
+
   { key: 'platform', title: 'المنصة', items: [
-    // إدارة البيانات goes above the two importers because it is where you look
-    // to find out what the register currently is, and the importers are how you
-    // change it. Reading before writing.
-    { label: 'إدارة البيانات', path: '/admin/data-management' },
-    { label: 'الاستيراد الجماعي', path: '/admin/bulk-import' },
-    { label: '⚡ استيراد من السجل التجاري', path: '/admin/registry-import' },
     { label: 'المستخدمون', path: '/admin/users' },
     { label: 'حسابات الشركات', path: '/admin/tenants' },
-    { label: 'مسؤولو المنصة', path: '/admin/admin-users' },
-    { label: 'الدعم الفني', path: '/admin/support' },
+    { label: 'الاستيراد', path: '/admin/bulk-import' },
     { label: 'دليل الأنشطة', path: '/admin/activities' },
     { label: 'الإعدادات', path: '/admin/settings' },
-    { header: 'المراقبة' },
-    { label: 'السجلات', path: '/admin/logs', indent: true },
-    { label: 'حالة النظام', path: '/admin/system-health', indent: true },
-    { label: 'سجل المساهمين', path: '/admin/fraud-detection', indent: true },
-    { header: 'أدوات' },
+  ] },
+
+  { key: 'system', title: 'النظام', items: [
+    { label: 'سجل النشاط', path: '/admin/logs' },
+    { label: 'حالة النظام', path: '/admin/system-health' },
+    // Both entries in the design resolve to سجل العمليات — it is the only
+    // screen over audit_logs that exists. Left pointing at the real screen
+    // rather than at a `?view=audit` that nothing reads.
+    { label: 'Audit Log', path: '/admin/logs' },
+  ] },
+
+  // Everything the new menu does not name, kept reachable.
+  //
+  // These are working screens with working routes. Dropping the links would
+  // not delete them — it would only mean the sole way in is to type the URL,
+  // and a screen nobody can find is a screen that rots. Collapsed by default,
+  // so the menu above still reads as the design intends.
+  { key: 'more', title: 'أدوات إضافية', items: [
+    { header: 'التقارير والبيانات' },
+    { label: 'إضافة تقرير', path: '/admin/add-report', indent: true },
+    { label: 'مستودع الشركات', path: '/admin/knowledge-base/companies', indent: true },
+    { label: 'طلبات تصحيح من المستخدمين', path: '/admin/requests', badgeKey: 'requests', badgeBg: '#DC2626', indent: true },
+    { label: 'إدارة البيانات', path: '/admin/data-management', indent: true },
+    { label: '⚡ استيراد من السجل التجاري', path: '/admin/registry-import', indent: true },
     { label: 'تصدير البيانات', path: '/admin/data-export', indent: true },
+    { header: 'الحسابات والاشتراكات' },
+    { label: 'مسؤولو المنصة', path: '/admin/admin-users', indent: true },
+    { label: 'سجل المساهمين', path: '/admin/fraud-detection', indent: true },
+    { label: 'الباقات', path: '/admin/plans', indent: true },
+    { label: 'الاشتراكات', path: '/admin/subscriptions', indent: true },
+    { label: 'الشركاء', path: '/admin/partners', indent: true },
+    { label: 'المدفوعات', path: '/admin/payments', indent: true },
+    { header: 'التشغيل' },
+    { label: 'الدعم الفني', path: '/admin/support', indent: true },
     { label: '🔒 نماذج البريد', path: '/admin/email-templates', indent: true },
     { label: '🔒 التكاملات', path: '/admin/integrations', indent: true },
   ] },
 ]
 
 const SCREEN_LABELS = {
-  '/admin': 'المؤشرات',
+  '/admin': 'مؤشرات المنصة',
+  '/admin/command-center': 'مركز الإجراءات',
+  '/admin/work': 'صندوق المراجعة الموحد',
   '/admin/requests': 'طلبات تصحيح بيانات من المستخدمين',
   '/admin/reports': 'مراجعة التقارير',
   '/admin/company-requests': 'طلبات الشركات — تسجيل وملكية وتصحيح',
@@ -200,36 +233,76 @@ export default function AdminShell({ user }) {
   const [navOpen, setNavOpen] = useNavDrawer()
   useEffect(() => { setNavOpen(false) }, [path])
 
-  const isActive = (p) => (p === '/admin' ? path === '/admin' : path === p || path.startsWith(p + '/'))
+  // Several entries are the same screen carrying a filter — `?tab=expired`,
+  // `?kind=report_review`. The router matches on pathname alone, so comparing
+  // the whole string would leave every one of them permanently inactive.
+  // Highlight on the path, then on the query only when the entry asks for one.
+  const search = location.search
+  const isActive = (full) => {
+    const [p, q] = String(full).split('?')
+    const onPath = p === '/admin' ? path === '/admin' : path === p || path.startsWith(p + '/')
+    if (!onPath) return false
+    if (!q) return true
+    const want = new URLSearchParams(q)
+    const have = new URLSearchParams(search)
+    return [...want].every(([k, v]) => have.get(k) === v)
+  }
+
+  // For a group heading: is any child the current screen, ignoring filters.
+  const onScreen = (full) => {
+    const p = String(full).split('?')[0]
+    return p === '/admin' ? path === '/admin' : path === p || path.startsWith(p + '/')
+  }
   const currentLabel = SCREEN_LABELS[
     Object.keys(SCREEN_LABELS).sort((a, b) => b.length - a.length).find(isActive)
   ] || 'لوحة تحكم الإدارة'
 
   const [openGroups, setOpenGroups] = useState({})
-  const toggleGroup = (key) => setOpenGroups((s) => ({ ...s, [key]: !s[key] }))
+  // Takes what the group is showing right now, rather than reading state that
+  // is still undefined for a group opened by the active screen. Without it, the
+  // first click on such a group writes `true` over an already-open group and
+  // looks like the header does nothing.
+  const toggleGroup = (key, isOpen) => setOpenGroups((s) => ({ ...s, [key]: !isOpen }))
 
-  // Live badge counts (real pending work)
-  const [counts, setCounts] = useState({ requests: 0, reviews: 0 })
-  // What the urgent-action control shows. Summed from the counts already
-  // fetched rather than a third query — two numbers that must agree with the
-  // sidebar badges beside them.
-  const urgent = (counts.requests || 0) + (counts.reviews || 0)
+  // Live badge counts.
+  //
+  // One RPC instead of three table reads. `admin_work_counts` already breaks
+  // the queue down by kind, and it is the same function مركز الإجراءات reads —
+  // so a badge here and a tile there cannot disagree, which is the failure this
+  // shell had when each computed its own totals.
+  const [counts, setCounts] = useState({})
+  const urgent = counts.urgent || 0
+
   useEffect(() => {
+    let alive = true
     const load = async () => {
-      try {
-        const supabase = getSupabase()
-        const [pendingCompanies, pendingData, pendingReports] = await Promise.all([
-          supabase.from('companies').select('id', { count: 'exact', head: true }).eq('approved', false),
-          supabase.from('company_data_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').then((r) => r, () => ({ count: 0 })),
-          supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
-        ])
-        setCounts({
-          requests: (pendingCompanies.count || 0) + (pendingData.count || 0),
-          reviews: pendingReports.count || 0,
-        })
-      } catch (e) { /* non-blocking */ }
+      const supabase = getSupabase()
+
+      // Each of the three is allowed to fail on its own. A badge that cannot be
+      // computed is simply absent; it must never take the navigation with it.
+      const work = await supabase.rpc('admin_work_counts').then((r) => r.data, () => null)
+      const k = work?.by_kind || {}
+
+      // Both company badges from one roster read, and from the same rows
+      // مركز الإجراءات uses for its trust tile. Counting low trust from
+      // `trust_scores` instead would include companies that are not approved,
+      // and the badge would quietly disagree with the tile it sits beside.
+      const roster = await supabase.rpc('company_roster')
+        .then((r) => (r.data || []).filter((c) => c.approved), () => null)
+
+      if (!alive) return
+      setCounts({
+        urgent: work?.all || 0,
+        requests: k.data_update || 0,
+        pending: (k.registration || 0) + (k.claim || 0) + (k.document_review || 0),
+        reviews: (k.report_review || 0) + (k.dispute || 0),
+        docs: k.document_review || 0,
+        trust: (roster || []).filter((c) => c.trust_score != null && Number(c.trust_score) < 50).length,
+        unclaimed: (roster || []).filter((c) => !c.claimed_by).length,
+      })
     }
     load()
+    return () => { alive = false }
   }, [path])
 
   return (
@@ -339,16 +412,37 @@ export default function AdminShell({ user }) {
 
           {/* Collapsible groups */}
           {GROUPS.map((g) => {
-            const hasActive = g.items.some((i) => i.path && isActive(i.path))
-            const open = openGroups[g.key] || hasActive
+            const hasActive = g.items.some((i) => i.path && onScreen(i.path))
+            // «أدوات إضافية» stays shut unless you are standing in it. Every
+            // other group opens when it holds the current screen.
+            const open = openGroups[g.key] ?? hasActive
+            const n = g.badgeKey ? counts[g.badgeKey] : 0
             return (
               <div key={g.key}>
+                {/* A heading over the groups, not a group itself — it has no
+                    items and nothing to collapse. */}
+                {g.section && (
+                  <div style={{
+                    fontSize: '10.5px', fontWeight: 800, color: '#64748B',
+                    letterSpacing: '.6px', padding: '18px 10px 2px',
+                  }}>{g.section}</div>
+                )}
                 <div
-                  onClick={() => toggleGroup(g.key)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 10px 11px 8px', marginTop: '8px', cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: '12px', fontWeight: 800, color: hasActive ? '#fff' : '#94A3B8' }}
+                  onClick={() => toggleGroup(g.key, open)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 10px 11px 8px', marginTop: '8px', cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: '12px', fontWeight: 800, color: hasActive ? '#fff' : '#94A3B8' }}
                 >
-                  <span>{g.title}</span>
-                  <span style={{ display: 'inline-block', transition: 'transform .15s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: '#64748B', fontSize: '10px' }}>▾</span>
+                  <span style={{ flex: 'none' }}>{g.title}</span>
+                  {/* The number and what it counts. «2» alone tells you
+                      something is there but not whether it needs you. */}
+                  {n > 0 && (
+                    <span style={{
+                      background: g.badgeBg, color: '#fff', borderRadius: '999px',
+                      padding: '2px 8px', fontSize: '10px', fontWeight: 800,
+                      whiteSpace: 'nowrap', flex: 'none',
+                    }}>{n} {g.badgeWord}</span>
+                  )}
+                  <span style={{ flex: 1 }} />
+                  <span style={{ display: 'inline-block', transition: 'transform .15s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: '#64748B', fontSize: '10px', flex: 'none' }}>▾</span>
                 </div>
                 <div style={{ display: open ? 'flex' : 'none', flexDirection: 'column', gap: '2px', paddingBottom: '4px' }}>
                   {g.items.map((it, idx) => {
@@ -358,7 +452,7 @@ export default function AdminShell({ user }) {
                     const active = isActive(it.path)
                     return (
                       <button
-                        key={it.path}
+                        key={`${it.path}-${idx}`}
                         onClick={() => navigate(it.path)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',

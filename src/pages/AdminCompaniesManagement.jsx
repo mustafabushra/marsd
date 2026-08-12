@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser, useAuth } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { notifyTenant } from '../lib/notify'
@@ -83,7 +83,20 @@ export default function AdminCompaniesManagement() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
+  // The sidebar links «الشركات غير المطالب بها» straight to this screen's own
+  // unclaimed filter. Reading it from the URL is what makes that link mean
+  // something — pressing it and landing on the unfiltered list would be the
+  // quiet kind of wrong. The chips below still set state directly, so the URL
+  // is a starting point and not a second source of truth.
+  const [params] = useSearchParams()
+  const urlFilter = params.get('filter')
+  const [filter, setFilter] = useState(urlFilter || 'all')
+
+  // «كل الشركات» and «غير المطالب بها» are the same mounted screen, so the
+  // initialiser above only ever fires for whichever was opened first.
+  // Resets when the link carries no filter, so «كل الشركات» is the whole list
+  // even when you arrive from «غير المطالب بها».
+  useEffect(() => { setFilter(urlFilter || 'all') }, [urlFilter])
   const [sort, setSort] = useState('attention')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)

@@ -196,6 +196,15 @@ p {
       720px  a phone: rows have to wrap and columns have to stack
    =========================================================================== */
 
+/* --- مركز الإجراءات ------------------------------------------------------ */
+/* The queue and the monitoring column sit side by side while there is room for
+   both. Below 1100px the aside would be squeezed to a strip too narrow for a
+   company name, so it goes under the queue rather than beside it — the queue is
+   what the screen is for, and it keeps the full width. */
+@media (max-width: 1100px) {
+  .marsad-cc-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
 /* --- The shell ---------------------------------------------------------- */
 /* The sidebar is 268px of a 360px phone. It becomes an overlay the header can
    summon; these rules take it out of the flow, and CompanyShell/AdminShell

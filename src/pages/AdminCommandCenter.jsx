@@ -1,77 +1,72 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
-import { Card } from '../ui'
+import { docLabel } from '../lib/enums'
 
 /**
- * What needs me, what is late, what broke, what is running.
+ * /admin/command-center — مركز الإجراءات
  *
- * Not a dashboard. A dashboard answers «how are we doing»; this answers «is
- * anything wrong and where do I go». So there are no charts, no totals nobody
- * acts on, and no number without somewhere to click.
+ * What needs a decision, ranked, with the evidence attached and somewhere to
+ * click. Not a dashboard: a dashboard answers «how are we doing», and this
+ * answers «what do I do next».
  *
  * ============================================================================
  * Every section loads on its own
  * ============================================================================
- * Ten calls, ten independent states. A failing health check must not blank the
- * queue beside it, and one slow query must not hold the whole screen — which is
- * why there is no page-level spinner anywhere in this file.
+ * Six independent states. A failing trust query must not blank the queue beside
+ * it, which is why there is no page-level spinner in this file.
  *
  * ============================================================================
- * Nothing here is computed in the browser
+ * No number is invented here
  * ============================================================================
- * Every figure comes from a function that owns it. A count assembled here from
- * three tables would be a fourth opinion about the truth, and this screen exists
- * because those disagreements went unnoticed for weeks.
+ * Every figure traces to a function or a table that owns it. The tiles read
+ * `admin_work_counts().by_kind` — the same call the sidebar badges read, so a
+ * tile and the badge beside it cannot disagree. The trust panel is computed
+ * from `company_roster`, and says what it actually measured rather than
+ * borrowing a more impressive label.
  *
- * There is deliberately no «↑ 3 since yesterday»: no daily snapshot is stored,
- * so a comparison could only be decoration.
- *
  * ============================================================================
- * Permissions hide actions; they do not protect data
+ * Every button does something
  * ============================================================================
- * `my_permissions()` decides which buttons render. Every one of those buttons
- * calls a definer function that checks the same permission again — the check
- * here is courtesy, and the one in the database is the rule.
+ * There is no «quick approve»: approval means a different thing for a
+ * registration, a claim, a document and a report, and no single RPC spans them.
+ * So the card offers the three acts that are real — take it, open the queue
+ * where the decision is made with its evidence, open the company file.
  */
 
-// Colour carries meaning and nothing else. No card is a solid block of it — a
-// screen that is entirely red says the same as one entirely grey: nothing.
 const TONE = {
-  critical: { fg: '#B91C1C', bg: '#FEF2F2', bd: '#FECACA', dot: '🔴' },
-  overdue:  { fg: '#C2410C', bg: '#FFF7ED', bd: '#FED7AA', dot: '🟠' },
-  waiting:  { fg: '#B45309', bg: '#FFFBEB', bd: '#FDE68A', dot: '🟡' },
-  company:  { fg: '#1D4ED8', bg: '#EFF6FF', bd: '#BFDBFE', dot: '🔵' },
-  done:     { fg: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0', dot: '🟢' },
-  neutral:  { fg: '#475569', bg: '#F8FAFC', bd: '#E2E8F0', dot: '⚪' },
+  critical: { fg: '#B91C1C', bg: '#FEF2F2', bd: '#FECACA' },
+  high:     { fg: '#C2410C', bg: '#FFF7ED', bd: '#FED7AA' },
+  normal:   { fg: '#475569', bg: '#F8FAFC', bd: '#E2E8F0' },
 }
 
+// Where the decision is actually made, per kind.
 const KIND_ROUTE = {
-  registration: '/admin/work', claim: '/admin/work', data_update: '/admin/work',
-  document_review: '/admin/work', report_review: '/admin/reports', dispute: '/admin/disputes',
+  registration: '/admin/company-approval',
+  claim: '/admin/claim-requests',
+  data_update: '/admin/requests',
+  document_review: '/admin/documents?tab=pending',
+  report_review: '/admin/reports',
+  dispute: '/admin/disputes',
 }
 
-const IMPORT_STATE = {
-  created: 'أُنشئت', validating: 'قيد التحقّق', loading: 'جارٍ الاستيراد',
-  verifying: 'قيد الفحص النهائي', ready: 'جاهزة للنشر', published: 'منشورة',
-  failed: 'فشلت', cancelled: 'أُلغيت', rolled_back: 'تُوجِع عنها',
+const OFFICIAL_LABEL = {
+  insolvency: 'تعثّر مالي', suspended: 'إيقاف نشاط', liquidation: 'تصفية',
+  bankruptcy: 'إفلاس', struck_off: 'شطب السجل',
 }
 
-const num = (n) => Number(n ?? 0).toLocaleString('en')
-
-// «بانتظار الشركة» sits beside «متأخّر», never inside it. Counting their delay
-// against Marsad is what makes an SLA number stop meaning anything.
-const SCOPES = [
-  { v: 'now',          t: 'يحتاج تدخّلك', tone: 'critical', empty: '✓ لا توجد طلبات تحتاج تدخّلك الآن.' },
-  { v: 'all',          t: 'الكل',          tone: 'neutral',  count: 'all',          empty: 'لا يوجد عمل مفتوح.' },
-  { v: 'unassigned',   t: 'غير مُسنَد',     tone: 'waiting',  count: 'unassigned',   empty: '✓ كل شيء مُسنَد.' },
-  { v: 'late',         t: 'متأخّر',         tone: 'overdue',  count: 'late',         empty: '✓ لا توجد طلبات متأخّرة.' },
-  { v: 'waiting_them', t: 'بانتظار الشركة', tone: 'company',  count: 'waiting_them', empty: 'لا توجد طلبات بانتظار الشركة.' },
+// The six tiles, in the order the design puts them. `k` indexes into
+// by_kind; `trust` is the one that comes from elsewhere.
+const TILES = [
+  { key: 'trust',           t: 'تنبيهات الثقة',   accent: '#8B5CF6', to: '/admin/trust-score' },
+  { key: 'dispute',         t: 'اعتراضات نشطة',   accent: '#3B82F6', to: '/admin/disputes' },
+  { key: 'document_review', t: 'تحقق مستندات',    accent: '#F59E0B', to: '/admin/documents?tab=pending' },
+  { key: 'claim',           t: 'طلبات ملكية',     accent: '#F97316', to: '/admin/claim-requests' },
+  { key: 'registration',    t: 'طلبات انضمام',    accent: '#EF4444', to: '/admin/company-approval' },
+  { key: 'report_review',   t: 'تقارير للمراجعة', accent: '#DC2626', to: '/admin/reports' },
 ]
 
-const fmtTime = (t) => t ? new Date(t).toLocaleString('ar-SA', {
-  hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short',
-}) : '—'
+const num = (n) => Number(n ?? 0).toLocaleString('en')
 
 const since = (t) => {
   if (!t) return '—'
@@ -83,7 +78,6 @@ const since = (t) => {
   return `منذ ${Math.round(h / 24)} يوم`
 }
 
-/** How long past a deadline, in words. */
 const overdueBy = (due) => {
   if (!due) return ''
   const h = Math.round((Date.now() - new Date(due).getTime()) / 3600000)
@@ -92,10 +86,15 @@ const overdueBy = (due) => {
   return `${Math.round(h / 24)} يوم`
 }
 
+/** Where a score sits, in words. */
+const band = (s) => s >= 80 ? { t: 'عالي جداً (ممتاز)', fg: '#15803D' }
+  : s >= 65 ? { t: 'جيد', fg: '#65A30D' }
+    : s >= 50 ? { t: 'متوسط', fg: '#B45309' }
+      : { t: 'منخفض', fg: '#B91C1C' }
+
 /** One independently-loading section. */
 function useSection (fn, deps = []) {
   const [state, set] = useState({ data: null, loading: true, error: '' })
-
   const load = useCallback(async () => {
     set((s) => ({ ...s, loading: true, error: '' }))
     try {
@@ -106,7 +105,6 @@ function useSection (fn, deps = []) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
-
   useEffect(() => { load() }, [load])
   return { ...state, reload: load }
 }
@@ -117,135 +115,119 @@ const rpc = (name, args) => async (sb) => {
   return data
 }
 
-const card = {
-  background: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px',
-  padding: '24px', minWidth: 0,
+/**
+ * The trust panel, and the monitoring alerts under it, from one roster read.
+ *
+ * Both describe the same population, so computing them from two queries would
+ * be two opinions about how many companies there are.
+ */
+const rosterSummary = async (sb) => {
+  const { data, error } = await sb.rpc('company_roster')
+  if (error) throw error
+  const rows = (data || []).filter((r) => r.approved)
+  const scored = rows.filter((r) => r.trust_score != null)
+  const avg = scored.length
+    ? scored.reduce((a, r) => a + Number(r.trust_score), 0) / scored.length
+    : null
+  const clean = rows.filter((r) => !(r.quality_issues || []).length).length
+
+  // Anything Marsad would want to look at today, worst first.
+  const alerts = rows
+    .filter((r) => (r.official_status && r.official_status !== 'none')
+      || (r.quality_issues || []).length || r.open_clarifications > 0)
+    .sort((a, b) => (Number(a.trust_score ?? 999) - Number(b.trust_score ?? 999)))
+    .slice(0, 6)
+
+  return {
+    avg,
+    total: rows.length,
+    scored: scored.length,
+    lowTrust: scored.filter((r) => Number(r.trust_score) < 50).length,
+    cleanPct: rows.length ? (clean / rows.length) * 100 : null,
+    alerts,
+  }
 }
-const titleStyle = { fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }
-const noteStyle = { fontSize: '13px', color: '#64748B', margin: '0 0 16px' }
+
+/** Pending documents, grouped by company, so a card can show its evidence. */
+const pendingDocs = async (sb) => {
+  const { data, error } = await sb.rpc('documents_overview', { p_state: 'pending' })
+  if (error) throw error
+  const by = {}
+  for (const d of (data?.items || [])) {
+    if (!d.company_id) continue
+    ;(by[d.company_id] = by[d.company_id] || []).push(d)
+  }
+  return by
+}
+
+const shell = {
+  background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px',
+  padding: '22px', minWidth: 0,
+}
 const btn = {
-  minHeight: '40px', padding: '0 18px', borderRadius: '8px', fontSize: '13.5px',
+  minHeight: '38px', padding: '0 16px', borderRadius: '9px', fontSize: '13px',
   fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
 }
 
-function Skeleton ({ lines = 3, height = 14 }) {
+function Bars ({ lines = 3 }) {
   return (
     <div aria-hidden="true">
       {Array.from({ length: lines }).map((_, i) => (
         <div key={i} style={{
-          height: `${height}px`, background: '#F1F5F9', borderRadius: '6px',
-          marginBottom: '10px', width: `${100 - i * 10}%`,
+          height: '16px', background: '#F1F5F9', borderRadius: '6px',
+          marginBottom: '10px', width: `${100 - i * 12}%`,
         }} />
       ))}
     </div>
   )
 }
 
-/** A section that failed says so, and nothing around it changes. */
-function SectionError ({ message, onRetry, what }) {
+function Failed ({ what, message, onRetry }) {
   return (
-    <div role="alert" style={{ fontSize: '13.5px', color: '#B45309', lineHeight: 1.9 }}>
+    <div role="alert" style={{ fontSize: '13px', color: '#B45309', lineHeight: 1.9 }}>
       تعذّر تحميل {what}
-      <div style={{ color: '#94A3B8', fontSize: '12.5px' }}>{String(message).slice(0, 140)}</div>
+      <div style={{ color: '#94A3B8', fontSize: '12px' }}>{String(message).slice(0, 120)}</div>
       <button onClick={onRetry} style={{
-        ...btn, marginTop: '10px', minHeight: '36px', background: '#fff',
+        ...btn, marginTop: '8px', minHeight: '34px', background: '#fff',
         border: '1.5px solid #E2E8F0', color: '#334155',
       }}>إعادة المحاولة</button>
     </div>
   )
 }
 
-function Empty ({ children, ok = false }) {
-  return (
-    <div style={{
-      fontSize: '13.5px', color: ok ? '#15803D' : '#64748B',
-      fontWeight: ok ? 700 : 400, lineHeight: 1.9,
-    }}>{children}</div>
-  )
-}
-
-/** A section wrapper that owns its own three states. */
-function Section ({ title, note, state, what, empty, children, action, style }) {
-  return (
-    <section style={{ ...card, ...style }} aria-label={title}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
-        <h2 style={titleStyle}>{title}</h2>
-        {action}
-      </div>
-      {note && <p style={noteStyle}>{note}</p>}
-      {state.loading ? <Skeleton lines={4} height={22} />
-        : state.error ? <SectionError message={state.error} onRetry={state.reload} what={what} />
-          : (empty ?? children)}
-    </section>
-  )
-}
-
 export default function AdminCommandCenter () {
   const navigate = useNavigate()
   const [tick, setTick] = useState(0)
-  const [refreshedAt, setRefreshedAt] = useState(Date.now())
-  const [confirm, setConfirm] = useState(null)   // the publish dialog
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
-  // The queue's own scopes. «بانتظار الشركة» is a scope, never a subset of
-  // «متأخّر» — the clock is stopped and the delay is not ours.
-  const [scope, setScope] = useState('now')
+  const [onlyUrgent, setOnlyUrgent] = useState(false)
 
-  const perms    = useSection(rpc('my_permissions'), [])
-  const counts   = useSection(rpc('admin_work_counts'), [tick])
-  const items    = useSection(rpc('admin_work_items', { p_scope: 'all', p_limit: 200 }), [tick])
-  const late     = useSection(rpc('admin_work_items', { p_scope: 'late', p_limit: 50 }), [tick])
-  const waiting  = useSection(rpc('admin_work_items', { p_scope: 'waiting_them', p_limit: 50 }), [tick])
-  const health   = useSection(rpc('admin_model_health'), [tick])
-  const today    = useSection(rpc('admin_completed_today'), [tick])
-  const official = useSection(rpc('admin_official_status_changes', { p_days: 30 }), [tick])
-  const jobs     = useSection(rpc('admin_background_jobs'), [tick])
-  const imports  = useSection(rpc('registry_import_history', { p_limit: 5 }), [tick])
-  const activity = useSection(rpc('admin_activity_feed', { p_limit: 12 }), [tick])
+  const perms   = useSection(rpc('my_permissions'), [])
+  const counts  = useSection(rpc('admin_work_counts'), [tick])
+  const items   = useSection(rpc('admin_work_items', { p_scope: 'all', p_limit: 200 }), [tick])
+  const roster  = useSection(rosterSummary, [tick])
+  const docs    = useSection(pendingDocs, [tick])
 
   const can = useMemo(() => {
     const keys = new Set((perms.data || []).map((p) => p.key))
     return (k) => keys.has(k)
   }, [perms.data])
 
-  const refresh = () => { setTick((t) => t + 1); setRefreshedAt(Date.now()); setActionError('') }
+  const refresh = () => { setTick((t) => t + 1); setActionError('') }
 
-  // A screen somebody trusts to be live has to admit when it is not.
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000)
-    return () => clearInterval(t)
-  }, [])
-  const staleMinutes = Math.floor((now - refreshedAt) / 60000)
-
-  const criticalHealth = (health.data || []).filter((h) => h.status === 'critical')
+  const byKind = counts.data?.by_kind || {}
   const all = items.data || []
-  const scoped = scope === 'now' ? all.filter((i) => i.priority === 'critical')
-    : scope === 'unassigned' ? all.filter((i) => !i.assignee && i.assignable)
-      : scope === 'late' ? all.filter((i) => ['late_response', 'late_resolution'].includes(i.sla_state))
-        : scope === 'waiting_them' ? all.filter((i) => i.sla_state === 'paused')
-          : all
-  const healthBad = (health.data || []).filter((h) => h.status !== 'healthy').length
-  const criticalItems  = (items.data || []).filter((i) => i.priority === 'critical')
-  const runningJob = (imports.data || []).find((j) =>
-    ['created', 'validating', 'loading', 'verifying', 'ready'].includes(j.status))
-  const publishedJob = (imports.data || []).find((j) => j.is_published)
-  const failedJob = (imports.data || []).find((j) => j.status === 'failed')
+  const urgent = all.filter((i) => i.priority === 'critical')
+  const shown = onlyUrgent ? urgent : all
+  const openTotal = counts.data?.all ?? all.length
 
-  const alerts = [
-    ...criticalHealth.map((h) => ({
-      key: h.key, text: h.label, detail: h.detail, to: h.target,
-    })),
-    ...(failedJob ? [{
-      key: 'import_failed', text: 'مهمّة استيراد فاشلة',
-      detail: failedJob.failure_reason, to: '/admin/registry-import',
-    }] : []),
-  ]
+  const tileValue = (key) => key === 'trust'
+    ? (roster.data?.lowTrust ?? null)
+    : (byKind[key] || 0)
 
   /** Take a request. The database checks the same permission again. */
   const takeIt = async (id) => {
-    setBusy(true)
-    setActionError('')
+    setBusy(true); setActionError('')
     try {
       const { error } = await getSupabase().rpc('assign_company_request', { p_request_id: id })
       if (error) throw error
@@ -255,528 +237,394 @@ export default function AdminCommandCenter () {
     } finally { setBusy(false) }
   }
 
-  /** Open the publish dialog with the full picture, diff included. */
-  const openPublish = async (jobId) => {
-    setBusy(true)
-    setActionError('')
-    try {
-      const { data, error } = await getSupabase()
-        .rpc('admin_import_job_detail', { p_job_id: jobId, p_with_diff: true })
-      if (error) throw error
-      setConfirm(data)
-    } catch (e) {
-      setActionError(e.message || 'تعذّر فتح التفاصيل')
-    } finally { setBusy(false) }
-  }
-
-  /** Publishing goes through the database, which re-checks everything. */
-  const doPublish = async () => {
-    setBusy(true)
-    setActionError('')
-    try {
-      const { error } = await getSupabase().rpc('import_job_publish', {
-        p_job_id: confirm.job.id, p_confirm_shrink: true,
-      })
-      if (error) throw error
-      setConfirm(null)
-      refresh()
-    } catch (e) {
-      setActionError(e.message || 'تعذّر النشر')
-    } finally { setBusy(false) }
-  }
-
-  const workRow = (i, tone) => (
-    <div key={`${i.kind}-${i.item_id}`} style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: '12px', padding: '12px 0', borderTop: '1px solid #F1F5F9', flexWrap: 'wrap',
-    }}>
-      <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-        <div style={{ fontSize: '12.5px', color: tone.fg, fontWeight: 700 }}>
-          {tone.dot} {i.kind_label}
-          {i.sla_state === 'late_resolution' && i.due_at ? ` · متأخّر ${overdueBy(i.due_at)}` : ''}
-          {i.sla_state === 'late_response' ? ' · لم يُستلَم' : ''}
-        </div>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
-          {i.company_name || i.title}
-        </div>
-        <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>
-          {i.status_label}
-          {' · '}{i.assignee || 'غير مُسنَد'}
-          {i.due_at ? ` · المهلة ${fmtTime(i.due_at)}` : ''}
-          {i.waiting_days ? ` · منذ ${i.waiting_days} يوم` : ''}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: '8px', flex: 'none' }}>
-        {/* Shown only when the caller may do it and the item can take it. The
-            database refuses it regardless — this is so nobody is offered a
-            button that will only tell them no. */}
-        {!i.assignee && i.assignable && can('work.assign_self') && (
-          <button onClick={() => takeIt(i.item_id)} disabled={busy}
-            aria-label={`استلام ${i.kind_label} — ${i.company_name || i.title}`}
-            style={{ ...btn, minHeight: '36px', background: '#0F172A', color: '#fff', border: 0 }}>
-            استلام
-          </button>
-        )}
-        <button onClick={() => navigate(KIND_ROUTE[i.kind] || '/admin/work')}
-          aria-label={`فتح ${i.kind_label} — ${i.company_name || i.title}`}
-          style={{ ...btn, minHeight: '36px', background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
-          فتح
-        </button>
-      </div>
-    </div>
-  )
+  const avg = roster.data?.avg
+  const avgBand = avg != null ? band(avg) : null
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1500px', margin: '0 auto' }}>
 
-      {/* --- Header --- */}
-      <header style={{
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        gap: '16px', flexWrap: 'wrap', marginBottom: '24px',
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>
-            مركز القيادة
-          </h1>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-            نظرة تشغيلية فورية على ما يحتاج تدخّلك وحالة النظام.
-          </p>
-        </div>
+      {/* ---------------------------------------------------------------- */}
+      {/* Header                                                            */}
+      {/* ---------------------------------------------------------------- */}
+      <section style={{ ...shell, padding: '26px 28px', marginBottom: '18px' }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          gap: '18px', flexWrap: 'wrap',
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <span style={{
+              display: 'inline-block', background: '#EEF2FF', color: '#4338CA',
+              border: '1px solid #C7D2FE', borderRadius: '999px', padding: '4px 12px',
+              fontSize: '11.5px', fontWeight: 800, marginBottom: '12px',
+            }}>⚡ مركز الإجراءات والتدقيق المباشر</span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <span aria-live="polite" style={{
-            fontSize: '12.5px', fontWeight: 700,
-            color: staleMinutes >= 5 ? '#B45309' : '#94A3B8',
-          }}>
-            {staleMinutes >= 5
-              ? `⚠ البيانات منذ ${staleMinutes} دقيقة`
-              : `آخر تحديث ${since(refreshedAt)}`}
-          </span>
-          <button onClick={refresh} aria-label="تحديث كل الأقسام"
-            style={{ ...btn, background: '#0F172A', color: '#fff', border: 0 }}>
-            ↻ تحديث
-          </button>
+            <h1 style={{ fontSize: '30px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>
+              مركز الإجراءات
+            </h1>
+            <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
+              {items.loading
+                ? 'جارٍ حساب ما يحتاج قراراً…'
+                : openTotal > 0
+                  ? <>لديك <strong style={{ color: '#B91C1C' }}>{num(openTotal)}</strong> إجراءً يحتاج انتباهك الفوري والمراجعة</>
+                  : 'لا يوجد عمل مفتوح — كل الطوابير فارغة.'}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button onClick={() => navigate('/admin/trust-score')}
+              style={{ ...btn, minHeight: '42px', background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
+              مراقبة مؤشر الثقة
+            </button>
+            <button onClick={() => navigate('/admin/work')}
+              style={{ ...btn, minHeight: '42px', background: '#2563EB', color: '#fff', border: 0 }}>
+              فتح صندوق المراجعة الموحد ‹
+            </button>
+            <button onClick={refresh} aria-label="تحديث كل الأقسام"
+              style={{ ...btn, minHeight: '42px', background: '#0F172A', color: '#fff', border: 0 }}>
+              ↻
+            </button>
+          </div>
         </div>
-      </header>
+      </section>
 
       {actionError && (
         <div role="alert" style={{
           background: TONE.critical.bg, border: `1px solid ${TONE.critical.bd}`,
           color: TONE.critical.fg, borderRadius: '10px', padding: '12px 18px',
-          marginBottom: '12px', fontSize: '13.5px', fontWeight: 700,
+          marginBottom: '14px', fontSize: '13.5px', fontWeight: 700,
         }}>{actionError}</div>
       )}
 
-      {/* --- Critical alerts --- */}
-      {alerts.map((a) => (
-        <button key={a.key} onClick={() => navigate(a.to || '/admin/work')} style={{
-          display: 'block', width: '100%', textAlign: 'right', cursor: 'pointer',
-          background: TONE.critical.bg, border: `1px solid ${TONE.critical.bd}`,
-          borderRadius: '12px', padding: '18px 24px', marginBottom: '12px',
-          fontFamily: 'inherit',
-        }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: TONE.critical.fg }}>
-            🔴 {a.text}
-          </div>
-          {a.detail && (
-            <div style={{ fontSize: '13.5px', color: '#7F1D1D', marginTop: '4px', lineHeight: 1.8 }}>
-              {a.detail}
-            </div>
-          )}
-          <div style={{ fontSize: '12.5px', color: TONE.critical.fg, marginTop: '8px', fontWeight: 700 }}>
-            فتح التفاصيل ←
-          </div>
-        </button>
-      ))}
-
-      {/* --- KPI strip --- */}
+      {/* ---------------------------------------------------------------- */}
+      {/* Six tiles                                                         */}
+      {/* ---------------------------------------------------------------- */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-        gap: '16px', marginBottom: '32px',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))',
+        gap: '14px', marginBottom: '18px',
       }}>
-        {[
-          { k: 'now',   t: 'يحتاج تدخّلك', tone: 'critical', n: criticalItems.length + criticalHealth.length, sub: 'حرج', to: '/admin/work', st: items },
-          { k: 'late',  t: 'متأخّر', tone: 'overdue', n: counts.data?.late, sub: 'تجاوز المهلة', to: '/admin/work?scope=late', st: counts },
-          { k: 'waiting_them', t: 'بانتظار الشركة', tone: 'company', n: counts.data?.waiting_them, sub: 'الكرة عندهم', to: '/admin/work?scope=waiting_them', st: counts },
-          { k: 'today', t: 'أُنجز اليوم', tone: 'done', n: today.data?.total, sub: 'قرار وإجراء', to: '/admin/work', st: today },
-          // «غير مُسنَد» is a filter on the queue below, not a headline. Model
-          // health is: it is the only figure here that says whether the rules
-          // the product rests on are still holding.
-          { k: 'health', t: 'صحّة النموذج', tone: healthBad ? 'critical' : 'done',
-            n: healthBad, sub: healthBad ? 'يحتاج مراجعة' : 'سليم',
-            to: '/admin/system-health', st: health },
-        ].map((c) => {
-          const tone = TONE[c.tone]
+        {TILES.map((tile) => {
+          const v = tileValue(tile.key)
+          const dead = tile.key === 'trust' ? roster.error : counts.error
           return (
-            <button key={c.k} onClick={() => navigate(c.to)}
-              aria-label={`${c.t}: ${c.st.loading ? 'قيد التحميل' : (c.n ?? 0)}`}
-              style={{ ...card, padding: '20px', cursor: 'pointer', textAlign: 'right', fontFamily: 'inherit', borderRight: `3px solid ${tone.fg}` }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-                {tone.dot} {c.t}
-              </div>
-              <div style={{ fontSize: '32px', fontWeight: 700, color: '#0F172A', margin: '8px 0 2px' }}>
-                {c.st.loading ? <span style={{ color: '#E2E8F0' }}>—</span>
-                  : c.st.error ? <span style={{ color: '#FCA5A5', fontSize: '18px' }}>؟</span>
-                    : (c.n ?? 0)}
-              </div>
-              <div style={{ fontSize: '12px', color: '#94A3B8' }}>{c.sub}</div>
+            <button key={tile.key} onClick={() => navigate(tile.to)}
+              aria-label={`${tile.t} — ${v == null ? 'غير متاح' : num(v)}`}
+              style={{
+                ...shell, padding: '18px', cursor: 'pointer', textAlign: 'right',
+                fontFamily: 'inherit', display: 'flex', flexDirection: 'column',
+                gap: '10px', borderRight: `3px solid ${tile.accent}`,
+              }}>
+              <span style={{
+                width: '9px', height: '9px', borderRadius: '50%',
+                background: tile.accent, display: 'inline-block',
+              }} />
+              <span style={{
+                fontSize: '26px', fontWeight: 900, lineHeight: 1,
+                color: v ? tile.accent : '#CBD5E1', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {dead ? '—' : (v == null ? '·' : num(v))}
+              </span>
+              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#475569' }}>
+                {tile.t}
+              </span>
             </button>
           )
         })}
       </div>
 
-      {/* --- Needs you now --- */}
-      <Section title="🔴 يحتاج تدخّلك الآن"
-        note="عناصر تتطلّب قراراً أو تدخّلاً إدارياً."
-        state={items} what="العناصر الحرجة"
-        style={{ marginBottom: '24px' }}
-        action={
-          <div role="tablist" aria-label="تصفية الطابور"
-            style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {SCOPES.map((sc) => (
-              <button key={sc.v} role="tab" aria-selected={scope === sc.v}
-                onClick={() => setScope(sc.v)}
-                style={{
-                  minHeight: '32px', padding: '0 12px', borderRadius: '999px',
-                  fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                  border: `1.5px solid ${scope === sc.v ? '#0F172A' : '#E2E8F0'}`,
-                  background: scope === sc.v ? '#0F172A' : '#fff',
-                  color: scope === sc.v ? '#fff' : '#475569',
-                }}>
-                {sc.t}{counts.data?.[sc.count] != null ? ` (${counts.data[sc.count]})` : ''}
-              </button>
-            ))}
-          </div>
-        }
-        empty={!items.loading && !items.error && scoped.length === 0
-          ? <Empty ok>{SCOPES.find((x) => x.v === scope)?.empty}</Empty> : null}>
-        {scoped.slice(0, 8).map((i) => workRow(i, TONE[SCOPES.find((x) => x.v === scope)?.tone || 'critical']))}
-      </Section>
-
-      {/* --- Late / waiting --- */}
+      {/* ---------------------------------------------------------------- */}
+      {/* Inbox + aside                                                     */}
+      {/* ---------------------------------------------------------------- */}
       <div className="marsad-cc-grid" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: '24px', marginBottom: '24px',
+        display: 'grid', gridTemplateColumns: 'minmax(0, 2.1fr) minmax(280px, 1fr)',
+        gap: '18px', alignItems: 'start',
       }}>
-        <Section title="🟠 متأخّر" note="تجاوزت مهلتها، والكرة عندنا."
-          state={late} what="المتأخّرات" style={{ alignSelf: 'start' }}
-          empty={!late.loading && !late.error && (late.data || []).length === 0
-            ? <Empty ok>✓ لا توجد طلبات متأخّرة.</Empty> : null}>
-          {(late.data || []).slice(0, 6).map((i) => workRow(i, TONE.overdue))}
-        </Section>
 
-        {/* Waiting on the company is not a Marsad delay. It is never counted as
-            overdue and never coloured as a fault — the clock is stopped. */}
-        <Section title="🔵 بانتظار الشركة" note="الكرة عندهم — الساعة متوقّفة."
-          state={waiting} what="ما ينتظر الشركات" style={{ alignSelf: 'start' }}
-          empty={!waiting.loading && !waiting.error && (waiting.data || []).length === 0
-            ? <Empty>لا توجد طلبات بانتظار الشركة.</Empty> : null}>
-          {(waiting.data || []).slice(0, 6).map((i) => (
-            <div key={i.item_id} style={{ padding: '12px 0', borderTop: '1px solid #F1F5F9' }}>
-              <div style={{ fontSize: '12.5px', color: TONE.company.fg, fontWeight: 700 }}>
-                🔵 {i.kind_label}
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
-                {i.company_name || i.title}
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>
-                {i.status_label} · آخر تحديث {since(i.updated_at)}
-                {i.assignee ? ` · ${i.assignee}` : ''}
-              </div>
-            </div>
-          ))}
-        </Section>
-      </div>
-
-      {/* --- Today / health --- */}
-      <div className="marsad-cc-grid" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: '24px', marginBottom: '24px',
-      }}>
-        <Section title="🟢 أُنجز اليوم" note="قرارات وإجراءات هذا اليوم."
-          state={today} what="إنجاز اليوم" style={{ alignSelf: 'start' }}
-          empty={!today.loading && !today.error && !(today.data?.total)
-            ? <Empty>لم تُنجز أي إجراءات اليوم بعد.</Empty> : null}>
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <span style={{ fontSize: '32px', fontWeight: 700, color: '#0F172A' }}>
-              {today.data?.total ?? 0}
-            </span>
-            <span style={{ fontSize: '13.5px', color: '#64748B', lineHeight: 2 }}>
-              {today.data?.approved ?? 0} قبول · {today.data?.rejected ?? 0} رفض ·
-              {' '}{today.data?.clarified ?? 0} طلب توضيح · {today.data?.documents ?? 0} تدقيق مستند
-              {today.data?.last_at ? ` · آخر قرار ${since(today.data.last_at)}` : ''}
-            </span>
-          </div>
-        </Section>
-
-        <Section title="🔴 صحّة النموذج" note="هل يعمل النظام وفق قواعده؟"
-          state={health} what="صحّة النموذج" style={{ alignSelf: 'start' }}
-          empty={!health.loading && !health.error && (health.data || []).length === 0
-            ? <Empty ok>✓ النموذج سليم</Empty> : null}>
-          {(health.data || []).map((h) => {
-            const tone = h.status === 'critical' ? TONE.critical
-              : h.status === 'warning' ? TONE.waiting : TONE.done
-            const mark = h.status === 'critical' ? '🔴' : h.status === 'warning' ? '⚠' : '✓'
-            const clickable = Number(h.n) > 0 && h.target
-            return (
-              <button key={h.key} disabled={!clickable}
-                onClick={() => clickable && navigate(h.target)}
-                aria-label={`${h.label}: ${h.n}`}
-                style={{
-                  display: 'flex', width: '100%', alignItems: 'flex-start', gap: '10px',
-                  justifyContent: 'space-between', padding: '10px 0', background: 'none',
-                  border: 0, borderTop: '1px solid #F1F5F9', textAlign: 'right',
-                  fontFamily: 'inherit', cursor: clickable ? 'pointer' : 'default',
-                }}>
-                <span style={{ fontSize: '13px', color: tone.fg, fontWeight: 700, minWidth: 0 }}>
-                  {mark} {h.label}
-                  {h.detail && (
-                    <span style={{ display: 'block', color: '#64748B', fontWeight: 400, fontSize: '12px', marginTop: '2px' }}>
-                      {h.detail}
-                    </span>
-                  )}
-                </span>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: tone.fg, flex: 'none' }}>
-                  {h.n}
-                </span>
-              </button>
-            )
-          })}
-        </Section>
-      </div>
-
-      {/* --- Official / registry --- */}
-      <div className="marsad-cc-grid" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: '24px', marginBottom: '24px',
-      }}>
-        <Section title="🏛 حالات رسمية جديدة" note="ما تقوله الوزارة، لا ما تقوله مرصد."
-          state={official} what="الحالات الرسمية" style={{ alignSelf: 'start' }}
-          action={(official.data || []).length > 0 ? (
-            <button onClick={() => navigate('/admin/companies?filter=official_status')}
-              style={{ background: 'none', border: 0, color: '#1D4ED8', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-              عرض الكل ←
-            </button>
-          ) : null}
-          empty={!official.loading && !official.error && (official.data || []).length === 0
-            ? <Empty ok>✓ لا تغيّرات رسمية خلال آخر ٣٠ يوماً</Empty> : null}>
-          {(official.data || []).slice(0, 6).map((o) => (
-            <button key={o.company_id} onClick={() => navigate(`/admin/company/${o.company_id}`)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'right', padding: '12px 0',
-                borderTop: '1px solid #F1F5F9', background: 'none', border: 0,
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{o.company_name}</div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>
-                سجل {o.cr_number || '—'} · {since(o.changed_at)}
-                {o.source ? ` · ${o.source}` : ''}
-              </div>
-              {/* Two claims, never merged. «Active in Marsad» and «in liquidation
-                  at the Ministry» are both true, and flattening them into one
-                  badge is the most dangerous thing this screen could do. */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', background: TONE.done.bg, color: TONE.done.fg }}>
-                  مرصد: {o.marsad_status}
-                </span>
-                <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', background: TONE.critical.bg, color: TONE.critical.fg }}>
-                  الوزارة: {o.official_status}
-                </span>
-              </div>
-            </button>
-          ))}
-        </Section>
-
-        <Section title="📦 السجل التجاري والاستيراد" note="المهمّة الجارية، والجيل المنشور."
-          state={imports} what="حالة الاستيراد" style={{ alignSelf: 'start' }}
-          empty={!imports.loading && !imports.error && (imports.data || []).length === 0
-            ? <Empty>لا توجد مهامّ استيراد مسجّلة.</Empty> : null}>
-
-          {runningJob && (
-            <div style={{ padding: '12px 0', borderTop: '1px solid #F1F5F9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                  {runningJob.snapshot_period || runningJob.file_name}
-                </span>
-                <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', background: TONE.neutral.bg, color: TONE.neutral.fg }}>
-                  {IMPORT_STATE[runningJob.status] || runningJob.status}
-                </span>
-              </div>
-              <div role="progressbar" aria-valuenow={Number(runningJob.completeness ?? 0)}
-                aria-valuemin={0} aria-valuemax={100}
-                style={{ height: '8px', background: '#F1F5F9', borderRadius: '999px', margin: '10px 0 6px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, Number(runningJob.completeness ?? 0))}%`, height: '100%', background: TONE.neutral.fg }} />
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.9 }}>
-                متوقّع {num(runningJob.expected_rows)} · محمّل {num(runningJob.rows_loaded)} · مرفوض {num(runningJob.rows_rejected)}
-                <div style={{ fontWeight: 700 }}>اكتمال {runningJob.completeness ?? 0}%</div>
-              </div>
-
-              {/* Only a generation that passed every check. The database refuses
-                  it either way — this is so nobody is invited to try. */}
-              {runningJob.status === 'ready' && can('data.publish') && (
-                <button onClick={() => openPublish(runningJob.job_id)} disabled={busy}
-                  style={{ ...btn, marginTop: '10px', background: '#16A34A', color: '#fff', border: 0 }}>
-                  نشر هذه المجموعة
+        {/* ---------------- The queue ---------------- */}
+        <section style={shell} aria-label="صندوق الإجراءات العاجلة والأولويات">
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: '12px', flexWrap: 'wrap', marginBottom: '16px',
+          }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+              🕐 صندوق الإجراءات العاجلة والأولويات
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>تصفية:</span>
+              {[{ v: false, t: 'الكل' }, { v: true, t: 'عاجل فقط' }].map((f) => (
+                <button key={String(f.v)} onClick={() => setOnlyUrgent(f.v)}
+                  aria-pressed={onlyUrgent === f.v}
+                  style={{
+                    ...btn, minHeight: '30px', padding: '0 12px', fontSize: '12px',
+                    background: onlyUrgent === f.v ? '#2563EB' : '#fff',
+                    color: onlyUrgent === f.v ? '#fff' : '#475569',
+                    border: onlyUrgent === f.v ? 0 : '1.5px solid #E2E8F0',
+                  }}>
+                  {f.t}{f.v && urgent.length > 0 ? ` (${urgent.length})` : ''}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {items.loading ? <Bars lines={5} />
+            : items.error ? <Failed what="الطوابير" message={items.error} onRetry={items.reload} />
+              : shown.length === 0 ? (
+                <div style={{ fontSize: '13.5px', color: '#15803D', fontWeight: 700, lineHeight: 2 }}>
+                  ✓ {onlyUrgent ? 'لا توجد إجراءات عاجلة الآن.' : 'لا يوجد عمل مفتوح.'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {shown.map((i) => {
+                    const tone = TONE[i.priority] || TONE.normal
+                    const late = ['late_response', 'late_resolution'].includes(i.sla_state)
+                    const evidence = (docs.data || {})[i.company_id] || []
+                    return (
+                      <article key={`${i.kind}-${i.item_id}`} style={{
+                        border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px',
+                      }}>
+                        {/* Who, and how loud */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          gap: '10px', flexWrap: 'wrap', marginBottom: '4px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                            <span style={{
+                              background: '#EFF6FF', borderRadius: '8px', padding: '6px 8px',
+                              fontSize: '13px', flex: 'none',
+                            }}>🏢</span>
+                            <span style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                              {i.company_name || i.title}
+                            </span>
+                          </div>
+                          <span style={{
+                            background: tone.bg, color: tone.fg, border: `1px solid ${tone.bd}`,
+                            borderRadius: '999px', padding: '3px 11px', fontSize: '11.5px',
+                            fontWeight: 800, flex: 'none',
+                          }}>
+                            {i.priority === 'critical' ? '🔴 عاجل للغاية'
+                              : i.priority === 'high' ? '🟠 عاجل' : i.status_label}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '12.5px', color: '#64748B', marginBottom: '12px' }}>
+                          {i.kind_label}
+                          {' · '}{i.assignee ? `مُسنَد إلى ${i.assignee}` : 'غير مُسنَد'}
+                          {' · '}{since(i.created_at)}
+                        </div>
+
+                        {/* Why it is loud. Only when there is a reason. */}
+                        {(late || i.sla_state === 'due_soon') && (
+                          <div style={{
+                            background: late ? TONE.critical.bg : TONE.high.bg,
+                            border: `1px solid ${late ? TONE.critical.bd : TONE.high.bd}`,
+                            color: late ? TONE.critical.fg : TONE.high.fg,
+                            borderRadius: '9px', padding: '9px 13px', marginBottom: '10px',
+                            fontSize: '12.5px', fontWeight: 700,
+                          }}>
+                            ⚠ {i.sla_state === 'late_response' ? 'لم يُستلَم خلال المهلة'
+                              : i.sla_state === 'late_resolution' ? `تجاوز مهلة الإنجاز بـ ${overdueBy(i.due_at)}`
+                                : 'تقترب مهلة الإنجاز'}
+                          </div>
+                        )}
+
+                        <div style={{
+                          background: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '9px',
+                          padding: '11px 14px', fontSize: '13px', color: '#334155', lineHeight: 1.9,
+                        }}>
+                          {i.status_label}
+                          {i.waiting_days > 0 && ` — بانتظار قرار منذ ${i.waiting_days} يوم`}
+                          {i.due_at && ` · المهلة ${new Date(i.due_at).toLocaleDateString('ar-SA')}`}
+                        </div>
+
+                        {/* Evidence, when this company has paperwork waiting. */}
+                        {evidence.length > 0 && (
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            flexWrap: 'wrap', marginTop: '10px',
+                          }}>
+                            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>
+                              المستندات المرفقة:
+                            </span>
+                            {evidence.slice(0, 3).map((d) => (
+                              <span key={d.id} style={{
+                                background: '#F8FAFC', border: '1px solid #E2E8F0',
+                                borderRadius: '7px', padding: '4px 10px', fontSize: '11.5px',
+                                fontWeight: 700, color: '#475569',
+                              }}>
+                                📄 {docLabel(d.doc_type)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* What you can do about it. */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          gap: '10px', flexWrap: 'wrap', marginTop: '14px',
+                        }}>
+                          {i.company_id ? (
+                            <button onClick={() => navigate(`/admin/company/${i.company_id}`)}
+                              style={{
+                                ...btn, minHeight: '32px', padding: 0, background: 'none',
+                                border: 0, color: '#2563EB', fontSize: '12.5px',
+                              }}>
+                              عرض ملف الفحص والملكية الكامل ↗
+                            </button>
+                          ) : <span />}
+
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button onClick={() => navigate(KIND_ROUTE[i.kind] || '/admin/work')}
+                              style={{ ...btn, background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
+                              مراجعة مع الملاحظات
+                            </button>
+                            {!i.assignee && i.assignable && can('work.assign_self') && (
+                              <button onClick={() => takeIt(i.item_id)} disabled={busy}
+                                aria-label={`استلام ${i.kind_label} — ${i.company_name || i.title}`}
+                                style={{ ...btn, background: '#2563EB', color: '#fff', border: 0, opacity: busy ? .6 : 1 }}>
+                                ⊙ استلام
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+        </section>
+
+        {/* ---------------- Aside ---------------- */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}>
+
+          {/* Trust */}
+          <section style={shell} aria-label="مؤشر الثقة الوطني للمنصة">
+            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: '0 0 14px' }}>
+              🏅 مؤشر الثقة الوطني للمنصة
+            </h2>
+
+            {roster.loading ? <Bars lines={3} />
+              : roster.error ? <Failed what="مؤشر الثقة" message={roster.error} onRetry={roster.reload} />
+                : avg == null ? (
+                  <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.9 }}>
+                    لا توجد درجات ثقة محتسبة بعد.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#15803D' }}>
+                        {avg.toFixed(1)}%
+                      </span>
+                      <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>
+                        متوسط {num(roster.data.scored)} شركة مقيَّمة
+                      </span>
+                    </div>
+
+                    <div style={{
+                      height: '7px', background: '#F1F5F9', borderRadius: '999px',
+                      overflow: 'hidden', marginBottom: '8px',
+                    }}>
+                      <div style={{
+                        width: `${Math.min(100, Math.max(0, avg))}%`, height: '100%',
+                        background: avgBand.fg, borderRadius: '999px',
+                      }} />
+                    </div>
+
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      fontSize: '11.5px', fontWeight: 700, marginBottom: '16px',
+                    }}>
+                      <span style={{ color: avgBand.fg }}>{avgBand.t}</span>
+                      <span style={{ color: '#94A3B8' }}>متوسط الشفافية المسجلة</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '19px', fontWeight: 900, color: '#B45309' }}>
+                          {roster.data.cleanPct == null ? '—' : `${roster.data.cleanPct.toFixed(1)}%`}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '3px' }}>
+                          سجلات بلا ملاحظات جودة
+                        </div>
+                      </div>
+                      <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '19px', fontWeight: 900, color: '#1E2A52' }}>
+                          {num(roster.data.total)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '3px' }}>
+                          شركة مسجَّلة ومعتمدة
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+          </section>
+
+          {/* Monitoring */}
+          <section style={shell} aria-label="تنبيهات المراقبة الفورية">
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '10px', marginBottom: '14px',
+            }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                ⚠ تنبيهات المراقبة الفورية
+              </h2>
+              {roster.data?.alerts?.length > 0 && (
+                <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>
+                  {roster.data.alerts.length} بلاغات
+                </span>
               )}
             </div>
-          )}
 
-          {failedJob && (
-            <div style={{ padding: '12px 0', borderTop: '1px solid #F1F5F9' }}>
-              <div style={{ fontSize: '13.5px', fontWeight: 700, color: TONE.critical.fg }}>
-                🔴 فشل الاستيراد — {failedJob.snapshot_period}
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.9, marginTop: '4px' }}>
-                {failedJob.failure_reason}
-                <div>محمّل {num(failedJob.rows_loaded)} · مرفوض {num(failedJob.rows_rejected)} · {fmtTime(failedJob.finished_at)}</div>
-              </div>
-            </div>
-          )}
+            {roster.loading ? <Bars lines={3} />
+              : roster.error ? <Failed what="التنبيهات" message={roster.error} onRetry={roster.reload} />
+                : !roster.data.alerts.length ? (
+                  <div style={{ fontSize: '13px', color: '#15803D', fontWeight: 700, lineHeight: 1.9 }}>
+                    ✓ لا توجد تنبيهات مراقبة.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {roster.data.alerts.map((a) => (
+                      <button key={a.company_id}
+                        onClick={() => navigate(`/admin/company/${a.company_id}`)}
+                        style={{
+                          background: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '10px',
+                          padding: '11px 13px', textAlign: 'right', cursor: 'pointer',
+                          fontFamily: 'inherit', width: '100%',
+                        }}>
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '3px' }}>
+                          {a.name}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: 1.8 }}>
+                          {a.official_status && a.official_status !== 'none'
+                            && `حالة رسمية: ${OFFICIAL_LABEL[a.official_status] || a.official_status}`}
+                          {(a.quality_issues || []).length > 0
+                            && ` · ${a.quality_issues.length} ملاحظة جودة`}
+                          {a.open_clarifications > 0
+                            && ` · ${a.open_clarifications} استيضاح مفتوح`}
+                        </div>
+                        {a.trust_score != null && (
+                          <div style={{
+                            display: 'inline-block', marginTop: '7px', background: '#fff',
+                            border: '1px solid #E2E8F0', borderRadius: '6px', padding: '2px 8px',
+                            fontSize: '11px', fontWeight: 800, color: band(Number(a.trust_score)).fg,
+                          }}>
+                            مؤشر الثقة: {Number(a.trust_score).toFixed(0)}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-          {publishedJob && (
-            <div style={{ padding: '12px 0', borderTop: '1px solid #F1F5F9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>
-                  الجيل المنشور — {publishedJob.snapshot_period}
-                </span>
-                <span style={{
-                  fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
-                  background: Number(publishedJob.completeness) < 100 ? TONE.critical.bg : TONE.done.bg,
-                  color: Number(publishedJob.completeness) < 100 ? TONE.critical.fg : TONE.done.fg,
-                }}>منشورة</span>
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.9, marginTop: '4px' }}>
-                محمّل {num(publishedJob.rows_loaded)} من {num(publishedJob.expected_rows)}
-                <div style={{
-                  fontWeight: 700,
-                  color: Number(publishedJob.completeness) < 100 ? TONE.critical.fg : TONE.done.fg,
-                }}>اكتمال {publishedJob.completeness}%</div>
-              </div>
-            </div>
-          )}
-        </Section>
-      </div>
-
-      {/* --- Jobs / activity --- */}
-      <div className="marsad-cc-grid" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: '24px', marginBottom: '32px',
-      }}>
-        <Section title="⚙ المهامّ الخلفية" note="ما يعمل دون أن يراه أحد."
-          state={jobs} what="المهامّ الخلفية" style={{ alignSelf: 'start' }}
-          empty={!jobs.loading && !jobs.error && !jobs.data
-            ? <Empty>لا توجد مهامّ خلفية مسجّلة.</Empty> : null}>
-          {['cleanup', 'import'].map((k) => {
-            const j = jobs.data?.[k]
-            if (!j) return null
-            // «Never run» is a state of its own. Showing it as «success, 0» is
-            // how a job that never fires looks healthy forever.
-            const st = j.status === 'success' ? TONE.done
-              : j.status === 'failed' ? TONE.critical
-                : j.status === 'never' ? TONE.neutral
-                  : j.status === 'stalled' ? TONE.overdue : TONE.neutral
-            const label = { success: 'نجح', failed: 'فشل', never: 'لم يعمل قطّ', stalled: 'متوقّف' }[j.status]
-              || IMPORT_STATE[j.status] || j.status
-            return (
-              <div key={k} style={{ padding: '12px 0', borderTop: '1px solid #F1F5F9' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{j.name}</span>
-                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: st.fg }}>{st.dot} {label}</span>
-                </div>
-                <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '4px', lineHeight: 1.9 }}>
-                  {k === 'cleanup'
-                    ? <>آخر تشغيل {fmtTime(j.last_at)} · حرّر {j.released ?? 0} · الجدولة <code>{j.schedule}</code></>
-                    : <>{j.period} · محمّل {num(j.loaded)} من {num(j.expected)}</>}
-                </div>
-              </div>
-            )
-          })}
-        </Section>
-
-        <Section title="🕘 النشاط التشغيلي" note="من فعل ماذا، ومتى."
-          state={activity} what="سجلّ النشاط" style={{ alignSelf: 'start' }}
-          empty={!activity.loading && !activity.error && (activity.data || []).length === 0
-            ? <Empty>لا يوجد نشاط تشغيلي حديث.</Empty> : null}>
-          {(activity.data || []).map((a, i) => (
-            <div key={i} style={{
-              display: 'flex', gap: '10px', padding: '9px 0',
-              borderTop: i ? '1px solid #F1F5F9' : 0, fontSize: '13px', color: '#334155',
-            }}>
-              <span style={{ color: '#94A3B8', flex: 'none', fontSize: '12px', minWidth: '68px' }}>
-                {fmtTime(a.at)}
-              </span>
-              {/* The Arabic comes from `activity_action_types()` with the row, so
-                  no component keeps its own copy of the words. `a.action` is
-                  still carried for anyone reading the log itself. */}
-              <span style={{ minWidth: 0 }} title={a.action}>
-                <b>{a.actor || 'النظام'}</b>
-                <span style={{ color: '#64748B' }}> · {a.label || a.action}</span>
-              </span>
-            </div>
-          ))}
-        </Section>
-      </div>
-
-      {/* --- Publish confirmation --- */}
-      {confirm && (
-        <div role="dialog" aria-modal="true" aria-label="تأكيد نشر مجموعة السجل التجاري"
-          onClick={(e) => e.target === e.currentTarget && setConfirm(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 60,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
-          }}>
-          <Card style={{ maxWidth: '620px', width: '100%', maxHeight: '86vh', overflowY: 'auto' }}>
-            <h2 style={{ ...titleStyle, fontSize: '20px' }}>نشر مجموعة السجل التجاري</h2>
-            <p style={noteStyle}>
-              النشر يبدّل السجل الذي يقرأه المنتج كلّه. هذه أرقامه قبل التنفيذ.
-            </p>
-
-            <dl style={{ margin: 0, fontSize: '13.5px', color: '#334155', lineHeight: 2.2 }}>
-              {[
-                ['الفترة', confirm.job.snapshot_period],
-                ['متوقّع', num(confirm.job.expected_rows)],
-                ['محمّل', num(confirm.job.rows_loaded)],
-                ['مرفوض', num(confirm.job.rows_rejected)],
-                ['الأعداد متّسقة', confirm.job.accounted ? '✓ نعم' : '✗ لا'],
-                ['اكتمال', `${confirm.job.completeness ?? 0}%`],
-                ['بلا رقم سجل وله رقم موحّد', num(confirm.quality?.no_cr_with_unified)],
-                ['بلا أي معرّف', num(confirm.quality?.no_identifier)],
-                ['رقم سجل مكرّر', num(confirm.quality?.duplicate_cr)],
-                ['رقم موحّد مكرّر', num(confirm.quality?.duplicate_unified)],
-                ...(confirm.diff ? [
-                  ['جديد', num(confirm.diff.new)],
-                  ['متغيّر', num(confirm.diff.changed)],
-                  ['محذوف من ملف الوزارة', num(confirm.diff.removed)],
-                ] : []),
-                ['المنشورة الآن', String(confirm.published_now || '—').slice(0, 8)],
-                ['ستصبح المنشورة', String(confirm.job.dataset_id).slice(0, 8)],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderBottom: '1px solid #F1F5F9' }}>
-                  <dt style={{ color: '#64748B' }}>{k}</dt>
-                  <dd style={{ margin: 0, fontWeight: 700 }}>{v}</dd>
-                </div>
-              ))}
-            </dl>
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
-              <button onClick={doPublish} disabled={busy || !confirm.job.accounted}
-                style={{
-                  ...btn, background: confirm.job.accounted ? '#16A34A' : '#CBD5E1',
-                  color: '#fff', border: 0,
-                  cursor: confirm.job.accounted ? 'pointer' : 'not-allowed',
-                }}>
-                {busy ? 'جارٍ…' : 'تأكيد النشر'}
-              </button>
-              <button onClick={() => setConfirm(null)} disabled={busy}
-                style={{ ...btn, background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
-                إلغاء
-              </button>
-            </div>
-          </Card>
+            <button onClick={() => navigate('/admin/fraud-detection')}
+              style={{
+                ...btn, width: '100%', marginTop: '14px', background: '#F8FAFC',
+                color: '#475569', border: '1.5px solid #E2E8F0',
+              }}>
+              عرض كافة قوائم المراقبة المتقدمة
+            </button>
+          </section>
         </div>
-      )}
+      </div>
     </div>
   )
 }
