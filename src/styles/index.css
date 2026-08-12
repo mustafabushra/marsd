@@ -701,3 +701,15 @@ p {
 @media (max-width: 900px) {
   .marsad-tour-label { display: none; }
 }
+
+/* The urgent-action badge in the admin header. Opacity only — a badge that
+   changes size nudges the header's baseline every two seconds. */
+@keyframes marsadPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+
+/* Somebody who has asked not to see motion has asked for this too. */
+@media (prefers-reduced-motion: reduce) {
+  [style*="marsadPulse"] { animation: none !important; }
+}

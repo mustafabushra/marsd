@@ -210,6 +210,10 @@ export default function AdminShell({ user }) {
 
   // Live badge counts (real pending work)
   const [counts, setCounts] = useState({ requests: 0, reviews: 0 })
+  // What the urgent-action control shows. Summed from the counts already
+  // fetched rather than a third query — two numbers that must agree with the
+  // sidebar badges beside them.
+  const urgent = (counts.requests || 0) + (counts.reviews || 0)
   useEffect(() => {
     const load = async () => {
       try {
@@ -246,7 +250,7 @@ export default function AdminShell({ user }) {
       {/* Tapping beside an open overlay closes it — the expected way out. */}
       {navOpen && <div className="marsad-scrim" onClick={() => setNavOpen(false)} />}
 
-      <aside className="marsad-sidebar" data-open={navOpen} style={{ width: '268px', background: '#0B1220', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      <aside className="marsad-sidebar" data-open={navOpen} style={{ width: '288px', background: '#0B1220', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         {/* Logo */}
         <div onClick={() => navigate('/admin')} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '0 8px 22px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: '16px' }}>
           <span style={{ display: 'inline-flex', background: '#fff', borderRadius: '9px', padding: '5px', flex: 'none' }}>
@@ -264,8 +268,46 @@ export default function AdminShell({ user }) {
           </span>
           <div>
             <div style={{ fontWeight: 900, fontSize: '20px', color: '#fff', lineHeight: 1 }}>مرصد</div>
-            <div style={{ fontSize: '11px', color: '#A78BFA', fontWeight: 800, letterSpacing: '.5px' }}>لوحة الإدارة</div>
+            <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '.5px' }}>حوكمة وشفافية</div>
           </div>
+        </div>
+
+        {/* Portal switcher.
+            One account can hold both jobs — running Marsad and belonging to a
+            company on it — which is why CompanyRoute stopped redirecting staff
+            away. The two portals were reached by a «return to the other one»
+            button at the foot of each sidebar, which reads as an exit rather
+            than a switch, and put the two halves of one product on different
+            footings. Same navigation, said as what it is, at the top. */}
+        <div role="tablist" aria-label="التبديل بين اللوحتين"
+          style={{
+            display: 'flex', gap: '4px', padding: '4px', marginBottom: '14px',
+            background: 'rgba(255,255,255,.06)', borderRadius: '999px',
+            border: '1px solid rgba(255,255,255,.10)',
+          }}>
+          <span role="tab" aria-selected="true"
+            style={{
+              flex: 1, textAlign: 'center', padding: '8px 10px', borderRadius: '999px',
+              background: '#1E2A52', color: '#fff', fontSize: '12.5px', fontWeight: 800,
+            }}>لوحة الإدارة</span>
+          <button role="tab" aria-selected="false"
+            onClick={() => navigate('/dashboard')}
+            style={{
+              flex: 1, textAlign: 'center', padding: '8px 10px', borderRadius: '999px',
+              background: 'transparent', border: 0, color: '#94A3B8',
+              fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+            }}>لوحة الشركات</button>
+        </div>
+
+        {/* Who is looking. The header carried «وضع المسؤول» in a purple that
+            belongs to no part of this identity; a role belongs beside the
+            portal it applies to, not beside the page title. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px', padding: '0 4px 14px',
+          marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,.08)',
+        }}>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16A34A', flex: 'none' }} />
+          <span style={{ fontSize: '12px', color: '#CBD5E1', fontWeight: 700 }}>مشرف تدقيق وحوكمة</span>
         </div>
 
         {/* Nav */}
@@ -377,7 +419,32 @@ export default function AdminShell({ user }) {
               ☰
             </button>
             <div style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentLabel}</div>
-            <span style={{ background: '#F5F3FF', color: '#7C3AED', borderRadius: '7px', padding: '4px 11px', fontSize: '12px', fontWeight: 800, flex: 'none' }}>وضع المسؤول</span>
+            {/* The role moved to the sidebar, beside the portal it applies to.
+                What belongs here is what needs doing: the two counts this shell
+                already fetches, as one control that goes where the work is. It
+                appears only when there is work — a permanent «0» is a thing the
+                eye learns to skip, and then it skips the 7 as well. */}
+            {urgent > 0 && (
+              <button
+                onClick={() => navigate('/admin/work')}
+                title={`${urgent} عنصراً بانتظار قرار`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '7px', flex: 'none',
+                  background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '999px',
+                  padding: '5px 12px 5px 8px', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <span style={{
+                  background: '#DC2626', color: '#fff', borderRadius: '999px',
+                  minWidth: '20px', height: '20px', display: 'inline-flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11.5px', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+                  animation: 'marsadPulse 2s ease-in-out infinite',
+                }}>{urgent}</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#B91C1C' }}>
+                  يحتاج قراراً
+                </span>
+              </button>
+            )}
           </div>
 
           {/* A keyboard shortcut nobody knows about is a shortcut nobody uses.
