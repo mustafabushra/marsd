@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
+import { getSupabase } from '../lib/api'
 import { useUser } from '@clerk/react'
 import { createTenantAndUser } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
@@ -69,6 +71,24 @@ export default function CompanyRegister() {
   const [crFile, setCrFile] = useState(null)
   const [crFileError, setCrFileError] = useState('')
 
+  // What the Ministry already published about this company.
+  //
+  // Nine fields come from government_company_registry — name, both numbers,
+  // capital, legal entity, region, city, registration date and type. Asking a
+  // company to type them again is asking it to re-enter what the authority has
+  // already stated, and every retyping is a chance to disagree with the
+  // register the rest of the product reads. So they are filled from the record
+  // and shown as read-only, with the source named.
+  const [registryMatch, setRegistryMatch] = useState(null)
+  const [lookupBusy, setLookupBusy] = useState(false)
+  const [lookupNote, setLookupNote] = useState('')
+
+  // The four documents the database marks required. Collected here rather than
+  // after approval: a file opened without them is a file nobody can verify.
+  const [docFiles, setDocFiles] = useState({})
+  const [docTypes, setDocTypes] = useState([])
+  const docsLeft = docTypes.filter((t) => !docFiles[t.doc_type]).length
+
   const [companyData, setCompanyData] = useState({
     name: '',
     nameEn: '',
@@ -103,12 +123,71 @@ export default function CompanyRegister() {
     }))
   }
 
+  /**
+   * Find this company in the Ministry's published generation and fill it in.
+   *
+   * search_companies_unified already answers a name, a commercial registration
+   * number or a unified number against both Marsad and the published register
+   * — it is what /search and /add-report use. Nothing new is asked of the
+   * database here.
+   */
+  const lookupRegistry = async () => {
+    const q = companyData.crNumber.trim() || companyData.name.trim()
+    if (!q) { setLookupNote('اكتب رقم السجل أو اسم الشركة أولاً'); return }
+    setLookupBusy(true)
+    setLookupNote('')
+    try {
+      const { data, error: e } = await getSupabase()
+        .rpc('search_companies_unified', { p_query: q, p_limit: 5 })
+      if (e) throw e
+      const hit = (data || []).find((r) => r.origin === 'registry')
+        || (data || []).find((r) => r.origin === 'marsad')
+      if (!hit) {
+        setLookupNote('لم نجد هذه الشركة في السجل التجاري المنشور — أكمل البيانات يدوياً')
+        setRegistryMatch(null)
+        return
+      }
+      if (hit.origin === 'marsad') {
+        setLookupNote('هذه الشركة مسجّلة في مرصد بالفعل. إن كانت شركتك فقدّم طلب ملكية بدل تسجيل جديد.')
+        setRegistryMatch(null)
+        return
+      }
+      setRegistryMatch(hit)
+      setCompanyData((prev) => ({
+        ...prev,
+        name: hit.name || prev.name,
+        crNumber: hit.cr_number || prev.crNumber,
+        unifiedNumber: hit.unified_number || prev.unifiedNumber,
+        entityType: hit.legal_entity || prev.entityType,
+        region: hit.region || prev.region,
+        city: hit.city || prev.city,
+        foundingDate: hit.registration_date || prev.foundingDate,
+      }))
+      setLookupNote('')
+    } catch (err) {
+      setLookupNote(err?.message || 'تعذّر الوصول إلى السجل التجاري')
+    } finally {
+      setLookupBusy(false)
+    }
+  }
+
+  // Filled from the register, so not asked for again. The list is exactly the
+  // columns search_companies_unified returns from the official record.
+  const fromRegistry = (field) => Boolean(registryMatch) && [
+    'name', 'crNumber', 'unifiedNumber', 'entityType', 'region', 'city', 'foundingDate',
+  ].includes(field)
+
   const validateCompanyData = () => {
     if (!companyData.name.trim()) return 'اسم الشركة مطلوب'
     if (companyData.name.trim().length < 3) return 'اسم الشركة يجب أن يكون 3 أحرف على الأقل'
 
     if (!companyData.crNumber.trim()) return 'رقم السجل التجاري مطلوب'
     if (!crFile) return 'صورة السجل التجاري مطلوبة'
+    // Every document the database marks required, at registration.
+    if (docTypes.length && docsLeft > 0) {
+      const missing = docTypes.filter((t) => !docFiles[t.doc_type]).map((t) => t.label)
+      return `مستندات ناقصة: ${missing.join('، ')}`
+    }
     const crDigits = companyData.crNumber.replace(/\D/g, '')
     if (crDigits.length < 10) return 'رقم السجل يجب أن يكون 10 أرقام على الأقل'
 
@@ -159,7 +238,7 @@ export default function CompanyRegister() {
         r.readAsDataURL(crFile)
       })
 
-      await createTenantAndUser(user.id, {
+      const created = await createTenantAndUser(user.id, {
         crFileUrl,
         name: companyData.name,
         crNumber: companyData.crNumber,
@@ -183,6 +262,26 @@ export default function CompanyRegister() {
         firstName: user.firstName,
         lastName: user.lastName
       })
+
+      // The documents go onto the company that was just created, not into a
+      // queue for later. Two phases because the storage path needs the company
+      // id, which is why createTenantAndUser returns it.
+      //
+      // A failed upload does not undo the registration. The account exists and
+      // the company is in review either way; losing all of it because one file
+      // did not land would be the worse outcome, so what failed is named and
+      // can be supplied from the dashboard.
+      if (created?.companyId && Object.keys(docFiles).length) {
+        const failed = await uploadCompanyDocuments(docFiles, {
+          companyId: created.companyId,
+          tenantId: created.tenantId,
+          userId: user.id,
+        })
+        if (failed?.length) {
+          const names = failed.map((k) => docTypes.find((t) => t.doc_type === k)?.label || k)
+          setErrorWithTimeout(`تعذّر رفع: ${names.join('، ')} — أضفها من لوحة التحكم`)
+        }
+      }
 
       // Registered, not admitted.
       //
@@ -274,6 +373,7 @@ export default function CompanyRegister() {
                 type="text"
                 value={companyData.name}
                 onChange={(e) => handleCompanyChange('name', e.target.value)}
+                readOnly={fromRegistry('name')}
                 placeholder="مثال: شركة نجد"
                 style={{
                   width: '100%',
@@ -300,6 +400,7 @@ export default function CompanyRegister() {
                 type="text"
                 value={companyData.crNumber}
                 onChange={(e) => handleCompanyChange('crNumber', e.target.value)}
+                readOnly={fromRegistry('crNumber')}
                 placeholder="مثال: 1234567890"
                 style={{
                   width: '100%',
@@ -358,6 +459,36 @@ export default function CompanyRegister() {
             </div>
           </div>
 
+          {/* Fill it from the register instead of asking twice. */}
+          <div style={{
+            background: registryMatch ? '#F0FDF4' : '#F8FAFC',
+            border: `1.5px solid ${registryMatch ? '#A7F3D0' : '#E2E8F0'}`,
+            borderRadius: '12px', padding: '14px', marginBottom: '16px',
+          }}>
+            {registryMatch ? (
+              <div style={{ fontSize: '13px', color: '#15803D', fontWeight: 700, lineHeight: 1.9 }}>
+                ✔ عُثر على الشركة في السجل التجاري — وزارة التجارة
+                <div style={{ color: '#334155', fontWeight: 600, marginTop: '4px' }}>
+                  الاسم والرقمان والكيان والمنطقة والمدينة وتاريخ القيد مُعبّأة من السجل الرسمي،
+                  ولن يُطلب منك إدخالها. المطلوب منك المستندات وبيانات التواصل.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button type="button" onClick={lookupRegistry} disabled={lookupBusy}
+                  style={{
+                    padding: '9px 18px', borderRadius: '9px', border: 0,
+                    background: lookupBusy ? '#93C5FD' : '#1E2A52', color: '#fff',
+                    fontSize: '13px', fontWeight: 800,
+                    cursor: lookupBusy ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}>{lookupBusy ? '… جارٍ البحث' : 'جلب البيانات من السجل التجاري'}</button>
+                <span style={{ fontSize: '12.5px', color: lookupNote ? '#B45309' : '#64748B', fontWeight: 600, lineHeight: 1.8 }}>
+                  {lookupNote || 'اكتب رقم السجل ثم اجلب بياناتك الرسمية بدل إدخالها يدوياً'}
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Row 2: Sector + City */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
@@ -403,6 +534,7 @@ export default function CompanyRegister() {
               <select
                 value={companyData.city}
                 onChange={(e) => handleCompanyChange('city', e.target.value)}
+                readOnly={fromRegistry('city')}
                 style={{
                   width: '100%',
                   border: '1.5px solid #E2E8F0',
@@ -633,6 +765,31 @@ export default function CompanyRegister() {
             textAlign: 'right'
           }}>
             🔒 بياناتك محمية بسياسة الخصوصية. لن نشارك معلوماتك مع جهات خارجية.
+          </div>
+
+          {/* The documents that open a complete file.
+              The list is read from company_document_types(), so «which are
+              required» is answered by the database rather than by this form —
+              the two cannot drift. They are saved onto the company and appear
+              in its dashboard; nothing here is asked for a second time unless
+              it expires or is rejected. */}
+          <div style={{ marginBottom: '18px' }}>
+            <RequiredCompanyDocuments
+              files={docFiles}
+              onChange={setDocFiles}
+              onTypesLoaded={setDocTypes}
+              disabled={loading}
+            />
+            {docTypes.length > 0 && (
+              <div style={{
+                fontSize: '12.5px', fontWeight: 700, marginTop: '8px',
+                color: docsLeft === 0 ? '#15803D' : '#B45309',
+              }}>
+                {docsLeft === 0
+                  ? '✔ كل المستندات المطلوبة مرفقة'
+                  : `بقي ${docsLeft} من ${docTypes.length} مستندات مطلوبة`}
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

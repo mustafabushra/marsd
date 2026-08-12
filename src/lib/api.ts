@@ -787,7 +787,12 @@ export async function createTenantAndUser(userId: string, companyData: any) {
       console.warn('Audit log warning:', err)
     }
 
-    return { success: true, tenantId: tenantData.id }
+    // companyId comes back too. Documents are stored under the company, and a
+    // caller that has just created one has no other way to learn its id —
+    // CompanyRegister had to be able to upload the registration paperwork it
+    // collected, and looking the company up again by CR number afterwards is a
+    // second query that can find the wrong row.
+    return { success: true, tenantId: tenantData.id, companyId: companyInsertData.id }
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : 'خطأ في إنشاء الحساب')
   }
