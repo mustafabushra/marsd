@@ -1,62 +1,65 @@
-import { useEffect, useState } from 'react'
-import { useOrganization, useUser } from '@clerk/react'
-import { supabase } from '../lib/supabase'
-import { syncClerkOrgToSupabase, getUserTenantContext } from '../lib/clerkOrganizations'
+import { useUser } from '@clerk/react'
+import { useUserRecord } from './useUserRecord'
+import { useUserRole } from './useUserRole'
 
 /**
- * Hook to get and sync tenant context from Clerk organization
- * Automatically syncs Clerk org data to Supabase tenants table
+ * Which company this account belongs to, from the table that decides it.
+ *
+ * ============================================================================
+ * What was wrong, and why it was wrong at the root
+ * ============================================================================
+ * This treated a Clerk organization as the tenant. On every load it wrote the
+ * Clerk org into `tenants`, using the org id as the primary key:
+ *
+ *     id: clerkOrg.id            // "org_3GulxFGLNd2AEqh5KXrDAdT0WTk"
+ *
+ * `tenants.id` is a uuid, and the table has no column for a Clerk org id and
+ * never has. So the write could not succeed under any circumstances — it threw
+ * 22P02 on every page load since the day it was written, caught by a
+ * `console.warn` that let the app carry on.
+ *
+ * The noise was the smaller half. `getUserTenantContext` then returned
+ * `tenantId: organization?.id` — so this hook's `tenantId` was a Clerk org id
+ * while `users.tenant_id`, the uuid every policy and every screen reads, is
+ * something else entirely. Two different values under one name. Nothing looked
+ * broken only because its one consumer, the command palette, uses it as a
+ * yes/no.
+ *
+ * A tenant on Marsad is a row created by registration and by an approved
+ * ownership claim — decide_claim_request builds one from the company's own
+ * fields. It is not a Clerk organization, and syncing one into the other was
+ * trying to make Clerk the source of truth for something the database already
+ * owns.
+ *
+ * So this reads users.tenant_id, through useUserRecord — which fetches that row
+ * once and shares it, so asking here costs nothing. Clerk still answers who the
+ * person is; the database answers which company they belong to.
  */
 export function useTenantContext() {
-  const { organization, isLoaded: isOrgLoaded } = useOrganization()
-  const { user, isLoaded: isUserLoaded } = useUser()
-  const [tenantContext, setTenantContext] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { user, isLoaded } = useUser()
+  const { tenantId, loading, error } = useUserRecord()
+  const { role, isPlatformAdmin } = useUserRole()
 
-  useEffect(() => {
-    async function initTenantContext() {
-      if (!isOrgLoaded || !isUserLoaded) return
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        if (!user || !organization) {
-          setTenantContext(null)
-          setLoading(false)
-          return
-        }
-
-        // Sync Clerk org to Supabase
-        try {
-          await syncClerkOrgToSupabase(supabase, organization)
-        } catch (syncError) {
-          console.warn('Failed to sync org to Supabase:', syncError)
-          // Don't fail completely if sync fails - tenant context still works
-        }
-
-        // Build tenant context
-        const context = getUserTenantContext(organization, user)
-        setTenantContext(context)
-      } catch (err) {
-        console.error('Failed to initialize tenant context:', err)
-        setError(err)
-      } finally {
-        setLoading(false)
+  const tenantContext = tenantId
+    ? {
+        tenantId,
+        userId: user?.id,
+        userEmail: user?.primaryEmailAddress?.emailAddress,
+        userRole: role,
+        isAdmin: isPlatformAdmin || role === 'company_admin',
       }
-    }
-
-    initTenantContext()
-  }, [organization, user, isOrgLoaded, isUserLoaded])
+    : null
 
   return {
     tenantContext,
-    tenantId: tenantContext?.tenantId,
-    tenantName: tenantContext?.tenantName,
-    isAdmin: tenantContext?.isAdmin,
-    loading,
+    tenantId: tenantContext?.tenantId ?? null,
+    // The name lives on the company, not here. Screens that show it read it
+    // from the company record they are already displaying rather than being
+    // handed a second copy that can go stale.
+    tenantName: null,
+    isAdmin: tenantContext?.isAdmin ?? false,
+    loading: !isLoaded || loading,
     error,
-    isReady: !loading && !error && tenantContext,
+    isReady: isLoaded && !loading && !error && !!tenantContext,
   }
 }
