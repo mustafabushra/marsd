@@ -145,9 +145,16 @@ export default function ExecutiveHeader({ identity, score, band, tier, reports, 
   const onTime = Number(behaviour?.full ?? 0)
 
   const signals = [
-    identity.verified
+    // «طابقت مستنداتها الرسمية» was said about every verified company, and the
+    // only verified companies are Ministry imports — which have no documents at
+    // all. The flag there means the authority published the record; Marsad's
+    // own verification is verification_source = 'marsad_review'.
+    identity.verification_source === 'marsad_review'
       ? { ok: true, label: 'موثّقة من مرصد', detail: 'طابقت مستنداتها الرسمية' }
-      : { ok: null, label: 'غير موثّقة', detail: 'لم تُقدَّم مستندات للتوثيق بعد' },
+      : identity.verified
+        ? { ok: true, label: 'مُطابَقة بالسجل التجاري',
+            detail: 'قيدها منشور في سجل وزارة التجارة — لم تُدقَّق مستنداتها بعد' }
+        : { ok: null, label: 'غير موثّقة', detail: 'لم تُقدَّم مستندات للتوثيق بعد' },
 
     identity.cr_status === 'active'
       ? { ok: true, label: 'سجل تجاري نشط' }

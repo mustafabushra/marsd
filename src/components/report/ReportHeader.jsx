@@ -214,9 +214,24 @@ export default function ReportHeader({
 
         <div style={{ display: 'flex', gap: '9px', flexWrap: 'wrap', marginTop: '18px',
                       paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-          <Chip ok={!!identity?.verified}
-                title={identity?.verified_at ? `وُثّقت في ${new Date(identity.verified_at).toLocaleDateString('en-GB')}` : undefined}>
-            {identity?.verified ? 'موثّقة من مرصد' : 'غير موثّقة'}
+          {/* Which verification this is.
+              This said «موثّقة من مرصد» for anything with verified = true, and
+              every verified company on the platform got that flag from the
+              Ministry import — where it means the authority published the
+              record, not that Marsad reviewed the company. Marsad's own
+              verification is verification_source = 'marsad_review', and it is
+              only set after somebody reads the documents. Saying the stronger
+              thing about the weaker fact, on a public report about a real
+              business, is the one claim this page cannot afford to get wrong. */}
+          <Chip ok={identity?.verification_source === 'marsad_review'}
+                title={identity?.verified_at
+                  ? `${identity?.verification_source === 'marsad_review' ? 'وُثّقت في' : 'قُيّدت في'} ${new Date(identity.verified_at).toLocaleDateString('en-GB')}`
+                  : undefined}>
+            {identity?.verification_source === 'marsad_review'
+              ? 'موثّقة من مرصد'
+              : identity?.verified
+                ? 'مُطابَقة بالسجل التجاري'
+                : 'غير موثّقة'}
           </Chip>
           <Chip ok={(identity?.cr_status || company?.cr_status) === 'active'}>
             {(identity?.cr_status || company?.cr_status) === 'active' ? 'سجل تجاري نشط'
