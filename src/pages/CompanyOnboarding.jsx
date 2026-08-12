@@ -55,6 +55,18 @@ export default function CompanyOnboarding() {
   })
 
   // Filled from the Ministry's published generation, and not asked for twice.
+  // Identity first, form second.
+  //
+  // The form used to open with every field showing and a «fetch» button beside
+  // them, which asks somebody to look at twenty empty inputs before finding out
+  // that nineteen of them are about to be filled for him. Worse, it is the same
+  // order that let a person type an entire company and only then learn it was
+  // already registered — the mistake RegistryLookup was written to stop.
+  //
+  // So one question comes first: the number. What follows is either a form
+  // already filled from the register, or an empty one — and either way the
+  // person knows which before typing anything.
+  const [identified, setIdentified] = useState(false)
   const [registryMatch, setRegistryMatch] = useState(null)
   const [lookupBusy, setLookupBusy] = useState(false)
   const [lookupNote, setLookupNote] = useState('')
@@ -99,10 +111,18 @@ export default function CompanyOnboarding() {
       const { data, error: e } = await getSupabase()
         .rpc('search_companies_unified', { p_query: q, p_limit: 5 })
       if (e) throw e
+      const mine = (data || []).find((r) => r.origin === 'marsad')
+      if (mine) {
+        // Said before anything is typed, not after.
+        setLookupNote('هذه الشركة مسجّلة في مرصد بالفعل — إن كانت شركتك فقدّم طلب ملكية بدل تسجيل جديد')
+        setRegistryMatch(null)
+        return
+      }
       const hit = (data || []).find((r) => r.origin === 'registry')
       if (!hit) {
         setRegistryMatch(null)
-        setLookupNote('لم نجد الشركة في السجل المنشور — أكمل البيانات يدوياً')
+        setIdentified(true)
+        setLookupNote('')
         return
       }
       setRegistryMatch(hit)
@@ -118,6 +138,7 @@ export default function CompanyOnboarding() {
         capital: hit.capital != null ? String(hit.capital) : prev.capital,
         foundingDate: hit.registration_date || prev.foundingDate,
       }))
+      setIdentified(true)
       setLookupNote('')
     } catch (err) {
       setLookupNote(err?.message || 'تعذّر الوصول إلى السجل التجاري')
@@ -527,7 +548,69 @@ export default function CompanyOnboarding() {
         )}
 
         {/* Step 1 */}
-        {step === 1 && (
+        {step === 1 && !identified && (
+          <div style={{
+            background: '#fff', padding: '32px', borderRadius: '16px',
+            border: '1px solid #E2E8F0',
+          }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>
+              ابدأ برقم السجل
+            </h2>
+            <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px', lineHeight: 1.9 }}>
+              اكتب رقم سجلك التجاري أو رقمك الموحّد. إن كانت شركتك في السجل الذي نشرته
+              وزارة التجارة، سنملأ بياناتها الرسمية عنك — ولن نطلب منك كتابتها.
+            </p>
+
+            <label htmlFor="identify-cr" style={{
+              fontSize: '14px', fontWeight: 700, color: '#334155',
+              display: 'block', marginBottom: '6px',
+            }}>رقم السجل التجاري أو الرقم الموحّد</label>
+            <input
+              id="identify-cr"
+              type="text"
+              inputMode="numeric"
+              value={formData.crNumber}
+              onChange={(e) => handleChange('crNumber', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); lookupRegistry() } }}
+              placeholder="١٠١٠١٢٣٤٥٦ أو ٧٠٠١٢٣٤٥٦٧"
+              style={{
+                width: '100%', border: '1.5px solid #E2E8F0', borderRadius: '10px',
+                padding: '13px 14px', fontSize: '16px', outline: 'none',
+                boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums',
+              }}
+            />
+
+            {lookupNote && (
+              <div role="alert" style={{
+                fontSize: '13px', color: '#B45309', fontWeight: 700,
+                marginTop: '10px', lineHeight: 1.9,
+              }}>{lookupNote}</div>
+            )}
+
+            <button type="button" onClick={lookupRegistry} disabled={lookupBusy}
+              style={{
+                width: '100%', marginTop: '16px', padding: '13px',
+                borderRadius: '10px', border: 0,
+                background: lookupBusy ? '#93C5FD' : '#16A34A', color: '#fff',
+                fontSize: '15px', fontWeight: 800,
+                cursor: lookupBusy ? 'default' : 'pointer', fontFamily: 'inherit',
+              }}>{lookupBusy ? '… جارٍ البحث في السجل' : 'متابعة'}</button>
+
+            {/* Not every company is in the published generation — it is one
+                quarter of one register — and none of them should be stuck. */}
+            <button type="button" onClick={() => { setRegistryMatch(null); setIdentified(true) }}
+              disabled={lookupBusy}
+              style={{
+                width: '100%', marginTop: '10px', padding: '11px',
+                borderRadius: '10px', border: '1.5px solid #E2E8F0',
+                background: '#fff', color: '#475569',
+                fontSize: '13.5px', fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>شركتي ليست في السجل — سأدخل البيانات يدوياً</button>
+          </div>
+        )}
+
+        {step === 1 && identified && (
           <form style={{
             background: '#fff',
             padding: '32px',
@@ -867,17 +950,14 @@ export default function CompanyOnboarding() {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button" onClick={lookupRegistry} disabled={lookupBusy}
+                <div style={{ fontSize: '13px', color: '#475569', fontWeight: 600, lineHeight: 1.9 }}>
+                  لم نجد هذه الشركة في السجل المنشور — أكمل بياناتها يدوياً وستراجعها إدارة مرصد.
+                  <button type="button" onClick={() => setIdentified(false)}
                     style={{
-                      padding: '9px 18px', borderRadius: '9px', border: 0,
-                      background: lookupBusy ? '#93C5FD' : '#1E2A52', color: '#fff',
-                      fontSize: '13px', fontWeight: 800,
-                      cursor: lookupBusy ? 'default' : 'pointer', fontFamily: 'inherit',
-                    }}>{lookupBusy ? '… جارٍ البحث' : 'جلب البيانات من السجل التجاري'}</button>
-                  <span style={{ fontSize: '12.5px', color: lookupNote ? '#B45309' : '#64748B', fontWeight: 600, lineHeight: 1.8 }}>
-                    {lookupNote || 'اكتب رقم السجل ثم اجلب بياناتك الرسمية بدل إدخالها يدوياً'}
-                  </span>
+                      background: 'none', border: 0, color: '#1E2A52', fontWeight: 800,
+                      fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
+                      textDecoration: 'underline', padding: '0 6px',
+                    }}>تغيير الرقم</button>
                 </div>
               )}
             </div>
