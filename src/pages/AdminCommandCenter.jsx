@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { docLabel } from '../lib/enums'
+import { S, NAVY, GREEN, BRAND, OK, TONE as TINT, card, innerCard, btnPrimary, btnGhost } from '../styles/adminTheme'
 
 /**
  * /admin/command-center — مركز الإجراءات
@@ -35,9 +36,9 @@ import { docLabel } from '../lib/enums'
  */
 
 const TONE = {
-  critical: { fg: '#B91C1C', bg: '#FEF2F2', bd: '#FECACA' },
-  high:     { fg: '#C2410C', bg: '#FFF7ED', bd: '#FED7AA' },
-  normal:   { fg: '#475569', bg: '#F8FAFC', bd: '#E2E8F0' },
+  critical: { fg: '#b91c1c', bg: '#fef2f2', bd: '#fecaca' },
+  high:     { fg: '#c2410c', bg: '#fff7ed', bd: '#fed7aa' },
+  normal:   { fg: S[600], bg: S[50], bd: S[200] },
 }
 
 // Where the decision is actually made, per kind.
@@ -57,14 +58,18 @@ const OFFICIAL_LABEL = {
 
 // The six tiles, in the order the design puts them. `k` indexes into
 // by_kind; `trust` is the one that comes from elsewhere.
+// اللون هنا يقول درجة الإلحاح، لا يميّز البلاطات عن بعضها:
+// أحمر لِما هو غير سليم، برتقالي لِما ينتظر قراراً، كحلي للإجراء الرسمي.
 const TILES = [
-  { key: 'trust',           t: 'تنبيهات الثقة',   accent: '#8B5CF6', to: '/admin/trust-score' },
-  { key: 'dispute',         t: 'اعتراضات نشطة',   accent: '#3B82F6', to: '/admin/disputes' },
-  { key: 'document_review', t: 'تحقق مستندات',    accent: '#F59E0B', to: '/admin/documents?tab=pending' },
-  { key: 'claim',           t: 'طلبات ملكية',     accent: '#F97316', to: '/admin/claim-requests' },
-  { key: 'registration',    t: 'طلبات انضمام',    accent: '#EF4444', to: '/admin/company-approval' },
-  { key: 'report_review',   t: 'تقارير للمراجعة', accent: '#DC2626', to: '/admin/reports' },
+  { key: 'report_review',   t: 'تقارير للمراجعة', tone: 'red',    icon: '📄', to: '/admin/reports' },
+  { key: 'trust',           t: 'تنبيهات الثقة',   tone: 'red',    icon: '📉', to: '/admin/trust-score' },
+  { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/company-approval' },
+  { key: 'claim',           t: 'طلبات ملكية',     tone: 'orange', icon: '🛡', to: '/admin/claim-requests' },
+  { key: 'document_review', t: 'تحقق مستندات',    tone: 'orange', icon: '🗂', to: '/admin/documents?tab=pending' },
+  { key: 'dispute',         t: 'اعتراضات نشطة',   tone: 'navy',   icon: '⚖', to: '/admin/disputes' },
 ]
+
+const RED_TXT = '#B91C1C'
 
 const num = (n) => Number(n ?? 0).toLocaleString('en')
 
@@ -160,13 +165,10 @@ const pendingDocs = async (sb) => {
   return by
 }
 
-const shell = {
-  background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px',
-  padding: '22px', minWidth: 0,
-}
+const shell = { ...card, padding: '22px' }
 const btn = {
-  minHeight: '38px', padding: '0 16px', borderRadius: '9px', fontSize: '13px',
-  fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  minHeight: '38px', padding: '0 16px', borderRadius: '10px', fontSize: '12.5px',
+  fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 }
 
 function Bars ({ lines = 3 }) {
@@ -253,34 +255,37 @@ export default function AdminCommandCenter () {
         }}>
           <div style={{ minWidth: 0 }}>
             <span style={{
-              display: 'inline-block', background: '#EEF2FF', color: '#4338CA',
-              border: '1px solid #C7D2FE', borderRadius: '999px', padding: '4px 12px',
-              fontSize: '11.5px', fontWeight: 800, marginBottom: '12px',
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: BRAND[50], color: NAVY,
+              border: `1px solid ${BRAND[100]}`, borderRadius: '999px', padding: '4px 12px',
+              fontSize: '12px', fontWeight: 600, marginBottom: '10px',
             }}>⚡ مركز الإجراءات والتدقيق المباشر</span>
 
-            <h1 style={{ fontSize: '30px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>
+            <h1 style={{ fontSize: '30px', fontWeight: 700, color: S[900], margin: '0 0 8px', letterSpacing: '-.02em' }}>
               مركز الإجراءات
             </h1>
-            <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: S[500], margin: 0 }}>
               {items.loading
                 ? 'جارٍ حساب ما يحتاج قراراً…'
                 : openTotal > 0
-                  ? <>لديك <strong style={{ color: '#B91C1C' }}>{num(openTotal)}</strong> إجراءً يحتاج انتباهك الفوري والمراجعة</>
+                  ? <>لديك <strong style={{ color: RED_TXT, fontWeight: 800 }}>{num(openTotal)} إجراءً</strong> يحتاج انتباهك الفوري والمراجعة</>
                   : 'لا يوجد عمل مفتوح — كل الطوابير فارغة.'}
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('/admin/trust-score')}
-              style={{ ...btn, minHeight: '42px', background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
-              مراقبة مؤشر الثقة
-            </button>
             <button onClick={() => navigate('/admin/work')}
-              style={{ ...btn, minHeight: '42px', background: '#2563EB', color: '#fff', border: 0 }}>
+              style={{ ...btnPrimary, minHeight: '42px' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = BRAND[700] }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = NAVY }}>
               فتح صندوق المراجعة الموحد ‹
             </button>
+            <button onClick={() => navigate('/admin/trust-score')}
+              style={{ ...btnGhost, minHeight: '42px' }}>
+              مراقبة مؤشر الثقة
+            </button>
             <button onClick={refresh} aria-label="تحديث كل الأقسام"
-              style={{ ...btn, minHeight: '42px', background: '#0F172A', color: '#fff', border: 0 }}>
+              style={{ ...btnGhost, minHeight: '42px', padding: '10px 14px' }}>
               ↻
             </button>
           </div>
@@ -305,25 +310,32 @@ export default function AdminCommandCenter () {
         {TILES.map((tile) => {
           const v = tileValue(tile.key)
           const dead = tile.key === 'trust' ? roster.error : counts.error
+          const c = TINT[tile.tone]
           return (
             <button key={tile.key} onClick={() => navigate(tile.to)}
               aria-label={`${tile.t} — ${v == null ? 'غير متاح' : num(v)}`}
+              onMouseEnter={(e) => { e.currentTarget.style.background = c.hover }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = c.bg }}
               style={{
-                ...shell, padding: '18px', cursor: 'pointer', textAlign: 'right',
+                background: c.bg, border: `1px solid ${c.bd}`, borderRadius: '12px',
+                padding: '16px', cursor: 'pointer', textAlign: 'right',
                 fontFamily: 'inherit', display: 'flex', flexDirection: 'column',
-                gap: '10px', borderRight: `3px solid ${tile.accent}`,
+                boxShadow: '0 1px 2px 0 rgba(0,0,0,.05)', transition: 'background .15s',
               }}>
               <span style={{
-                width: '9px', height: '9px', borderRadius: '50%',
-                background: tile.accent, display: 'inline-block',
-              }} />
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: '8px',
+              }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.fg }} />
+                <span style={{ fontSize: '13px', opacity: .85 }}>{tile.icon}</span>
+              </span>
               <span style={{
-                fontSize: '26px', fontWeight: 900, lineHeight: 1,
-                color: v ? tile.accent : '#CBD5E1', fontVariantNumeric: 'tabular-nums',
+                fontSize: '24px', fontWeight: 700, lineHeight: 1.1, marginBottom: '4px',
+                color: c.fg, fontVariantNumeric: 'tabular-nums',
               }}>
                 {dead ? '—' : (v == null ? '·' : num(v))}
               </span>
-              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#475569' }}>
+              <span style={{ fontSize: '12px', fontWeight: 500, color: c.tx }}>
                 {tile.t}
               </span>
             </button>
@@ -345,19 +357,20 @@ export default function AdminCommandCenter () {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             gap: '12px', flexWrap: 'wrap', marginBottom: '16px',
           }}>
-            <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: S[900], margin: 0 }}>
               🕐 صندوق الإجراءات العاجلة والأولويات
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>تصفية:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: S[400], fontWeight: 500 }}>تصفية:</span>
               {[{ v: false, t: 'الكل' }, { v: true, t: 'عاجل فقط' }].map((f) => (
                 <button key={String(f.v)} onClick={() => setOnlyUrgent(f.v)}
                   aria-pressed={onlyUrgent === f.v}
                   style={{
-                    ...btn, minHeight: '30px', padding: '0 12px', fontSize: '12px',
-                    background: onlyUrgent === f.v ? '#2563EB' : '#fff',
-                    color: onlyUrgent === f.v ? '#fff' : '#475569',
-                    border: onlyUrgent === f.v ? 0 : '1.5px solid #E2E8F0',
+                    minHeight: '30px', padding: '0 14px', fontSize: '11px', fontWeight: 700,
+                    borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
+                    background: onlyUrgent === f.v ? NAVY : '#fff',
+                    color: onlyUrgent === f.v ? '#fff' : S[700],
+                    border: onlyUrgent === f.v ? 0 : `1px solid ${S[200]}`,
                   }}>
                   {f.t}{f.v && urgent.length > 0 ? ` (${urgent.length})` : ''}
                 </button>
@@ -379,7 +392,8 @@ export default function AdminCommandCenter () {
                     const evidence = (docs.data || {})[i.company_id] || []
                     return (
                       <article key={`${i.kind}-${i.item_id}`} style={{
-                        border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px',
+                        border: `1px solid ${S[200]}`, borderRadius: '12px', padding: '16px',
+                        background: '#fff',
                       }}>
                         {/* Who, and how loud */}
                         <div style={{
@@ -388,10 +402,11 @@ export default function AdminCommandCenter () {
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
                             <span style={{
-                              background: '#EFF6FF', borderRadius: '8px', padding: '6px 8px',
+                              background: BRAND[50], border: `1px solid ${BRAND[100]}`,
+                              borderRadius: '8px', padding: '5px 7px',
                               fontSize: '13px', flex: 'none',
                             }}>🏢</span>
-                            <span style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: S[900] }}>
                               {i.company_name || i.title}
                             </span>
                           </div>
@@ -459,30 +474,40 @@ export default function AdminCommandCenter () {
                         {/* What you can do about it. */}
                         <div style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          gap: '10px', flexWrap: 'wrap', marginTop: '14px',
+                          gap: '10px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '10px',
+                          borderTop: `1px solid ${S[100]}`,
                         }}>
                           {i.company_id ? (
                             <button onClick={() => navigate(`/admin/company/${i.company_id}`)}
                               style={{
-                                ...btn, minHeight: '32px', padding: 0, background: 'none',
-                                border: 0, color: '#2563EB', fontSize: '12.5px',
+                                minHeight: '30px', padding: 0, background: 'none', border: 0,
+                                color: NAVY, fontSize: '12px', fontWeight: 700,
+                                cursor: 'pointer', fontFamily: 'inherit',
                               }}>
                               عرض ملف الفحص والملكية الكامل ↗
                             </button>
                           ) : <span />}
 
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            <button onClick={() => navigate(KIND_ROUTE[i.kind] || '/admin/work')}
-                              style={{ ...btn, background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0' }}>
-                              مراجعة مع الملاحظات
-                            </button>
                             {!i.assignee && i.assignable && can('work.assign_self') && (
                               <button onClick={() => takeIt(i.item_id)} disabled={busy}
                                 aria-label={`استلام ${i.kind_label} — ${i.company_name || i.title}`}
-                                style={{ ...btn, background: '#2563EB', color: '#fff', border: 0, opacity: busy ? .6 : 1 }}>
+                                style={{
+                                  padding: '6px 14px', borderRadius: '8px', background: NAVY,
+                                  color: '#fff', border: 0, fontSize: '12px', fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: 'inherit', opacity: busy ? .6 : 1,
+                                }}>
                                 ⊙ استلام
                               </button>
                             )}
+                            <button onClick={() => navigate(KIND_ROUTE[i.kind] || '/admin/work')}
+                              style={{
+                                padding: '6px 14px', borderRadius: '8px', background: S[100],
+                                color: S[700], border: `1px solid ${S[200]}`, fontSize: '12px',
+                                fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                              }}>
+                              مراجعة مع الملاحظات
+                            </button>
                           </div>
                         </div>
                       </article>
@@ -497,9 +522,21 @@ export default function AdminCommandCenter () {
 
           {/* Trust */}
           <section style={shell} aria-label="مؤشر الثقة الوطني للمنصة">
-            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: '0 0 14px' }}>
-              🏅 مؤشر الثقة الوطني للمنصة
-            </h2>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '10px', borderBottom: `1px solid ${S[100]}`, paddingBottom: '12px', marginBottom: '14px',
+            }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, color: S[900], margin: 0 }}>
+                🏅 مؤشر الثقة الوطني للمنصة
+              </h2>
+              {avg != null && (
+                <span style={{
+                  background: OK[50], color: OK[700], border: `1px solid ${OK[200]}`,
+                  borderRadius: '6px', padding: '2px 8px', fontSize: '10px', fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums', flex: 'none',
+                }}>{avg.toFixed(1)}%</span>
+              )}
+            </div>
 
             {roster.loading ? <Bars lines={3} />
               : roster.error ? <Failed what="مؤشر الثقة" message={roster.error} onRetry={roster.reload} />
@@ -509,48 +546,40 @@ export default function AdminCommandCenter () {
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '10px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#15803D' }}>
-                        {avg.toFixed(1)}%
-                      </span>
-                      <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>
-                        متوسط {num(roster.data.scored)} شركة مقيَّمة
-                      </span>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      fontSize: '12px', fontWeight: 500, color: S[600], marginBottom: '8px',
+                    }}>
+                      <span>متوسط الشفافية المسجلة</span>
+                      <span style={{ color: avgBand.fg, fontWeight: 700 }}>{avgBand.t}</span>
                     </div>
 
+                    {/* الشريط بحشوة داخلية وحدّ — كما في النموذج. */}
                     <div style={{
-                      height: '7px', background: '#F1F5F9', borderRadius: '999px',
-                      overflow: 'hidden', marginBottom: '8px',
+                      height: '12px', background: S[100], borderRadius: '999px',
+                      border: `1px solid ${S[200]}`, padding: '2px', marginBottom: '14px',
                     }}>
                       <div style={{
                         width: `${Math.min(100, Math.max(0, avg))}%`, height: '100%',
-                        background: avgBand.fg, borderRadius: '999px',
+                        background: GREEN, borderRadius: '999px',
                       }} />
                     </div>
 
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between',
-                      fontSize: '11.5px', fontWeight: 700, marginBottom: '16px',
-                    }}>
-                      <span style={{ color: avgBand.fg }}>{avgBand.t}</span>
-                      <span style={{ color: '#94A3B8' }}>متوسط الشفافية المسجلة</span>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '19px', fontWeight: 900, color: '#B45309' }}>
-                          {roster.data.cleanPct == null ? '—' : `${roster.data.cleanPct.toFixed(1)}%`}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '3px' }}>
-                          سجلات بلا ملاحظات جودة
-                        </div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '19px', fontWeight: 900, color: '#1E2A52' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'center' }}>
+                      <div style={{ ...innerCard, padding: '12px' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: NAVY }}>
                           {num(roster.data.total)}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, marginTop: '3px' }}>
+                        <div style={{ fontSize: '11px', color: S[500], marginTop: '2px' }}>
                           شركة مسجَّلة ومعتمدة
+                        </div>
+                      </div>
+                      <div style={{ ...innerCard, padding: '12px' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#d97706' }}>
+                          {roster.data.cleanPct == null ? '—' : `${roster.data.cleanPct.toFixed(1)}%`}
+                        </div>
+                        <div style={{ fontSize: '11px', color: S[500], marginTop: '2px' }}>
+                          سجلات بلا ملاحظات جودة
                         </div>
                       </div>
                     </div>
@@ -562,13 +591,13 @@ export default function AdminCommandCenter () {
           <section style={shell} aria-label="تنبيهات المراقبة الفورية">
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: '10px', marginBottom: '14px',
+              gap: '10px', borderBottom: `1px solid ${S[100]}`, paddingBottom: '12px', marginBottom: '14px',
             }}>
-              <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, color: S[900], margin: 0 }}>
                 ⚠ تنبيهات المراقبة الفورية
               </h2>
               {roster.data?.alerts?.length > 0 && (
-                <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 700 }}>
+                <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>
                   {roster.data.alerts.length} بلاغات
                 </span>
               )}
@@ -585,15 +614,17 @@ export default function AdminCommandCenter () {
                     {roster.data.alerts.map((a) => (
                       <button key={a.company_id}
                         onClick={() => navigate(`/admin/company/${a.company_id}`)}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#d8b4fe' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = S[200] }}
                         style={{
-                          background: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '10px',
-                          padding: '11px 13px', textAlign: 'right', cursor: 'pointer',
-                          fontFamily: 'inherit', width: '100%',
+                          background: S[50], border: `1px solid ${S[200]}`, borderRadius: '12px',
+                          padding: '12px', textAlign: 'right', cursor: 'pointer',
+                          fontFamily: 'inherit', width: '100%', transition: 'border-color .15s',
                         }}>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '3px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: S[900], marginBottom: '4px' }}>
                           {a.name}
                         </div>
-                        <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: 1.8 }}>
+                        <div style={{ fontSize: '11px', color: S[600], lineHeight: 1.7 }}>
                           {a.official_status && a.official_status !== 'none'
                             && `حالة رسمية: ${OFFICIAL_LABEL[a.official_status] || a.official_status}`}
                           {(a.quality_issues || []).length > 0
@@ -617,8 +648,9 @@ export default function AdminCommandCenter () {
 
             <button onClick={() => navigate('/admin/fraud-detection')}
               style={{
-                ...btn, width: '100%', marginTop: '14px', background: '#F8FAFC',
-                color: '#475569', border: '1.5px solid #E2E8F0',
+                width: '100%', marginTop: '14px', padding: '9px 16px', borderRadius: '12px',
+                background: S[100], color: S[700], border: `1px solid ${S[200]}`,
+                fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               عرض كافة قوائم المراقبة المتقدمة
             </button>

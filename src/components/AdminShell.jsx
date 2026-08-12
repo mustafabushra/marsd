@@ -10,6 +10,7 @@ import { useEntitlements } from '../hooks/useEntitlements'
 // Only the two leading entries carry an icon. The grouped items below never
 // did — six more were imported for a menu that no longer exists.
 import { DashboardIcon } from './icons'
+import { S, SIDEBAR, NAVY, GREEN, OK, DARK_BADGE, FONT } from '../styles/adminTheme'
 
 // Grouped by the work, not by the kind of screen.
 //
@@ -67,7 +68,7 @@ const TOP_ITEMS = [
 // what is being watched. A heading that covers everything names nothing.
 const GROUPS = [
   { key: 'companies', section: 'الكيانات والرقابة', title: 'الشركات',
-    badgeKey: 'unclaimed', badgeWord: 'غير مطالب بها', badgeBg: '#F59E0B', items: [
+    badgeKey: 'unclaimed', badgeWord: 'غير مطالب بها', badgeTone: 'sky', items: [
     { label: 'كل الشركات', path: '/admin/companies' },
     { label: 'طلبات الشركات', path: '/admin/company-requests' },
     // The registry screen already filters on claimed_by; this is that filter as
@@ -97,14 +98,14 @@ const GROUPS = [
   // of the eighth is worse than no promise, so it gets its own line saying
   // what it actually is. The individual decision still lives in Company 360;
   // this is the screen for doing many at once.
-  { key: 'review', title: 'المراجعة', badgeKey: 'pending', badgeWord: 'معلق', badgeBg: '#F59E0B', items: [
+  { key: 'review', title: 'المراجعة', badgeKey: 'pending', badgeWord: 'معلق', badgeTone: 'red', items: [
     { label: 'صندوق المراجعة', path: '/admin/work' },
     { label: 'طلبات الانضمام', path: '/admin/company-approval' },
     { label: 'طلبات الملكية', path: '/admin/claim-requests' },
     { label: 'التحقق من الشركات', path: '/admin/company-verification' },
   ] },
 
-  { key: 'reports', title: 'التقارير', badgeKey: 'reviews', badgeWord: 'قيد المراجعة', badgeBg: '#F59E0B', items: [
+  { key: 'reports', title: 'التقارير', badgeKey: 'reviews', badgeWord: 'قيد المراجعة', badgeTone: 'orange', items: [
     { label: 'التقارير', path: '/admin/reports' },
     // The one queue, narrowed to this kind — `?kind=` is read by مركز العمل.
     { label: 'تقارير قيد المراجعة', path: '/admin/work?kind=report_review' },
@@ -114,14 +115,14 @@ const GROUPS = [
 
   // The document screen's own tabs, as links. `?tab=` matches TABS in
   // AdminDocuments exactly — pending / expired / rejected.
-  { key: 'documents', title: 'المستندات', badgeKey: 'docs', badgeWord: 'تنبيه', badgeBg: '#F59E0B', items: [
+  { key: 'documents', title: 'المستندات', badgeKey: 'docs', badgeWord: 'تنبيه', badgeTone: 'orange', items: [
     { label: 'المستندات', path: '/admin/documents' },
     { label: 'المستندات قيد الفحص', path: '/admin/documents?tab=pending' },
     { label: 'المستندات المنتهية', path: '/admin/documents?tab=expired' },
     { label: 'المستندات المرفوضة', path: '/admin/documents?tab=rejected' },
   ] },
 
-  { key: 'watch', title: 'المراقبة', badgeKey: 'trust', badgeWord: 'تنبيه ثقة', badgeBg: '#DC2626', items: [
+  { key: 'watch', title: 'المراقبة', badgeKey: 'trust', badgeWord: 'تنبيه ثقة', badgeTone: 'red', items: [
     { label: 'قوائم المراقبة', path: '/admin/fraud-detection' },
     { label: 'تنبيهات مؤشر الثقة', path: '/admin/trust-score' },
     { label: 'تغييرات الشركات', path: '/admin/data-management' },
@@ -306,7 +307,7 @@ export default function AdminShell({ user }) {
   }, [path])
 
   return (
-    <div dir="rtl" style={{ fontFamily: 'Tajawal, system-ui, sans-serif', background: '#F8FAFC', minHeight: '100vh', display: 'flex', color: '#0F172A' }}>
+    <div dir="rtl" style={{ fontFamily: FONT, background: S[50], minHeight: '100vh', display: 'flex', color: S[900] }}>
       {/* Skip link. Both shells put a sidebar of 15+ links before the content, so
           a keyboard user tabs through the entire navigation on every page before
           reaching anything. WCAG 2.4.1. Visible only when focused — it is for
@@ -323,7 +324,7 @@ export default function AdminShell({ user }) {
       {/* Tapping beside an open overlay closes it — the expected way out. */}
       {navOpen && <div className="marsad-scrim" onClick={() => setNavOpen(false)} />}
 
-      <aside className="marsad-sidebar" data-open={navOpen} style={{ width: '288px', background: '#0B1220', flex: 'none', display: 'flex', flexDirection: 'column', padding: '22px 16px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      <aside className="marsad-sidebar" data-open={navOpen} style={{ width: '288px', background: SIDEBAR, borderInlineStart: `1px solid ${S[800]}`, flex: 'none', display: 'flex', flexDirection: 'column', padding: '18px 12px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         {/* Logo */}
         <div onClick={() => navigate('/admin')} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '0 8px 22px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: '16px' }}>
           <span style={{ display: 'inline-flex', background: '#fff', borderRadius: '9px', padding: '5px', flex: 'none' }}>
@@ -354,21 +355,21 @@ export default function AdminShell({ user }) {
             footings. Same navigation, said as what it is, at the top. */}
         <div role="tablist" aria-label="التبديل بين اللوحتين"
           style={{
-            display: 'flex', gap: '4px', padding: '4px', marginBottom: '14px',
-            background: 'rgba(255,255,255,.06)', borderRadius: '999px',
-            border: '1px solid rgba(255,255,255,.10)',
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', padding: '4px',
+            marginBottom: '14px', background: S[950], borderRadius: '12px',
+            border: `1px solid ${S[800]}`, fontSize: '12px', fontWeight: 700,
           }}>
           <span role="tab" aria-selected="true"
             style={{
-              flex: 1, textAlign: 'center', padding: '8px 10px', borderRadius: '999px',
-              background: '#1E2A52', color: '#fff', fontSize: '12.5px', fontWeight: 800,
+              textAlign: 'center', padding: '6px 10px', borderRadius: '8px',
+              background: NAVY, color: '#fff',
             }}>لوحة الإدارة</span>
           <button role="tab" aria-selected="false"
             onClick={() => navigate('/dashboard')}
             style={{
-              flex: 1, textAlign: 'center', padding: '8px 10px', borderRadius: '999px',
-              background: 'transparent', border: 0, color: '#94A3B8',
-              fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+              textAlign: 'center', padding: '6px 10px', borderRadius: '8px',
+              background: 'transparent', border: 0, color: S[400],
+              fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', fontFamily: 'inherit',
             }}>لوحة الشركات</button>
         </div>
 
@@ -393,18 +394,27 @@ export default function AdminShell({ user }) {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  background: active ? '#16A34A' : 'transparent', border: 0,
-                  color: active ? '#fff' : '#CBD5E1', padding: '12px 15px', fontSize: '14.5px',
-                  fontWeight: active ? 800 : 600, textAlign: 'right', cursor: 'pointer', borderRadius: '11px',
-                  display: 'flex', alignItems: 'center', gap: '12px', fontFamily: 'inherit',
+                  background: active ? GREEN : 'transparent', border: 0,
+                  color: active ? '#fff' : S[300], padding: '10px 14px', fontSize: '14px',
+                  fontWeight: 500, textAlign: 'right', cursor: 'pointer', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: '12px', fontFamily: 'inherit',
+                  boxShadow: active ? '0 4px 6px -1px rgba(22,163,74,.35)' : 'none',
                 }}
-                onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,.06)'; e.currentTarget.style.color = '#fff' } }}
-                onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#CBD5E1' } }}
+                onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = 'rgba(30,41,59,.8)'; e.currentTarget.style.color = '#fff' } }}
+                onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S[300] } }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', flex: 'none', color: 'inherit' }}><Icon /></span>
-                <span style={{ flex: 1 }}>{item.label}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', flex: 'none', color: active ? '#fff' : OK[400] }}><Icon /></span>
+                  <span>{item.label}</span>
+                </span>
+                {/* النبض هنا مقصود: هذا العدّاد وحده هو ما يقول «الآن». */}
                 {item.badgeKey && counts[item.badgeKey] > 0 && (
-                  <span style={{ background: item.badgeBg, color: '#fff', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 800 }}>{counts[item.badgeKey]}</span>
+                  <span style={{
+                    background: '#ef4444', color: '#fff', borderRadius: '999px',
+                    padding: '1px 8px', fontSize: '10px', fontWeight: 700, flex: 'none',
+                    animation: 'marsadPulse 2s ease-in-out infinite',
+                  }}>{counts[item.badgeKey]}</span>
                 )}
               </button>
             )
@@ -423,28 +433,43 @@ export default function AdminShell({ user }) {
                     items and nothing to collapse. */}
                 {g.section && (
                   <div style={{
-                    fontSize: '10.5px', fontWeight: 800, color: '#64748B',
-                    letterSpacing: '.6px', padding: '18px 10px 2px',
+                    fontSize: '11px', fontWeight: 600, color: S[500],
+                    letterSpacing: '.05em', padding: '12px 12px 4px',
                   }}>{g.section}</div>
                 )}
                 <div
                   onClick={() => toggleGroup(g.key, open)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 10px 11px 8px', marginTop: '8px', cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: '12px', fontWeight: 800, color: hasActive ? '#fff' : '#94A3B8' }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '8px 14px', marginTop: '2px', cursor: 'pointer',
+                    borderRadius: '8px', fontSize: '14px',
+                    fontWeight: hasActive ? 600 : 500,
+                    background: hasActive ? S[800] : 'transparent',
+                    color: hasActive ? OK[400] : S[300],
+                    // الشريط على الحافة الابتدائية — يمين في RTL.
+                    borderInlineStart: hasActive ? `4px solid ${GREEN}` : '4px solid transparent',
+                  }}
                 >
                   <span style={{ flex: 'none' }}>{g.title}</span>
-                  {/* The number and what it counts. «2» alone tells you
-                      something is there but not whether it needs you. */}
-                  {n > 0 && (
+                  <span style={{ flex: 1 }} />
+                  {/* الرقم ونوعه. «٢» وحدها تقول إن هناك شيئاً، لا إن كان يحتاجك. */}
+                  {n > 0 && g.badgeTone && (
                     <span style={{
-                      background: g.badgeBg, color: '#fff', borderRadius: '999px',
-                      padding: '2px 8px', fontSize: '10px', fontWeight: 800,
-                      whiteSpace: 'nowrap', flex: 'none',
+                      background: DARK_BADGE[g.badgeTone].bg,
+                      color: DARK_BADGE[g.badgeTone].fg,
+                      border: `1px solid ${DARK_BADGE[g.badgeTone].bd}`,
+                      borderRadius: '999px', padding: '1px 8px', fontSize: '10px',
+                      fontWeight: 500, whiteSpace: 'nowrap', flex: 'none',
                     }}>{n} {g.badgeWord}</span>
                   )}
-                  <span style={{ flex: 1 }} />
-                  <span style={{ display: 'inline-block', transition: 'transform .15s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: '#64748B', fontSize: '10px', flex: 'none' }}>▾</span>
+                  <span style={{ display: 'inline-block', transition: 'transform .2s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: open ? OK[400] : S[400], fontSize: '10px', flex: 'none' }}>▾</span>
                 </div>
-                <div style={{ display: open ? 'flex' : 'none', flexDirection: 'column', gap: '2px', paddingBottom: '4px' }}>
+                {/* خطّ رفيع على حافة القائمة الفرعية — يربط البنود بعنوانها. */}
+                <div style={{
+                  display: open ? 'flex' : 'none', flexDirection: 'column', gap: '2px',
+                  margin: '4px 24px 4px 0', paddingInlineEnd: '12px',
+                  borderInlineStart: `1px solid ${S[800]}`,
+                }}>
                   {g.items.map((it, idx) => {
                     if (it.header) {
                       return <div key={`h-${idx}`} style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', padding: '10px 15px 4px' }}>{it.header}</div>
@@ -456,13 +481,14 @@ export default function AdminShell({ user }) {
                         onClick={() => navigate(it.path)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: it.indent ? '10px 34px 10px 15px' : '10px 15px', borderRadius: '10px',
-                          fontSize: '13.5px', fontWeight: active ? 800 : 600, cursor: 'pointer', border: 0,
+                          padding: it.indent ? '6px 26px 6px 12px' : '6px 12px', borderRadius: '8px',
+                          fontSize: '12px', fontWeight: active ? 600 : 400, cursor: 'pointer', border: 0,
                           width: '100%', textAlign: 'right', fontFamily: 'inherit',
-                          background: active ? '#16A34A' : 'transparent', color: active ? '#fff' : '#94A3B8',
+                          background: active ? 'rgba(30,41,59,.85)' : 'transparent',
+                          color: active ? '#fff' : S[400],
                         }}
-                        onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,.06)'; e.currentTarget.style.color = '#fff' } }}
-                        onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94A3B8' } }}
+                        onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = 'rgba(30,41,59,.5)'; e.currentTarget.style.color = S[200] } }}
+                        onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S[400] } }}
                       >
                         {it.label}
                       </button>
@@ -496,7 +522,7 @@ export default function AdminShell({ user }) {
             the search by construction and pins each side to its own edge. Two
             shells that put the same control in two different places is one
             product that behaves like two. */}
-        <header className="marsad-appbar" style={{ background: '#fff', borderBottom: '1px solid #E2E8F0', padding: '0 32px', minHeight: '68px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px', position: 'sticky', top: 0, zIndex: 30 }}>
+        <header className="marsad-appbar" style={{ background: '#fff', borderBottom: `1px solid ${S[200]}`, padding: '0 28px', minHeight: '64px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '20px', position: 'sticky', top: 0, zIndex: 30 }}>
           <div className="marsad-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, justifySelf: 'start' }}>
             {/* Shown only where the sidebar is an overlay. */}
             <button
@@ -523,19 +549,19 @@ export default function AdminShell({ user }) {
                 onClick={() => navigate('/admin/work')}
                 title={`${urgent} عنصراً بانتظار قرار`}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '7px', flex: 'none',
-                  background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '999px',
-                  padding: '5px 12px 5px 8px', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: '8px', flex: 'none',
+                  background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '999px',
+                  padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: '12px', fontWeight: 600, color: '#b91c1c',
                 }}>
                 <span style={{
-                  background: '#DC2626', color: '#fff', borderRadius: '999px',
-                  minWidth: '20px', height: '20px', display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11.5px', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+                  width: '8px', height: '8px', borderRadius: '999px', flex: 'none',
+                  background: '#dc2626',
                   animation: 'marsadPulse 2s ease-in-out infinite',
-                }}>{urgent}</span>
-                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#B91C1C' }}>
-                  يحتاج قراراً
+                }} />
+                <span>مركز الإجراءات:</span>
+                <span style={{ fontWeight: 700, color: '#991b1b', fontVariantNumeric: 'tabular-nums' }}>
+                  {urgent} إجراء عاجل
                 </span>
               </button>
             )}
@@ -548,17 +574,17 @@ export default function AdminShell({ user }) {
             onClick={() => window.dispatchEvent(
               new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
             title="ابحث أو نفّذ أمراً"
-            style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC',
-                     border: '1px solid #E2E8F0', borderRadius: '11px', padding: '12px 18px',
-                     cursor: 'pointer', fontFamily: 'inherit', color: '#64748B', fontSize: '14px',
-                     fontWeight: 600, width: 'min(520px, 100%)', minWidth: '340px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', background: S[100],
+                     border: 0, borderRadius: '999px', padding: '9px 16px',
+                     cursor: 'pointer', fontFamily: 'inherit', color: S[500], fontSize: '12px',
+                     fontWeight: 400, width: 'min(520px, 100%)', minWidth: '280px' }}>
             <span style={{ flex: 'none' }}>🔍</span>
             <span style={{ flex: 1, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              ابحث عن شركة أو نفّذ أمراً…
+              ابحث باسم الشركة، السجل التجاري، أو الرقم الموحد…
             </span>
-            <kbd style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '5px',
-                          padding: '1px 6px', fontSize: '10.5px', fontWeight: 800, direction: 'ltr',
-                          color: '#94A3B8', flex: 'none' }}>
+            <kbd style={{ background: '#fff', border: `1px solid ${S[200]}`, borderRadius: '999px',
+                          padding: '2px 8px', fontSize: '10px', fontWeight: 500, direction: 'ltr',
+                          color: S[500], flex: 'none' }}>
               Ctrl K
             </kbd>
           </button>
