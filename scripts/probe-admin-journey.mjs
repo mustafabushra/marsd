@@ -83,7 +83,11 @@ try {
   }
 
   await page.goBack()
-  await page.waitForTimeout(1800)
+  // Wait for the screen behind, not for the clock. A fixed 1.8s read the work
+  // centre mid-load and called a page that renders fine «empty».
+  await page.waitForFunction(
+    () => (document.querySelector('#main')?.innerText || '').trim().length > 200,
+    { timeout: 20000 }).catch(() => {})
   ok('الرجوع من الملفّ لا يترك صفحة فارغة',
     (await page.locator('#main').innerText()).trim().length > 200, page.url())
 

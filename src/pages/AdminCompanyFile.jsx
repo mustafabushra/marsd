@@ -4,6 +4,11 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { SkeletonPage } from '../components/Skeleton'
 import DocumentViewer from '../components/DocumentViewer'
+// Field and TabError stay local for now: this screen's Field drops empty values
+// rather than printing «—», and TabError is an inline note, not a block. The
+// primitive learned hideEmpty so the next screen need not fork it; renaming
+// twenty call sites here is its own pass.
+import { Card, SectionTitle, EmptyState } from '../ui'
 
 /**
  * /admin/company/:id — one company, everything about it.
@@ -189,7 +194,6 @@ const EDITABLE = [
 ]
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('ar-SA') : '—')
-const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }
 const h3 = { fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px' }
 const lbl = { fontSize: '11.5px', color: '#64748B', fontWeight: 700 }
 const val = { fontSize: '14px', color: '#0F172A', fontWeight: 700, marginTop: '3px' }
@@ -484,10 +488,10 @@ export default function AdminCompanyFile() {
 
   if (error || !file?.company_id) {
     return (
-      <div style={card}>
+      <Card>
         <h1 style={{ fontSize: '19px', fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>ملف الشركة</h1>
         <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>{error || 'الشركة غير موجودة، أو ليست ضمن صلاحيتك.'}</p>
-      </div>
+      </Card>
     )
   }
 
@@ -505,7 +509,7 @@ export default function AdminCompanyFile() {
   return (
     <div>
       {/* Header — the identity and the state, on every tab. */}
-      <div style={{ ...card, marginBottom: '16px' }}>
+      <Card style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div style={{ minWidth: '220px', flex: 1 }}>
             <button onClick={() => navigate('/admin/roster')}
@@ -555,7 +559,7 @@ export default function AdminCompanyFile() {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* A real tablist. The labels here repeat names that also exist in the
           navigation — «الاعتراضات» is both a tab and a sidebar entry — so a test
@@ -600,8 +604,8 @@ export default function AdminCompanyFile() {
               leaving the one page that shows the documents, the reports and
               the history the decision rests on. The queues still exist and are
               still how the work is found; this is where it is done. */}
-          <div style={card}>
-            <h2 style={h3}>القرارات</h2>
+          <Card>
+            <SectionTitle>القرارات</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ ...lbl, minWidth: '78px' }}>التسجيل</span>
@@ -654,10 +658,10 @@ export default function AdminCompanyFile() {
                 )}
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div style={card}>
-            <h2 style={h3}>السلوك التجاري</h2>
+          <Card>
+            <SectionTitle>السلوك التجاري</SectionTitle>
             <Grid>
               <Stat k="تقارير معتمدة" v={beh.reports_approved ?? 0} sub={`من ${beh.reports_total ?? 0}`} />
               <Stat k="نسبة السداد الكامل" v={beh.on_time_pct == null ? '—' : `${beh.on_time_pct}%`} />
@@ -666,21 +670,21 @@ export default function AdminCompanyFile() {
               <Stat k="جهات مُبلِّغة" v={beh.counterparties ?? 0} sub="مستقلّة" />
               <Stat k="قيد المراجعة" v={beh.reports_pending ?? 0} sub={`${beh.reports_rejected ?? 0} مرفوض`} />
             </Grid>
-          </div>
-          <div style={card}>
-            <h2 style={h3}>جودة السجلّ</h2>
+          </Card>
+          <Card>
+            <SectionTitle>جودة السجلّ</SectionTitle>
             <Grid>
               <Stat k="اكتمال البيانات" v={`${q.profile_completeness ?? 0}%`} />
               <Stat k="مستندات موثّقة" v={q.documents ?? 0} sub={`${docs.filter((d) => d.state === 'pending').length} بانتظار المراجعة`} />
               <Stat k="آخر تقرير" v={fmt(q.last_report_at)} />
               <Stat k="اعتراضات قائمة" v={q.disputes_open ?? 0} />
             </Grid>
-          </div>
+          </Card>
         </div>
       )}
 
       {tab === 'data' && (
-        <div style={card}>
+        <Card>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <h2 style={{ ...h3, margin: 0 }}>البيانات الأساسية</h2>
             <button onClick={openEdit} disabled={busy}
@@ -709,12 +713,12 @@ export default function AdminCompanyFile() {
               <div style={{ fontSize: '12px', color: '#B91C1C', opacity: 0.8, marginTop: '5px' }}>{fmt(ident.official_status.at)}</div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {tab === 'documents' && (
-        <div style={card}>
-          <h2 style={h3}>المستندات</h2>
+        <Card>
+          <SectionTitle>المستندات</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {docs.map((d) => {
               const st = DOC_STATE[d.state] || DOC_STATE.missing
@@ -793,7 +797,7 @@ export default function AdminCompanyFile() {
                   style={{ marginTop: '16px', padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '9px', background: '#fff', color: '#1E2A52', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             طابور التوثيق لكل الشركات
           </button>
-        </div>
+        </Card>
       )}
 
       {tab === 'account' && (
@@ -803,8 +807,8 @@ export default function AdminCompanyFile() {
               work is found across every company. This is the one screen where
               «who says this is theirs» is a question about the company in front
               of you, and the evidence for answering it is on this page. */}
-          <div style={{ ...card, marginBottom: '16px' }}>
-            <h2 style={h3}>طلبات الملكية</h2>
+          <Card style={{ marginBottom: '16px' }}>
+            <SectionTitle>طلبات الملكية</SectionTitle>
             {claims.loading ? <TabSkeleton n={2} />
               : claims.error ? <TabError what="طلبات الملكية" message={claims.error} onRetry={claims.reload} />
                 : !claims.data?.length ? (
@@ -853,14 +857,14 @@ export default function AdminCompanyFile() {
                     )}
                   </div>
                 ))}
-          </div>
+          </Card>
 
           {/* Where this record came from.
               A company the Ministry published and one somebody typed are
               different claims, and a reviewer should not have to guess which is
               in front of them. */}
-          <div style={card}>
-            <h2 style={h3}>المصدر</h2>
+          <Card>
+            <SectionTitle>المصدر</SectionTitle>
             <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: 2.1 }}>
               {context?.origin?.from_registry
                 ? '🏛 من السجل التجاري — وزارة التجارة'
@@ -871,10 +875,10 @@ export default function AdminCompanyFile() {
                 ? `موثّقة — ${context.origin.verification_source || 'مصدر غير مسمّى'}`
                 : 'غير موثّقة'}
             </div>
-          </div>
+          </Card>
 
-          <div style={card}>
-            <h2 style={h3}>الحساب</h2>
+          <Card>
+            <SectionTitle>الحساب</SectionTitle>
             {context?.tenant ? (
               <>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
@@ -908,10 +912,10 @@ export default function AdminCompanyFile() {
                 لا حساب مرتبط بهذه الشركة — لم يُطالب بها أحد بعد.
               </div>
             )}
-          </div>
+          </Card>
 
-          <div style={card}>
-            <h2 style={h3}>الطلبات</h2>
+          <Card>
+            <SectionTitle>الطلبات</SectionTitle>
             {(context?.requests || []).length === 0 ? (
               <div style={{ fontSize: '13.5px', color: '#64748B' }}>لا طلبات</div>
             ) : (
@@ -941,14 +945,14 @@ export default function AdminCompanyFile() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </>
       )}
 
 
       {tab === 'reports' && (
-        <div style={card}>
-          <h2 style={h3}>التقارير عن هذه الشركة</h2>
+        <Card>
+          <SectionTitle>التقارير عن هذه الشركة</SectionTitle>
           {(full?.recent || []).length === 0 ? (
             <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا تقارير معتمدة بعد.</p>
           ) : (
@@ -978,12 +982,12 @@ export default function AdminCompanyFile() {
               </div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {tab === 'clarifications' && (
-        <div style={card}>
-          <h2 style={h3}>طلبات التوضيح</h2>
+        <Card>
+          <SectionTitle>طلبات التوضيح</SectionTitle>
           {(file.clarifications || []).length === 0 ? (
             <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا طلبات توضيح على هذه الشركة.</p>
           ) : (
@@ -1012,20 +1016,20 @@ export default function AdminCompanyFile() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {tab === 'score' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={card}>
-            <h2 style={h3}>موضعها في السوق</h2>
+          <Card>
+            <SectionTitle>موضعها في السوق</SectionTitle>
             <Grid>
               <Stat k="متوسط القطاع" v={full?.market?.sector_avg ?? '—'} sub={ident.sector || ''} />
               <Stat k="الترتيب" v={full?.market?.rank ?? '—'} sub={`من ${full?.market?.rated_total ?? 0} مصنّفة`} />
             </Grid>
-          </div>
-          <div style={card}>
-            <h2 style={h3}>تاريخ المؤشر</h2>
+          </Card>
+          <Card>
+            <SectionTitle>تاريخ المؤشر</SectionTitle>
             {history.length < 2 ? (
               <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
                 {history.length ? `قياس واحد — سُجّل ${fmt(history[0].recorded_at)}` : 'لا قياسات بعد.'}
@@ -1042,14 +1046,14 @@ export default function AdminCompanyFile() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ===== Disputes ===== */}
       {tab === 'disputes' && (
-        <div style={card}>
-          <h2 style={h3}>الاعتراضات</h2>
+        <Card>
+          <SectionTitle>الاعتراضات</SectionTitle>
           {disputes.loading ? <TabSkeleton />
             : disputes.error ? <TabError what="الاعتراضات" message={disputes.error} onRetry={disputes.reload} />
               : !disputes.data?.items?.length ? (
@@ -1129,13 +1133,13 @@ export default function AdminCompanyFile() {
                   ))}
                 </>
               )}
-        </div>
+        </Card>
       )}
 
       {/* ===== Timeline — the story, not the columns ===== */}
       {tab === 'timeline' && (
-        <div style={card}>
-          <h2 style={h3}>الخطّ الزمني</h2>
+        <Card>
+          <SectionTitle>الخطّ الزمني</SectionTitle>
           {timeline.loading ? <TabSkeleton n={6} />
             : timeline.error ? <TabError what="الخطّ الزمني" message={timeline.error} onRetry={timeline.reload} />
               : !timeline.data?.length ? (
@@ -1168,12 +1172,12 @@ export default function AdminCompanyFile() {
                   </div>
                 )
               })}
-        </div>
+        </Card>
       )}
 
       {/* ===== Audit — raw on purpose ===== */}
       {tab === 'audit' && (
-        <div style={card}>
+        <Card>
           <h2 style={{ ...h3, marginBottom: '4px' }}>سجل التدقيق</h2>
           <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 14px' }}>
             من غيّر أي حقل، ومن أي قيمة إلى أي قيمة، ولماذا. القيم كما كُتبت.
@@ -1246,7 +1250,7 @@ export default function AdminCompanyFile() {
                   </div>
                 </>
               )}
-        </div>
+        </Card>
       )}
 
       {/* ===== Audit detail — a drawer, not a page ===== */}
@@ -1314,8 +1318,8 @@ export default function AdminCompanyFile() {
       )}
 
       {tab === 'activity' && (
-        <div style={card}>
-          <h2 style={h3}>سجل النشاط</h2>
+        <Card>
+          <SectionTitle>سجل النشاط</SectionTitle>
           {(file.timeline || []).length === 0 ? (
             <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا نشاط مسجّل.</p>
           ) : (
@@ -1334,7 +1338,7 @@ export default function AdminCompanyFile() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {asking && (
@@ -1503,7 +1507,7 @@ export default function AdminCompanyFile() {
             position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 150,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
           }}>
-          <div style={{ ...card, width: 'min(500px, 100%)' }}>
+          <Card style={{ width: 'min(500px, 100%)' }}>
             <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>رفض المستند</h2>
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
               {rejecting.label} — سيُعرض السبب على الشركة.
@@ -1532,7 +1536,7 @@ export default function AdminCompanyFile() {
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>إلغاء</button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -1546,7 +1550,7 @@ export default function AdminCompanyFile() {
             position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 150,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
           }}>
-          <div style={{ ...card, width: 'min(500px, 100%)' }}>
+          <Card style={{ width: 'min(500px, 100%)' }}>
             <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>
               {deciding.title}
             </h2>
@@ -1579,7 +1583,7 @@ export default function AdminCompanyFile() {
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>إلغاء</button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 

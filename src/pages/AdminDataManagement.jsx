@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPanel } from '../components/Skeleton'
+import { Card, PageTitle, SectionTitle, ErrorState } from '../ui'
 
 /**
  * /admin/data-management — the commercial register, generation by generation.
@@ -41,8 +42,6 @@ import { SkeletonPanel } from '../components/Skeleton'
  * which is what makes the button a convenience rather than the control.
  */
 
-const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px' }
-const h3 = { fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px' }
 const lbl = { fontSize: '11.5px', color: '#64748B', fontWeight: 700 }
 const val = { fontSize: '14px', color: '#0F172A', fontWeight: 700, marginTop: '3px' }
 const num = { ...val, fontVariantNumeric: 'tabular-nums' }
@@ -62,21 +61,6 @@ const state = (s) => STATE[s] || { t: s || '—', bg: '#F1F5F9', fg: '#475569', 
 
 const n = (v) => (v == null ? '—' : Number(v).toLocaleString('ar-SA'))
 const dt = (d) => (d ? new Date(d).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
-
-/** A section that failed on its own, and can be retried on its own. */
-function Failed ({ what, message, onRetry }) {
-  return (
-    <div style={{ padding: '16px 0' }}>
-      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#B91C1C' }}>تعذّر تحميل {what}</div>
-      <div style={{ fontSize: '12.5px', color: '#64748B', margin: '5px 0 10px', lineHeight: 1.9 }}>{message}</div>
-      <button onClick={onRetry} style={{
-        padding: '7px 15px', borderRadius: '8px', border: '1.5px solid #E2E8F0',
-        background: '#fff', color: '#1E2A52', fontSize: '12.5px', fontWeight: 800,
-        cursor: 'pointer', fontFamily: 'inherit',
-      }}>إعادة المحاولة</button>
-    </div>
-  )
-}
 
 function Field ({ k, v, mono }) {
   return (
@@ -179,10 +163,9 @@ export default function AdminDataManagement () {
 
   return (
     <div>
-      <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>إدارة البيانات</h1>
-      <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 18px', lineHeight: 1.9 }}>
-        السجل التجاري كما نشرته وزارة التجارة، جيلاً بعد جيل. لا يُنشر جيل إلا بعد اجتياز الفحص.
-      </p>
+      <PageTitle note="السجل التجاري كما نشرته وزارة التجارة، جيلاً بعد جيل. لا يُنشر جيل إلا بعد اجتياز الفحص.">
+        إدارة البيانات
+      </PageTitle>
 
       {toast && (
         <div role="status" style={{
@@ -192,10 +175,10 @@ export default function AdminDataManagement () {
       )}
 
       {/* ===== The generation the product is reading right now ===== */}
-      <div style={{ ...card, marginBottom: '16px' }}>
-        <h2 style={h3}>الجيل المنشور حالياً</h2>
+      <Card style={{ marginBottom: '16px' }}>
+        <SectionTitle>الجيل المنشور حالياً</SectionTitle>
         {gens.loading ? <SkeletonPanel rows={3} title={false} />
-          : gens.error ? <Failed what="الأجيال" message={gens.error} onRetry={loadGens} />
+          : gens.error ? <ErrorState what="الأجيال" message={gens.error} onRetry={loadGens} />
             : !published ? (
               <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
                 <b style={{ color: '#0F172A' }}>لا يوجد جيل منشور</b>
@@ -232,13 +215,13 @@ export default function AdminDataManagement () {
                 }}>عرض التفاصيل الكاملة</button>
               </>
             )}
-      </div>
+      </Card>
 
       {/* ===== Anything on its way in ===== */}
-      <div style={{ ...card, marginBottom: '16px' }}>
-        <h2 style={h3}>جيل قادم</h2>
+      <Card style={{ marginBottom: '16px' }}>
+        <SectionTitle>جيل قادم</SectionTitle>
         {gens.loading ? <SkeletonPanel rows={2} title={false} />
-          : gens.error ? <Failed what="الأجيال" message={gens.error} onRetry={loadGens} />
+          : gens.error ? <ErrorState what="الأجيال" message={gens.error} onRetry={loadGens} />
             : incoming.length === 0 ? (
               <div style={{ fontSize: '14px', color: '#64748B', lineHeight: 2 }}>
                 <b style={{ color: '#0F172A' }}>لا جيل قيد الاستيراد</b>
@@ -287,16 +270,16 @@ export default function AdminDataManagement () {
                 </div>
               )
             })}
-      </div>
+      </Card>
 
       {/* ===== Every generation, kept ===== */}
-      <div style={card}>
-        <h2 style={h3}>الأجيال السابقة</h2>
+      <Card>
+        <SectionTitle>الأجيال السابقة</SectionTitle>
         <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 12px' }}>
           لا يُحذف جيل عند نشر ما بعده. كل مجموعة تبقى قابلة للمراجعة والرجوع إليها.
         </p>
         {gens.loading ? <SkeletonPanel rows={4} title={false} />
-          : gens.error ? <Failed what="الأجيال" message={gens.error} onRetry={loadGens} />
+          : gens.error ? <ErrorState what="الأجيال" message={gens.error} onRetry={loadGens} />
             : !gens.data?.length ? (
               <div style={{ fontSize: '14px', color: '#64748B' }}>لا توجد عمليات استيراد مسجّلة.</div>
             ) : (
@@ -342,7 +325,7 @@ export default function AdminDataManagement () {
                 </table>
               </div>
             )}
-      </div>
+      </Card>
 
       {/* ===== Import review ===== */}
       {openJob && (
@@ -368,13 +351,13 @@ export default function AdminDataManagement () {
               }}>إغلاق</button>
             </div>
 
-            {detail.loading ? <div style={card}><SkeletonPanel rows={5} title={false} /></div>
-              : detail.error ? <div style={card}><Failed what="تفاصيل الاستيراد" message={detail.error} onRetry={() => loadDetail(openJob.job_id, openJob.status === 'ready')} /></div>
+            {detail.loading ? <Card><SkeletonPanel rows={5} title={false} /></Card>
+              : detail.error ? <Card><ErrorState what="تفاصيل الاستيراد" message={detail.error} onRetry={() => loadDetail(openJob.job_id, openJob.status === 'ready')} /></Card>
                 : !j ? null : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {/* --- المجموعة --- */}
-                    <div style={card}>
-                      <h3 style={h3}>المجموعة</h3>
+                    <Card>
+                      <SectionTitle>المجموعة</SectionTitle>
                       <Grid>
                         <Field k="الحالة" v={<span style={{ background: state(j.status).bg, color: state(j.status).fg, borderRadius: '999px', padding: '3px 11px', fontSize: '12px', fontWeight: 800 }}>{state(j.status).t}</span>} />
                         <Field k="الفترة" v={j.snapshot_period || '—'} />
@@ -383,11 +366,11 @@ export default function AdminDataManagement () {
                         <Field k="المجموعة الحالية" v={<code style={{ fontSize: '11px' }}>{detail.data.published_now || '—'}</code>} />
                         <Field k="بدأ" v={dt(j.started_at)} />
                       </Grid>
-                    </div>
+                    </Card>
 
                     {/* --- المعادلة --- */}
-                    <div style={card}>
-                      <h3 style={h3}>المعادلة</h3>
+                    <Card>
+                      <SectionTitle>المعادلة</SectionTitle>
                       <Grid min="130px">
                         <Field k="المتوقّع" v={n(j.expected_rows)} mono />
                         <Field k="المحمّل" v={n(j.rows_loaded)} mono />
@@ -408,11 +391,11 @@ export default function AdminDataManagement () {
                           </div>
                         )}
                       </div>
-                    </div>
+                    </Card>
 
                     {/* --- السلامة --- */}
-                    <div style={card}>
-                      <h3 style={h3}>سلامة المعرّفات</h3>
+                    <Card>
+                      <SectionTitle>سلامة المعرّفات</SectionTitle>
                       {!q ? <div style={{ fontSize: '13px', color: '#94A3B8' }}>لا توجد صفوف في هذه المجموعة.</div> : (
                         <>
                           <Grid min="150px">
@@ -432,11 +415,11 @@ export default function AdminDataManagement () {
                           </div>
                         </>
                       )}
-                    </div>
+                    </Card>
 
                     {/* --- الفحوص --- */}
-                    <div style={card}>
-                      <h3 style={h3}>الفحص</h3>
+                    <Card>
+                      <SectionTitle>الفحص</SectionTitle>
                       {!checks.length ? (
                         <div style={{ fontSize: '13px', color: '#94A3B8', lineHeight: 1.9 }}>
                           لم يُسجَّل فحص لهذه المجموعة — استُوردت قبل أن يصبح الفحص جزءاً من المسار.
@@ -455,25 +438,25 @@ export default function AdminDataManagement () {
                           </span>
                         </div>
                       ))}
-                    </div>
+                    </Card>
 
                     {/* --- المقارنة --- */}
                     {diff && (
-                      <div style={card}>
-                        <h3 style={h3}>المقارنة بالجيل الحالي</h3>
+                      <Card>
+                        <SectionTitle>المقارنة بالجيل الحالي</SectionTitle>
                         <Grid min="130px">
                           <Field k="جديد" v={n(diff.new)} mono />
                           <Field k="متغيّر" v={n(diff.changed)} mono />
                           <Field k="محذوف" v={n(diff.removed)} mono />
                           <Field k="دون تغيير" v={n(diff.unchanged)} mono />
                         </Grid>
-                      </div>
+                      </Card>
                     )}
 
                     {/* --- المرفوض --- */}
                     {Number(j.rows_rejected) > 0 && (
-                      <div style={card}>
-                        <h3 style={h3}>الصفوف المرفوضة</h3>
+                      <Card>
+                        <SectionTitle>الصفوف المرفوضة</SectionTitle>
                         <p style={{ fontSize: '12.5px', color: '#94A3B8', margin: '0 0 12px' }}>
                           {n(j.rows_rejected)} صفّاً مرفوضاً. أوّل {Math.min(20, rejections.length)} منها بسببها.
                         </p>
@@ -486,12 +469,12 @@ export default function AdminDataManagement () {
                             <div style={{ color: '#B91C1C', marginTop: '2px' }}>{r.reason}</div>
                           </div>
                         ))}
-                      </div>
+                      </Card>
                     )}
 
                     {/* --- النشر --- */}
-                    <div style={card}>
-                      <h3 style={h3}>النشر</h3>
+                    <Card>
+                      <SectionTitle>النشر</SectionTitle>
                       {j.is_published ? (
                         <div style={{ fontSize: '13.5px', color: '#15803D', fontWeight: 700 }}>
                           هذا هو الجيل المنشور حالياً.
@@ -520,7 +503,7 @@ export default function AdminDataManagement () {
                             }}>نشر هذا الجيل</button>
                         </>
                       )}
-                    </div>
+                    </Card>
                   </div>
                 )}
           </div>
@@ -534,7 +517,7 @@ export default function AdminDataManagement () {
             position: 'fixed', inset: 0, background: 'rgba(15,23,42,.6)', zIndex: 70,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
           }}>
-          <div style={{ ...card, width: 'min(560px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <Card style={{ width: 'min(560px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', margin: '0 0 6px' }}>تأكيد النشر</h2>
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px', lineHeight: 1.9 }}>
               النشر يستبدل السجل الذي تقرأه المنصة بأكملها. هذه أرقام الجيل الذي على وشك أن يصبح حيّاً.
@@ -587,7 +570,7 @@ export default function AdminDataManagement () {
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>تراجع</button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

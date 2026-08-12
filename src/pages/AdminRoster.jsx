@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { PageTitle } from '../ui'
 
 /**
  * /admin/roster — every company, and what each one is waiting on.
@@ -185,10 +186,9 @@ export default function AdminRoster() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0F172A', margin: '0 0 5px' }}>سجلّ الشركات</h1>
-          <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-            كل شركة في السجلّ، وما تنتظره — مرتّبة بما يحتاج متابعة أولاً.
-          </p>
+          <PageTitle note="كل شركة في السجلّ، وما تنتظره — مرتّبة بما يحتاج متابعة أولاً.">
+            سجلّ الشركات
+          </PageTitle>
         </div>
         <LiveBadge connected={connected} liveAt={liveAt} />
       </div>

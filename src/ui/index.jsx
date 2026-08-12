@@ -1,4 +1,4 @@
-import { COLORS, BORDER_RADIUS, SHADOWS } from '../theme/themeConstants'
+import { COLORS, BORDER_RADIUS } from '../theme/themeConstants'
 
 /**
  * The pieces every admin screen was drawing by hand.
@@ -157,8 +157,14 @@ export function ErrorState ({ what, message, onRetry }) {
   )
 }
 
-/** A label over a value — the shape every «facts» grid was rebuilding. */
-export function Field ({ label, value, mono, style }) {
+/**
+ * A label over a value — the shape every «facts» grid was rebuilding.
+ *
+ * `hideEmpty` because several screens drop a field entirely rather than print
+ * «—» for it, and a primitive that cannot do that is one they will fork.
+ */
+export function Field ({ label, value, mono, hideEmpty, style }) {
+  if (hideEmpty && (value == null || value === '')) return null
   return (
     <div style={style}>
       <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 700 }}>{label}</div>
