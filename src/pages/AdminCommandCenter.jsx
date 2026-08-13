@@ -69,7 +69,10 @@ const OFFICIAL_LABEL = {
 //   - الثقة → فلتر في سجلّ الشركات يعرض الشركات المعدودة عينها.
 const TILES = [
   { key: 'report_review',   t: 'تقارير للمراجعة', tone: 'red',    icon: '📄', to: '/admin/work?kind=report_review' },
-  { key: 'trust',           t: 'تنبيهات الثقة',   tone: 'red',    icon: '📉', to: '/admin/companies?filter=low_trust' },
+  // «تنبيهات الثقة» كان اسماً يصطدم بـ«تنبيهات المراقبة الفورية» أسفل الصفحة،
+  // وهما يعدّان شيئين مختلفين — درجة متدنّية هنا، وملاحظات جودة أو حالة رسمية
+  // هناك. فيقرأ المشرف رقمين متجاورين باسم واحد ويظنّ أحدهما خطأً.
+  { key: 'trust',           t: 'مؤشر ثقة منخفض',  tone: 'red',    icon: '📉', to: '/admin/companies?filter=low_trust' },
   { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/work?kind=registration' },
   { key: 'claim',           t: 'طلبات ملكية',     tone: 'orange', icon: '🛡', to: '/admin/work?kind=claim' },
   { key: 'document_review', t: 'تحقق مستندات',    tone: 'orange', icon: '🗂', to: '/admin/documents?tab=pending' },
@@ -137,9 +140,17 @@ const rosterSummary = async (sb) => {
   const { data, error } = await sb.rpc('company_roster')
   if (error) throw error
   const rows = (data || []).filter((r) => r.approved)
-  const scored = rows.filter((r) => r.trust_score != null)
-  const avg = scored.length
-    ? scored.reduce((a, r) => a + Number(r.trust_score), 0) / scored.length
+
+  // صفر يعني «غير مصنّفة»، لا «ثقتها صفر».
+  //
+  // نموذج الثقة يعطي الطبقة المجتمعية نصف الوزن، فشركة بلا تقارير معتمدة
+  // تُخزَّن بـ score = 0 و tier = 'none' — أي أن الدرجة لم تُحتسب أصلاً.
+  // وأدنى درجة محتسَبة هي ٥ لأن الـ clamp يضع أرضية عندها، فالصفر لا يمكن
+  // أن يكون ناتج حساب. جمع هذه الأصفار في متوسط كان يعرض «٠٫٠٪ — منخفض»
+  // على منصّة كل شركاتها ببساطة لم تُقيَّم بعد.
+  const rated = rows.filter((r) => r.trust_score != null && Number(r.trust_score) > 0)
+  const avg = rated.length
+    ? rated.reduce((a, r) => a + Number(r.trust_score), 0) / rated.length
     : null
   const clean = rows.filter((r) => !(r.quality_issues || []).length).length
 
@@ -153,8 +164,11 @@ const rosterSummary = async (sb) => {
   return {
     avg,
     total: rows.length,
-    scored: scored.length,
-    lowTrust: scored.filter((r) => Number(r.trust_score) < 50).length,
+    rated: rated.length,
+    // شركة مصنّفة ودرجتها متدنّية — لا شركة لم تُقيَّم بعد. كانت الأخيرة
+    // تُحسب «تنبيه ثقة»، فيقرأ المشرف إنذاراً حيث لا يوجد إلا غياب بيانات.
+    lowTrust: rated.filter((r) => Number(r.trust_score) < 50).length,
+    unrated: rows.length - rated.length,
     cleanPct: rows.length ? (clean / rows.length) * 100 : null,
     alerts,
   }
@@ -561,8 +575,21 @@ export default function AdminCommandCenter () {
             {roster.loading ? <Bars lines={3} />
               : roster.error ? <Failed what="مؤشر الثقة" message={roster.error} onRetry={roster.reload} />
                 : avg == null ? (
-                  <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.9 }}>
-                    لا توجد درجات ثقة محتسبة بعد.
+                  // لا متوسط لأن لا شركة مصنّفة — وهذا خبر، لا فراغ.
+                  <div style={{ fontSize: '13px', color: S[600], lineHeight: 1.9 }}>
+                    لا توجد شركة مصنّفة بعد.
+                    <div style={{ fontSize: '12px', color: S[500], marginTop: '4px' }}>
+                      {num(roster.data.unrated)} من {num(roster.data.total)} شركة معتمدة بلا درجة.
+                      الطبقة المجتمعية نصف وزن المؤشر، ولا تُحتسب قبل ورود تقارير معتمدة.
+                    </div>
+                    <div style={{ ...innerCard, padding: '12px', marginTop: '12px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '20px', fontWeight: 800, color: '#d97706' }}>
+                        {roster.data.cleanPct == null ? '—' : `${roster.data.cleanPct.toFixed(1)}%`}
+                      </div>
+                      <div style={{ fontSize: '11px', color: S[500], marginTop: '2px' }}>
+                        سجلات بلا ملاحظات جودة
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -614,11 +641,11 @@ export default function AdminCommandCenter () {
               gap: '10px', borderBottom: `1px solid ${S[100]}`, paddingBottom: '12px', marginBottom: '14px',
             }}>
               <h2 style={{ fontSize: '14px', fontWeight: 700, color: S[900], margin: 0 }}>
-                ⚠ تنبيهات المراقبة الفورية
+                ⚠ سجلات عليها ملاحظات
               </h2>
               {roster.data?.alerts?.length > 0 && (
-                <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>
-                  {roster.data.alerts.length} بلاغات
+                <span style={{ fontSize: '11.5px', color: S[500], fontWeight: 600 }}>
+                  {roster.data.alerts.length} شركة
                 </span>
               )}
             </div>
