@@ -36,7 +36,7 @@ import { createClient } from '@supabase/supabase-js'
 // A value that differs from the real one by an invisible character fails as an
 // authentication error, which sends you looking at permissions instead of the
 // value. Normalise on read.
-const clean = (v) => (typeof v === 'string' ? v.replace(/^﻿/, '').trim() : v) || undefined
+import { clean } from './_lib/secrets.js'
 
 const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)
 const SERVICE_KEY = clean(process.env.SUPABASE_SERVICE_ROLE_KEY)

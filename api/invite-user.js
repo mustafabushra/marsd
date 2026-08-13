@@ -30,7 +30,9 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 // value into a CLI on Windows can prepend a BOM. A key that differs from the
 // real one by one invisible character fails as an authentication error, which
 // sends you looking at permissions instead of the value. Normalise on read.
-const clean = (v) => (typeof v === 'string' ? v.replace(/^﻿/, '').trim() : v) || undefined
+// نسخة محلية ثالثة من هذه الدالة نُسيت في trust-report-pdf فسقط وحده.
+// المصدر الآن واحد.
+import { clean } from './_lib/secrets.js'
 
 const CLERK_SECRET = clean(process.env.CLERK_SECRET_KEY)
 const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)

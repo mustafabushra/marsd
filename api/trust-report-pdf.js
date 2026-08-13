@@ -49,6 +49,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // why every request returned FUNCTION_INVOCATION_FAILED, including ones this
 // file rejects on its second line. Built by scripts/build-report-template.mjs.
 import { TrustReportDocument, documentShell } from './_report/document.js'
+import { clean, clerkKeyKind } from './_lib/secrets.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -121,7 +122,9 @@ export default async function handler (req, res) {
 
   // A key that is not there is not an invalid session, and saying so sends the
   // reader to look at their login instead of at the deployment.
-  const secretKey = process.env.CLERK_SECRET_KEY
+  // كان يُقرأ خاماً هنا وحده، بينما نظيراه يمرّرانه على clean. فبادئة خفية
+  // في متغيّر البيئة تُبقيهما يعملان وتُسقط هذا وحده بـ«جلسة غير صالحة».
+  const secretKey = clean(process.env.CLERK_SECRET_KEY)
   if (!secretKey) {
     return res.status(500).json({
       error: 'مفتاح Clerk غير مضبوط على الخادم',
@@ -144,7 +147,7 @@ export default async function handler (req, res) {
         : /issuer|instance|kid|key/i.test(why) ? 'مفتاح Clerk على الخادم لا يطابق الذي أصدر الجلسة'
           : 'جلسة غير صالحة',
       detail: why.slice(0, 240),
-      keyKind: secretKey.startsWith('sk_test') ? 'test' : secretKey.startsWith('sk_live') ? 'live' : 'unknown',
+      keyKind: clerkKeyKind(process.env.CLERK_SECRET_KEY),
     })
   }
   if (!userId) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })

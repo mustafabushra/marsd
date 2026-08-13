@@ -41,8 +41,10 @@ import { createClient } from '@supabase/supabase-js'
 
 // A value piped through a shell on Windows can carry a BOM; a key that differs
 // by one invisible character fails as an auth error and sends you looking at
-// permissions. Same normalisation as invite-user.js.
-const clean = (v) => (typeof v === 'string' ? v.replace(/^﻿/, '').trim() : v) || undefined
+// permissions. The normalisation was copied into each function by hand and
+// forgotten in trust-report-pdf, so that one alone rejected every session.
+// One source now.
+import { clean, clerkKeyKind } from './_lib/secrets.js'
 
 const CLERK_SECRET = clean(process.env.CLERK_SECRET_KEY)
 const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)
@@ -295,8 +297,23 @@ export default async function handler(req, res) {
     let callerId
     try {
       callerId = (await verifyToken(token, { secretKey: CLERK_SECRET })).sub
-    } catch {
-      return res.status(401).json({ error: 'جلسة غير صالحة — أعد تسجيل الدخول' })
+    } catch (err) {
+      // `catch {}` بلا وسيط كان يبتلع السبب كاملاً، فتتشابه كل حالات الرفض:
+      // جلسة منتهية، ومفتاح من نسخة Clerk أخرى، وتوكن مشوّه — ثلاثتها تُعطي
+      // نفس الجملة وتحتاج ثلاثة إصلاحات مختلفة. سبب Clerk يسمّي الفحص الذي
+      // فشل ولا يكشف مفتاحاً، فيُمرَّر؛ والتفصيل الكامل إلى سجلّ الخادم.
+      const why = String(err?.reason || err?.message || 'سبب غير معروف')
+      console.error('extract-document — token verification failed:', {
+        reason: err?.reason || null,
+        message: err?.message || null,
+        keyKind: clerkKeyKind(process.env.CLERK_SECRET_KEY),
+      })
+      return res.status(401).json({
+        error: /expired/i.test(why) ? 'انتهت صلاحية الجلسة — أعد تحميل الصفحة'
+          : /issuer|instance|kid|key/i.test(why) ? 'مفتاح Clerk على الخادم لا يطابق الذي أصدر الجلسة'
+            : 'جلسة غير صالحة — أعد تسجيل الدخول',
+        detail: why.slice(0, 240),
+      })
     }
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
