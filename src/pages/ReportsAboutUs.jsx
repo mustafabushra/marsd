@@ -109,9 +109,12 @@ export default function ReportsAboutUs() {
 
       // الدرجة نفسها. الصفحة كانت تعرض المادة الخام — البلاغات — ولا تعرض
       // ما بُني منها، فتقرأ الشركة ما قيل عنها ولا تعرف أين صار موقفها.
+      // breakdown يحمل rules_applied ومعه العتبات، وهو مقروء للشركة بينما
+      // system_settings ليست. فتُقرأ العتبة من الصفّ نفسه الذي حُسبت به
+      // الدرجة — ولا يمكن للواجهة أن تعرض حدّاً غير الذي طُبِّق فعلاً.
       const { data: ts } = await supabase
         .from('trust_scores')
-        .select('score, risk_band, approved_reports, computed_at')
+        .select('score, risk_band, tier, approved_reports, computed_at, breakdown')
         .eq('company_id', t.company_id)
         .maybeSingle()
       setScore(ts || null)
@@ -232,6 +235,10 @@ export default function ReportsAboutUs() {
       {(() => {
         const rated = score && Number(score.score) > 0
         const b = rated ? (RISK_BAND[score.risk_band] || RISK_BAND.medium) : null
+        // العتبات من الصفّ نفسه لا من قيمة مكتوبة هنا.
+        const th = score?.breakdown?.rules_applied?.thresholds || {}
+        const minPrelim = th.preliminary_min_reports
+        const minFull = th.full_min_reports
         return (
           <div style={{
             ...card, padding: '20px 22px', marginBottom: '16px',
@@ -253,24 +260,34 @@ export default function ReportsAboutUs() {
                   }}>{b.t}</span>
                 </div>
               ) : (
-                // صفر يعني «لم تُحتسب» لا «ثقتك صفر» — أرضية الـ clamp خمسة،
-                // فلا حساب حقيقي ينتج صفراً. عرضه رقماً كان سيقول للشركة إنها
-                // بأسوأ حال وهي لم تُصنَّف بعد.
+                // صفر يعني «لم تُصنَّف» لا «ثقتك صفر» — أرضية الـ clamp خمسة،
+                // فلا حساب حقيقي ينتج صفراً.
                 //
-                // ولا يُنسب السبب هنا إلى غياب التقارير: شركات لديها تقارير
-                // معتمدة درجتها صفر كذلك، لأن طبقة المجتمع في نموذج الثقة بلا
-                // معاملات تسجيل أصلاً. سبب لا نتحقّق منه لا يُقال للشركة.
+                // والسبب يُقال بعدده: الطبقة المجتمعية نصف الوزن، ولا تُحتسب
+                // قبل بلوغ preliminary_min_reports. «لم تُصنَّف» وحدها تترك
+                // الشركة تظنّ عطلاً؛ «تقرير من ٢» تقول لها أين هي بالضبط.
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#B45309' }}>
                   لم تُصنَّف بعد
                   <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '5px', lineHeight: 1.9 }}>
-                    مؤشر ثقتك قيد الاحتساب، وسيظهر هنا فور اكتماله.
+                    {minPrelim
+                      ? <>وصلك <strong>{score?.approved_reports || 0}</strong> من <strong>{minPrelim}</strong> تقارير معتمدة يحتاجها التصنيف المبدئي.</>
+                      : 'مؤشر ثقتك قيد الاحتساب، وسيظهر هنا فور اكتماله.'}
                   </div>
+                </div>
+              )}
+              {/* «مبدئي» ليس تفصيلاً داخلياً: درجة مبنيّة على تقريرين ليست
+                  كدرجة مبنيّة على خمسة، والشركة تستحقّ أن تعرف أيّهما تقرأ
+                  وما الذي يرفعها إلى التصنيف الكامل. */}
+              {rated && score.tier === 'preliminary' && minFull && (
+                <div style={{ fontSize: '12px', color: '#B45309', fontWeight: 700, marginTop: '8px', lineHeight: 1.8 }}>
+                  تصنيف مبدئي — يكتمل عند {minFull} تقارير معتمدة
+                  {score.approved_reports != null && ` (لديك ${score.approved_reports})`}
                 </div>
               )}
               {rated && score.computed_at && (
                 <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>
                   آخر احتساب {new Date(score.computed_at).toLocaleDateString('en-GB')}
-                  {score.approved_reports != null && ` · ${score.approved_reports} تقريراً معتمداً`}
+                  {score.tier === 'full' && score.approved_reports != null && ` · ${score.approved_reports} تقريراً معتمداً`}
                 </div>
               )}
             </div>
