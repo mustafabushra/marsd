@@ -65,6 +65,16 @@ export default function DocumentViewer ({ open, docKey, fileName, mimeType, onCl
     setLoading(true); setError(''); setUrl(null)
     setPage(1); setPages(0); setRotate(0); setScale(1.2)
 
+    // الصفوف التي سبقت وجود الـ bucket تخزّن الملف نفسه في العمود — data: —
+    // وبعضها رابط كامل. توقيع هذه يفشل، والفشل يظهر «تعذّر فتح المستند» على
+    // مستند سليم. تُقرأ القيمة كما هي بدل افتراض شكل واحد، وهو نفس ما تفعله
+    // شاشة المستندات منذ أن ظهرت الحالتان معاً.
+    if (docKey.startsWith('data:') || docKey.startsWith('http')) {
+      setUrl(docKey)
+      setLoading(false)
+      return () => { alive = false }
+    }
+
     getSupabase().storage.from(BUCKET).createSignedUrl(docKey, SIGN_SECONDS)
       .then(({ data, error: e }) => {
         if (!alive) return

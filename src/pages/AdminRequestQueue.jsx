@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { Card } from '../ui'
+import DocumentViewer from '../components/DocumentViewer'
 
 /**
  * The queue, and one request opened.
@@ -83,6 +84,8 @@ export default function AdminRequestQueue() {
 
   const [open, setOpen] = useState(null)      // the request being read
   const [detail, setDetail] = useState(null)
+  // المستند المفتوح للمعاينة. القرار يُتَّخذ والورقة على الشاشة، لا من الذاكرة.
+  const [viewing, setViewing] = useState(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
 
@@ -254,7 +257,34 @@ export default function AdminRequestQueue() {
                           {x.uploaded_by ? ` · ${x.uploaded_by}` : ''}
                           {x.uploaded_at ? ` · ${String(x.uploaded_at).slice(0, 10)}` : ''}
                         </div>
+                        {x.status === 'rejected' && x.rejection_reason && (
+                          <div style={{ fontSize: '12px', color: '#B91C1C', fontWeight: 700, marginTop: '4px' }}>
+                            سبب الرفض: {x.rejection_reason}
+                          </div>
+                        )}
                       </div>
+                      {/* المستندات كانت مسرودة نصّاً بلا أي طريقة لفتحها — اسم
+                          ملف ومَن رفعه، ثم يُطلب القرار. هذا الزرّ هو الفرق بين
+                          مراجعة ورقة ومراجعة اسمها. */}
+                      {x.file_url ? (
+                        <button
+                          onClick={() => setViewing({
+                            key: x.file_url,
+                            name: x.file_name,
+                            title: x.label || x.doc_type,
+                          })}
+                          style={{
+                            flex: 'none', minHeight: '34px', padding: '0 14px', borderRadius: '9px',
+                            border: '1.5px solid #E2E8F0', background: '#fff', color: '#1E2A52',
+                            fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>
+                          معاينة
+                        </button>
+                      ) : (
+                        <span style={{ flex: 'none', fontSize: '12px', color: '#94A3B8', fontWeight: 700 }}>
+                          لا ملف
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -382,6 +412,16 @@ export default function AdminRequestQueue() {
             )}
           </>
         )}
+
+        {/* العارض فوق الصفحة لا بديلاً عنها: الإغلاق يعيدك إلى الطلب وأزراره
+            كما تركتها، فلا تُفقد الملاحظة المكتوبة ولا يُعاد التحميل. */}
+        <DocumentViewer
+          open={!!viewing}
+          docKey={viewing?.key}
+          fileName={viewing?.name}
+          title={viewing?.title}
+          onClose={() => setViewing(null)}
+        />
       </div>
     )
   }
