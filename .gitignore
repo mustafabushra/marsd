@@ -31,3 +31,7 @@ mobile-shots/
 # The checklist snapshot is a working file for verify-checklist-unchanged.mjs.
 # It is real data from real companies and belongs on one machine, not in git.
 .checklist-before.json
+
+# مسبارات مؤقتة تُكتب أثناء التشخيص وتُترك. تُتجاهَل ولا تُحذف —
+# ملفات لم يكتبها من يمرّ هنا لاحقاً ليست له ليحذفها.
+scripts/_tmp-*

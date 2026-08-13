@@ -9,7 +9,8 @@
     "check:enums": "node scripts/check-enum-drift.mjs",
     "lint": "eslint src api scripts",
     "build:report": "node scripts/build-report-template.mjs",
-    "check:tiles": "node scripts/probe-tile-truth.mjs"
+    "check:tiles": "node scripts/probe-tile-truth.mjs",
+    "check:nav": "node scripts/probe-admin-nav.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
