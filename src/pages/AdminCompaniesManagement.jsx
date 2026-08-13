@@ -169,7 +169,6 @@ export default function AdminCompaniesManagement() {
       if (filter === 'attention' && !(r.open_clarifications > 0 || r.docs_pending > 0)) return false
       if (filter === 'flagged' && (!r.official_status || r.official_status === 'none')) return false
       if (filter === 'unclaimed' && r.claimed_by) return false
-      if (filter === 'weak' && r.trust_score != null) return false
       if (filter === 'low_trust' && !(r.trust_score != null && Number(r.trust_score) > 0 && Number(r.trust_score) < 50)) return false
       if (filter === 'unrated' && !(r.trust_score == null || Number(r.trust_score) === 0)) return false
       if (filter === 'broken' && !(r.quality_issues || []).length) return false

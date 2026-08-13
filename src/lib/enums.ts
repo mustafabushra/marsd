@@ -131,11 +131,20 @@ export const TENANT_STATUS_VALUES = Object.values(TENANT_STATUS) as TenantStatus
 // ---------------------------------------------------------------------------
 // users.role
 // ---------------------------------------------------------------------------
+// خمسة أدوار كانت في القاعدة وليست هنا: manager و compliance و data_operator
+// و finance و support. لم تكن ترفض شيئاً وقت التشغيل لأن USER_ROLE_VALUES لا
+// يُستعمل في أي تحقّق — لكنها كانت تُبقي check:enums أحمر، وحارس يُتجاهَل
+// لأنه أحمر دائماً لا يحرس شيئاً.
 export const USER_ROLE = {
   COMPANY_MEMBER: 'company_member',
   COMPANY_ADMIN: 'company_admin',
   PLATFORM_ADMIN: 'platform_admin',
+  MANAGER: 'manager',
   REVIEWER: 'reviewer',
+  COMPLIANCE: 'compliance',
+  DATA_OPERATOR: 'data_operator',
+  FINANCE: 'finance',
+  SUPPORT: 'support',
 } as const
 export type UserRole = (typeof USER_ROLE)[keyof typeof USER_ROLE]
 export const USER_ROLE_VALUES = Object.values(USER_ROLE) as UserRole[]

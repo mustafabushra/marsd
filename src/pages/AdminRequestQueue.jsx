@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { Card } from '../ui'
 
@@ -56,7 +57,25 @@ const SLA = {
 }
 
 export default function AdminRequestQueue() {
-  const [filter, setFilter] = useState('submitted')
+  // «الكل» هي البداية، لا «جديدة».
+  //
+  // الافتراض القديم كان 'submitted'، فطلب انتقل إلى under_review يختفي من أول
+  // ما تراه — والطلب المفتوح الوحيد على المنصة كان كذلك بالضبط. شاشة الطابور
+  // تُفتح فارغة بينما العمل ينتظر، وهو أسوأ ما يمكن أن تفعله شاشة طابور.
+  //
+  // و`?status=` و`?kind=` يسمحان للبلاطة وللقائمة الجانبية بأن تفتح ما عدّته
+  // بالضبط بدل أن تُنزل المشرف على تبويب لا يحوي ما ضغط عليه.
+  const [params] = useSearchParams()
+  const urlStatus = params.get('status')
+  const urlKind = params.get('kind')
+
+  const [filter, setFilter] = useState(urlStatus || null)
+  const [kind, setKind] = useState(urlKind || null)
+
+  // الانتقال بين رابطين لا يُعيد تركيب الشاشة، فبدون هذا يتغيّر الرابط ولا
+  // يتغيّر ما يُعرض.
+  useEffect(() => { setFilter(urlStatus || null) }, [urlStatus])
+  useEffect(() => { setKind(urlKind || null) }, [urlKind])
   const [rows, setRows] = useState([])
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -66,6 +85,11 @@ export default function AdminRequestQueue() {
   const [detail, setDetail] = useState(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
+
+  // ما يُعرض فعلاً — الحالة من الخادم، والنوع هنا.
+  const shown = useMemo(
+    () => (kind ? rows.filter((r) => r.kind === kind) : rows),
+    [rows, kind])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -391,6 +415,26 @@ export default function AdminRequestQueue() {
         })}
       </div>
 
+      {/* النوع — التصفية هنا في المتصفح لأن admin_request_queue يأخذ الحالة
+          وحدها. الصفوف محدودة بمئة على أي حال. */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+        {[{ v: null, t: 'كل الأنواع' }, ...Object.entries(KINDS).map(([v, t]) => ({ v, t }))].map((k) => {
+          const on = kind === k.v
+          return (
+            <button key={k.t} onClick={() => setKind(k.v)}
+                    style={{
+                      minHeight: '32px', padding: '0 13px', borderRadius: '999px',
+                      border: on ? 0 : '1.5px solid #E2E8F0',
+                      background: on ? '#16A34A' : '#fff',
+                      color: on ? '#fff' : '#64748B',
+                      fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+              {k.t}
+            </button>
+          )
+        })}
+      </div>
+
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '12px', padding: '13px', marginBottom: '14px', fontSize: '13.5px', fontWeight: 700 }}>
           {error}
@@ -399,12 +443,12 @@ export default function AdminRequestQueue() {
 
       {loading ? (
         <Card style={{ color: '#94A3B8' }}>جاري التحميل…</Card>
-      ) : rows.length === 0 ? (
+      ) : shown.length === 0 ? (
         <Card style={{ textAlign: 'center', color: '#94A3B8', padding: '40px' }}>
           لا طلبات في هذه الحالة
         </Card>
       ) : (
-        rows.map((r) => (
+        shown.map((r) => (
           <div key={r.id} onClick={() => openRequest(r.id)}
                style={{ ...card, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>

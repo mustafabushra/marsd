@@ -12,11 +12,11 @@
  * ============================================================================
  * What the real header turned out to be
  * ============================================================================
- *   ﻿الرقم الموحد,رقم السجل,اسم السجل,نوع السجل,الكيان القانوني,الكيان القانوني,…
+ *   <U+FEFF>الرقم الموحد,رقم السجل,اسم السجل,نوع السجل,الكيان القانوني,الكيان القانوني,…
  *
  * Three things there are not what the metadata suggested:
  *
- *   a BOM on the first byte, which makes the first column's name «﻿الرقم الموحد»
+ *   a BOM on the first byte, which makes the first column's name «<U+FEFF>الرقم الموحد»
  *   and matches nothing;
  *
  *   «الكيان القانوني» twice, literally — not suffixed the way a spreadsheet
@@ -62,7 +62,7 @@ export function splitCsvLine(line) {
  */
 export function mapHeader(headerLine, columns) {
   // The BOM belongs to the file, not to the first column's name.
-  const names = splitCsvLine(headerLine.replace(/^﻿/, ''))
+  const names = splitCsvLine(headerLine.replace(/^<U+FEFF>/, ''))
     .map((h) => h.trim())
 
   const index = {}

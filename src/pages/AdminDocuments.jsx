@@ -347,72 +347,8 @@ export default function AdminDocuments() {
         )}
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', borderTop: '4px solid #B91C1C' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', margin: '0 0 4px' }}>تسجيل حالة رسمية</h2>
-        <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 18px' }}>
-          أثقل إشارة في المؤشر — الإفلاس يخصم ٧٠ نقطة من الطبقة الرسمية. لا تستطيع الشركة تعيينها ولا مسحها عن نفسها،
-          ولهذا تُقرأ. سجّل المصدر في الملاحظة.
-        </p>
-
-        <div style={{ display: 'grid', gap: '14px', maxWidth: '640px' }}>
-          <label>
-            <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>الشركة</span>
-            <select value={statusFor.companyId} onChange={(e) => setStatusFor((s) => ({ ...s, companyId: e.target.value }))}
-                    style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', background: '#fff' }}>
-              <option value="">— اختر —</option>
-              {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.cr_number || '—'})</option>)}
-            </select>
-          </label>
-
-          <label>
-            <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>الحالة</span>
-            <select value={statusFor.status} onChange={(e) => setStatusFor((s) => ({ ...s, status: e.target.value }))}
-                    style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', background: '#fff' }}>
-              {OFFICIAL_STATUS.map((s) => <option key={s.v} value={s.v}>{s.t}</option>)}
-            </select>
-          </label>
-
-          <label>
-            <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>المصدر أو المرجع</span>
-            <input value={statusFor.note} onChange={(e) => setStatusFor((s) => ({ ...s, note: e.target.value }))}
-                   placeholder="مثال: إعلان تصفية في الجريدة الرسمية بتاريخ …"
-                   style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
-          </label>
-
-          <div>
-            <button onClick={saveStatus} disabled={busy === 'status'}
-                    style={{ padding: '12px 26px', background: '#1E2A52', color: '#fff', border: 0, borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-              {busy === 'status' ? 'جارٍ الحفظ…' : 'حفظ الحالة'}
-            </button>
-          </div>
-        </div>
-
-        {flagged.length > 0 && (
-          <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #E2E8F0' }}>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>
-              شركات عليها حالة مسجَّلة ({flagged.length})
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {flagged.map((c) => {
-                const s = OFFICIAL_STATUS.find((x) => x.v === c.official_status)
-                return (
-                  <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', background: '#FEF2F2', borderRadius: '9px', padding: '11px 14px' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>{c.name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: s?.fg || '#B91C1C' }}>
-                      {s?.t || c.official_status}
-                      {c.official_status_at && (
-                        <span style={{ color: '#64748B', fontWeight: 700, marginRight: '10px' }}>
-                          {new Date(c.official_status_at).toLocaleDateString('ar-SA')}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* أداة الحالة الرسمية انتقلت إلى /admin/official-status — هي صلاحية
+          أخرى على مصدر آخر، ووجودها أسفل طابور يومي جعل الشاشة غير مفهومة. */}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', insetInlineStart: '24px', background: '#0F172A', color: '#fff', padding: '13px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, zIndex: 90 }}>{toast}</div>

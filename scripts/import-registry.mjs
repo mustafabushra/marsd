@@ -134,7 +134,7 @@ async function* readRows() {
 }
 
 const period = isCsv
-  ? file.split(/[\/]/).pop().replace(/\.csv$/i, '')
+  ? file.split(/[/\\]/).pop().replace(/\.csv$/i, '')
   : 'الورقة الأولى'
 const snapshotAt = new Date().toISOString().slice(0, 10)
 

@@ -65,6 +65,7 @@ const AdminEmailTemplates = lazy(() => import('./pages/AdminEmailTemplates'))
 const AdminDataExport = lazy(() => import('./pages/AdminDataExport'))
 const AdminDisputes = lazy(() => import('./pages/AdminDisputes'))
 const AdminDocuments = lazy(() => import('./pages/AdminDocuments'))
+const AdminOfficialStatus = lazy(() => import('./pages/AdminOfficialStatus'))
 const AdminRoster = lazy(() => import('./pages/AdminRoster'))
 const AdminCommandCenter = lazy(() => import('./pages/AdminCommandCenter'))
 const AdminWorkCenter = lazy(() => import('./pages/AdminWorkCenter'))
@@ -74,7 +75,6 @@ const AdminFraudDetection = lazy(() => import('./pages/AdminFraudDetection'))
 const AdminIntegrations = lazy(() => import('./pages/AdminIntegrations'))
 const AdminTenantAnalytics = lazy(() => import('./pages/AdminTenantAnalytics'))
 const AdminCompanyVerification = lazy(() => import('./pages/AdminCompanyVerification'))
-const AdminCompanyApproval = lazy(() => import('./pages/AdminCompanyApproval'))
 const AccountPendingApproval = lazy(() => import('./pages/AccountPendingApproval'))
 const AccountRejected = lazy(() => import('./pages/AccountRejected'))
 const AccountSuspended = lazy(() => import('./pages/AccountSuspended'))
@@ -239,6 +239,7 @@ function AppContent() {
           <Route path="/admin/data-export" element={<AdminRoute><AdminDataExport /></AdminRoute>} />
           <Route path="/admin/disputes" element={<AdminRoute><AdminDisputes /></AdminRoute>} />
           <Route path="/admin/documents" element={<AdminRoute><AdminDocuments /></AdminRoute>} />
+          <Route path="/admin/official-status" element={<AdminRoute><AdminOfficialStatus /></AdminRoute>} />
           <Route path="/admin/roster" element={<AdminRoute><AdminRoster /></AdminRoute>} />
           <Route path="/admin/command-center" element={<AdminRoute><AdminCommandCenter /></AdminRoute>} />
           <Route path="/admin/work" element={<AdminRoute><AdminWorkCenter /></AdminRoute>} />
@@ -248,7 +249,14 @@ function AppContent() {
           <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
           <Route path="/admin/tenant-analytics" element={<AdminRoute><AdminTenantAnalytics /></AdminRoute>} />
           <Route path="/admin/company-verification" element={<AdminRoute><AdminCompanyVerification /></AdminRoute>} />
-          <Route path="/admin/company-approval" element={<AdminRoute><AdminCompanyApproval /></AdminRoute>} />
+          {/* هذه الشاشة كانت تقرأ companies.status='pending'، وهي حالة لا وجود
+              لها في القاعدة — القيم المستعملة active و approved — بينما مراجعة
+              التسجيل تعيش في company_requests. فكانت تُفتح فارغة أبداً وطلب
+              مفتوح ينتظر خلفها، وتكتب قرارها في companies مباشرة متجاوزةً
+              decide_company_request وسجلّ التدقيق معه.
+              الرابط يبقى لأن المفضّلات والروابط القديمة تشير إليه. */}
+          <Route path="/admin/company-approval"
+                 element={<Navigate to="/admin/company-requests?kind=registration" replace />} />
           <Route path="/admin/claim-requests" element={<AdminRoute><AdminClaimRequests /></AdminRoute>} />
           {/* Knowledge Base Management - Central Repositories */}
           <Route path="/admin/knowledge-base/companies" element={<AdminRoute><CompanyKnowledgeBase /></AdminRoute>} />

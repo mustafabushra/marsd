@@ -43,7 +43,7 @@ const TONE = {
 
 // Where the decision is actually made, per kind.
 const KIND_ROUTE = {
-  registration: '/admin/company-approval',
+  registration: '/admin/company-requests?kind=registration',
   claim: '/admin/claim-requests',
   data_update: '/admin/requests',
   document_review: '/admin/documents?tab=pending',
@@ -73,7 +73,7 @@ const TILES = [
   // وهما يعدّان شيئين مختلفين — درجة متدنّية هنا، وملاحظات جودة أو حالة رسمية
   // هناك. فيقرأ المشرف رقمين متجاورين باسم واحد ويظنّ أحدهما خطأً.
   { key: 'trust',           t: 'مؤشر ثقة منخفض',  tone: 'red',    icon: '📉', to: '/admin/companies?filter=low_trust' },
-  { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/work?kind=registration' },
+  { key: 'registration',    t: 'طلبات انضمام',    tone: 'orange', icon: '👥', to: '/admin/company-requests?kind=registration' },
   { key: 'claim',           t: 'طلبات ملكية',     tone: 'orange', icon: '🛡', to: '/admin/work?kind=claim' },
   { key: 'document_review', t: 'تحقق مستندات',    tone: 'orange', icon: '🗂', to: '/admin/documents?tab=pending' },
   { key: 'dispute',         t: 'اعتراضات نشطة',   tone: 'navy',   icon: '⚖', to: '/admin/work?kind=dispute' },

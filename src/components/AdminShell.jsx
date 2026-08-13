@@ -100,7 +100,10 @@ const GROUPS = [
   // this is the screen for doing many at once.
   { key: 'review', title: 'المراجعة', badgeKey: 'pending', badgeWord: 'معلق', badgeTone: 'red', items: [
     { label: 'صندوق المراجعة', path: '/admin/work' },
-    { label: 'طلبات الانضمام', path: '/admin/company-approval' },
+    // شاشة company-approval كانت تقرأ companies.status='pending' وهي حالة لا
+    // وجود لها في هذه القاعدة — القيم المستعملة active و approved. مراجعة
+    // التسجيل تعيش في company_requests، وهذه هي شاشتها.
+    { label: 'طلبات الانضمام', path: '/admin/company-requests?kind=registration' },
     { label: 'طلبات الملكية', path: '/admin/claim-requests' },
     { label: 'التحقق من الشركات', path: '/admin/company-verification' },
   ] },
@@ -120,6 +123,7 @@ const GROUPS = [
     { label: 'المستندات قيد الفحص', path: '/admin/documents?tab=pending' },
     { label: 'المستندات المنتهية', path: '/admin/documents?tab=expired' },
     { label: 'المستندات المرفوضة', path: '/admin/documents?tab=rejected' },
+    { label: 'الحالة الرسمية', path: '/admin/official-status' },
   ] },
 
   { key: 'watch', title: 'المراقبة', badgeKey: 'trust', badgeWord: 'تنبيه ثقة', badgeTone: 'red', items: [
@@ -144,10 +148,9 @@ const GROUPS = [
   { key: 'system', title: 'النظام', items: [
     { label: 'سجل النشاط', path: '/admin/logs' },
     { label: 'حالة النظام', path: '/admin/system-health' },
-    // Both entries in the design resolve to سجل العمليات — it is the only
-    // screen over audit_logs that exists. Left pointing at the real screen
-    // rather than at a `?view=audit` that nothing reads.
-    { label: 'Audit Log', path: '/admin/logs' },
+    // «Audit Log» كان مدخلاً ثانياً يفتح سجل العمليات نفسه — وهو الشاشة
+    // الوحيدة فوق audit_logs. مدخلان باسمين مختلفين لشاشة واحدة يوحيان بوجود
+    // شاشتين، فيُفتح الثاني بحثاً عمّا رآه في الأول.
   ] },
 
   // Everything the new menu does not name, kept reachable.
@@ -203,7 +206,8 @@ const SCREEN_LABELS = {
   '/admin/roster': 'سجلّ الشركات وحالاتها',
   '/admin/company': 'ملفّ الشركة',
   '/admin/disputes': 'الاعتراضات على التقارير',
-  '/admin/documents': 'المستندات والحالة الرسمية',
+  '/admin/documents': 'توثيق المستندات',
+  '/admin/official-status': 'الحالة الرسمية',
   '/admin/data-export': 'تصدير البيانات',
   '/admin/company-approval': 'مراجعة طلبات التسجيل',
   '/admin/claim-requests': 'طلبات ملكية الشركات',
