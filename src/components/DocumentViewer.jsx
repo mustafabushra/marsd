@@ -44,6 +44,36 @@ const SIGN_SECONDS = 300
 const isPdf = (name, mime) =>
   (mime || '').includes('pdf') || /\.pdf$/i.test(name || '')
 
+/**
+ * ما يُقبل من `file_url` دون توقيع.
+ *
+ * ============================================================================
+ * لماذا قائمة سماح لا استثناء
+ * ============================================================================
+ * `company_documents.file_url` حقل **ترفعه الشركات**. القراءة السابقة كانت
+ * تمرّر أي قيمة تبدأ بـ data: أو http إلى العارض — ومنه إلى
+ * `<a href target="_blank">`. أي أن نصّاً تكتبه شركة يصير رابطاً يضغطه مراجع
+ * في مرصد.
+ *
+ * المتصفحات تمنع التنقّل العلوي إلى data: منذ ٢٠١٧، و rel="noopener
+ * noreferrer" يقطع window.opener والمُحيل — فالخطر كان متبقّياً لا حادّاً.
+ * لكن الاعتماد على أن المتصفح سيمنع ليس حاجزاً، وحاجزٌ واحد لا يكفي لحقل
+ * يكتبه طرف خارجي.
+ *
+ * فالمقبول أنواعٌ تُعرض ولا تُنفَّذ: صور، وPDF. و data:text/html — وهي
+ * الشكل الوحيد الذي يهمّ المهاجم — تسقط.
+ *
+ * ============================================================================
+ * و http(s) سقط كلّه
+ * ============================================================================
+ * قِيس على القاعدة قبل حذفه: تسعة مسارات تخزين، وصفٌّ data:image/png واحد،
+ * و **صفر** رابط http. أي أن الفرع الأخطر — رابط خارجي يفتحه مراجع بضغطة —
+ * لم يكن يخدم صفّاً واحداً. حذفُ ما لا يُستعمل أرخص من تأمينه.
+ */
+const SAFE_DATA = /^data:(image\/(png|jpe?g|gif|webp|bmp)|application\/pdf);/i
+
+const passthroughUrl = (v) => (SAFE_DATA.test(v) ? v : null)
+
 export default function DocumentViewer ({ open, docKey, fileName, mimeType, onClose, title }) {
   const [url, setUrl] = useState(null)
   const [error, setError] = useState('')
@@ -58,6 +88,11 @@ export default function DocumentViewer ({ open, docKey, fileName, mimeType, onCl
 
   const pdf = isPdf(fileName, mimeType)
 
+  // «فتح في تبويب» لا يعمل مع data: — المتصفحات تمنع التنقّل العلوي إليها —
+  // فهو زرّ ميت يعرضه للمراجع. وإخفاؤه يزيل آخر موضع يصل فيه محتوى ترفعه
+  // شركة إلى سياق تنقّل. الرابط الموقَّع من نطاقنا يبقى قابلاً للفتح.
+  const canOpenInTab = !!url && !url.startsWith('data:')
+
   // A signed link, made now and not kept.
   useEffect(() => {
     if (!open || !docKey) return
@@ -65,12 +100,21 @@ export default function DocumentViewer ({ open, docKey, fileName, mimeType, onCl
     setLoading(true); setError(''); setUrl(null)
     setPage(1); setPages(0); setRotate(0); setScale(1.2)
 
-    // الصفوف التي سبقت وجود الـ bucket تخزّن الملف نفسه في العمود — data: —
-    // وبعضها رابط كامل. توقيع هذه يفشل، والفشل يظهر «تعذّر فتح المستند» على
-    // مستند سليم. تُقرأ القيمة كما هي بدل افتراض شكل واحد، وهو نفس ما تفعله
-    // شاشة المستندات منذ أن ظهرت الحالتان معاً.
-    if (docKey.startsWith('data:') || docKey.startsWith('http')) {
-      setUrl(docKey)
+    // الصفوف التي سبقت وجود الـ bucket تخزّن الملف نفسه في العمود. توقيعها
+    // يفشل، فيظهر «تعذّر فتح المستند» على مستند سليم — لكنها تُقبل بنوعها لا
+    // ببادئتها، راجع SAFE_DATA أعلاه.
+    if (docKey.startsWith('data:')) {
+      const safe = passthroughUrl(docKey)
+      if (safe) setUrl(safe)
+      else setError('نوع الملف المخزَّن غير مدعوم للعرض')
+      setLoading(false)
+      return () => { alive = false }
+    }
+
+    // كل ما عدا ذلك يُوقَّع. ورابط خارجي مخزَّن في العمود لن يُوقَّع ولن
+    // يُمرَّر — يفشل بوضوح بدل أن يُفتح.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(docKey)) {
+      setError('مسار المستند غير صالح')
       setLoading(false)
       return () => { alive = false }
     }
@@ -199,7 +243,7 @@ export default function DocumentViewer ({ open, docKey, fileName, mimeType, onCl
           </span>
           <button style={ghost} onClick={() => setScale((s) => Math.min(4, +(s + 0.2).toFixed(2)))} aria-label="تكبير">+</button>
           <button style={ghost} onClick={() => setRotate((r) => (r + 90) % 360)} aria-label="تدوير">⟳</button>
-          {url && (
+          {canOpenInTab && (
             <a href={url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: 'none' }}>
               فتح في تبويب
             </a>
@@ -222,7 +266,7 @@ export default function DocumentViewer ({ open, docKey, fileName, mimeType, onCl
               تعذّر عرض المستند
             </div>
             <div style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.9 }}>{error}</div>
-            {url && (
+            {canOpenInTab && (
               <a href={url} target="_blank" rel="noopener noreferrer"
                 style={{ ...btn, display: 'inline-block', marginTop: '14px', textDecoration: 'none' }}>
                 محاولة فتحه في تبويب
