@@ -288,19 +288,23 @@ export default function AdminShell({ user }) {
       const work = await supabase.rpc('admin_work_counts').then((r) => r.data, () => null)
       const k = work?.by_kind || {}
 
-      // Both company badges from one roster read, and from the same rows
-      // مركز الإجراءات uses for its trust tile. Counting low trust from
-      // `trust_scores` instead would include companies that are not approved,
-      // and the badge would quietly disagree with the tile it sits beside.
-      const roster = await supabase.rpc('company_roster')
-        .then((r) => (r.data || []).filter((c) => c.approved), () => null)
+      // شارتان، لا السجلّ كلّه.
+      //
+      // كان هذا ينادي company_roster() — وهي تُرجع كل شركة معتمدة بلا ترقيم،
+      // ثمانمئة وثمانية وخمسون بايتاً للصفّ: ثمانية ميغابايت عند عشرة آلاف
+      // شركة وعشرون عند أربعة وعشرين ألفاً. في كل تنقّل، لقراءة رقمين.
+      //
+      // admin_company_badges تحسبهما في القاعدة وتعود بعشرات البايتات مهما كبر
+      // السجلّ، وبنفس التعريف حرفياً — تحقّقت منه كتلةُ التحقّق في
+      // migration 171 بمقارنة العدّين بما يحسبه السجلّ.
+      const badges = await supabase.rpc('admin_company_badges')
+        .then((r) => r.data || {}, () => ({}))
 
       // `counts` في documents_overview محسوب على كل المستندات مهما كان
       // p_state، فنداء واحد يعطي حالات التبويبات الأربعة كلها.
       const dc = await supabase.rpc('documents_overview', { p_state: 'pending' })
         .then((r) => r.data?.counts || {}, () => ({}))
 
-      const co = roster || []
       if (!alive) return
       setCounts({
         urgent: work?.all || 0,
@@ -310,12 +314,12 @@ export default function AdminShell({ user }) {
         pending: (k.registration || 0) + (k.claim || 0) + (k.document_review || 0),
         reviews: (k.report_review || 0) + (k.dispute || 0),
         docs: k.document_review || 0,
-        trust: co.filter((c) => c.trust_score != null && Number(c.trust_score) > 0 && Number(c.trust_score) < 50).length,
-        unclaimed: co.filter((c) => !c.claimed_by).length,
+        trust: badges.low_trust || 0,
+        unclaimed: badges.unclaimed || 0,
 
         // الصفحات نفسها — شارة المجموعة تقول «٢ غير مطالب بها» فوق أربع
         // صفحات، ولا تقول أيّها فيه الاثنان. هذه تقولها.
-        n_companies: co.length,
+        n_companies: badges.total || 0,
         n_company_requests: (k.registration || 0) + (k.claim || 0) + (k.data_update || 0),
         n_work: work?.all || 0,
         n_registration: k.registration || 0,
@@ -326,7 +330,7 @@ export default function AdminShell({ user }) {
         n_docs_expired: dc.expired || 0,
         n_docs_rejected: dc.rejected || 0,
         n_docs_all: Object.values(dc).reduce((a, n) => a + Number(n || 0), 0),
-        n_official: co.filter((c) => c.official_status && c.official_status !== 'none').length,
+        n_official: badges.official || 0,
       })
     }
     load()
