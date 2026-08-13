@@ -28,6 +28,26 @@ import { Card, SectionTitle, EmptyState } from '../ui'
  * compute differently.
  */
 
+// `full` و`late` كانت تُطبع كما هي في صفّ التقرير — نفس عطل أنواع المستندات:
+// قيمة عمود مقيَّد تُعرض بالإنجليزية للمراجع لأن لا خريطة لها.
+const PAYMENT = {
+  full: 'سُدِّد كاملاً', partial: 'سداد جزئي', late: 'سُدِّد متأخراً',
+  default: 'لم يُسدَّد', unpaid: 'لم يُسدَّد', na: 'لا ينطبق',
+}
+const CATEGORY = {
+  late_payment: 'تأخير سداد', no_payment: 'عدم سداد', contract_breach: 'إخلال بالعقد',
+  quality: 'جودة العمل', execution_delay: 'تأخير التنفيذ', dispute: 'نزاع',
+  fraud: 'احتيال', other: 'أخرى',
+}
+const REPORT_STATE = {
+  approved:       { t: 'منشور',            fg: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0' },
+  pending_review: { t: 'بانتظار المراجعة', fg: '#B45309', bg: '#FFFBEB', bd: '#FDE68A' },
+  request_info:   { t: 'بانتظار معلومات',  fg: '#1E2A52', bg: '#EEF2F8', bd: '#CBD5E1' },
+  rejected:       { t: 'مسحوب / غير مقبول', fg: '#B91C1C', bg: '#FEF2F2', bd: '#FECACA' },
+  cancelled:      { t: 'ملغى',             fg: '#64748B', bg: '#F8FAFC', bd: '#E2E8F0' },
+  draft:          { t: 'مسودّة',            fg: '#64748B', bg: '#F8FAFC', bd: '#E2E8F0' },
+}
+
 const REVIEW = {
   under_review:           { t: 'قيد المراجعة',        bg: '#EEF2FF', fg: '#1E40AF' },
   awaiting_verification:  { t: 'بانتظار التحقق',       bg: '#EEF2FF', fg: '#1E40AF' },
@@ -162,7 +182,7 @@ const dayLabel = (t) => {
   const same = (a, b) => a.toDateString() === b.toDateString()
   if (same(d, today)) return 'اليوم'
   if (same(d, y)) return 'أمس'
-  return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+  return d.toLocaleDateString('ar-SA-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 // Exactly the fields admin_update_company accepts. approved, verified, status,
@@ -193,7 +213,13 @@ const EDITABLE = [
   { k: 'keywords', t: 'كلمات للبحث' },
 ]
 
-const fmt = (d) => (d ? new Date(d).toLocaleDateString('ar-SA') : '—')
+// أرقام لاتينية.
+//
+// 'ar-SA' يجرّ معه التقويم الهجري والأرقام الهندية، فيظهر التاريخ ٢٠٢٦/٨/١٣
+// بينما مؤشر الثقة 87 وأيام التأخير 14 لاتينية في السطر نفسه. رقمان بنظامين
+// في شاشة واحدة يُقرآن كأنهما من مصدرين. اللاحقة u-nu-latn تُبقي اللغة عربية
+// وتوحّد الأرقام.
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '—')
 const h3 = { fontSize: '15px', fontWeight: 900, color: '#0F172A', margin: '0 0 14px' }
 const lbl = { fontSize: '11.5px', color: '#64748B', fontWeight: 700 }
 const val = { fontSize: '14px', color: '#0F172A', fontWeight: 700, marginTop: '3px' }
@@ -272,6 +298,15 @@ export default function AdminCompanyFile() {
   }, [id, tab === 'audit', auditPage])
 
   const [statusForm, setStatusForm] = useState(null)
+  // التقارير كاملةً للإدارة.
+  //
+  // company_report_full().recent يعطي {at, delay, payment, defaulted} فقط —
+  // بلا معرّف ولا تصنيف ولا قيمة ولا حالة. يكفي للتقرير العلني، ولا يكفي
+  // لشاشة يُتَّخذ فيها قرار: لا يمكن سحب تقرير لا تعرف معرّفه. وهي دالة
+  // يقرأها التقرير العلني أيضاً، فتوسيعها تُسرّب معرّفات التقارير لكل من
+  // يفتحه. القراءة هنا مباشرة، وهذه شاشة إدارة.
+  const [reportRows, setReportRows] = useState([])
+  const [withdrawing, setWithdrawing] = useState(null)
   // Reading a wrong sector and being unable to fix it is the same dead end as
   // reading a needed clarification and being unable to ask for one.
   const [editForm, setEditForm] = useState(null)
@@ -282,7 +317,7 @@ export default function AdminCompanyFile() {
       const sb = getSupabase()
       // One round of calls, all of them RPCs written for earlier screens — so no
       // figure here can disagree with the same figure shown elsewhere.
-      const [a, b, c, d, e, f] = await Promise.all([
+      const [a, b, c, d, e, f, g] = await Promise.all([
         sb.rpc('company_review_file', { p_company_id: id }),
         sb.rpc('company_report_full', { p_company_id: id }),
         sb.rpc('company_document_checklist', { p_company_id: id }),
@@ -296,6 +331,7 @@ export default function AdminCompanyFile() {
       setHistory(Array.isArray(d.data) ? d.data : [])
       setSent(Array.isArray(e.data) ? e.data : [])
       setContext(f.data || null)
+      setReportRows(Array.isArray(g.data) ? g.data : [])
     } catch (err) {
       setError(err.message || 'تعذّر تحميل ملف الشركة')
     } finally {
@@ -307,6 +343,31 @@ export default function AdminCompanyFile() {
   useLiveData(load, { tables: ['companies', 'company_documents', 'clarification_requests', 'reports'] })
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 4000) }
+
+  /**
+   * سحب تقرير منشور.
+   *
+   * القاعدة تتحقّق من الصلاحية ومن أن التقرير منشور ومن أن السبب غير فارغ،
+   * وتُعيد احتساب مؤشر الثقة في نفس المعاملة. الفحص هنا مجاملة لتفادي رحلة
+   * ذهاب وإياب، والقرار هناك.
+   */
+  const withdrawReport = async (row) => {
+    const why = (withdrawing?.reason || '').trim()
+    if (!why) { showToast('❌ سبب السحب مطلوب'); return }
+    try {
+      setWithdrawing((w) => ({ ...w, busy: true }))
+      const { error: e } = await getSupabase().rpc('withdraw_report', {
+        p_report_id: row.id, p_reason: why,
+      })
+      if (e) throw e
+      setWithdrawing(null)
+      showToast('✅ سُحب التقرير وأُعيد احتساب مؤشر الثقة')
+      load()
+    } catch (err) {
+      setWithdrawing((w) => ({ ...w, busy: false }))
+      showToast('❌ ' + (err?.message || 'تعذّر سحب التقرير'))
+    }
+  }
 
   /**
    * Verify or reject a document without leaving the file.
@@ -953,18 +1014,82 @@ export default function AdminCompanyFile() {
       {tab === 'reports' && (
         <Card>
           <SectionTitle>التقارير عن هذه الشركة</SectionTitle>
-          {(full?.recent || []).length === 0 ? (
-            <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا تقارير معتمدة بعد.</p>
+          {/* كل التقارير، لا المنشورة وحدها — ومعها حالتها.
+              الصفّ كان سطراً واحداً بلا تصنيف ولا قيمة ولا حالة، ويُطبع فيه
+              payment بالإنجليزية. ومَن يقرّر السحب يحتاج أن يرى ما يسحبه. */}
+          {reportRows.length === 0 ? (
+            <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>لا تقارير عن هذه الشركة.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {(full.recent || []).map((r, i) => {
-                const ok = r.payment === 'full' && !r.defaulted
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {reportRows.map((r) => {
+                const st = REPORT_STATE[r.status] || REPORT_STATE.draft
+                const bad = r.defaulted || (r.delay_days > 0) || ['default', 'unpaid'].includes(r.payment_commitment)
+                const isOpen = withdrawing?.id === r.id
                 return (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', background: ok ? '#F0FDF4' : '#FFFBEB', borderRadius: '9px', padding: '11px 14px' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: ok ? '#15803D' : '#B45309' }}>
-                      {ok ? '✔' : '!'} {r.payment}{r.delay > 0 ? ` — تأخير ${r.delay} يوم` : ''}{r.defaulted ? ' — تعثّر' : ''}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>{fmt(r.at)}</span>
+                  <div key={r.id} style={{ border: `1px solid ${st.bd}`, background: st.bg, borderRadius: '11px', padding: '13px 15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
+                        {bad ? '!' : '✔'} {CATEGORY[r.category] || r.category || 'تقرير تعامل'}
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: st.fg, background: '#fff', border: `1px solid ${st.bd}`, borderRadius: '999px', padding: '2px 10px' }}>
+                        {st.t}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: '10px', marginTop: '11px' }}>
+                      {[
+                        ['السداد', PAYMENT[r.payment_commitment] || r.payment_commitment],
+                        ['التأخير', r.delay_days != null ? `${r.delay_days} يوم` : null],
+                        ['تعثّر', r.defaulted ? 'نعم' : 'لا'],
+                        ['قيمة التعامل', r.deal_value ? `${Number(r.deal_value).toLocaleString('en-US')} ${r.currency || 'ر.س'}` : null],
+                        ['تاريخ التعامل', r.dealt_at ? fmt(r.dealt_at) : null],
+                        [r.status === 'approved' ? 'نُشر' : 'أُنشئ', fmt(r.approved_at || r.created_at)],
+                      ].map(([k, v]) => (
+                        <div key={k}>
+                          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>{k}</div>
+                          <div style={{ fontSize: '13px', fontWeight: 800, color: v ? '#334155' : '#CBD5E1' }}>{v || '—'}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {r.status === 'rejected' && r.rejection_reason && (
+                      <div style={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 700, marginTop: '10px' }}>
+                        سبب السحب: {r.rejection_reason}
+                      </div>
+                    )}
+
+                    {/* السحب للمنشور وحده — غير المنشور يُرفض من مسار المراجعة. */}
+                    {r.status === 'approved' && (
+                      isOpen ? (
+                        <div style={{ marginTop: '12px' }}>
+                          <input
+                            autoFocus
+                            value={withdrawing.reason || ''}
+                            onChange={(e) => setWithdrawing((w) => ({ ...w, reason: e.target.value }))}
+                            placeholder="سبب السحب — مكرّر، أو عن شركة خطأ، أو لم يثبت التعامل"
+                            style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #FECACA', borderRadius: '9px', padding: '10px 13px', fontSize: '13.5px', fontFamily: 'inherit', textAlign: 'right' }}
+                          />
+                          <div style={{ fontSize: '11.5px', color: '#64748B', margin: '7px 2px', lineHeight: 1.8 }}>
+                            السحب يُنزل التقرير من تقرير الثقة فوراً ويُعيد احتساب المؤشر، ويُسجَّل باسمك في سجلّ التدقيق.
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', flexDirection: 'row-reverse' }}>
+                            <button onClick={() => withdrawReport(r)} disabled={withdrawing.busy}
+                                    style={{ padding: '9px 18px', background: '#B91C1C', color: '#fff', border: 0, borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              {withdrawing.busy ? 'جارٍ السحب…' : 'تأكيد السحب'}
+                            </button>
+                            <button onClick={() => setWithdrawing(null)} disabled={withdrawing.busy}
+                                    style={{ padding: '9px 18px', background: '#fff', color: '#334155', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              إلغاء
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setWithdrawing({ id: r.id, reason: '' })}
+                                style={{ marginTop: '11px', padding: '8px 16px', background: '#fff', color: '#B91C1C', border: '1.5px solid #FECACA', borderRadius: '9px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          سحب التقرير
+                        </button>
+                      )
+                    )}
                   </div>
                 )
               })}
@@ -974,9 +1099,11 @@ export default function AdminCompanyFile() {
             <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #E2E8F0' }}>
               <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>مصادر التقارير</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {/* «غير محدّد · 2» تقرأ كأنها عطل، وهي بيانات صحيحة: قطاع
+                    الجهة المُبلِّغة غير مسجَّل. تُقال كما هي. */}
                 {full.sources.map((s) => (
                   <span key={s.sector} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '999px', padding: '5px 13px', fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>
-                    {s.sector} · {s.count}
+                    {s.sector === 'غير محدّد' ? 'قطاع غير مسجَّل' : s.sector} — {s.count} تقرير
                   </span>
                 ))}
               </div>
