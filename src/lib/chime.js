@@ -41,16 +41,44 @@ const makeCtx = () => {
  * الصفحة، أيّاً كان موضعها. بعدها يبقى السياق 'running' ويعمل التشغيل من أي
  * مكان، بما فيه حدث قادم من الشبكة.
  *
- * once: true — يُنزع المستمع بعد أول نداء، فلا يبقى شيء معلّقاً على المستند.
+ * المستمعان يُنزعان عند **النجاح** لا عند أول نداء. `once: true` كان ينزعهما
+ * بعد أول ضغطة أيّاً كانت نتيجتها — فإن رفض المتصفح الاستئناف في تلك اللحظة
+ * لم تبقَ فرصة ثانية، وصمت الصوت إلى الأبد. وكان نزع «pointerdown» يترك
+ * «keydown» معلّقاً على النافذة.
+ *
+ * والدالة غير ضارّة إن نوديت مرّات: الجرس موجود في لوحتين، وكل انتقال بينهما
+ * يُعيد تركيبه.
  */
+let armed = false
+let listening = false
+
 export function armAudio () {
-  const unlock = () => {
-    const c = makeCtx()
-    if (c && c.state === 'suspended') c.resume().catch(() => {})
+  if (armed || listening) return
+
+  const cleanup = () => {
+    window.removeEventListener('pointerdown', unlock)
+    window.removeEventListener('keydown', unlock)
+    listening = false
   }
-  window.addEventListener('pointerdown', unlock, { once: true, passive: true })
-  window.addEventListener('keydown', unlock, { once: true })
+
+  async function unlock () {
+    const c = makeCtx()
+    if (!c) { cleanup(); return }        // لا Web Audio أصلاً — لا فائدة من الانتظار
+    if (c.state === 'suspended') {
+      try { await c.resume() } catch { /* رفض المتصفح — تُترك فرصة أخرى */ }
+    }
+    // يُنزع المستمعان فقط بعد أن يصير السياق قابلاً للتشغيل. وإلا يُترَكان
+    // للضغطة التالية.
+    if (c.state === 'running') { armed = true; cleanup() }
+  }
+
+  window.addEventListener('pointerdown', unlock, { passive: true })
+  window.addEventListener('keydown', unlock)
+  listening = true
 }
+
+/** هل السياق جاهز فعلاً؟ للتشخيص من وحدة التحكم عند الحاجة. */
+export const audioReady = () => !!ctx && ctx.state === 'running'
 
 /** ثانية ونصف من الصمت خير من نغمتين متتاليتين على دفعة إشعارات واحدة. */
 let lastAt = 0

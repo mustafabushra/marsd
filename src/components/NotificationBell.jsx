@@ -29,6 +29,13 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const wrap = useRef(null)
 
+  // هل اكتمل أول جلب؟ البذر يعتمد على هذا لا على امتلاء القائمة.
+  //
+  // الاعتماد على `items.length === 0` كان يترك صندوقاً فارغاً بلا بذر إلى
+  // الأبد — لأن القائمة تبقى فارغة — فيصل أول إشعار في حياة المستخدم فيُبذَر
+  // به ويُبتلع صوته. أول إشعار هو أحقّ ما يُسمع.
+  const loadedOnce = useRef(false)
+
   const load = useCallback(async () => {
     if (!user?.id) return
     try {
@@ -39,7 +46,10 @@ export default function NotificationBell() {
         .order('created_at', { ascending: false })
         .limit(20)
       setItems(data || [])
+      loadedOnce.current = true
     } catch (err) {
+      // جلب فاشل لا يُعدّ بذراً: لو عُدَّ، لصار كل ما في الصندوق «جديداً» عند
+      // أول جلب ناجح بعده.
       console.warn('Notifications warning:', err)
     }
   }, [user?.id])
@@ -58,15 +68,24 @@ export default function NotificationBell() {
   // إشعاراً قديماً ليس حدثاً، ونغمة عند فتح كل صفحة تُكتَم في أول يوم.
   const seen = useRef(null)
 
+  // حساب جديد يبدأ من جديد. لولا هذا لبقيت معرّفات الحساب السابق في `seen`،
+  // فيصير صندوق الداخل كلّه «جديداً» وتُطلق نغمة عند تسجيل الدخول.
   useEffect(() => {
-    // لا شيء بعد: التركيب يسبق أول جلب، و items حينها فارغة. البذر هنا كان
-    // يزرع مجموعة فارغة، فيصير كل إشعار قديم «جديداً» عند وصول أول دفعة
-    // وتُطلق النغمة عند فتح الصفحة. يُنتظر أول تحميل فعلي.
-    if (!user?.id) return
-    if (seen.current === null && items.length === 0) return
+    seen.current = null
+    loadedOnce.current = false
+  }, [user?.id])
+
+  useEffect(() => {
+    // التركيب يسبق أول جلب، فلا يُقاس شيء قبل اكتماله. البذر بمجموعة فارغة
+    // هنا كان يجعل كل إشعار قديم «جديداً» عند وصول أول دفعة، فتُطلق النغمة
+    // عند فتح الصفحة.
+    if (!loadedOnce.current) return
 
     const ids = new Set(items.filter((n) => !n.read_at).map((n) => n.id))
 
+    // البذرة: ما كان موجوداً قبل دخول المستخدم ليس حدثاً. تُنفَّذ مرة واحدة
+    // بعد أول جلب ناجح — حتى لو كان الصندوق فارغاً، فتبدأ المقارنة من صفر
+    // ويُسمع أول إشعار يصل.
     if (seen.current === null) { seen.current = ids; return }
 
     // جديد = غير مقروء ولم نره في الدفعة السابقة. المقارنة بالمعرّفات لا
@@ -184,7 +203,9 @@ export default function NotificationBell() {
                   const next = !sound
                   setSound(next)
                   setSoundOn(next)
-                  if (next) playChime()
+                  // الضغطة نفسها تفاعل، فهي أفضل لحظة لفكّ القفل. والنغمة
+                  // الاختبارية تجعل الزرّ يُثبت أنه يعمل بدل انتظار إشعار.
+                  if (next) { armAudio(); playChime() }
                 }}
                 aria-pressed={sound}
                 title={sound ? 'كتم صوت الإشعارات' : 'تشغيل صوت الإشعارات'}
