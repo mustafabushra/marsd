@@ -57,6 +57,7 @@ export default function ReportsAboutUs() {
   const navigate = useNavigate()
   const { user } = useUser()
   const [score, setScore] = useState(null)
+  const [thresholds, setThresholds] = useState(null)
   const { role, loading: roleLoading } = useUserRole()
   const [companyId, setCompanyId] = useState(null)
   const [tenantId, setTenantId] = useState(null)
@@ -109,15 +110,25 @@ export default function ReportsAboutUs() {
 
       // الدرجة نفسها. الصفحة كانت تعرض المادة الخام — البلاغات — ولا تعرض
       // ما بُني منها، فتقرأ الشركة ما قيل عنها ولا تعرف أين صار موقفها.
-      // breakdown يحمل rules_applied ومعه العتبات، وهو مقروء للشركة بينما
-      // system_settings ليست. فتُقرأ العتبة من الصفّ نفسه الذي حُسبت به
-      // الدرجة — ولا يمكن للواجهة أن تعرض حدّاً غير الذي طُبِّق فعلاً.
-      const { data: ts } = await supabase
-        .from('trust_scores')
-        .select('score, risk_band, tier, approved_reports, computed_at, breakdown')
-        .eq('company_id', t.company_id)
-        .maybeSingle()
+      // العتبتان من دالة تُرجعهما وحدهما.
+      //
+      // كانتا تُقرآن من breakdown.rules_applied، وهو نسخة من نموذج الثقة كاملاً
+      // في جدول سياسته USING (true) — فكان كل مستخدم مسجَّل يقرأ الأوزان
+      // والمكافآت والعقوبات لكل شركة. أُزيل المفتاح في migration 170، وبقيت
+      // العتبتان عبر trust_rating_thresholds لأنهما تصفان موقع الشركة لا
+      // كيفية التسجيل.
+      //
+      // و breakdown ما زال يُقرأ: layers هي المنتَج الذي يعرضه تقرير الثقة.
+      const [{ data: ts }, { data: th }] = await Promise.all([
+        supabase
+          .from('trust_scores')
+          .select('score, risk_band, tier, approved_reports, computed_at')
+          .eq('company_id', t.company_id)
+          .maybeSingle(),
+        supabase.rpc('trust_rating_thresholds'),
+      ])
       setScore(ts || null)
+      setThresholds(th || null)
     } catch (err) {
       setError(err.message || 'تعذّر تحميل التقارير')
     } finally {
@@ -235,10 +246,9 @@ export default function ReportsAboutUs() {
       {(() => {
         const rated = score && Number(score.score) > 0
         const b = rated ? (RISK_BAND[score.risk_band] || RISK_BAND.medium) : null
-        // العتبات من الصفّ نفسه لا من قيمة مكتوبة هنا.
-        const th = score?.breakdown?.rules_applied?.thresholds || {}
-        const minPrelim = th.preliminary_min_reports
-        const minFull = th.full_min_reports
+        // من الدالة الضيّقة، لا من نسخة النموذج داخل الدرجة.
+        const minPrelim = thresholds?.preliminary_min_reports
+        const minFull = thresholds?.full_min_reports
         return (
           <div style={{
             ...card, padding: '20px 22px', marginBottom: '16px',
