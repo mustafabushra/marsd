@@ -69,11 +69,11 @@ const TOP_ITEMS = [
 const GROUPS = [
   { key: 'companies', section: 'الكيانات والرقابة', title: 'الشركات',
     badgeKey: 'unclaimed', badgeWord: 'غير مطالب بها', badgeTone: 'sky', items: [
-    { label: 'كل الشركات', path: '/admin/companies' },
-    { label: 'طلبات الشركات', path: '/admin/company-requests' },
+    { label: 'كل الشركات', path: '/admin/companies', badgeKey: 'n_companies', muted: true },
+    { label: 'طلبات الشركات', path: '/admin/company-requests', badgeKey: 'n_company_requests' },
     // The registry screen already filters on claimed_by; this is that filter as
     // a link rather than a thing you have to know to press.
-    { label: 'الشركات غير المطالب بها', path: '/admin/companies?filter=unclaimed' },
+    { label: 'الشركات غير المطالب بها', path: '/admin/companies?filter=unclaimed', badgeKey: 'unclaimed' },
     { label: 'البحث الموحد', path: '/admin/roster' },
   ] },
 
@@ -99,36 +99,36 @@ const GROUPS = [
   // what it actually is. The individual decision still lives in Company 360;
   // this is the screen for doing many at once.
   { key: 'review', title: 'المراجعة', badgeKey: 'pending', badgeWord: 'معلق', badgeTone: 'red', items: [
-    { label: 'صندوق المراجعة', path: '/admin/work' },
+    { label: 'صندوق المراجعة', path: '/admin/work', badgeKey: 'n_work' },
     // شاشة company-approval كانت تقرأ companies.status='pending' وهي حالة لا
     // وجود لها في هذه القاعدة — القيم المستعملة active و approved. مراجعة
     // التسجيل تعيش في company_requests، وهذه هي شاشتها.
-    { label: 'طلبات الانضمام', path: '/admin/company-requests?kind=registration' },
-    { label: 'طلبات الملكية', path: '/admin/claim-requests' },
+    { label: 'طلبات الانضمام', path: '/admin/company-requests?kind=registration', badgeKey: 'n_registration' },
+    { label: 'طلبات الملكية', path: '/admin/claim-requests', badgeKey: 'n_claim' },
     { label: 'التحقق من الشركات', path: '/admin/company-verification' },
   ] },
 
   { key: 'reports', title: 'التقارير', badgeKey: 'reviews', badgeWord: 'قيد المراجعة', badgeTone: 'orange', items: [
-    { label: 'التقارير', path: '/admin/reports' },
+    { label: 'التقارير', path: '/admin/reports', badgeKey: 'n_reports' },
     // The one queue, narrowed to this kind — `?kind=` is read by مركز العمل.
-    { label: 'تقارير قيد المراجعة', path: '/admin/work?kind=report_review' },
-    { label: 'الاعتراضات', path: '/admin/disputes' },
+    { label: 'تقارير قيد المراجعة', path: '/admin/work?kind=report_review', badgeKey: 'n_reports' },
+    { label: 'الاعتراضات', path: '/admin/disputes', badgeKey: 'n_disputes' },
     { label: 'مستودع الأدلة', path: '/admin/knowledge-base/reports' },
   ] },
 
   // The document screen's own tabs, as links. `?tab=` matches TABS in
   // AdminDocuments exactly — pending / expired / rejected.
   { key: 'documents', title: 'المستندات', badgeKey: 'docs', badgeWord: 'تنبيه', badgeTone: 'orange', items: [
-    { label: 'المستندات', path: '/admin/documents' },
-    { label: 'المستندات قيد الفحص', path: '/admin/documents?tab=pending' },
-    { label: 'المستندات المنتهية', path: '/admin/documents?tab=expired' },
-    { label: 'المستندات المرفوضة', path: '/admin/documents?tab=rejected' },
-    { label: 'الحالة الرسمية', path: '/admin/official-status' },
+    { label: 'المستندات', path: '/admin/documents', badgeKey: 'n_docs_all', muted: true },
+    { label: 'المستندات قيد الفحص', path: '/admin/documents?tab=pending', badgeKey: 'n_docs_pending' },
+    { label: 'المستندات المنتهية', path: '/admin/documents?tab=expired', badgeKey: 'n_docs_expired' },
+    { label: 'المستندات المرفوضة', path: '/admin/documents?tab=rejected', badgeKey: 'n_docs_rejected' },
+    { label: 'الحالة الرسمية', path: '/admin/official-status', badgeKey: 'n_official' },
   ] },
 
   { key: 'watch', title: 'المراقبة', badgeKey: 'trust', badgeWord: 'تنبيه ثقة', badgeTone: 'red', items: [
     { label: 'قوائم المراقبة', path: '/admin/fraud-detection' },
-    { label: 'تنبيهات مؤشر الثقة', path: '/admin/trust-score' },
+    { label: 'تنبيهات مؤشر الثقة', path: '/admin/trust-score', badgeKey: 'trust' },
     { label: 'تغييرات الشركات', path: '/admin/data-management' },
   ] },
   { key: 'analytics', title: 'التحليلات', items: [
@@ -295,15 +295,38 @@ export default function AdminShell({ user }) {
       const roster = await supabase.rpc('company_roster')
         .then((r) => (r.data || []).filter((c) => c.approved), () => null)
 
+      // `counts` في documents_overview محسوب على كل المستندات مهما كان
+      // p_state، فنداء واحد يعطي حالات التبويبات الأربعة كلها.
+      const dc = await supabase.rpc('documents_overview', { p_state: 'pending' })
+        .then((r) => r.data?.counts || {}, () => ({}))
+
+      const co = roster || []
       if (!alive) return
       setCounts({
         urgent: work?.all || 0,
+
+        // عناوين المجموعات
         requests: k.data_update || 0,
         pending: (k.registration || 0) + (k.claim || 0) + (k.document_review || 0),
         reviews: (k.report_review || 0) + (k.dispute || 0),
         docs: k.document_review || 0,
-        trust: (roster || []).filter((c) => c.trust_score != null && Number(c.trust_score) < 50).length,
-        unclaimed: (roster || []).filter((c) => !c.claimed_by).length,
+        trust: co.filter((c) => c.trust_score != null && Number(c.trust_score) > 0 && Number(c.trust_score) < 50).length,
+        unclaimed: co.filter((c) => !c.claimed_by).length,
+
+        // الصفحات نفسها — شارة المجموعة تقول «٢ غير مطالب بها» فوق أربع
+        // صفحات، ولا تقول أيّها فيه الاثنان. هذه تقولها.
+        n_companies: co.length,
+        n_company_requests: (k.registration || 0) + (k.claim || 0) + (k.data_update || 0),
+        n_work: work?.all || 0,
+        n_registration: k.registration || 0,
+        n_claim: k.claim || 0,
+        n_reports: k.report_review || 0,
+        n_disputes: k.dispute || 0,
+        n_docs_pending: dc.pending || 0,
+        n_docs_expired: dc.expired || 0,
+        n_docs_rejected: dc.rejected || 0,
+        n_docs_all: Object.values(dc).reduce((a, n) => a + Number(n || 0), 0),
+        n_official: co.filter((c) => c.official_status && c.official_status !== 'none').length,
       })
     }
     load()
@@ -494,7 +517,24 @@ export default function AdminShell({ user }) {
                         onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = 'rgba(30,41,59,.5)'; e.currentTarget.style.color = S[200] } }}
                         onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S[400] } }}
                       >
-                        {it.label}
+                        <span style={{ flex: 1, minWidth: 0 }}>{it.label}</span>
+                        {/* العدّ على الصفحة نفسها.
+                            شارة المجموعة تقول «٢ غير مطالب بها» فوق أربع صفحات
+                            ولا تقول أيّها فيه الاثنان، فيُفتَح الأربع بحثاً عن
+                            الرقم. هذه تقول أين هو.
+
+                            المكتوم للإجماليات — «كل الشركات ٤» يفيد في المعرفة
+                            لا في الإلحاح — والملوّن لِما ينتظر قراراً. صفرٌ لا
+                            يُعرض إطلاقاً: صفحة فارغة لا تحتاج أن تعلن فراغها،
+                            و«٠» متكرّرة تُعلّم العين أن تتخطّى الأرقام كلّها. */}
+                        {it.badgeKey && counts[it.badgeKey] > 0 && (
+                          <span style={{
+                            flex: 'none', borderRadius: '999px', padding: '1px 7px',
+                            fontSize: '10px', fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                            background: it.muted ? 'rgba(148,163,184,.15)' : 'rgba(245,158,11,.18)',
+                            color: it.muted ? S[400] : '#FCD34D',
+                          }}>{counts[it.badgeKey]}</span>
+                        )}
                       </button>
                     )
                   })}
