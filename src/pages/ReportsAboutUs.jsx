@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import { useUserRole } from '../hooks/useUserRole'
@@ -40,8 +41,22 @@ const DISPUTE_STATUS = {
 
 const MIN_REASON = 20
 
+/**
+ * نطاق المخاطر كما يخرجه النموذج نفسه، لا بعتبات تُخترع هنا.
+ *
+ * الانتباه واجب إلى الاتجاه: «منخفض» في risk_band يعني مخاطر منخفضة — أي
+ * ثقة عالية. عرضه على أنه سيّئ يقلب معنى الرقم رأساً على عقب.
+ */
+const RISK_BAND = {
+  low:    { t: 'مخاطر منخفضة', fg: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0' },
+  medium: { t: 'مخاطر متوسطة', fg: '#B45309', bg: '#FFFBEB', bd: '#FDE68A' },
+  high:   { t: 'مخاطر مرتفعة', fg: '#B91C1C', bg: '#FEF2F2', bd: '#FECACA' },
+}
+
 export default function ReportsAboutUs() {
+  const navigate = useNavigate()
   const { user } = useUser()
+  const [score, setScore] = useState(null)
   const { role, loading: roleLoading } = useUserRole()
   const [companyId, setCompanyId] = useState(null)
   const [tenantId, setTenantId] = useState(null)
@@ -91,6 +106,15 @@ export default function ReportsAboutUs() {
 
       setReports(rows || [])
       setDisputes(Object.fromEntries((mine || []).map((d) => [d.report_id, d])))
+
+      // الدرجة نفسها. الصفحة كانت تعرض المادة الخام — البلاغات — ولا تعرض
+      // ما بُني منها، فتقرأ الشركة ما قيل عنها ولا تعرف أين صار موقفها.
+      const { data: ts } = await supabase
+        .from('trust_scores')
+        .select('score, risk_band, approved_reports, computed_at')
+        .eq('company_id', t.company_id)
+        .maybeSingle()
+      setScore(ts || null)
     } catch (err) {
       setError(err.message || 'تعذّر تحميل التقارير')
     } finally {
@@ -199,6 +223,70 @@ export default function ReportsAboutUs() {
       {error && (
         <div style={{ marginBottom: '16px', padding: '13px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#B91C1C', fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>⚠️ {error}</div>
       )}
+
+      {/* الدرجة، وما تفتحه.
+          البلاغات أدناه مادّة خام تدخل الطبقة المجتمعية؛ وهذه نتيجتها. عرض
+          الأولى دون الثانية يترك الشركة تقرأ ما قيل عنها ولا تعرف أثره. والزرّ
+          يفتح التقرير نفسه الذي يراه العميل من محرك البحث — لا نسخة مختصرة
+          منه، حتى لا يكون ما تراه الشركة عن نفسها غير ما يراه السوق. */}
+      {(() => {
+        const rated = score && Number(score.score) > 0
+        const b = rated ? (RISK_BAND[score.risk_band] || RISK_BAND.medium) : null
+        return (
+          <div style={{
+            ...card, padding: '20px 22px', marginBottom: '16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: '16px', flexWrap: 'wrap', flexDirection: 'row-reverse',
+          }}>
+            <div style={{ textAlign: 'right', minWidth: 0 }}>
+              <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 700, marginBottom: '6px' }}>
+                درجة ثقتك الآن
+              </div>
+              {rated ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '30px', fontWeight: 900, color: b.fg, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                    {Number(score.score).toFixed(0)}
+                  </span>
+                  <span style={{
+                    background: b.bg, color: b.fg, border: `1px solid ${b.bd}`,
+                    borderRadius: '999px', padding: '3px 11px', fontSize: '12px', fontWeight: 800,
+                  }}>{b.t}</span>
+                </div>
+              ) : (
+                // صفر يعني «لم تُحتسب» لا «ثقتك صفر» — أرضية الـ clamp خمسة،
+                // فلا حساب حقيقي ينتج صفراً. عرضه رقماً كان سيقول للشركة إنها
+                // بأسوأ حال وهي لم تُصنَّف بعد.
+                //
+                // ولا يُنسب السبب هنا إلى غياب التقارير: شركات لديها تقارير
+                // معتمدة درجتها صفر كذلك، لأن طبقة المجتمع في نموذج الثقة بلا
+                // معاملات تسجيل أصلاً. سبب لا نتحقّق منه لا يُقال للشركة.
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#B45309' }}>
+                  لم تُصنَّف بعد
+                  <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '5px', lineHeight: 1.9 }}>
+                    مؤشر ثقتك قيد الاحتساب، وسيظهر هنا فور اكتماله.
+                  </div>
+                </div>
+              )}
+              {rated && score.computed_at && (
+                <div style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 600, marginTop: '7px' }}>
+                  آخر احتساب {new Date(score.computed_at).toLocaleDateString('en-GB')}
+                  {score.approved_reports != null && ` · ${score.approved_reports} تقريراً معتمداً`}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => navigate(`/trust-report/${companyId}`)}
+              style={{
+                flex: 'none', padding: '12px 20px', background: '#1E2A52', color: '#fff',
+                border: 0, borderRadius: '11px', fontSize: '13.5px', fontWeight: 800,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              اعرض تقريرك كما يراه العميل ↗
+            </button>
+          </div>
+        )
+      })()}
 
       {!canObject && reports.length > 0 && (
         <div style={{ ...card, padding: '13px 16px', marginBottom: '16px', background: '#F8FAFC', fontSize: '13.5px', color: '#475569', fontWeight: 600, lineHeight: 1.8, textAlign: 'right' }}>
