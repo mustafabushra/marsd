@@ -23,25 +23,54 @@
 
 let ctx = null
 
-/** ثانيتان من الصمت خير من نغمتين متتاليتين على دفعة إشعارات واحدة. */
+const makeCtx = () => {
+  const Ctor = window.AudioContext || window.webkitAudioContext
+  if (!Ctor) return null
+  ctx = ctx || new Ctor()
+  return ctx
+}
+
+/**
+ * فكّ قفل الصوت عند أول تفاعل، مرة واحدة.
+ *
+ * هذا هو ما كان ناقصاً. المتصفح ينشئ AudioContext معلّقاً ما لم يكن هناك
+ * تفاعل سابق، واستئنافه من داخل حدث realtime — أي خارج أي تفاعل — يُرفض
+ * صامتاً. فالإشعار يصل والنغمة تُطلَب ولا يُسمع شيء.
+ *
+ * العلاج أن يُستأنف السياق داخل معالج تفاعل حقيقي: أول ضغطة أو مفتاح في
+ * الصفحة، أيّاً كان موضعها. بعدها يبقى السياق 'running' ويعمل التشغيل من أي
+ * مكان، بما فيه حدث قادم من الشبكة.
+ *
+ * once: true — يُنزع المستمع بعد أول نداء، فلا يبقى شيء معلّقاً على المستند.
+ */
+export function armAudio () {
+  const unlock = () => {
+    const c = makeCtx()
+    if (c && c.state === 'suspended') c.resume().catch(() => {})
+  }
+  window.addEventListener('pointerdown', unlock, { once: true, passive: true })
+  window.addEventListener('keydown', unlock, { once: true })
+}
+
+/** ثانية ونصف من الصمت خير من نغمتين متتاليتين على دفعة إشعارات واحدة. */
 let lastAt = 0
 const MIN_GAP_MS = 1500
 
 export async function playChime () {
   const now = Date.now()
   if (now - lastAt < MIN_GAP_MS) return false
-  lastAt = now
 
   try {
-    const Ctor = window.AudioContext || window.webkitAudioContext
-    if (!Ctor) return false
-    ctx = ctx || new Ctor()
+    if (!makeCtx()) return false
 
     // مُعلَّق حتى يتفاعل المستخدم — تُحاوَل مرة، ولا يُصرَخ إن رُفضت.
     if (ctx.state === 'suspended') {
       try { await ctx.resume() } catch { /* سياسة المتصفح */ }
     }
+    // المهلة تُسجَّل عند التشغيل الفعلي لا عند المحاولة. تسجيلها قبل ذلك كان
+    // يجعل محاولةً فاشلة تكتم النغمة التالية بعدها مباشرة.
     if (ctx.state !== 'running') return false
+    lastAt = now
 
     const t0 = ctx.currentTime
 

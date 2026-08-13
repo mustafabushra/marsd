@@ -5,7 +5,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { BellIcon } from './icons'
 import { notificationText, NOTIFICATION_STYLE } from '../lib/notify'
-import { playChime, soundOn, setSoundOn } from '../lib/chime'
+import { playChime, soundOn, setSoundOn, armAudio } from '../lib/chime'
 
 /**
  * The bell in the header, doing something.
@@ -49,11 +49,22 @@ export default function NotificationBell() {
 
   const [sound, setSound] = useState(soundOn)
 
+  // يُستأنف السياق الصوتي عند أول ضغطة في الصفحة. بدونه يبقى معلّقاً، ويصل
+  // الإشعار فتُطلَب النغمة من داخل حدث شبكة — خارج أي تفاعل — فيرفض المتصفح
+  // ولا يُسمع شيء. هذا هو سبب الصمت.
+  useEffect(() => { armAudio() }, [])
+
   // ما رأيناه بالفعل. يُبذَر عند أول تحميل ولا يُصوَّت له: الدخول على اثني عشر
   // إشعاراً قديماً ليس حدثاً، ونغمة عند فتح كل صفحة تُكتَم في أول يوم.
   const seen = useRef(null)
 
   useEffect(() => {
+    // لا شيء بعد: التركيب يسبق أول جلب، و items حينها فارغة. البذر هنا كان
+    // يزرع مجموعة فارغة، فيصير كل إشعار قديم «جديداً» عند وصول أول دفعة
+    // وتُطلق النغمة عند فتح الصفحة. يُنتظر أول تحميل فعلي.
+    if (!user?.id) return
+    if (seen.current === null && items.length === 0) return
+
     const ids = new Set(items.filter((n) => !n.read_at).map((n) => n.id))
 
     if (seen.current === null) { seen.current = ids; return }
@@ -66,7 +77,7 @@ export default function NotificationBell() {
     seen.current = ids
 
     if (fresh > 0 && sound) playChime()
-  }, [items, sound])
+  }, [items, sound, user?.id])
 
   // Close on an outside click and on Escape. A panel that only closes by
   // clicking the thing that opened it is one people close by navigating away.
