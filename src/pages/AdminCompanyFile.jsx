@@ -324,6 +324,13 @@ export default function AdminCompanyFile() {
         sb.rpc('company_score_history', { p_company_id: id, p_limit: 24 }),
         sb.rpc('admin_company_documents', { p_company_id: id }),
         sb.rpc('admin_company_context', { p_company_id: id }),
+        // قراءة مباشرة لا RPC: company_report_full().recent لا يعطي معرّفاً،
+        // فلا يمكن سحب ما لا تعرف معرّفه — وهي دالة يقرأها التقرير العلني
+        // كذلك، فتوسيعها تُسرّب معرّفات التقارير لكل من يفتحه.
+        sb.from('reports')
+          .select('id, status, category, title, payment_commitment, delay_days, defaulted, deal_value, currency, dealt_at, approved_at, created_at, rejection_reason')
+          .eq('target_company_id', id)
+          .order('created_at', { ascending: false }),
       ])
       setFile(a.data || null)
       setFull(b.data || null)
