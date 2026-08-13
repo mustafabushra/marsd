@@ -5,6 +5,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { BellIcon } from './icons'
 import { notificationText, NOTIFICATION_STYLE } from '../lib/notify'
+import { playChime, soundOn, setSoundOn } from '../lib/chime'
 
 /**
  * The bell in the header, doing something.
@@ -45,6 +46,27 @@ export default function NotificationBell() {
 
   useEffect(() => { load() }, [load])
   useLiveData(load, { tables: ['notifications'] })
+
+  const [sound, setSound] = useState(soundOn)
+
+  // ما رأيناه بالفعل. يُبذَر عند أول تحميل ولا يُصوَّت له: الدخول على اثني عشر
+  // إشعاراً قديماً ليس حدثاً، ونغمة عند فتح كل صفحة تُكتَم في أول يوم.
+  const seen = useRef(null)
+
+  useEffect(() => {
+    const ids = new Set(items.filter((n) => !n.read_at).map((n) => n.id))
+
+    if (seen.current === null) { seen.current = ids; return }
+
+    // جديد = غير مقروء ولم نره في الدفعة السابقة. المقارنة بالمعرّفات لا
+    // بالعدد، لأن قراءة إشعار وورود آخر في اللحظة نفسها يُبقيان العدد ثابتاً
+    // بينما وصل شيء فعلاً.
+    let fresh = 0
+    for (const id of ids) if (!seen.current.has(id)) fresh++
+    seen.current = ids
+
+    if (fresh > 0 && sound) playChime()
+  }, [items, sound])
 
   // Close on an outside click and on Escape. A panel that only closes by
   // clicking the thing that opened it is one people close by navigating away.
@@ -135,12 +157,35 @@ export default function NotificationBell() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid #F1F5F9' }}>
             <span style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A' }}>الإشعارات</span>
-            {unread.length > 0 && (
-              <button onClick={markAllRead}
-                      style={{ background: 'none', border: 0, color: '#1E2A52', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                تعليم الكل كمقروء
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {unread.length > 0 && (
+                <button onClick={markAllRead}
+                        style={{ background: 'none', border: 0, color: '#1E2A52', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  تعليم الكل كمقروء
+                </button>
+              )}
+              {/* الكتم، حيث يبحث عنه من أزعجه الصوت.
+                  والضغط يشغّل نغمة عند التفعيل — فهو أول تفاعل يسمح للمتصفح
+                  باستئناف السياق الصوتي، ويسمع المستخدم ما فعّله بدل أن ينتظر
+                  إشعاراً ليكتشف أنه يعمل. */}
+              <button
+                onClick={() => {
+                  const next = !sound
+                  setSound(next)
+                  setSoundOn(next)
+                  if (next) playChime()
+                }}
+                aria-pressed={sound}
+                title={sound ? 'كتم صوت الإشعارات' : 'تشغيل صوت الإشعارات'}
+                aria-label={sound ? 'كتم صوت الإشعارات' : 'تشغيل صوت الإشعارات'}
+                style={{
+                  background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: '14px', lineHeight: 1, padding: 0,
+                  opacity: sound ? 1 : 0.45,
+                }}>
+                {sound ? '🔔' : '🔕'}
               </button>
-            )}
+            </div>
           </div>
 
           <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
