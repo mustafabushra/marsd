@@ -464,9 +464,19 @@ export default function AdminShell({ user }) {
                     letterSpacing: '.05em', padding: '12px 12px 4px',
                   }}>{g.section}</div>
                 )}
-                <div
+                {/* زرّ لا div.
+                    أعدتُ تنسيق هذا الرأس فأزلتُ الزرّ الذي كان بداخله وتركته
+                    div عليه onClick — أي عنصر يُفتح بالفأرة ولا يُبلغ بلوحة
+                    المفاتيح ولا يُعلن نفسه لقارئ الشاشة. توثيق NotificationBell
+                    في هذا المشروع يقول العبارة نفسها عن الجرس حين كان div. */}
+                <button
+                  type="button"
                   onClick={() => toggleGroup(g.key, open)}
+                  aria-expanded={open}
+                  aria-label={n > 0 && g.badgeWord ? `${g.title} — ${n} ${g.badgeWord}` : g.title}
                   style={{
+                    width: '100%', border: 0,
+                    fontFamily: 'inherit', textAlign: 'right',
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '8px 14px', marginTop: '2px', cursor: 'pointer',
                     borderRadius: '8px', fontSize: '14px',
@@ -489,8 +499,8 @@ export default function AdminShell({ user }) {
                       fontWeight: 500, whiteSpace: 'nowrap', flex: 'none',
                     }}>{n} {g.badgeWord}</span>
                   )}
-                  <span style={{ display: 'inline-block', transition: 'transform .2s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: open ? OK[400] : S[400], fontSize: '10px', flex: 'none' }}>▾</span>
-                </div>
+                  <span aria-hidden="true" style={{ display: 'inline-block', transition: 'transform .2s', transform: `rotate(${open ? '180deg' : '0deg'})`, color: open ? OK[400] : S[400], fontSize: '10px', flex: 'none' }}>▾</span>
+                </button>
                 {/* خطّ رفيع على حافة القائمة الفرعية — يربط البنود بعنوانها. */}
                 <div style={{
                   display: open ? 'flex' : 'none', flexDirection: 'column', gap: '2px',
@@ -506,6 +516,9 @@ export default function AdminShell({ user }) {
                       <button
                         key={`${it.path}-${idx}`}
                         onClick={() => navigate(it.path)}
+                        aria-label={it.badgeKey && counts[it.badgeKey] > 0
+                          ? `${it.label} — ${counts[it.badgeKey]}`
+                          : it.label}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
                           padding: it.indent ? '6px 26px 6px 12px' : '6px 12px', borderRadius: '8px',
@@ -527,8 +540,12 @@ export default function AdminShell({ user }) {
                             لا في الإلحاح — والملوّن لِما ينتظر قراراً. صفرٌ لا
                             يُعرض إطلاقاً: صفحة فارغة لا تحتاج أن تعلن فراغها،
                             و«٠» متكرّرة تُعلّم العين أن تتخطّى الأرقام كلّها. */}
+                        {/* aria-hidden، والعدد يُقال في aria-label على الزرّ.
+                            بدونه يصير الاسم المتاح «المستندات 9» فينطق قارئ
+                            الشاشة رقماً بلا وحدة — ويتغيّر اسم الزرّ كلما
+                            تغيّر العدد، فلا يثبت له اسم. */}
                         {it.badgeKey && counts[it.badgeKey] > 0 && (
-                          <span style={{
+                          <span aria-hidden="true" style={{
                             flex: 'none', borderRadius: '999px', padding: '1px 7px',
                             fontSize: '10px', fontWeight: 700, fontVariantNumeric: 'tabular-nums',
                             background: it.muted ? 'rgba(148,163,184,.15)' : 'rgba(245,158,11,.18)',
