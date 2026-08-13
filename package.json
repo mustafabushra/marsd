@@ -10,7 +10,8 @@
     "lint": "eslint src api scripts",
     "build:report": "node scripts/build-report-template.mjs",
     "check:tiles": "node scripts/probe-tile-truth.mjs",
-    "check:nav": "node scripts/probe-admin-nav.mjs"
+    "check:nav": "node scripts/probe-admin-nav.mjs",
+    "check:features": "node scripts/probe-admin-features.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
