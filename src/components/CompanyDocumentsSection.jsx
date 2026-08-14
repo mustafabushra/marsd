@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser } from '@clerk/react'
 import PhoneHandoff from './PhoneHandoff'
 import { inspectFile } from '../lib/fileSafety'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
@@ -124,20 +125,12 @@ export default function CompanyDocumentsSection() {
       setBusy(docType)
       const sb = getSupabase()
 
-      // Storage first; the inline fallback is what kept this working before the
-      // bucket existed and stays for the same reason.
-      let stored = null
+      // كان هنا احتياطٌ يُخزّن الملف نصّاً بصيغة data: حين يتعذّر الرفع —
+      // بقيّةُ زمنٍ لم يكن فيه دلو. وقد صار ثغرةً بوجود البوّابة: ملفٌ تردّه
+      // البوّابة كان يسقط إليه فيُخزَّن غير مفحوص. فحُذف.
       const path = `${companyId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
-      const { error: upErr } = await sb.storage
-        .from('company-documents').upload(path, file, { contentType: file.type })
-      if (!upErr) stored = path
-      else console.warn('Storage upload failed, falling back to inline:', upErr.message)
-
-      const fileUrl = stored || await new Promise((resolve, reject) => {
-        const r = new FileReader()
-        r.onload = () => resolve(r.result)
-        r.onerror = reject
-        r.readAsDataURL(file)
+      const { path: fileUrl } = await uploadViaGateway(file, {
+        targetBucket: 'company-documents', targetPath: path,
       })
 
       // Read the row back: an insert RLS filters out raises nothing and returns

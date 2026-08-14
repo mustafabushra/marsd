@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
 import { docLabel } from '../lib/enums'
@@ -79,17 +80,11 @@ export default function ClarificationRequests() {
       const sb = getSupabase()
       const path = `${companyId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
 
-      let stored = null
-      const { error: upErr } = await sb.storage
-        .from('company-documents').upload(path, file, { contentType: file.type })
-      if (!upErr) stored = path
-      else console.warn('Storage upload failed, falling back to inline:', upErr.message)
-
-      const fileUrl = stored || await new Promise((resolve, reject) => {
-        const rd = new FileReader()
-        rd.onload = () => resolve(rd.result)
-        rd.onerror = reject
-        rd.readAsDataURL(file)
+      // كان هنا سقوطٌ إلى data: عند فشل الرفع، فيُخزَّن الملف نصّاً في العمود
+      // بلا فحص. وقد صار ذلك ثغرةً بوجود البوّابة: ما تردّه البوّابة كان
+      // أضمن الملفّات وصولاً. فحُذف، وفشل الرفع يُبلَّغ.
+      const { path: fileUrl } = await uploadViaGateway(file, {
+        targetBucket: 'company-documents', targetPath: path,
       })
 
       // Read the row back. An insert RLS filters out raises nothing and returns

@@ -37,13 +37,17 @@ import { createClient } from '@supabase/supabase-js'
 // authentication error, which sends you looking at permissions instead of the
 // value. Normalise on read.
 import { clean } from './_lib/secrets.js'
+import { scanFile, sha256, reasonLabel, SCANNER_VERSION } from './_lib/fileScan.js'
 
 const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)
 const SERVICE_KEY = clean(process.env.SUPABASE_SERVICE_ROLE_KEY)
 
 const BUCKET = 'company-documents'
+const QUARANTINE = 'quarantine'
 const MAX_BYTES = 15 * 1024 * 1024
 const TYPES = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }
+/** النوع المُستنتَج من المحتوى ← ترويسته عند الحفظ. */
+const TYPE_MIME = { pdf: 'application/pdf', png: 'image/png', jpeg: 'image/jpeg' }
 
 // The token arrives in a URL the phone opened. Reject anything that is not the
 // shape the database issues, before it reaches a query.
@@ -116,14 +120,19 @@ export default async function handler(req, res) {
       // against a company the code was not issued for.
       const path = `${row.company_id}/${row.doc_type}-${Date.now()}.${TYPES[mime]}`
 
+      // الهاتف يرفع إلى الحجر لا إلى الدلو الدائم. مسار الحجر مشتقّ من الرمز
+      // نفسه، فلا يختاره الهاتف — والفحص يجري في `finish` قبل الترقية.
+      const quarantinePath = `handoff/${token.slice(0, 24)}-${Date.now()}.${TYPES[mime]}`
+
       const { data: signed, error: e2 } = await sb.storage
-        .from(BUCKET).createSignedUploadUrl(path)
+        .from(QUARANTINE).createSignedUploadUrl(quarantinePath)
       if (e2) return fail(res, 500, 'تعذّر تجهيز الرفع')
 
       return res.status(200).json({
         uploadUrl: signed.signedUrl,
         token: signed.token,
-        path,
+        path: quarantinePath,
+        targetPath: path,
         companyName: row.company_name,
         docLabel: row.doc_label,
         expiresAt: row.expires_at,
@@ -134,17 +143,71 @@ export default async function handler(req, res) {
       const path = String(body.path || '')
       const fileName = String(body.fileName || 'مستند').slice(0, 200)
 
-      // The object has to exist before a row claims it does. Without this a
-      // phone could report a successful upload that never happened, and the
-      // laptop would show a document that opens to nothing.
-      const folder = path.split('/')[0]
-      const { data: listed, error: e0 } = await sb.storage
-        .from(BUCKET).list(folder, { search: path.split('/').slice(1).join('/') })
-      if (e0) return fail(res, 500, 'تعذّر التحقّق من الملف')
-      if (!listed?.length) return fail(res, 400, 'لم يصل الملف — أعد المحاولة')
+      // مسار الحجر يُشتقّ من الرمز نفسه — فلا يُصدَّق ما يرسله الهاتف. بدونه
+      // يستطيع من يملك رمزاً أن يطلب ترقية ملف حجرٍ لغيره.
+      if (!/^handoff\/[A-Za-z0-9_-]{1,64}-\d+\.[a-z0-9]{1,8}$/.test(path)
+          || !path.startsWith(`handoff/${token.slice(0, 24)}-`)) {
+        return fail(res, 400, 'مسار غير صالح')
+      }
+
+      // ---- الفحص قبل الترقية ------------------------------------------------
+      // الهاتف رفع إلى الحجر. لا شيء يقرأ من هناك، ولا يبلغ الدلو الدائم إلا
+      // بحكم. والفشل مُغلَق: أي تعذّر يُبقي الملف محجوزاً بلا صفّ يشير إليه.
+      const { data: blob, error: dlErr } = await sb.storage.from(QUARANTINE).download(path)
+      if (dlErr || !blob) return fail(res, 400, 'لم يصل الملف — أعد المحاولة')
+      const bytes = Buffer.from(await blob.arrayBuffer())
+
+      const verdict = scanFile(bytes, {
+        allow: ['pdf', 'png', 'jpeg'],
+        maxBytes: MAX_BYTES,
+      })
+
+      const targetPath = String(body.targetPath || '')
+      // الوجهة تُعاد من `start` وتُتحقَّق هنا: مجلّد شركة الرمز، لا غير.
+      const { data: peek } = await sb.rpc('peek_upload_handoff', { p_token: token })
+      const peeked = Array.isArray(peek) ? peek[0] : peek
+
+      await sb.from('file_scans').insert({
+        sha256: sha256(bytes),
+        quarantine_path: path,
+        target_bucket: BUCKET,
+        target_path: verdict.verdict === 'clean' ? targetPath : null,
+        declared_mime: null,
+        detected_type: verdict.detectedType,
+        size_bytes: bytes.length,
+        scanner_version: SCANNER_VERSION,
+        actor: `handoff:${peeked?.company_name || 'unknown'}`,
+        verdict: verdict.verdict,
+        reasons: verdict.reasons,
+        scanned_at: new Date().toISOString(),
+      })
+
+      if (verdict.verdict !== 'clean') {
+        await sb.storage.from(QUARANTINE).remove([path])
+        return res.status(422).json({
+          error: 'الملف مرفوض',
+          reasons: verdict.reasons,
+          messages: verdict.reasons.map(reasonLabel),
+        })
+      }
+
+      if (!targetPath || !targetPath.startsWith(`${peeked?.company_id ?? ' '}/`)) {
+        return fail(res, 400, 'وجهة غير صالحة')
+      }
+
+      // الترقية بمفتاح الخدمة: لا هويّة مستخدم في هذا المسار — الرمز هو
+      // التصريح، والمسار مشتقّ منه لا من الهاتف.
+      const out = verdict.sanitized?.bytes || bytes
+      const { error: upErr } = await sb.storage.from(BUCKET)
+        .upload(targetPath, out, { contentType: TYPE_MIME[verdict.detectedType], upsert: false })
+      if (upErr) {
+        console.error('handoff-upload — promote failed', upErr)
+        return fail(res, 502, 'تعذّر حفظ الملف — أعد المحاولة')
+      }
+      await sb.storage.from(QUARANTINE).remove([path])
 
       const { data, error } = await sb.rpc('finish_upload_handoff', {
-        p_token: token, p_path: path, p_file_name: fileName,
+        p_token: token, p_path: targetPath, p_file_name: fileName,
       })
       if (error) return fail(res, 400, error.message)
 

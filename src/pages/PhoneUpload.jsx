@@ -171,8 +171,16 @@ export default function PhoneUpload() {
         xhr.send(file)
       })
 
-      setMessage('جاري الحفظ…')
-      await post({ action: 'finish', token, path: start.path, fileName: file.name })
+      // الرفع كان إلى الحجر. الفحص والترقية يجريان في `finish` على الخادم،
+      // ولذلك يستغرق لحظةً أطول من مجرّد «حفظ».
+      setMessage('جاري فحص الملف…')
+      await post({
+        action: 'finish',
+        token,
+        path: start.path,
+        targetPath: start.targetPath,
+        fileName: file.name,
+      })
 
       setPhase('done')
     } catch (e) {

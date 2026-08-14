@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { inspectFile } from '../lib/fileSafety'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 
 /**
  * The evidence behind a report.
@@ -67,15 +68,18 @@ export async function uploadReportFiles(reportId, files, userId) {
   for (const file of files) {
     const key = keyFor(reportId, file)
     try {
-      const { error: upErr } = await supabase.storage.from(BUCKET)
-        .upload(key, file, { contentType: file.type, upsert: false })
-      if (upErr) throw upErr
+      // عبر بوّابة الفحص: الملف يمرّ بالحجر ولا يبلغ هذا الدلو إلا نظيفاً.
+      // والمسار العائد قد يخالف المطلوب — البوّابة تُصحّح الامتداد ليطابق
+      // المحتوى الفعلي، فيُسجَّل العائد لا المُرسَل.
+      const { path: storedKey } = await uploadViaGateway(file, {
+        targetBucket: BUCKET, targetPath: key,
+      })
 
       // `.select()` because an insert filtered out by RLS returns no error and
       // no rows, and the file would sit in the bucket attached to nothing.
       const { data, error: rowErr } = await supabase.from('report_documents').insert([{
         report_id: reportId,
-        s3_key: key,
+        s3_key: storedKey,
         file_name: file.name,
         mime_type: file.type || null,
         file_size: file.size,

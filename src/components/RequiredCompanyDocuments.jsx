@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { LIMITS } from '../lib/validate.js'
 
 /**
@@ -53,9 +54,11 @@ export async function uploadCompanyDocuments(files, { companyId, tenantId, userI
     try {
       const path = `${companyId}/${docType}-${Date.now()}.${EXT[file.type] || 'bin'}`
 
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET).upload(path, file, { contentType: file.type })
-      if (upErr) throw upErr
+      // عبر بوّابة الفحص. الامتداد أعلاه مبنيٌّ على النوع الذي **يدّعيه**
+      // المتصفّح؛ والعائد مبنيٌّ على المحتوى الفعلي بعد قراءة بايتاته.
+      const { path: storedPath } = await uploadViaGateway(file, {
+        targetBucket: BUCKET, targetPath: path,
+      })
 
       const { data, error: rowErr } = await supabase
         .from('company_documents')
@@ -64,7 +67,7 @@ export async function uploadCompanyDocuments(files, { companyId, tenantId, userI
           uploaded_by_tenant_id: tenantId,
           uploaded_by_user_id: userId,
           doc_type: docType,
-          file_url: path,
+          file_url: storedPath,
           file_name: file.name,
           status: 'pending',
           // Attached to the request when there is one. A document beside a

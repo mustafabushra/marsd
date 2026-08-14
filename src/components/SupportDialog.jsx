@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { inspectFile } from '../lib/fileSafety'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { LIMITS } from '../lib/validate.js'
 
 /**
@@ -148,15 +149,17 @@ export default function SupportDialog ({ open, onClose }) {
       for (const f of files) {
         const key = keyFor(ticketId, f)
         try {
-          const { error: upErr } = await sb.storage.from(BUCKET)
-            .upload(key, f, { contentType: f.type, upsert: false })
-          if (upErr) throw upErr
+          // عبر بوّابة الفحص. والمسار العائد هو ما استقرّ فعلاً — البوّابة
+          // تُصحّح الامتداد ليطابق المحتوى.
+          const { path: storedKey } = await uploadViaGateway(f, {
+            targetBucket: BUCKET, targetPath: key,
+          })
           // `.select()` because an insert filtered out by RLS returns no error
           // and no rows, leaving the file in the bucket attached to nothing.
           const { data, error: rowErr } = await sb.from('support_ticket_attachments')
             .insert([{
               ticket_id: ticketId,
-              s3_key: key,
+              s3_key: storedKey,
               file_name: f.name,
               mime_type: f.type || null,
               file_size: f.size,

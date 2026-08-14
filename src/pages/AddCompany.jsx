@@ -4,6 +4,7 @@ import { useUser } from '@clerk/react'
 import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
 import RegistryLookup from '../components/RegistryLookup'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
 
@@ -106,10 +107,10 @@ export default function AddCompany() {
       return
     }
     setError('')
-    const reader = new FileReader()
-    reader.onload = () => setCrFile({ name: file.name, url: reader.result })
-    reader.onerror = () => setError('تعذّر قراءة الملف')
-    reader.readAsDataURL(file)
+    // يُحتفظ بالملف نفسه لا بقراءته نصّاً. كان يُقرأ هنا إلى data: ويُخزَّن في
+    // العمود كما هو — فصار كل صفّ يحمل ملفاً بطول ميغابايت ونصف، غير مفحوص،
+    // في عمود اسمه \u200E_url\u200E. الرفع الآن عند الإرسال، عبر بوّابة الفحص.
+    setCrFile({ name: file.name, file })
   }
 
   // Everything in the patch has already been shown to the person and was
@@ -241,6 +242,17 @@ export default function AddCompany() {
       // companies.cr_number is NOT NULL — generate a placeholder if none provided
       const crNumber = formData.registryNumber.trim() || `CR${Date.now().toString().slice(-8)}`
 
+      // المستند يُرفع عبر البوّابة قبل إنشاء الصفّ. ولا شركة بعد، فالمسار تحت
+      // معرّف الرافع؛ ويُنقل إلى مجلّد الشركة عند الاعتماد إن لزم.
+      let crFileUrl = null
+      if (crFile?.file) {
+        const { path } = await uploadViaGateway(crFile.file, {
+          targetBucket: 'company-documents',
+          targetPath: `pending/${user.id}/cr-${Date.now()}`,
+        })
+        crFileUrl = path
+      }
+
       // The status the person picked is one Arabic word; the database keeps it
       // as two coded columns. See crStatusToDb — the trust score penalises
       // «مشطوب» and «تحت التصفية» differently, and it can only do that if the
@@ -271,7 +283,7 @@ export default function AddCompany() {
         website: formData.website,
         officialEmail: formData.officialEmail,
         phone: formData.phone,
-        crFileUrl: crFile?.url || null,
+        crFileUrl,
         verificationUrl: officialSource?.verificationUrl || null,
         officialData: officialSource?.officialData || null,
         approved: false,      // pending admin review

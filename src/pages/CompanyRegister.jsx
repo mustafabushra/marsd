@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
 import { getSupabase } from '../lib/api'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { useUser } from '@clerk/react'
 import { createTenantAndUser } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
@@ -231,14 +232,16 @@ export default function CompanyRegister() {
         return
       }
 
-      // Read the file here rather than on selection: holding a 20 MB data URL in
-      // component state for the length of a form is memory nobody asked for.
+      // يُرفع هنا لا عند الاختيار: حملُ عشرين ميغابايت في حالة المكوّن طوال
+      // النموذج ذاكرةٌ لم يطلبها أحد.
+      //
+      // وكان يُقرأ نصّاً بصيغة data: ويُخزَّن كما هو في العمود — بلا فحص، وبلا
+      // مرور بتخزين. الآن عبر البوّابة، ولا مستأجر بعد فالمسار تحت معرّف
+      // الرافع.
       const crFile = docFiles.commercial_registration
-      const crFileUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader()
-        r.onload = () => resolve(r.result)
-        r.onerror = () => reject(new Error('تعذّرت قراءة ملف السجل التجاري'))
-        r.readAsDataURL(crFile)
+      const { path: crFileUrl } = await uploadViaGateway(crFile, {
+        targetBucket: 'company-documents',
+        targetPath: `pending/${user.id}/cr-${Date.now()}`,
       })
 
       const created = await createTenantAndUser(user.id, {

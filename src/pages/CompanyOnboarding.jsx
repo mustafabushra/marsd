@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
-import { getSupabase, smartCompanyDetection, ensureStorageBucket, buildCompanyInsert } from '../lib/api'
+import { getSupabase, smartCompanyDetection, buildCompanyInsert } from '../lib/api'
+import { uploadViaGateway } from '../lib/uploadViaGateway'
 import { COMPANY_STATUS, COMPANY_SOURCE, REQUEST_STATUS, USER_ROLE, USER_STATUS, TENANT_STATUS } from '../lib/enums'
 import { notifyAdmins } from '../lib/notify'
 import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
@@ -291,52 +292,27 @@ export default function CompanyOnboarding() {
       console.log('📄 [1/6] Starting document upload...')
       const uploadTimer = createTimer()
 
-      try {
-        await ensureStorageBucket('company-documents')
-        const fileName = `cr_${Date.now()}_${crFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('company-documents')
-          .upload(`cr-files/${fileName}`, crFile)
-
-        if (uploadError) {
-          console.warn('⚠️ Storage upload failed:', uploadError.message)
-          throw new Error(`فشل رفع الملف إلى التخزين: ${uploadError.message}`)
-        }
-
-        if (!uploadData?.path) {
-          console.warn('⚠️ No path returned from upload')
-          throw new Error('لم يتم الحصول على رابط الملف')
-        }
-
-        crFileUrl = uploadData.path
-        uploadTimer.log('Document storage upload')
-        console.log(`✅ Document uploaded to: ${crFileUrl}`)
-      } catch (storageError) {
-        console.warn('⚠️ Storage fallback due to:', storageError.message)
-
-        // Fallback: base64 encoding
-        try {
-          console.log('📦 Falling back to base64 encoding...')
-          const reader = new FileReader()
-          crFileUrl = await new Promise((resolve, reject) => {
-            reader.onload = () => {
-              const result = reader.result
-              if (typeof result === 'string' && result.length > 21 * 1024 * 1024) {
-                reject(new Error('الملف كبير جداً حتى بعد التحويل (>13MB)'))
-              } else {
-                resolve(result)
-              }
-            }
-            reader.onerror = () => reject(new Error('فشل قراءة الملف من الجهاز'))
-            reader.readAsDataURL(crFile)
-          })
-          uploadTimer.log('Base64 encoding')
-          console.log(`✅ Base64 fallback successful (${crFileUrl.length} bytes)`)
-        } catch (base64Error) {
-          throw new Error(`❌ فشل حفظ الملف: ${base64Error.message}`)
-        }
-      }
+      // ==========================================================================
+      // عبر بوّابة الفحص — ولا احتياط
+      // ==========================================================================
+      // كان هنا سقوطٌ إلى base64 عند فشل الرفع: يُقرأ الملف ويُخزَّن نصّاً في
+      // `cr_file_url` بصيغة data:. وهو ما جعل كل قيمة في ذلك العمود ملفاً
+      // مضمَّناً بطول ١٫٥ م.ب لا رابطاً.
+      //
+      // وقد صار ذلك الاحتياط ثغرةً بوجود البوّابة: ملفٌ **تردّه البوّابة** كان
+      // يسقط إلى الفرع الاحتياطي فيُخزَّن كما هو، غير مفحوص، في عمود يُعرض
+      // للمراجع. أي أن أشدّ الملفّات خطراً كان أضمنها وصولاً.
+      //
+      // فحُذف. وفشل الرفع الآن يوقف التسجيل ويقول سببه — وهو ما يجب أن يحدث
+      // حين لا يمكن حفظ المستند بأمان.
+      const crName = crFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const { path: crStoredPath } = await uploadViaGateway(crFile, {
+        targetBucket: 'company-documents',
+        targetPath: `cr-files/cr_${Date.now()}_${crName}`,
+      })
+      crFileUrl = crStoredPath
+      uploadTimer.log('Document gateway upload')
+      console.log(`✅ Document scanned and stored at: ${crFileUrl}`)
 
       // ===== NOW: Handle CASE A (new) vs CASE B (existing) =====
       if (existingCompany) {
