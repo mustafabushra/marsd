@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getSupabase } from '../lib/api'
 import { Card } from '../ui'
 import { LIMITS } from '../lib/validate.js'
+import { parseActivityFile, ACTIVITY_CODE, MAX_FILE_BYTES } from '../lib/activityImport'
 
 /**
  * Load the national economic activity directory (ISIC4).
@@ -37,6 +38,11 @@ export default function AdminActivities() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [stats, setStats] = useState(null)
+  // ما قُرئ من ملف، بانتظار تأكيد المسؤول. لا شيء يُكتب قبله.
+  const [parsed, setParsed] = useState(null)
+  const [reading, setReading] = useState(false)
+  const [mode, setMode] = useState('merge')
+  const fileRef = useRef(null)
   // Where the extractor was wrong, according to the people who fixed it. This
   // table has been filling up since the import feature shipped and nothing has
   // ever read it — a feedback loop with no reader is a write-only log.
@@ -102,73 +108,128 @@ export default function AdminActivities() {
    * and from a PDF gets whatever the PDF felt like. A line that does not start
    * with a code is reported rather than skipped: silently ignoring rows is how
    * you end up believing you loaded four thousand activities and shipped three.
+   *
+   * تُرجع نفس شكل `parseActivityFile` كي تُعرض المعاينة بمكوّن واحد: مصدران
+   * بشكلين يفترقان عند أول تعديل.
    */
-  const parse = (raw) => {
+  const parsePasted = (raw) => {
     const rows = []
-    const rejected = []
-    const seen = new Set()
+    const problems = []
+    const seen = new Map()
+    let lineNo = 0
+    let blank = 0
+    let badCode = 0
+    let duplicate = 0
+    let total = 0
 
     for (const line of String(raw).split(/\r?\n/)) {
+      lineNo += 1
       const t = line.trim()
       if (!t) continue
+      total += 1
 
       const m = /^(\d{2,8})\s*[,\t;|]\s*(.+)$/.exec(t) || /^(\d{2,8})\s{1,}(.+)$/.exec(t)
-      if (!m) { rejected.push(t); continue }
+      if (!m) {
+        badCode += 1
+        problems.push(`سطر ${lineNo}: لا يبدأ بكود متبوعاً بالاسم — «${t.slice(0, 40)}»`)
+        continue
+      }
 
       const code = m[1]
       const name = m[2].trim().replace(/^["']|["']$/g, '').replace(/\s+/g, ' ')
-      if (!name) { rejected.push(t); continue }
+      if (!name) { blank += 1; problems.push(`سطر ${lineNo}: اسم فارغ للكود ${code}`); continue }
+      if (name.length > 300) { problems.push(`سطر ${lineNo}: الاسم أطول من ٣٠٠ حرف`); continue }
+      if (!ACTIVITY_CODE.test(code)) {
+        badCode += 1
+        problems.push(`سطر ${lineNo}: كود غير صالح «${code}»`)
+        continue
+      }
 
       // A duplicate code in the source file means two names for one activity.
-      // Keeping the first and reporting the rest beats letting the last write
-      // win invisibly.
-      if (seen.has(code)) { rejected.push(`${t}  (كود مكرر)`); continue }
-      seen.add(code)
+      // Reporting beats letting the last write win invisibly.
+      if (seen.has(code)) {
+        duplicate += 1
+        problems.push(`سطر ${lineNo}: الكود ${code} مكرّر (وردَ في سطر ${seen.get(code)})`)
+        continue
+      }
+      seen.set(code, lineNo)
 
       rows.push({
         code,
         name_ar: name,
+        name_en: null,
         level: code.length,
         parent_code: code.length > 2 ? code.slice(0, code.length - 2) : null,
-        active: true,
-        source: 'admin_upload',
       })
     }
-    return { rows, rejected }
+
+    return {
+      ok: rows.length > 0 && problems.length === 0,
+      rows,
+      problems,
+      headerMap: null,
+      counts: {
+        total,
+        valid: rows.length,
+        blank,
+        badCode,
+        duplicate,
+        byLevel: rows.reduce((a, r) => ({ ...a, [r.level]: (a[r.level] || 0) + 1 }), {}),
+      },
+    }
   }
 
-  const preview = text.trim() ? parse(text) : null
+  /** يُقرأ الملف المختار ويُعرض ما فيه. لا شيء يُكتب حتى يؤكّد المسؤول. */
+  const onFile = async (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setError(''); setResult(null); setText('')
+    setReading(true)
+    try {
+      const out = await parseActivityFile(f)
+      setParsed({ ...out, fileName: f.name })
+      if (!out.rows.length) setError(out.problems[0] || 'لم يُقرأ أي نشاط من الملف')
+    } catch (err) {
+      setParsed(null)
+      setError(err?.message || 'تعذّرت قراءة الملف')
+    } finally {
+      setReading(false)
+    }
+  }
 
+  // مصدر واحد للمعاينة أياً كان مصدر البيانات.
+  const preview = parsed || (text.trim() ? { ...parsePasted(text), fileName: null } : null)
+
+  /**
+   * الاستيراد.
+   *
+   * دالةٌ واحدة على الخادم بدل كتابةٍ مباشرة على دفعات. الفارق ليس أسلوبياً:
+   * الدفعات كانت تترك الدليل نصفه جديداً ونصفه قديماً إذا فشلت واحدة في
+   * المنتصف، ولا شيء يقول أين الحدّ. والدالة تعمل في معاملة واحدة — تتحقّق من
+   * كل الصفوف قبل كتابة أوّلها، وتكتب أثراً.
+   */
   const upload = async () => {
     setError(''); setResult(null)
-    const { rows, rejected } = parse(text)
-    if (!rows.length) { setError('لم يُقرأ أي نشاط صالح من النص'); return }
+    if (!preview?.rows.length) { setError('لا صفوف صالحة للاستيراد'); return }
+    if (preview.problems.length) {
+      setError('أصلح المشكلات المذكورة أولاً — لا يُستورد ملف ناقص')
+      return
+    }
 
     setBusy(true)
     try {
       const supabase = getSupabase()
-      // In batches, because a single insert of several thousand rows is one
-      // request that either wholly succeeds or wholly fails, and the failure
-      // gives no clue which row caused it.
-      let written = 0
-      for (let i = 0; i < rows.length; i += 500) {
-        const chunk = rows.slice(i, i + 500)
-        const { data, error: err } = await supabase
-          .from('reference_activities')
-          .upsert(chunk, { onConflict: 'code' })
-          .select('code')
-        // RLS filters a write silently: no error, no rows. Counting what came
-        // back is the only way to know the rows are actually there.
-        if (err) throw new Error(`الدفعة ${i / 500 + 1}: ${err.message}`)
-        written += data?.length ?? 0
-      }
+      const { data, error: err } = await supabase.rpc('import_reference_activities', {
+        p_rows: preview.rows,
+        p_mode: mode,
+        p_file_name: preview.fileName || 'لصق نصّي',
+      })
+      if (err) throw new Error(err.message)
 
-      if (written === 0) {
-        throw new Error('لم يُكتب أي صف — تحقّق أن حسابك مدير منصة')
-      }
-
-      setResult({ written, rejected })
+      setResult(data)
       setText('')
+      setParsed(null)
       await load()
     } catch (e) {
       setError(e.message)
@@ -176,8 +237,6 @@ export default function AdminActivities() {
       setBusy(false)
     }
   }
-
-  const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', marginBottom: '18px' }
 
   return (
     <div>
@@ -271,56 +330,165 @@ export default function AdminActivities() {
           </div>
         </div>
 
-        <textarea maxLength={LIMITS.description} value={text} onChange={(e) => setText(e.target.value)}
-                  rows={11} placeholder={SAMPLE}
-                  style={{ width: '100%', padding: '13px 15px', border: '1.5px solid #E2E8F0', borderRadius: '11px', fontSize: '13px', fontFamily: 'monospace', resize: 'vertical', lineHeight: 1.9 }} />
-
-        {preview && (
-          <div style={{ display: 'flex', gap: '9px', flexWrap: 'wrap', marginTop: '11px' }}>
-            <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
-              {preview.rows.length} نشاط صالح
+        {/* ---- ملف ---------------------------------------------------------- */}
+        <div style={{ display: 'flex', gap: '11px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                 onChange={onFile} style={{ display: 'none' }} />
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={reading || busy}
+                  style={{ background: '#1E2A52', color: '#fff', border: 0, borderRadius: '10px', padding: '11px 20px', fontSize: '13.5px', fontWeight: 800, cursor: reading || busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+            {reading ? 'يقرأ الملف…' : '📄 اختر ملف Excel أو CSV'}
+          </button>
+          {parsed?.fileName && (
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+              {parsed.fileName}
+              <button type="button" onClick={() => { setParsed(null); setError(''); }}
+                      style={{ marginRight: '9px', background: '#F1F5F9', border: 0, borderRadius: '7px', padding: '4px 10px', fontSize: '12px', fontWeight: 800, color: '#64748B', cursor: 'pointer', fontFamily: 'inherit' }}>
+                إزالة
+              </button>
             </span>
-            {preview.rejected.length > 0 && (
-              <span style={{ background: '#FEF2F2', color: '#B91C1C', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
-                {preview.rejected.length} سطر غير مقروء
+          )}
+          <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}>
+            العمودان المطلوبان: <code style={{ direction: 'ltr', fontSize: '12px' }}>activity_code</code>
+            {' و'}
+            <code style={{ direction: 'ltr', fontSize: '12px' }}>activity_description</code>
+            {` · حتى ${MAX_FILE_BYTES / 1048576} ميجابايت`}
+          </span>
+        </div>
+
+        {!parsed && (
+          <textarea maxLength={LIMITS.description} value={text} onChange={(e) => setText(e.target.value)}
+                    rows={8} placeholder={SAMPLE}
+                    style={{ width: '100%', padding: '13px 15px', border: '1.5px solid #E2E8F0', borderRadius: '11px', fontSize: '13px', fontFamily: 'monospace', resize: 'vertical', lineHeight: 1.9 }} />
+        )}
+
+        {/* ---- المعاينة ------------------------------------------------------ */}
+        {preview && (
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ display: 'flex', gap: '9px', flexWrap: 'wrap' }}>
+              <span style={{ background: '#ECFDF5', color: '#15803D', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
+                {preview.counts.valid} نشاط صالح
               </span>
+              {preview.counts.duplicate > 0 && (
+                <span style={{ background: '#FFFBEB', color: '#92400E', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
+                  {preview.counts.duplicate} كود مكرّر
+                </span>
+              )}
+              {preview.counts.blank > 0 && (
+                <span style={{ background: '#FEF2F2', color: '#B91C1C', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
+                  {preview.counts.blank} قيمة فارغة
+                </span>
+              )}
+              {preview.counts.badCode > 0 && (
+                <span style={{ background: '#FEF2F2', color: '#B91C1C', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 800 }}>
+                  {preview.counts.badCode} كود غير صالح
+                </span>
+              )}
+              {Object.entries(preview.counts.byLevel).sort().map(([lvl, n]) => (
+                <span key={lvl} style={{ background: '#EEF2FF', color: '#3730A3', borderRadius: '7px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 700 }}>
+                  {n} من {lvl} أرقام
+                </span>
+              ))}
+            </div>
+
+            {preview.headerMap && (
+              <div style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600, marginTop: '9px', lineHeight: 1.9 }}>
+                الأعمدة المقروءة: <strong>{preview.headerMap.code}</strong> ← الكود ·{' '}
+                <strong>{preview.headerMap.description}</strong> ← الوصف
+                {preview.headerMap.descriptionEn && <> · <strong>{preview.headerMap.descriptionEn}</strong> ← الإنجليزية</>}
+              </div>
+            )}
+
+            {preview.rows.length > 0 && (
+              <div style={{ marginTop: '11px', border: '1px solid #E2E8F0', borderRadius: '11px', overflow: 'hidden' }}>
+                <div style={{ maxHeight: '260px', overflowY: 'auto', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', position: 'sticky', top: 0 }}>
+                        <th style={{ textAlign: 'right', padding: '9px 13px', fontWeight: 800, color: '#334155', borderBottom: '1px solid #E2E8F0' }}>الكود</th>
+                        <th style={{ textAlign: 'right', padding: '9px 13px', fontWeight: 800, color: '#334155', borderBottom: '1px solid #E2E8F0' }}>الوصف</th>
+                        <th style={{ textAlign: 'right', padding: '9px 13px', fontWeight: 800, color: '#334155', borderBottom: '1px solid #E2E8F0' }}>المستوى</th>
+                        <th style={{ textAlign: 'right', padding: '9px 13px', fontWeight: 800, color: '#334155', borderBottom: '1px solid #E2E8F0' }}>الأب</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.rows.slice(0, 100).map((r) => (
+                        <tr key={r.code}>
+                          <td style={{ padding: '8px 13px', borderBottom: '1px solid #F1F5F9', direction: 'ltr', textAlign: 'right', fontWeight: 800, color: '#1E2A52' }}>{r.code}</td>
+                          <td style={{ padding: '8px 13px', borderBottom: '1px solid #F1F5F9', color: '#0F172A' }}>{r.name_ar}</td>
+                          <td style={{ padding: '8px 13px', borderBottom: '1px solid #F1F5F9', color: '#64748B' }}>{r.level}</td>
+                          <td style={{ padding: '8px 13px', borderBottom: '1px solid #F1F5F9', color: '#64748B', direction: 'ltr', textAlign: 'right' }}>{r.parent_code || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {preview.rows.length > 100 && (
+                  <div style={{ padding: '9px 13px', background: '#F8FAFC', fontSize: '12px', fontWeight: 700, color: '#64748B', borderTop: '1px solid #E2E8F0' }}>
+                    تُعرض أول ١٠٠ من {preview.rows.length}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {preview?.rejected.length > 0 && (
-          <details style={{ marginTop: '10px' }}>
+        {preview?.problems.length > 0 && (
+          <details style={{ marginTop: '10px' }} open>
             <summary style={{ fontSize: '12.5px', fontWeight: 800, color: '#B91C1C', cursor: 'pointer' }}>
-              اعرض الأسطر التي لن تُرفع
+              {preview.problems.length} مشكلة تمنع الاستيراد
             </summary>
-            <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#FEF2F2', borderRadius: '9px', padding: '10px 13px', marginTop: '7px', fontSize: '12px', color: '#7F1D1D', lineHeight: 1.9 }}>
-              {preview.rejected.slice(0, 60).map((r, i) => <div key={i}>{r}</div>)}
-              {preview.rejected.length > 60 && <div style={{ fontWeight: 800 }}>… و{preview.rejected.length - 60} غيرها</div>}
+            <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#FEF2F2', borderRadius: '9px', padding: '10px 13px', marginTop: '7px', fontSize: '12px', color: '#7F1D1D', lineHeight: 1.9 }}>
+              {preview.problems.slice(0, 80).map((r, i) => <div key={i}>{r}</div>)}
+              {preview.problems.length > 80 && <div style={{ fontWeight: 800 }}>… و{preview.problems.length - 80} غيرها</div>}
             </div>
           </details>
         )}
 
+        {/* ---- الوضع --------------------------------------------------------- */}
+        {preview?.rows.length > 0 && (
+          <div style={{ marginTop: '14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '11px', padding: '13px 15px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '9px' }}>ماذا يحدث للأنشطة الحالية؟</div>
+            {[
+              ['merge', 'دمج', 'يُحدَّث ما ورد في الملف، ويبقى ما لم يرد كما هو.'],
+              ['replace', 'استبدال', 'يُحدَّث ما ورد، ويُعطَّل كل نشاط لم يرد في الملف (لا يُحذف).'],
+            ].map(([val, label, hint]) => (
+              <label key={val} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', marginBottom: '7px', cursor: 'pointer' }}>
+                <input type="radio" name="import-mode" value={val} checked={mode === val}
+                       onChange={() => setMode(val)} style={{ marginTop: '3px' }} />
+                <span>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>{label}</span>
+                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: 600 }}> — {hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
         {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '10px', padding: '12px 15px', marginTop: '12px', fontSize: '13px', fontWeight: 700 }}>
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '10px', padding: '12px 15px', marginTop: '12px', fontSize: '13px', fontWeight: 700, lineHeight: 1.9 }}>
             {error}
           </div>
         )}
 
         {result && (
           <div style={{ background: '#ECFDF5', border: '1px solid #BBF7D0', color: '#15803D', borderRadius: '10px', padding: '12px 15px', marginTop: '12px', fontSize: '13px', fontWeight: 700, lineHeight: 1.9 }}>
-            ✅ حُفظ {result.written} نشاط.
-            {result.rejected.length > 0 && ` تُجوهل ${result.rejected.length} سطر غير مقروء.`}
+            ✅ استُورد الدليل: {result.inserted} جديد · {result.updated} محدَّث
+            {result.deactivated > 0 && ` · ${result.deactivated} عُطِّل`}
           </div>
         )}
 
-        <button onClick={upload} disabled={busy || !preview?.rows.length}
+        <button onClick={upload} disabled={busy || !preview?.rows.length || preview?.problems.length > 0}
                 style={{
-                  marginTop: '14px', background: busy || !preview?.rows.length ? '#CBD5E1' : '#1E2A52',
+                  marginTop: '14px',
+                  background: busy || !preview?.rows.length || preview?.problems.length > 0 ? '#CBD5E1' : '#1E2A52',
                   color: '#fff', border: 0, borderRadius: '11px', padding: '13px 26px',
-                  fontSize: '14px', fontWeight: 800, cursor: busy || !preview?.rows.length ? 'default' : 'pointer',
+                  fontSize: '14px', fontWeight: 800,
+                  cursor: busy || !preview?.rows.length || preview?.problems.length > 0 ? 'default' : 'pointer',
                   fontFamily: 'inherit',
                 }}>
-          {busy ? 'يرفع…' : `ارفع ${preview?.rows.length ?? 0} نشاط`}
+          {busy ? 'يستورد…'
+            : preview?.problems.length > 0 ? 'أصلح المشكلات أولاً'
+              : `${mode === 'replace' ? 'استبدل بـ' : 'استورد'} ${preview?.rows.length ?? 0} نشاط`}
         </button>
       </Card>
     </div>

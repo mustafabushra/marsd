@@ -17,7 +17,7 @@
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
     "check:authz": "node scripts/check-authorization.mjs",
     "check:input": "node scripts/check-input-validation.mjs",
-    "check:all": "npm run check:enums && npm run check:schema-drift && npm run check:authz && npm run check:input && npm run check:input-security && npm run check:limits && npm run check:gateway && npm run probe:gateway && npm run check:files && npm run check:api && npm run check:audit && npm run check:model-privacy && npm run check:doc-urls && npm run check:tiles",
+    "check:all": "npm run check:enums && npm run check:schema-drift && npm run check:authz && npm run check:input && npm run check:input-security && npm run check:limits && npm run check:gateway && npm run probe:gateway && npm run check:activities && npm run check:files && npm run check:api && npm run check:audit && npm run check:model-privacy && npm run check:doc-urls && npm run check:tiles",
     "check:files": "node scripts/check-file-safety.mjs",
     "check:api": "node scripts/check-api-security.mjs",
     "check:migration-ready": "node scripts/check-migration-readiness.mjs",
@@ -27,6 +27,7 @@
     "check:limits": "node scripts/check-field-limits.mjs",
     "check:input-security": "node scripts/check-input-security.mjs",
     "check:gateway": "node scripts/check-document-gateway.mjs",
+    "check:activities": "node scripts/check-activity-import.mjs",
     "probe:gateway": "node scripts/probe-document-gateway.mjs",
     "check:bundle": "node scripts/check-bundle-secrets.mjs"
   },
