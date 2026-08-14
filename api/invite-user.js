@@ -33,6 +33,7 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 // نسخة محلية ثالثة من هذه الدالة نُسيت في trust-report-pdf فسقط وحده.
 // المصدر الآن واحد.
 import { clean } from './_lib/secrets.js'
+import { limitOrReject } from './_lib/rateLimit.js'
 
 const CLERK_SECRET = clean(process.env.CLERK_SECRET_KEY)
 const SUPABASE_URL = clean(process.env.SUPABASE_URL) || clean(process.env.VITE_SUPABASE_URL)
@@ -179,6 +180,15 @@ export default async function handler(req, res) {
         reason: err?.reason || null, message: err?.message || null, token: t, expectedIssuer: expected,
       })
       return res.status(401).json({ error: `جلسة غير صالحة — ${parts.join(' · ')}` })
+    }
+
+    // حدّ المعدّل بعد التحقّق من الهوية لا قبله: العدّ على مستخدم مجهول يعني
+    // العدّ على عنوان IP، وعنوان واحد قد يخدم مكتباً كاملاً.
+    //
+    // وهذه الدالة ترسل بريداً إلى عنوان يختاره المُرسِل، والبريد يخرج باسم
+    // مرصد. بلا حدّ، حسابٌ واحد يقصف صندوق أي شخص ويحرق سمعة النطاق معه.
+    if (await limitOrReject(res, callerId, 'invite-user', { limit: 20, window: '1 hour' })) {
+      return
     }
 
     // 2) Validate input.

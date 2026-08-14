@@ -136,7 +136,7 @@ export function describeHeaders(headers) {
  * different thing from an anonymous spreadsheet somebody uploaded, and the
  * difference is what makes `source: 'official'` an honest claim.
  */
-export async function fetchDatasetInfo(signal) {
+export async function fetchDatasetInfo(signal, token) {
   // Through the server, not straight at the portal.
   //
   // This called open.data.gov.sa directly. The portal sends no
@@ -145,8 +145,14 @@ export async function fetchDatasetInfo(signal) {
   // treats the failure as non-fatal, the import kept working and the label
   // simply never appeared. `source: 'official'` was a claim with nothing behind
   // it. A server has no origin to be checked, and gets the real record.
+  //
+  // والتوكن مطلوب منذ أن صارت الدالة تشترط جلسة: نقطة نهاية بلا مصادقة تُطلق
+  // طلباً خارجياً ناقلُ استنزاف، ولا يُستدعى هذا إلا من شاشة إدارة فالتوكن
+  // متاح. يُمرَّر من المستدعي لأن هذه الوحدة لا تعرف Clerk.
+  if (!token) throw new Error('الجلسة منتهية — أعد تسجيل الدخول')
+
   const r = await fetch(`/api/registry-source?dataset=${DATASET_ID}`, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     signal,
   })
   if (!r.ok) {

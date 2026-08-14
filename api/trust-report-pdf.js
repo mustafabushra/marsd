@@ -50,6 +50,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // file rejects on its second line. Built by scripts/build-report-template.mjs.
 import { TrustReportDocument, documentShell } from './_report/document.js'
 import { clean, clerkKeyKind } from './_lib/secrets.js'
+import { limitOrReject } from './_lib/rateLimit.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -151,6 +152,13 @@ export default async function handler (req, res) {
     })
   }
   if (!userId) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })
+
+  // أثقل ما في المشروع: كل نداء يُشغّل Chromium كاملاً ويرسم صفحات A4. عشرة
+  // طلبات متوازية تستنفد حصّة الدوال وتوقف كل شيء آخر معها — فالحدّ هنا يحمي
+  // بقيّة المنصّة لا هذه الدالة وحدها.
+  if (await limitOrReject(res, userId, 'trust-report-pdf', { limit: 30, window: '1 hour' })) {
+    return
+  }
 
   // The caller's own token, not a service key.
   //

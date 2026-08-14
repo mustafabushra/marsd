@@ -24,6 +24,10 @@
 // who asks. The host and path are fixed here, and the only thing the caller
 // controls is a dataset id that must look like a UUID.
 
+import { verifyToken } from '@clerk/backend'
+import { clean } from './_lib/secrets.js'
+import { limitOrReject } from './_lib/rateLimit.js'
+
 const API = 'https://open.data.gov.sa/data/api'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -37,6 +41,36 @@ export default async function handler (req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
     return res.status(405).json({ error: 'GET only' })
+  }
+
+  // جلسة، وإن كان المحتوى عاماً.
+  //
+  // ما يُرجَع هنا منشور على بوابة البيانات المفتوحة، فلا سرّ يُحمى. لكن نقطة
+  // نهاية بلا مصادقة تُطلق طلباً خارجياً هي ناقل استنزاف: من يعرف الرابط
+  // يستهلك حصّة الدوال بلا حساب. والذاكرة المؤقتة تخفّف ولا تكفي — تعيش بعمر
+  // النسخة، و Vercel يشغّل نسخاً متوازية.
+  //
+  // ولا يُستدعى هذا إلا من شاشة استيراد السجل، وهي شاشة إدارة. فالتوكن متاح،
+  // والمصادقة تعطي معه مفتاحاً ثابتاً لحدّ المعدّل — وهو ما لا يعطيه عنوان IP
+  // قد يخدم مكتباً كاملاً.
+  const token = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })
+
+  const secretKey = clean(process.env.CLERK_SECRET_KEY)
+  if (!secretKey) {
+    return res.status(500).json({ error: 'مفتاح Clerk غير مضبوط على الخادم' })
+  }
+
+  let userId
+  try {
+    userId = (await verifyToken(token, { secretKey }))?.sub
+  } catch {
+    return res.status(401).json({ error: 'جلسة غير صالحة' })
+  }
+  if (!userId) return res.status(401).json({ error: 'يلزم تسجيل الدخول' })
+
+  if (await limitOrReject(res, userId, 'registry-source', { limit: 60, window: '1 hour' })) {
+    return
   }
 
   const dataset = String(req.query?.dataset || '')

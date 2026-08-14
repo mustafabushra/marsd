@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth } from '@clerk/react'
 import { getSupabase } from '../lib/api'
 import {
   DATASET_ID, PORTAL_URL, REGISTRY_COLUMNS, describeHeaders, fetchDatasetInfo,
@@ -38,6 +39,7 @@ import { Card } from '../ui'
 const BATCH = 500
 
 export default function AdminRegistryImport() {
+  const { getToken } = useAuth()
   const [info, setInfo] = useState(null)
   const [infoError, setInfoError] = useState('')
 
@@ -57,12 +59,17 @@ export default function AdminRegistryImport() {
   // --- Where this data comes from -------------------------------------------
   useEffect(() => {
     const ac = new AbortController()
-    fetchDatasetInfo(ac.signal).then(setInfo).catch((e) => {
-      // Not fatal. The file is the file; this only labels it.
-      if (e.name !== 'AbortError') setInfoError(e.message)
-    })
+    // التوكن يُجلب هنا ويُمرَّر: نقطة النهاية صارت تشترط جلسة لأنها تُطلق طلباً
+    // خارجياً، و registryDataset.js لا يعرف Clerk.
+    getToken()
+      .then((t) => fetchDatasetInfo(ac.signal, t))
+      .then(setInfo)
+      .catch((e) => {
+        // Not fatal. The file is the file; this only labels it.
+        if (e.name !== 'AbortError') setInfoError(e.message)
+      })
     return () => ac.abort()
-  }, [])
+  }, [getToken])
 
   // --- Reading the sheet ------------------------------------------------------
   //
