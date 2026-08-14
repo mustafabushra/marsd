@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { inspectFile } from '../lib/fileSafety'
 
 /**
  * «الإبلاغ عن مشكلة» — a route to Marsad from inside the product.
@@ -97,13 +98,20 @@ export default function SupportDialog ({ open, onClose }) {
 
   if (!open) return null
 
-  const add = (chosen) => {
+  // async: فحص التوقيع يقرأ أول بايتات الملف، وقراءة الملف غير متزامنة.
+  const add = async (chosen) => {
     const next = [...files]
     const rejected = []
     for (const f of Array.from(chosen || [])) {
       if (next.length >= MAX_FILES) { rejected.push(`${f.name}: تجاوز ${MAX_FILES} ملفات`); continue }
       if (!TYPES[f.type]) { rejected.push(`${f.name}: نوع غير مقبول`); continue }
-      if (f.size > MAX_BYTES) { rejected.push(`${f.name}: أكبر من ١٠ م.ب`); continue }
+      // التوقيع الفعلي، لا النوع المُعلَن.
+      //
+      // `accept` اقتراحٌ لمربّع الاختيار، و allowed_mime_types في الدلو يفحص
+      // الترويسة التي يرسلها العميل — كلاهما يقول ما ادّعاه المُرسِل. هذا يقرأ
+      // أول بايتات الملف، فيردّ ملفاً تنفيذياً سُمّي .pdf قبل أن يُرفع.
+      const verdict = await inspectFile(f, { maxBytes: MAX_BYTES })
+      if (!verdict.ok) { rejected.push(`${f.name}: ${verdict.reason}`); continue }
       if (next.some((x) => x.name === f.name && x.size === f.size)) {
         rejected.push(`${f.name}: مضاف بالفعل`); continue
       }

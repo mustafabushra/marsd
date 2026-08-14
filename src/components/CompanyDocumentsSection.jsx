@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser } from '@clerk/react'
 import PhoneHandoff from './PhoneHandoff'
+import { inspectFile } from '../lib/fileSafety'
 import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
@@ -104,12 +105,18 @@ export default function CompanyDocumentsSection() {
   const upload = async (file) => {
     const docType = pendingType.current
     if (!file || !companyId || !docType) return
-    if (file.size > MAX_BYTES) {
-      showToast(`❌ الملف ${(file.size / 1024 / 1024).toFixed(1)} م.ب — الحد الأقصى ١٥ ميجابايت`)
-      return
-    }
-    if (!ACCEPT.split(',').includes(file.type)) {
-      showToast('❌ الصيغ المقبولة: PDF أو PNG أو JPG')
+    // التوقيع الفعلي، لا النوع المُعلَن.
+    //
+    // `file.type` هو ما قاله المتصفح عن الامتداد، و ACCEPT اقتراحٌ لمربّع
+    // الاختيار، و allowed_mime_types في الدلو يفحص ترويسة يرسلها العميل —
+    // ثلاثتها تصدّق المُرسِل. هذا يقرأ أول بايتات الملف، فيردّ ملفاً تنفيذياً
+    // سُمّي .pdf قبل أن يُرفع.
+    const verdict = await inspectFile(file, {
+      maxBytes: MAX_BYTES,
+      allow: ['application/pdf', 'image/png', 'image/jpeg'],
+    })
+    if (!verdict.ok) {
+      showToast(`❌ ${verdict.reason}`)
       return
     }
 

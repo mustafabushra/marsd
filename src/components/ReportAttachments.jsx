@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { inspectFile } from '../lib/fileSafety'
 
 /**
  * The evidence behind a report.
@@ -93,14 +94,21 @@ export async function uploadReportFiles(reportId, files, userId) {
 export default function ReportAttachments({ files, onChange, disabled = false }) {
   const [note, setNote] = useState('')
 
-  const add = (chosen) => {
+  // async: فحص التوقيع يقرأ أول بايتات الملف، وقراءة الملف غير متزامنة.
+  const add = async (chosen) => {
     const next = [...files]
     const rejected = []
 
     for (const f of chosen) {
       if (next.length >= MAX_FILES) { rejected.push(`${f.name}: تجاوز ${MAX_FILES} ملفات`); continue }
       if (!TYPES[f.type]) { rejected.push(`${f.name}: نوع غير مقبول`); continue }
-      if (f.size > MAX_BYTES) { rejected.push(`${f.name}: أكبر من 10 م.ب`); continue }
+      // التوقيع الفعلي، لا النوع المُعلَن.
+      //
+      // `accept` اقتراحٌ لمربّع الاختيار، و allowed_mime_types في الدلو يفحص
+      // الترويسة التي يرسلها العميل — كلاهما يقول ما ادّعاه المُرسِل. هذا يقرأ
+      // أول بايتات الملف، فيردّ ملفاً تنفيذياً سُمّي .pdf قبل أن يُرفع.
+      const verdict = await inspectFile(f, { maxBytes: MAX_BYTES })
+      if (!verdict.ok) { rejected.push(`${f.name}: ${verdict.reason}`); continue }
       // Same name and size twice is the same file picked twice.
       if (next.some((x) => x.name === f.name && x.size === f.size)) {
         rejected.push(`${f.name}: مضاف بالفعل`); continue
