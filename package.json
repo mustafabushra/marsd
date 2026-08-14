@@ -22,7 +22,8 @@
     "check:api": "node scripts/check-api-security.mjs",
     "check:migration-ready": "node scripts/check-migration-readiness.mjs",
     "check:audit": "node scripts/check-audit-coverage.mjs",
-    "audit:coverage": "node scripts/audit-coverage-report.mjs"
+    "audit:coverage": "node scripts/audit-coverage-report.mjs",
+    "check:bundle": "node scripts/check-bundle-secrets.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
