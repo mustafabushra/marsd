@@ -18,6 +18,7 @@ import ActivityPicker from '../components/form/ActivityPicker'
 import { CR_STATUS, ENTITY_TYPE, COMPANY_TYPE, COMPANY_TRAITS, CR_TYPE, ENTITY_SIZE, crStatusToDb, matchOption, splitEntityType } from '../lib/reference/companyOptions'
 import { CITIES, REGIONS } from '../lib/extraction/data/cities'
 import { SECTORS } from '../lib/extraction/data/isic'
+import { LIMITS } from '../lib/validate.js'
 
 // Every city the extractor knows, so the form and the import agree on spelling.
 // Sorted in Arabic rather than by insertion, because a person scrolling a list
@@ -604,7 +605,7 @@ export default function AddCompany() {
                                    placeholder="اسم المدير، ثم Enter" />
 
                       ) : (
-                        <input
+                        <input maxLength={LIMITS.name}
                           type={['date', 'number', 'email', 'url', 'tel'].includes(f.type) ? f.type : 'text'}
                           inputMode={f.inputMode}
                           placeholder={f.ph}

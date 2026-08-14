@@ -1,3 +1,20 @@
+import { LIMITS } from '../../lib/validate.js'
+
+/**
+ * الحدّ الافتراضي حسب نوع الحقل.
+ *
+ * مكوّنٌ عامّ لا يعرف أيّ عمود يكتب فيه، فيأخذ أضيق حدٍّ معقول لنوعه. ومن
+ * يعرف أكثر يمرّر maxLength صراحةً — الخاصية توضع قبل \u200E{...props}\u200E كي يعلوها
+ * ما يمرّره المنادي.
+ */
+const defaultLimit = (type) => {
+  if (type === 'textarea') return LIMITS.description
+  if (type === 'email') return LIMITS.email
+  if (type === 'tel') return LIMITS.phone
+  if (type === 'url') return LIMITS.website
+  return LIMITS.name
+}
+
 export default function FormField({
   label,
   name,
@@ -50,6 +67,7 @@ export default function FormField({
             color: '#0F172A'
           }}
           required={required}
+          maxLength={defaultLimit('textarea')}
           {...props}
         />
       ) : (
@@ -71,6 +89,7 @@ export default function FormField({
             color: '#0F172A'
           }}
           required={required}
+          maxLength={defaultLimit(type)}
           {...props}
         />
       )}

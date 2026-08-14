@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
 import { Card } from '../ui'
 import DocumentViewer from '../components/DocumentViewer'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * The queue, and one request opened.
@@ -376,7 +377,7 @@ export default function AdminRequestQueue() {
                 )}
 
                 <div style={label}>القرار</div>
-                <textarea
+                <textarea maxLength={LIMITS.reason}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={3}

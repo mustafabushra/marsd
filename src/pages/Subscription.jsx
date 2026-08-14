@@ -9,6 +9,7 @@ import { UsageMeter } from '../components/LimitGate'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /subscription — the plan a company is on, what it allows, and what it has left.
@@ -257,7 +258,7 @@ export default function Subscription() {
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px', fontWeight: 600, textAlign: 'right', lineHeight: 1.9 }}>{billing.instructions}</p>
           )}
 
-          <textarea
+          <textarea maxLength={LIMITS.reason}
             value={upgradeNote}
             onChange={(e) => setUpgradeNote(e.target.value)}
             placeholder="ملاحظة لإدارة مرصد (اختياري) — مرجع التحويل، أو المدة التي تريدها"

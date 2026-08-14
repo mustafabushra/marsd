@@ -5,6 +5,7 @@ import { searchCompaniesKnowledgeBase, getAutocompleteCompanies, getSupabase } f
 import { Search as SearchIcon, X } from 'lucide-react'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { watchlistRoom } from '../lib/entitlements'
+import { LIMITS } from '../lib/validate.js'
 
 const EMPTY_REQ_FORM = { sector: '', city: '', region: '', unified: '', entityType: '', mainActivity: '', field: 'sector', correctValue: '', note: '' }
 
@@ -401,7 +402,7 @@ export default function Search() {
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px', position: 'relative' }}>
             <SearchIcon size={20} color="#94A3B8" />
-            <input
+            <input maxLength={LIMITS.search}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => query.length > 0 && setShowAutocomplete(true)}
@@ -693,7 +694,7 @@ export default function Search() {
                   ].map(f => (
                     <div key={f.key}>
                       <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>{f.label}</label>
-                      <input
+                      <input maxLength={LIMITS.name}
                         placeholder={f.ph}
                         value={reqForm[f.key]}
                         onChange={(e) => setReqForm(prev => ({ ...prev, [f.key]: e.target.value }))}
@@ -703,7 +704,7 @@ export default function Search() {
                   ))}
                   <div style={{ gridColumn: '1/3' }}>
                     <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>ملاحظة (اختياري)</label>
-                    <textarea
+                    <textarea maxLength={LIMITS.description}
                       placeholder="أي تفاصيل إضافية تساعد الإدارة..."
                       value={reqForm.note}
                       onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}
@@ -728,7 +729,7 @@ export default function Search() {
                   </div>
                   <div>
                     <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>القيمة الصحيحة</label>
-                    <input
+                    <input maxLength={LIMITS.money}
                       placeholder="اكتب القيمة الصحيحة"
                       value={reqForm.correctValue}
                       onChange={(e) => setReqForm(prev => ({ ...prev, correctValue: e.target.value }))}
@@ -737,7 +738,7 @@ export default function Search() {
                   </div>
                   <div>
                     <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>سبب التعديل (اختياري)</label>
-                    <textarea
+                    <textarea maxLength={LIMITS.reason}
                       placeholder="لماذا البيان الحالي غير دقيق؟"
                       value={reqForm.note}
                       onChange={(e) => setReqForm(prev => ({ ...prev, note: e.target.value }))}

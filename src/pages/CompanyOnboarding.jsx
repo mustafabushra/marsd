@@ -5,6 +5,7 @@ import { getSupabase, smartCompanyDetection, ensureStorageBucket, buildCompanyIn
 import { COMPANY_STATUS, COMPANY_SOURCE, REQUEST_STATUS, USER_ROLE, USER_STATUS, TENANT_STATUS } from '../lib/enums'
 import { notifyAdmins } from '../lib/notify'
 import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/RequiredCompanyDocuments'
+import { LIMITS } from '../lib/validate.js'
 
 const SAUDI_CITIES = [
   'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام',
@@ -601,7 +602,7 @@ export default function CompanyOnboarding() {
               fontSize: '14px', fontWeight: 700, color: '#334155',
               display: 'block', marginBottom: '6px',
             }}>رقم السجل التجاري أو الرقم الموحّد</label>
-            <input
+            <input maxLength={LIMITS.identifier}
               id="identify-cr"
               type="text"
               inputMode="numeric"
@@ -672,7 +673,7 @@ export default function CompanyOnboarding() {
                       fontSize: '12.5px', fontWeight: 700, color: '#334155',
                       display: 'block', marginBottom: '6px',
                     }}>تعريف بنفسك لمسؤول الشركة (اختياري)</label>
-                    <input
+                    <input maxLength={LIMITS.reason}
                       id="join-note"
                       type="text"
                       value={joinNote}
@@ -766,7 +767,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   اسم الشركة *
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
@@ -786,7 +787,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   رقم السجل التجاري *
                 </label>
-                <input
+                <input maxLength={LIMITS.identifier}
                   type="text"
                   value={formData.crNumber}
                   onChange={(e) => handleChange('crNumber', e.target.value)}
@@ -854,7 +855,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   الرقم الموحّد
                 </label>
-                <input
+                <input maxLength={LIMITS.identifier}
                   type="text"
                   value={formData.unifiedNumber}
                   onChange={(e) => handleChange('unifiedNumber', e.target.value)}
@@ -873,7 +874,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   الكيان القانوني
                 </label>
-                <input
+                <input maxLength={LIMITS.label}
                   type="text"
                   value={formData.entityType}
                   onChange={(e) => handleChange('entityType', e.target.value)}
@@ -892,7 +893,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   نوع السجل
                 </label>
-                <input
+                <input maxLength={LIMITS.label}
                   type="text"
                   value={formData.crType}
                   onChange={(e) => handleChange('crType', e.target.value)}
@@ -911,7 +912,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   المنطقة
                 </label>
-                <input
+                <input maxLength={LIMITS.label}
                   type="text"
                   value={formData.region}
                   onChange={(e) => handleChange('region', e.target.value)}
@@ -932,6 +933,9 @@ export default function CompanyOnboarding() {
                 </label>
                 <input
                   type="number"
+                  min="0"
+                  max="999999999999"
+                  step="0.01"
                   value={formData.capital}
                   onChange={(e) => handleChange('capital', e.target.value)}
                   readOnly={fromRegistry('capital')}
@@ -987,7 +991,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   الاسم بالإنجليزية
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   value={formData.nameEn}
                   onChange={(e) => handleChange('nameEn', e.target.value)}
@@ -1006,7 +1010,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   العنوان الوطني
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   value={formData.nationalAddress}
                   onChange={(e) => handleChange('nationalAddress', e.target.value)}
@@ -1025,7 +1029,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   الموقع الإلكتروني
                 </label>
-                <input
+                <input maxLength={LIMITS.website}
                   type="url"
                   value={formData.website}
                   onChange={(e) => handleChange('website', e.target.value)}
@@ -1044,7 +1048,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   البريد الرسمي
                 </label>
-                <input
+                <input maxLength={LIMITS.email}
                   type="email"
                   value={formData.officialEmail}
                   onChange={(e) => handleChange('officialEmail', e.target.value)}
@@ -1063,7 +1067,7 @@ export default function CompanyOnboarding() {
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
                   الهاتف
                 </label>
-                <input
+                <input maxLength={LIMITS.phone}
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}

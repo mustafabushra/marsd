@@ -19,6 +19,7 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
 import { signIn } from './lib/sign-in.mjs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://127.0.0.1:4360'
 
@@ -47,7 +48,7 @@ try {
   const { rows: [co] } = await db.query(
     `insert into public.companies (name, cr_number, source, status, approved, city)
      values ($1, $2, 'community', 'pending', false, 'الرياض') returning id`,
-    [NAME, `66${stamp}`])
+    [NAME, pad10(`66${stamp}`)])
   made.company = co.id
 
   const { rows: [tn] } = await db.query(

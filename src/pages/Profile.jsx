@@ -9,6 +9,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import ClarificationRequests from '../components/ClarificationRequests'
 import CompanyDocumentsSection from '../components/CompanyDocumentsSection'
 import { SkeletonPage } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /profile — the company's own record, and what the platform sends it.
@@ -266,9 +267,9 @@ export default function Profile() {
                       {f.options.map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}
                     </select>
                   ) : f.type === 'textarea' ? (
-                    <textarea value={form[f.name]} onChange={(e) => setField(f.name, e.target.value)} style={{ ...fieldStyle, minHeight: '70px', resize: 'vertical' }} />
+                    <textarea maxLength={LIMITS.description} value={form[f.name]} onChange={(e) => setField(f.name, e.target.value)} style={{ ...fieldStyle, minHeight: '70px', resize: 'vertical' }} />
                   ) : (
-                    <input type={f.type === 'date' ? 'date' : 'text'} value={form[f.name]} onChange={(e) => setField(f.name, e.target.value)} style={fieldStyle} />
+                    <input maxLength={LIMITS.name} type={f.type === 'date' ? 'date' : 'text'} value={form[f.name]} onChange={(e) => setField(f.name, e.target.value)} style={fieldStyle} />
                   )}
                 </div>
               ))}

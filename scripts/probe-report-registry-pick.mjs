@@ -20,6 +20,7 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
 import { signIn } from './lib/sign-in.mjs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://127.0.0.1:4350'
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
@@ -39,14 +40,14 @@ let created = null
 
 try {
   const stamp = Date.now().toString().slice(-7)
-  cr = `11${stamp}`
+  cr = pad10(`11${stamp}`)
   await db.query(`
     insert into public.government_company_registry
       (dataset_id, snapshot_period, snapshot_at, cr_number, name, unified_number,
        registration_type, legal_entity, legal_entity_2, capital, region, city, registration_date)
     values ('eeeeeeee-0000-0000-0000-000000000001','الربع الثاني 2026','2026-06-30',
             $1,'مصنع البحر للأنابيب',$2,'رئيسي','شركة','شركة مساهمة مقفلة',
-            2000000,'المنطقة الشرقية','الجبيل','2015-09-01')`, [cr, `70${stamp}`])
+            2000000,'المنطقة الشرقية','الجبيل','2015-09-01')`, [cr, pad10(`70${stamp}`)])
 
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage()
   await signIn(page, BASE)

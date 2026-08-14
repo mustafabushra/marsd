@@ -18,6 +18,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -51,7 +52,7 @@ try {
   if (!me) throw new Error('لا مستخدم — تعذّر الإثبات')
 
   const stamp = Date.now().toString().slice(-7)
-  const CR = `88${stamp}`
+  const CR = pad10(`88${stamp}`)
   const { rows: [g] } = await c.query(`
     insert into public.government_company_registry
       (dataset_id, snapshot_period, snapshot_at, cr_number, name, unified_number,
@@ -59,7 +60,7 @@ try {
     values ('bbbbbbbb-0000-0000-0000-000000000001', 'الربع الثاني 2026', '2026-06-30',
             $1, 'مؤسسة فحص الإضافة', $2, 'شركة',
             'شركة ذات مسؤولية محدودة', 250000, 'منطقة الرياض', 'الرياض')
-    returning id`, [CR, `70${stamp}`])
+    returning id`, [CR, pad10(`70${stamp}`)])
 
   await asUser(me.id)
 

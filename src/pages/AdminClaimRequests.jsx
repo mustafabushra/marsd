@@ -6,6 +6,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/claim-requests — someone says a company in the registry is theirs.
@@ -264,7 +265,7 @@ export default function AdminClaimRequests() {
                 </div>
 
                 {rejecting && (
-                  <textarea
+                  <textarea maxLength={LIMITS.reason}
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="سبب الرفض — يصل لمقدّم الطلب"

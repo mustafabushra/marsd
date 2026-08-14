@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/knowledge-base/reports — the approved-report archive, and who filed each one.
@@ -131,7 +132,7 @@ export default function ReportKnowledgeBase() {
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '260px', display: 'flex', alignItems: 'center', gap: '11px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '0 14px' }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="بحث بالشركة المُبلَّغ عنها أو الشركة المُبلِّغة" style={{ flex: 1, border: 0, background: 'transparent', padding: '12px 0', fontSize: '14.5px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
+          <input maxLength={LIMITS.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="بحث بالشركة المُبلَّغ عنها أو الشركة المُبلِّغة" style={{ flex: 1, border: 0, background: 'transparent', padding: '12px 0', fontSize: '14.5px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
         </div>
         <button
           onClick={() => setOnlyDisputed((v) => !v)}

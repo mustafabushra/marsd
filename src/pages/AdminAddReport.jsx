@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabase } from '../lib/api'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * A report filed by Marsad itself.
@@ -171,7 +172,7 @@ export default function AdminAddReport() {
             </div>
           ) : (
             <>
-              <input
+              <input maxLength={LIMITS.search}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="ابحث بالاسم أو رقم السجل التجاري"
@@ -210,13 +211,13 @@ export default function AdminAddReport() {
 
         <div style={{ marginBottom: '16px' }}>
           <label style={label}>العنوان</label>
-          <input value={form.title} onChange={(e) => set('title', e.target.value)}
+          <input maxLength={LIMITS.name} value={form.title} onChange={(e) => set('title', e.target.value)}
                  placeholder="جملة واحدة تصف ما حدث" style={field} />
         </div>
 
         <div style={{ marginBottom: '16px' }}>
           <label style={label}>الوصف</label>
-          <textarea value={form.description} onChange={(e) => set('description', e.target.value)}
+          <textarea maxLength={LIMITS.description} value={form.description} onChange={(e) => set('description', e.target.value)}
                     rows={5} placeholder="ما الذي أثبتته الإدارة، وكيف"
                     style={{ ...field, minHeight: '110px', resize: 'vertical' }} />
         </div>
@@ -232,12 +233,12 @@ export default function AdminAddReport() {
           </div>
           <div>
             <label style={label}>أيام التأخير</label>
-            <input type="number" min="0" value={form.delayDays}
+            <input type="number" min="0" max="3650" step="1" value={form.delayDays}
                    onChange={(e) => set('delayDays', e.target.value)} style={field} />
           </div>
           <div>
             <label style={label}>قيمة التعامل (ريال)</label>
-            <input type="number" min="0" value={form.dealValue}
+            <input type="number" min="0" max="999999999999" step="0.01" value={form.dealValue}
                    onChange={(e) => set('dealValue', e.target.value)} style={field} />
           </div>
         </div>
@@ -253,7 +254,7 @@ export default function AdminAddReport() {
 
         <div style={{ marginBottom: '20px' }}>
           <label style={label}>ملاحظة داخلية (اختيارية)</label>
-          <input value={form.notes} onChange={(e) => set('notes', e.target.value)}
+          <input maxLength={LIMITS.reason} value={form.notes} onChange={(e) => set('notes', e.target.value)}
                  placeholder="مصدر المعلومة أو رقم المرجع" style={field} />
         </div>
 

@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/api'
 import { notifyTenant } from '../lib/notify'
 import { AlertCircle } from 'lucide-react'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 export default function AdminTenants() {
   const [tenants, setTenants] = useState([])
@@ -133,7 +134,7 @@ export default function AdminTenants() {
 
       {/* Search */}
       <div style={{ marginBottom: '24px' }}>
-        <input
+        <input maxLength={LIMITS.search}
           type="text"
           placeholder="ابحث برقم السجل أو اسم الشركة..."
           value={searchTerm}

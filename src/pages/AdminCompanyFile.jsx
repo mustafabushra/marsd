@@ -9,6 +9,7 @@ import DocumentViewer from '../components/DocumentViewer'
 // primitive learned hideEmpty so the next screen need not fork it; renaming
 // twenty call sites here is its own pass.
 import { Card, SectionTitle, EmptyState } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/company/:id — one company, everything about it.
@@ -1069,7 +1070,7 @@ export default function AdminCompanyFile() {
                     {r.status === 'approved' && (
                       isOpen ? (
                         <div style={{ marginTop: '12px' }}>
-                          <input
+                          <input maxLength={LIMITS.name}
                             autoFocus
                             value={withdrawing.reason || ''}
                             onChange={(e) => setWithdrawing((w) => ({ ...w, reason: e.target.value }))}
@@ -1496,13 +1497,13 @@ export default function AdminCompanyFile() {
               </label>
               <label>
                 <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>السبب *</span>
-                <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                <input maxLength={LIMITS.reason} value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                        placeholder="يُعرض للشركة كما تكتبه"
                        style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
               </label>
               <label>
                 <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>التفاصيل</span>
-                <textarea value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} rows={3}
+                <textarea maxLength={LIMITS.description} value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} rows={3}
                           style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
               </label>
               <div>
@@ -1524,7 +1525,7 @@ export default function AdminCompanyFile() {
               </div>
               <label>
                 <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>مهلة الردّ (أيام)</span>
-                <input type="number" min="0" value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))}
+                <input type="number" min="1" max="365" step="1" value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))}
                        style={{ width: '110px', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
               </label>
             </div>
@@ -1560,7 +1561,7 @@ export default function AdminCompanyFile() {
                       {f.hint && <span style={{ fontWeight: 600, color: '#94A3B8' }}> · {f.hint}</span>}
                       {changed && <span style={{ fontWeight: 700 }}> · مُعدّل</span>}
                     </span>
-                    <input type={f.type || 'text'}
+                    <input maxLength={LIMITS.name} type={f.type || 'text'}
                            value={editForm.values[f.k] ?? ''}
                            onChange={(e) => setEditForm((s) => ({ ...s, values: { ...s.values, [f.k]: e.target.value } }))}
                            dir={f.k === 'website' || f.k === 'official_email' || f.k === 'name_en' ? 'ltr' : 'rtl'}
@@ -1576,7 +1577,7 @@ export default function AdminCompanyFile() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 سبب التصحيح <span style={{ color: '#B91C1C' }}>*</span>
               </span>
-              <input value={editForm.reason}
+              <input maxLength={LIMITS.reason} value={editForm.reason}
                      onChange={(e) => setEditForm((s) => ({ ...s, reason: e.target.value }))}
                      placeholder="مثال: تصحيح رقم السجل التجاري بناءً على شهادة السجل المرفوعة"
                      style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
@@ -1614,7 +1615,7 @@ export default function AdminCompanyFile() {
                 <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                   السبب {statusForm.status !== 'approved' && <span style={{ color: '#B91C1C' }}>*</span>}
                 </span>
-                <input value={statusForm.reason} onChange={(e) => setStatusForm((f) => ({ ...f, reason: e.target.value }))}
+                <input maxLength={LIMITS.reason} value={statusForm.reason} onChange={(e) => setStatusForm((f) => ({ ...f, reason: e.target.value }))}
                        placeholder="يُعرض للشركة"
                        style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
               </label>
@@ -1646,7 +1647,7 @@ export default function AdminCompanyFile() {
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
               {rejecting.label} — سيُعرض السبب على الشركة.
             </p>
-            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+            <textarea maxLength={LIMITS.reason} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
               rows={4} placeholder="ما الخطأ في المستند، وما المطلوب بدلاً منه؟"
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '11px 13px',
@@ -1691,7 +1692,7 @@ export default function AdminCompanyFile() {
             <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 14px', lineHeight: 1.9 }}>
               {deciding.note || 'سيُعرض السبب على الشركة.'}
             </p>
-            <textarea value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
+            <textarea maxLength={LIMITS.reason} value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
               rows={4}
               placeholder={deciding.placeholder}
               style={{

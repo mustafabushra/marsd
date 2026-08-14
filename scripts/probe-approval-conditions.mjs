@@ -16,6 +16,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -47,7 +48,7 @@ async function submitted (tag, { sector = 'مقاولات', email = null } = {})
   const { rows: [co] } = await db.query(
     `insert into public.companies (name, cr_number, source, status, approved, city, sector, official_email)
      values ($1,$2,'community','pending',false,'الرياض',$3,$4) returning id`,
-    [NAME, `55${s}`, sector, EMAIL])
+    [NAME, pad10(`55${s}`), sector, EMAIL])
   const { rows: [tn] } = await db.query(
     `insert into public.tenants (name, cr_number, email, company_id, status)
      values ($1,$2,$3,$4,'active') returning id`, [NAME, `C${s}`, `cond.${s}@example.com`, co.id])

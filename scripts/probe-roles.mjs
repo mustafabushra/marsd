@@ -19,6 +19,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -67,10 +68,13 @@ try {
 
   // A submitted registration with documents, for them to act on.
   const NAME = `شركة فحص الأدوار ${s}`
+  // عشرة أرقام لا تسعة — راجع pad10 في scripts/lib/test-ids.mjs. هذا السكربت
+  // بالذات خلّف في ٢٠٢٦-٠٨-١١ شركةً برقم من تسعة أرقام حين مات قبل تنظيفه،
+  // فظلّت في القاعدة صفّاً لا يقبل أي تعديل.
   const { rows: [co] } = await db.query(
     `insert into public.companies (name, cr_number, source, status, city, sector, official_email)
      values ($1,$2,'community','pending','الرياض','تقنية',$3) returning id`,
-    [NAME, `93${s}`, `roles.${s}@example.com`])
+    [NAME, pad10(`93${s}`), `roles.${s}@example.com`])
   made.company = co.id
   const { rows: [tn] } = await db.query(
     `insert into public.tenants (name, cr_number, email, company_id, status)

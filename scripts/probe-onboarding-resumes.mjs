@@ -25,6 +25,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -86,7 +87,7 @@ try {
   ok('قبل التسجيل: الحالة «لا شيء»', (await state()).state === 'none')
 
   // --- Registering -----------------------------------------------------------
-  const CR = `55${stamp}`
+  const CR = pad10(`55${stamp}`)
   const { rows: [made] } = await register(CR)
   ok('التسجيل يُنشئ شركة ومستأجراً', !!made.company_id && !!made.tenant_id)
 
@@ -141,7 +142,7 @@ try {
   // caller who has a tenant, and the claims at this point still belonged to the
   // first user — who by now has one. The fixture was being refused for a rule
   // that has nothing to do with what it is testing.
-  const ORPHAN = `56${stamp}`
+  const ORPHAN = pad10(`56${stamp}`)
   await c.query(`select set_config('request.jwt.claims', '{}', true)`)
   await c.query(
     `insert into public.companies (name, cr_number, source, status, approved)

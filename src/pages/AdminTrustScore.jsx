@@ -28,18 +28,27 @@ const card = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: '1
 const input = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: '9px', padding: '10px 12px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', textAlign: 'right' }
 
 // path → what the operator is actually deciding
+/**
+ * معاملات نموذج الثقة، ولكلٍّ مداه.
+ *
+ * المدى من معنى المعامل لا من نوعه: عددُ تقارير عددٌ صحيح موجب، ووزنٌ درجةٌ
+ * بين صفر ومئة، وقاسمُ أيام التأخير لا يكون صفراً — القسمة عليه تُنتج لانهاية
+ * تسري في كل درجة تُحسب بعدها.
+ */
+const COUNT = { min: 1, max: 1000, step: 1 }
+const SCORE = { min: 0, max: 100, step: 1 }
 const FIELDS = [
-  { path: ['thresholds', 'preliminary_min_reports'], label: 'أقل عدد تقارير لإصدار درجة', hint: 'تحته: «بيانات غير كافية» بلا تقييم' },
-  { path: ['thresholds', 'full_min_reports'], label: 'عدد التقارير لدرجة نهائية', hint: 'تحته تُوصف الدرجة بأنها أولية' },
-  { path: ['weights', 'base'], label: 'الأساس', hint: 'درجة شركة سجلّها متوسط' },
-  { path: ['weights', 'on_time'], label: 'وزن السداد في موعده', hint: 'يُضاف كاملاً إذا سدّدت في كل تعامل' },
-  { path: ['weights', 'default'], label: 'وزن التعثّر', hint: 'يُخصم كاملاً إذا تعثّرت في كل تعامل' },
-  { path: ['weights', 'delay_penalty_cap'], label: 'سقف خصم التأخير', hint: 'أقصى ما يكلّفه التأخير وحده' },
-  { path: ['weights', 'delay_days_per_point'], label: 'أيام التأخير لكل نقطة خصم', hint: 'متوسط التأخير مقسوماً على هذا الرقم' },
-  { path: ['clamp', 'floor'], label: 'أدنى درجة ممكنة', hint: 'لشركة مُقيَّمة — لا ينطبق على «بيانات غير كافية»' },
-  { path: ['clamp', 'ceiling'], label: 'أعلى درجة ممكنة', hint: '' },
-  { path: ['bands', 'low_min'], label: 'حد نطاق «مخاطر منخفضة»', hint: 'الدرجة عنده فأعلى تُعرض خضراء' },
-  { path: ['bands', 'medium_min'], label: 'حد نطاق «مخاطر متوسطة»', hint: 'تحته: مخاطر مرتفعة' },
+  { path: ['thresholds', 'preliminary_min_reports'], label: 'أقل عدد تقارير لإصدار درجة', hint: 'تحته: «بيانات غير كافية» بلا تقييم', ...COUNT },
+  { path: ['thresholds', 'full_min_reports'], label: 'عدد التقارير لدرجة نهائية', hint: 'تحته تُوصف الدرجة بأنها أولية', ...COUNT },
+  { path: ['weights', 'base'], label: 'الأساس', hint: 'درجة شركة سجلّها متوسط', ...SCORE },
+  { path: ['weights', 'on_time'], label: 'وزن السداد في موعده', hint: 'يُضاف كاملاً إذا سدّدت في كل تعامل', ...SCORE },
+  { path: ['weights', 'default'], label: 'وزن التعثّر', hint: 'يُخصم كاملاً إذا تعثّرت في كل تعامل', ...SCORE },
+  { path: ['weights', 'delay_penalty_cap'], label: 'سقف خصم التأخير', hint: 'أقصى ما يكلّفه التأخير وحده', ...SCORE },
+  { path: ['weights', 'delay_days_per_point'], label: 'أيام التأخير لكل نقطة خصم', hint: 'متوسط التأخير مقسوماً على هذا الرقم', min: 1, max: 365, step: 1 },
+  { path: ['clamp', 'floor'], label: 'أدنى درجة ممكنة', hint: 'لشركة مُقيَّمة — لا ينطبق على «بيانات غير كافية»', ...SCORE },
+  { path: ['clamp', 'ceiling'], label: 'أعلى درجة ممكنة', hint: '', ...SCORE },
+  { path: ['bands', 'low_min'], label: 'حد نطاق «مخاطر منخفضة»', hint: 'الدرجة عنده فأعلى تُعرض خضراء', ...SCORE },
+  { path: ['bands', 'medium_min'], label: 'حد نطاق «مخاطر متوسطة»', hint: 'تحته: مخاطر مرتفعة', ...SCORE },
 ]
 
 const BANDS = {
@@ -202,6 +211,9 @@ export default function AdminTrustScore() {
               </div>
               <input
                 type="number"
+                min={f.min}
+                max={f.max}
+                step={f.step}
                 value={get(draft, f.path) ?? ''}
                 onChange={(e) => setDraft(set(draft, f.path, e.target.value === '' ? '' : Number(e.target.value)))}
                 style={input}

@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { useLiveData } from '../hooks/useLiveData'
 import { notifyAdmins } from '../lib/notify'
 import { docLabel } from '../lib/enums'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * Where a company answers what Marsad asked it.
@@ -276,7 +277,7 @@ export default function ClarificationRequests() {
                   <label htmlFor={`clar-${r.id}`} style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>
                     ردّك
                   </label>
-                  <textarea
+                  <textarea maxLength={LIMITS.description}
                     id={`clar-${r.id}`}
                     value={drafts[r.id] || ''}
                     onChange={(e) => setDrafts((d) => ({ ...d, [r.id]: e.target.value }))}

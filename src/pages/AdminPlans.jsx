@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/plans — the control surface for what every plan allows.
@@ -265,17 +266,17 @@ export default function AdminPlans() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '12px', marginBottom: '14px' }}>
                     <label>
                       <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>الاسم</span>
-                      <input style={input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+                      <input maxLength={LIMITS.name} style={input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
                     </label>
                     <label>
                       <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>السعر الشهري (ر.س)</span>
-                      <input style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={editing.price_monthly ?? ''} onChange={(e) => setEditing({ ...editing, price_monthly: e.target.value })} />
+                      <input maxLength={LIMITS.name} style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={editing.price_monthly ?? ''} onChange={(e) => setEditing({ ...editing, price_monthly: e.target.value })} />
                     </label>
                   </div>
 
                   <label style={{ display: 'block', marginBottom: '14px' }}>
                     <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>الوصف</span>
-                    <input style={input} value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+                    <input maxLength={LIMITS.name} style={input} value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
                   </label>
 
                   <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>
@@ -285,7 +286,7 @@ export default function AdminPlans() {
                     {Object.entries(LIMIT_LABELS).map(([key, label]) => (
                       <label key={key}>
                         <span style={{ display: 'block', fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>{label}</span>
-                        <input
+                        <input maxLength={LIMITS.name}
                           style={{ ...input, direction: 'ltr', textAlign: 'left' }}
                           value={editing.limits?.[key] ?? ''}
                           onChange={(e) => setEditing({ ...editing, limits: { ...editing.limits, [key]: e.target.value } })}

@@ -7,6 +7,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/disputes — a company has objected to something published about it.
@@ -266,7 +267,7 @@ export default function AdminDisputes() {
                 {d.status === 'open' && (
                   <>
                     {open && (
-                      <textarea
+                      <textarea maxLength={LIMITS.reason}
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="سبب القرار — يصل للشركة المعترِضة وللشركة صاحبة التقرير"

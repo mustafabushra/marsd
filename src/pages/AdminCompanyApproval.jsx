@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/api'
 import { COMPANY_STATUS } from '../lib/constants'
 import { notifyTenant } from '../lib/notify'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/company-approval — letting a registered company onto the platform.
@@ -431,7 +432,7 @@ export default function AdminCompanyApproval() {
                 }}>
                   سبب الرفض (إذا كان متعلقاً):
                 </label>
-                <textarea
+                <textarea maxLength={LIMITS.reason}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="أدخل سبب الرفض (يصل للشركة في الإشعار)..."

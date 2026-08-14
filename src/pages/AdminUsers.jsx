@@ -4,6 +4,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/users — every account on Marsad.
@@ -133,7 +134,7 @@ export default function AdminUsers() {
       )}
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <input
+        <input maxLength={LIMITS.search}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setPage(1) }}
           placeholder="ابحث بالاسم أو البريد…"

@@ -6,6 +6,7 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { UNLIMITED } from '../lib/entitlements'
 import { FeatureGate } from '../components/LimitGate'
 import { SkeletonList } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 // Fallback only. How many companies may be compared is a plan limit
 // (compare_items); this is what applies when a plan does not name one.
@@ -224,7 +225,7 @@ export default function Compare() {
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #F1F5F9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
-                <input autoFocus value={addSearch} onChange={(e) => setAddSearch(e.target.value)} placeholder="ابحث بالاسم أو رقم السجل التجاري" style={{ flex: 1, border: 0, background: 'transparent', padding: '13px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
+                <input maxLength={LIMITS.search} autoFocus value={addSearch} onChange={(e) => setAddSearch(e.target.value)} placeholder="ابحث بالاسم أو رقم السجل التجاري" style={{ flex: 1, border: 0, background: 'transparent', padding: '13px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
               </div>
             </div>
             <div style={{ padding: '14px 24px', overflowY: 'auto', flex: 1 }}>

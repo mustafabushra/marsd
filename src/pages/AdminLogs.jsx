@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getSupabase } from '../lib/api'
 import { Skeleton, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * The platform's memory, made readable.
@@ -192,7 +193,7 @@ export default function AdminLogs() {
           <option value="all">كل الفترة</option>
         </select>
 
-        <input value={q} onChange={(e) => setQ(e.target.value)}
+        <input maxLength={LIMITS.search} value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="ابحث برقم كيان أو معرّف مستخدم…"
                style={{ ...input, flex: 1, minWidth: '220px' }} />
 

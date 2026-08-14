@@ -6,6 +6,7 @@ import { useUserRole } from '../hooks/useUserRole'
 import { useTenantContext } from '../hooks/useTenantContext'
 import { commandsFor } from '../lib/commands'
 import { fold } from '../lib/extraction/fold.js'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * Ctrl+K — go anywhere, do anything, without hunting through a menu.
@@ -222,7 +223,7 @@ export default function CommandPalette() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '18px 22px', borderBottom: '1px solid #F1F5F9' }}>
           <span style={{ fontSize: '18px' }}>🔍</span>
-          <input
+          <input maxLength={LIMITS.search}
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}

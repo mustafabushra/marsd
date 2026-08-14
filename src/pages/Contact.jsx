@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CheckIcon } from '../components/icons'
+import { LIMITS } from '../lib/validate.js'
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -85,7 +86,7 @@ export default function Contact() {
                 }}>
                   الاسم الكامل
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   name="name"
                   value={formData.name}
@@ -115,7 +116,7 @@ export default function Contact() {
                 }}>
                   اسم الشركة
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   name="company"
                   value={formData.company}
@@ -145,7 +146,7 @@ export default function Contact() {
                 }}>
                   البريد الإلكتروني
                 </label>
-                <input
+                <input maxLength={LIMITS.email}
                   type="email"
                   name="email"
                   value={formData.email}
@@ -175,7 +176,7 @@ export default function Contact() {
                 }}>
                   رقم الجوال
                 </label>
-                <input
+                <input maxLength={LIMITS.phone}
                   type="tel"
                   name="phone"
                   value={formData.phone}
@@ -205,7 +206,7 @@ export default function Contact() {
                 }}>
                   موضوع الرسالة
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   name="subject"
                   value={formData.subject}
@@ -235,7 +236,7 @@ export default function Contact() {
                 }}>
                   رسالتك
                 </label>
-                <textarea
+                <textarea maxLength={LIMITS.description}
                   name="message"
                   value={formData.message}
                   onChange={handleChange}

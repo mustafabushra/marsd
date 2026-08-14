@@ -9,6 +9,7 @@ import { titlesFor, groupsFor, buildDescription } from '../lib/reference/reportS
 import { SkeletonPanel } from '../components/Skeleton'
 import ReportAttachments, { uploadReportFiles } from '../components/ReportAttachments'
 import Stepper from '../components/Stepper'
+import { LIMITS } from '../lib/validate.js'
 
 const STEPS = [
   { n: 1, label: 'اختيار الشركة' },
@@ -504,7 +505,7 @@ export default function AddReport() {
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '11px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '0 16px' }}>
                 <SearchIcon size={20} color="#94A3B8" />
-                <input placeholder="اسم الشركة أو رقم السجل التجاري" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
+                <input maxLength={LIMITS.search} placeholder="اسم الشركة أو رقم السجل التجاري" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} style={{ flex: 1, border: 0, background: 'transparent', padding: '14px 0', fontSize: '15px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
@@ -663,7 +664,7 @@ export default function AddReport() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
               <div><label style={labelStyle}>تاريخ بداية التعامل</label><input type="date" value={form.fromDate} onChange={(e) => setField('fromDate', e.target.value)} style={fieldStyle} /></div>
               <div><label style={labelStyle}>تاريخ انتهاء التعامل (اختياري)</label><input type="date" value={form.toDate} onChange={(e) => setField('toDate', e.target.value)} style={fieldStyle} /></div>
-              <div><label style={labelStyle}>قيمة التعامل (اختياري)</label><input type="number" value={form.dealValue} onChange={(e) => setField('dealValue', e.target.value)} placeholder="120000" style={fieldStyle} /></div>
+              <div><label style={labelStyle}>قيمة التعامل (اختياري)</label><input type="number" min="0" max="999999999999" step="0.01" value={form.dealValue} onChange={(e) => setField('dealValue', e.target.value)} placeholder="120000" style={fieldStyle} /></div>
               <div><label style={labelStyle}>العملة</label>
                 <select value={form.currency} onChange={(e) => setField('currency', e.target.value)} style={{ ...fieldStyle, background: '#fff' }}>
                   <option value="SAR">ريال سعودي (SAR)</option>
@@ -672,8 +673,8 @@ export default function AddReport() {
                   <option value="EUR">يورو (EUR)</option>
                 </select>
               </div>
-              <div><label style={labelStyle}>رقم العقد (اختياري)</label><input value={form.contractNumber} onChange={(e) => setField('contractNumber', e.target.value)} style={fieldStyle} /></div>
-              <div><label style={labelStyle}>رقم الفاتورة (اختياري)</label><input value={form.invoiceNumber} onChange={(e) => setField('invoiceNumber', e.target.value)} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>رقم العقد (اختياري)</label><input maxLength={LIMITS.name} value={form.contractNumber} onChange={(e) => setField('contractNumber', e.target.value)} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>رقم الفاتورة (اختياري)</label><input maxLength={LIMITS.name} value={form.invoiceNumber} onChange={(e) => setField('invoiceNumber', e.target.value)} style={fieldStyle} /></div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gridColumn: '1/3', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 16px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#334155' }}>هل يوجد عقد؟</span>
                 {toggle(form.hasContract, (v) => setField('hasContract', v))}
@@ -689,7 +690,8 @@ export default function AddReport() {
             {(form.paymentStatus === 'partial' || form.paymentStatus === 'unpaid') && (
               <div style={{ marginBottom: '18px', maxWidth: '260px' }}>
                 <label style={labelStyle}>عدد أيام التأخير</label>
-                <input type="number" value={form.delayDays} onChange={(e) => setField('delayDays', e.target.value)} placeholder="0" style={fieldStyle} />
+                {/* عشر سنوات سقفٌ لتأخير سداد — وما فوقه خطأُ إدخال لا واقعة. */}
+                <input type="number" min="0" max="3650" step="1" value={form.delayDays} onChange={(e) => setField('delayDays', e.target.value)} placeholder="0" style={fieldStyle} />
               </div>
             )}
 

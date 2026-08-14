@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/partners — the partner programme, which the public site has been
@@ -323,7 +324,7 @@ export default function AdminPartners() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 السبب <span style={{ color: '#B91C1C' }}>*</span> — يُعرض للشركة
               </span>
-              <textarea value={decide.reason} rows={3}
+              <textarea maxLength={LIMITS.reason} value={decide.reason} rows={3}
                         onChange={(e) => setDecide((d) => ({ ...d, reason: e.target.value }))}
                         placeholder={decide.approve ? 'مثال: إسهام موثّق في بناء السجل خلال العام' : 'مثال: لم تُستوفَ شروط الإسهام المعلنة بعد'}
                         style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
@@ -369,7 +370,7 @@ export default function AdminPartners() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 سبب التعيين <span style={{ color: '#B91C1C' }}>*</span> — يُعرض للشركة
               </span>
-              <textarea value={appoint.reason} rows={3}
+              <textarea maxLength={LIMITS.reason} value={appoint.reason} rows={3}
                         onChange={(e) => setAppoint((a) => ({ ...a, reason: e.target.value }))}
                         placeholder="مثال: إسهام مبكر وموثوق في بناء سجل القطاع"
                         style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
@@ -400,7 +401,7 @@ export default function AdminPartners() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 السبب <span style={{ color: '#B91C1C' }}>*</span> — يُعرض للشركة
               </span>
-              <textarea value={revoke.reason} rows={3}
+              <textarea maxLength={LIMITS.reason} value={revoke.reason} rows={3}
                         onChange={(e) => setRevoke((v) => ({ ...v, reason: e.target.value }))}
                         style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
             </label>

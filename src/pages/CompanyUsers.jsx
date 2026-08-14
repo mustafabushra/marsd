@@ -7,6 +7,7 @@ import { UNLIMITED } from '../lib/entitlements'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ROLE_LABEL = { company_admin: 'مدير', company_member: 'محرّر' }
@@ -440,7 +441,7 @@ export default function CompanyUsers() {
 
       {isAdmin && showInviteForm && (
         <div style={{ ...S.card, borderRadius: '12px', padding: '16px', marginBottom: '18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <input type="email" placeholder="البريد الإلكتروني" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleInvite()} style={{ ...S.input, flex: 1, minWidth: '200px', direction: 'ltr', textAlign: 'left' }} />
+          <input maxLength={LIMITS.email} type="email" placeholder="البريد الإلكتروني" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleInvite()} style={{ ...S.input, flex: 1, minWidth: '200px', direction: 'ltr', textAlign: 'left' }} />
           <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} style={S.input}>
             <option value="company_member">محرّر</option>
             <option value="company_admin">مدير</option>

@@ -7,6 +7,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import DeferredSkeleton from '../components/DeferredSkeleton'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/subscriptions — every company's plan, and the only place any of them
@@ -265,7 +266,7 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
-      <input
+      <input maxLength={LIMITS.search}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="ابحث باسم الشركة…"
@@ -479,7 +480,7 @@ function Tile({ k, v, warn, note }) {
 /** The server refuses without one. This is only the field. */
 function Reason({ value, onChange }) {
   return (
-    <input
+    <input maxLength={LIMITS.money}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="سبب التغيير — يصل الشركة ويُحفظ في السجل"

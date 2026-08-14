@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/react'
 import { getSupabase } from '../lib/api'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /partners — the partner programme, as it actually exists.
@@ -619,7 +620,7 @@ export default function Partners() {
               }}>
                 اسم الشركة
               </label>
-              <input
+              <input maxLength={LIMITS.name}
                 type="text"
                 name="company"
                 value={formData.company}
@@ -658,7 +659,7 @@ export default function Partners() {
                 }}>
                   الاسم الكامل
                 </label>
-                <input
+                <input maxLength={LIMITS.name}
                   type="text"
                   name="contact"
                   value={formData.contact}
@@ -691,7 +692,7 @@ export default function Partners() {
                 }}>
                   البريد الإلكتروني
                 </label>
-                <input
+                <input maxLength={LIMITS.email}
                   type="email"
                   name="email"
                   value={formData.email}
@@ -725,7 +726,7 @@ export default function Partners() {
               }}>
                 رقم الهاتف
               </label>
-              <input
+              <input maxLength={LIMITS.phone}
                 type="tel"
                 name="phone"
                 value={formData.phone}
@@ -758,7 +759,7 @@ export default function Partners() {
               }}>
                 رسالة إضافية
               </label>
-              <textarea
+              <textarea maxLength={LIMITS.description}
                 name="message"
                 value={formData.message}
                 onChange={handleChange}

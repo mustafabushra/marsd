@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/api'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * Load the national economic activity directory (ISIC4).
@@ -270,7 +271,7 @@ export default function AdminActivities() {
           </div>
         </div>
 
-        <textarea value={text} onChange={(e) => setText(e.target.value)}
+        <textarea maxLength={LIMITS.description} value={text} onChange={(e) => setText(e.target.value)}
                   rows={11} placeholder={SAMPLE}
                   style={{ width: '100%', padding: '13px 15px', border: '1.5px solid #E2E8F0', borderRadius: '11px', fontSize: '13px', fontFamily: 'monospace', resize: 'vertical', lineHeight: 1.9 }} />
 

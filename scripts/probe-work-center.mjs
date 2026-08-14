@@ -16,6 +16,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -47,10 +48,13 @@ const made = { users: [], companies: [], tenants: [] }
 async function submitted (tag) {
   const s = `${Date.now().toString().slice(-6)}${made.companies.length}`
   const NAME = `شركة ${tag} ${s}`
+  // عشرة أرقام بالضبط: طول s يتغيّر مع عدد الشركات المُنشأة، فيُثبَّت الناتج
+  // بدل الاعتماد على أنه سيبقى سبعة.
+  const cr = pad10(`94${s}`)
   const { rows: [co] } = await db.query(
     `insert into public.companies (name, cr_number, source, status, city, sector, official_email)
      values ($1,$2,'community','pending','الرياض','تقنية',$3) returning id`,
-    [NAME, `94${s}`, `wc.${s}@example.com`])
+    [NAME, cr, `wc.${s}@example.com`])
   made.companies.push(co.id)
   const { rows: [tn] } = await db.query(
     `insert into public.tenants (name, cr_number, email, company_id, status)

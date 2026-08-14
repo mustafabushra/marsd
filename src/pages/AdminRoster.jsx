@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
 import { PageTitle } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/roster — every company, and what each one is waiting on.
@@ -208,7 +209,7 @@ export default function AdminRoster() {
             {t.t} <span style={{ opacity: 0.7 }}>{t.n}</span>
           </button>
         ))}
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو السجل التجاري"
+        <input maxLength={LIMITS.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو السجل التجاري"
                style={{ flex: 1, minWidth: '200px', padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
       </div>
 
@@ -372,7 +373,7 @@ export default function AdminRoster() {
 
               <label>
                 <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>السبب *</span>
-                <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                <input maxLength={LIMITS.reason} value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                        placeholder="مثال: رقم السجل التجاري لا يطابق الوثيقة المرفقة"
                        style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
                 <span style={{ display: 'block', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
@@ -382,7 +383,7 @@ export default function AdminRoster() {
 
               <label>
                 <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>تفاصيل ما هو مطلوب</span>
-                <textarea value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))}
+                <textarea maxLength={LIMITS.description} value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))}
                           rows={3} placeholder="اشرح بدقّة ما الذي يجب أن ترسله الشركة"
                           style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }} />
               </label>
@@ -409,7 +410,7 @@ export default function AdminRoster() {
 
               <label>
                 <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>مهلة الردّ (أيام)</span>
-                <input type="number" min="0" value={form.days}
+                <input type="number" min="1" max="365" step="1" value={form.days}
                        onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))}
                        style={{ width: '120px', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
               </label>

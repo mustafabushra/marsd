@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LIMITS } from '../../lib/validate.js'
 
 /**
  * A list of short values, entered one at a time.
@@ -43,7 +44,7 @@ export default function TagsInput({ value = [], onChange, placeholder = 'اكت�
         ))}
       </div>
 
-      <input
+      <input maxLength={LIMITS.search}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {

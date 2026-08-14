@@ -5,6 +5,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/admin-users — who works for Marsad.
@@ -184,7 +185,7 @@ export default function AdminAdminUsers() {
           </p>
 
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            <input value={query} onChange={(e) => search(e.target.value)} placeholder="البريد الإلكتروني (٣ أحرف على الأقل)…" style={{ flex: '1 1 280px', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }} />
+            <input maxLength={LIMITS.search} value={query} onChange={(e) => search(e.target.value)} placeholder="البريد الإلكتروني (٣ أحرف على الأقل)…" style={{ flex: '1 1 280px', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', textAlign: 'right' }} />
             <select value={grantRole} onChange={(e) => setGrantRole(e.target.value)} style={{ border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', outline: 'none', fontFamily: 'inherit', background: '#fff' }}>
               {Object.entries(PLATFORM_ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>

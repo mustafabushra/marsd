@@ -20,6 +20,7 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
 import { signIn } from './lib/sign-in.mjs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://127.0.0.1:4370'
 
@@ -65,7 +66,7 @@ try {
   await db.query('begin'); await as(made.user)
   const { rows: [reg] } = await db.query(
     'select * from public.register_company_for_current_user($1,$2,$3,$4,$5,$6)',
-    [NAME, `19${s}`, EMAIL, '0500000000', 'الرياض', 'مقاولات'])
+    [NAME, pad10(`19${s}`), EMAIL, '0500000000', 'الرياض', 'مقاولات'])
   await db.query('commit')
   made.company = reg.company_id
   made.tenant = reg.tenant_id

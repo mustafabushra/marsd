@@ -7,6 +7,7 @@ import { LiveBadge } from '../components/LiveBadge'
 import { StatTile, STATUS_COLOR } from '../components/Charts'
 import { SkeletonPage, SkeletonTable, SkeletonList } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/fraud-detection — who contributes to Marsad, and what their
@@ -292,7 +293,7 @@ export default function AdminFraudDetection() {
                       )}
 
                       {(!r.reporting_suspended || !r.company_add_suspended) && (
-                        <textarea
+                        <textarea maxLength={LIMITS.reason}
                           value={reason}
                           onChange={(e) => setReason(e.target.value)}
                           placeholder="سبب الإيقاف — يصل الشركة، وتراه عند كل محاولة"

@@ -5,6 +5,7 @@ import { qrSource, FILE_SOURCES } from '../lib/companyImport/extractors'
 import { aiSource, DOC_TYPES } from '../lib/companyImport/aiSource'
 import { isViewcrUrl, VIEWCR_HOST } from '../lib/companyImport/viewcrParser'
 import { extractForForm } from '../lib/extraction/toFormPatch'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * استيراد بيانات الشركة — read a commercial registration instead of typing it.
@@ -295,6 +296,7 @@ export default function CompanyImportSheet({ open, onClose, onApply }) {
                   style={{ background: '#F1F5F9', border: 0, borderRadius: '9px', width: '34px', height: '34px', fontSize: '18px', cursor: busy ? 'default' : 'pointer', color: '#64748B', flex: 'none', fontFamily: 'inherit' }}>✕</button>
         </div>
 
+        {/* accept يُضبط لحظةَ الاختيار حسب المصدر — انظر source.accepts أعلاه. */}
         <input ref={fileRef} type="file" onChange={onFile} style={{ display: 'none' }} />
 
         {/* ---- choosing a source ---- */}
@@ -383,7 +385,7 @@ export default function CompanyImportSheet({ open, onClose, onApply }) {
                       اختياري
                     </span>
                   </span>
-                  <input dir="ltr" value={link}
+                  <input maxLength={LIMITS.website} dir="ltr" value={link}
                          onChange={(e) => { setLink(e.target.value); setLinkError('') }}
                          placeholder={`https://${VIEWCR_HOST}/viewcr?nCrNumber=…`}
                          style={{ width: '100%', padding: '11px 13px', border: `1.5px solid ${linkError ? '#FCA5A5' : '#E2E8F0'}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'monospace' }} />
@@ -409,7 +411,7 @@ export default function CompanyImportSheet({ open, onClose, onApply }) {
                   </div>
                 </div>
 
-                <textarea value={pasted} onChange={(e) => setPasted(e.target.value)}
+                <textarea maxLength={LIMITS.description} value={pasted} onChange={(e) => setPasted(e.target.value)}
                           rows={7} placeholder="الصق نص السجل التجاري هنا…"
                           style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2E8F0', borderRadius: '11px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
 
@@ -535,7 +537,7 @@ export default function CompanyImportSheet({ open, onClose, onApply }) {
                         </button>
                       )}
                     </span>
-                    <input value={valueOf(key)}
+                    <input maxLength={LIMITS.name} value={valueOf(key)}
                            onChange={(e) => setEdited((s) => ({ ...s, [key]: e.target.value }))}
                            placeholder={got?.raw && !got.value ? String(got.raw) : 'لم يُستخرج — أدخله يدوياً'}
                            style={{ width: '100%', padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit',
@@ -579,7 +581,7 @@ export default function CompanyImportSheet({ open, onClose, onApply }) {
                 <summary style={{ fontSize: '12.5px', fontWeight: 800, color: '#334155', cursor: 'pointer' }}>
                   المحتوى الخام المقروء من المستند
                 </summary>
-                <textarea readOnly value={result.unparsed} rows={6}
+                <textarea maxLength={LIMITS.description} readOnly value={result.unparsed} rows={6}
                           onFocus={(e) => e.target.select()}
                           style={{ width: '100%', marginTop: '9px', padding: '11px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '12.5px', fontFamily: 'monospace', direction: 'ltr', resize: 'vertical' }} />
                 <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
 import { Card } from '../ui'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/settings — the settings the platform actually reads.
@@ -98,7 +99,7 @@ export default function AdminSettings() {
           {Object.entries(v.earn || {}).map(([action, rule]) => (
             <label key={action} style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '11px 13px' }}>
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#166534', marginBottom: '6px' }}>{rule.label || action}</span>
-              <input
+              <input maxLength={LIMITS.name}
                 style={{ ...input, direction: 'ltr', textAlign: 'left', background: '#fff' }}
                 value={rule.points ?? ''}
                 onChange={(e) => setRate('earn', action, e.target.value)}
@@ -112,7 +113,7 @@ export default function AdminSettings() {
           {Object.entries(v.spend || {}).map(([action, rule]) => (
             <label key={action} style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '11px 13px' }}>
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#92400E', marginBottom: '6px' }}>{rule.label || action}</span>
-              <input
+              <input maxLength={LIMITS.name}
                 style={{ ...input, direction: 'ltr', textAlign: 'left', background: '#fff' }}
                 value={rule.points ?? ''}
                 onChange={(e) => setRate('spend', action, e.target.value)}
@@ -123,7 +124,7 @@ export default function AdminSettings() {
 
         <label style={{ display: 'block', maxWidth: '280px', marginBottom: '14px' }}>
           <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0F172A', marginBottom: '5px' }}>سقف الكسب الشهري لكل كيان</span>
-          <input style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={v.monthly_earn_cap ?? ''} onChange={(e) => setCap(e.target.value)} />
+          <input maxLength={LIMITS.name} style={{ ...input, direction: 'ltr', textAlign: 'left' }} value={v.monthly_earn_cap ?? ''} onChange={(e) => setCap(e.target.value)} />
           <span style={{ display: 'block', fontSize: '11.5px', color: '#64748B', marginTop: '5px', lineHeight: 1.7 }}>
             المساهمة بلا حد، وما تتحوّل إليه من صلاحيات محدود. صفر يعني بلا سقف.
           </span>
@@ -179,7 +180,7 @@ export default function AdminSettings() {
           {Object.entries(v).map(([key, label]) => (
             <label key={key} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '11px 13px' }}>
               <code style={{ display: 'block', fontSize: '11.5px', color: '#64748B', direction: 'ltr', marginBottom: '6px' }}>{key}</code>
-              <input
+              <input maxLength={LIMITS.name}
                 style={{ ...input, background: '#fff' }}
                 value={label}
                 onChange={(e) => setDraft((d) => ({ ...d, [row.key]: { ...v, [key]: e.target.value } }))}
@@ -204,7 +205,7 @@ export default function AdminSettings() {
     const dirty = draft[row.key] !== undefined
     return (
       <>
-        <textarea
+        <textarea maxLength={LIMITS.description}
           value={text}
           onChange={(e) => setDraft((d) => ({ ...d, [row.key]: e.target.value }))}
           rows={Math.min(16, String(text).split('\n').length + 1)}

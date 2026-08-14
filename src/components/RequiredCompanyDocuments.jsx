@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * The documents a company must arrive with, collected when it is added.
@@ -163,7 +164,7 @@ export default function RequiredCompanyDocuments({ files, onChange, onTypesLoade
                 )}
               </div>
 
-              <input
+              <input maxLength={LIMITS.name}
                 ref={(el) => { inputs.current[t.doc_type] = el }}
                 type="file"
                 accept={ACCEPT}

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { fold } from '../../lib/extraction/fold.js'
+import { LIMITS } from '../../lib/validate.js'
 
 /**
  * A dropdown you can type into.
@@ -86,7 +87,7 @@ export default function SearchableSelect({
 
   return (
     <div ref={boxRef} style={{ position: 'relative' }}>
-      <input
+      <input maxLength={LIMITS.search}
         id={id}
         ref={inputRef}
         disabled={disabled}

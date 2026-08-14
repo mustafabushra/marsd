@@ -16,6 +16,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -63,7 +64,7 @@ try {
   const { rows: [co] } = await db.query(
     `insert into public.companies (name, cr_number, source, status, approved, city, sector, official_email)
      values ($1,$2,'community','pending',false,'الدمام','تقنية',$3) returning id`,
-    [NAME, `91${s}`, `rev.${s}@example.com`])
+    [NAME, pad10(`91${s}`), `rev.${s}@example.com`])
   made.company = co.id
   const { rows: [tn] } = await db.query(
     `insert into public.tenants (name, cr_number, email, company_id, status)
@@ -118,7 +119,7 @@ try {
   ok('ولا يعيد تسمية شركة', rename !== null && /هوية الشركة/.test(rename), rename?.slice(0, 90))
 
   const recr = await attempt(made.reviewer,
-    'update public.companies set cr_number = $1 where id = $2', [`92${s}`, co.id])
+    'update public.companies set cr_number = $1 where id = $2', [pad10(`92${s}`), co.id])
   ok('ولا يغيّر رقم السجل', recr !== null, recr?.slice(0, 90))
 
   const suspend = await attempt(made.reviewer,

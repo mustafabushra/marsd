@@ -21,6 +21,7 @@
 
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const url = readFileSync('.env.migrations', 'utf8').split(/\r?\n/)
   .find((l) => l.trim().startsWith('DATABASE_URL='))?.split('=').slice(1).join('=').trim()
@@ -71,7 +72,7 @@ try {
   const { rows: [co] } = await c.query(
     `insert into public.companies (name, cr_number, source, status, approved)
      values ('شركة فحص الطلبات', $1, 'community', 'pending', false) returning id`,
-    [`77${stamp}`])
+    [pad10(`77${stamp}`)])
 
   const { rows: [tn] } = await c.query(
     `insert into public.tenants (name, cr_number, email, company_id, status)

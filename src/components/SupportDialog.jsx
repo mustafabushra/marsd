@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/api'
 import { inspectFile } from '../lib/fileSafety'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * «الإبلاغ عن مشكلة» — a route to Marsad from inside the product.
@@ -254,7 +255,7 @@ export default function SupportDialog ({ open, onClose }) {
               {/* تفاصيل البلاغ */}
               <div style={{ marginBottom: '18px' }}>
                 <label htmlFor="sup-details" style={label}>تفاصيل البلاغ</label>
-                <textarea id="sup-details" value={details} disabled={busy}
+                <textarea maxLength={LIMITS.description} id="sup-details" value={details} disabled={busy}
                   onChange={(e) => { setDetails(e.target.value); setError('') }}
                   placeholder="يرجى وصف المشكلة بوضوح — ماذا كنت تفعل، وماذا حدث، وماذا توقّعت أن يحدث."
                   rows={5}

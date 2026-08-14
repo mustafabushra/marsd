@@ -5,6 +5,7 @@ import { getSupabase } from '../lib/api'
 import { useUser } from '@clerk/react'
 import { createTenantAndUser } from '../lib/api'
 import { SkeletonPage } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 const SAUDI_CITIES = [
   'الرياض',
@@ -371,7 +372,7 @@ export default function CompanyRegister() {
               }}>
                 اسم الشركة *
               </label>
-              <input
+              <input maxLength={LIMITS.name}
                 type="text"
                 value={companyData.name}
                 onChange={(e) => handleCompanyChange('name', e.target.value)}
@@ -398,7 +399,7 @@ export default function CompanyRegister() {
               }}>
                 رقم السجل التجاري *
               </label>
-              <input
+              <input maxLength={LIMITS.identifier}
                 type="text"
                 value={companyData.crNumber}
                 onChange={(e) => handleCompanyChange('crNumber', e.target.value)}
@@ -585,7 +586,7 @@ export default function CompanyRegister() {
               }}>
                 البريد الإلكتروني *
               </label>
-              <input
+              <input maxLength={LIMITS.email}
                 type="email"
                 value={companyData.email}
                 onChange={(e) => handleCompanyChange('email', e.target.value)}
@@ -611,7 +612,7 @@ export default function CompanyRegister() {
               }}>
                 رقم الهاتف
               </label>
-              <input
+              <input maxLength={LIMITS.phone}
                 type="tel"
                 value={companyData.phone}
                 onChange={(e) => handleCompanyChange('phone', e.target.value)}
@@ -640,7 +641,7 @@ export default function CompanyRegister() {
             }}>
               موقع الويب
             </label>
-            <input
+            <input maxLength={LIMITS.website}
               type="url"
               value={companyData.website}
               onChange={(e) => handleCompanyChange('website', e.target.value)}
@@ -670,7 +671,7 @@ export default function CompanyRegister() {
             ].map(({ f, label, ph, type }) => (
               <div key={f}>
                 <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>{label}</label>
-                <input
+                <input maxLength={LIMITS.name}
                   type={type || 'text'}
                   value={companyData[f]}
                   onChange={(e) => handleCompanyChange(f, e.target.value)}
@@ -692,7 +693,7 @@ export default function CompanyRegister() {
             }}>
               وصف النشاط
             </label>
-            <textarea
+            <textarea maxLength={LIMITS.description}
               value={companyData.description}
               onChange={(e) => handleCompanyChange('description', e.target.value)}
               placeholder="وصف موجز عن نشاط الشركة..."

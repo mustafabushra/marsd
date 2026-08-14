@@ -21,6 +21,7 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { readFileSync } from 'node:fs'
 import { signIn } from './lib/sign-in.mjs'
+import { pad10 } from './lib/test-ids.mjs'
 
 const BASE = process.argv.find((a) => a.startsWith('http')) || 'http://127.0.0.1:4320'
 
@@ -42,7 +43,7 @@ try {
   // A government record to find. Created here so the probe does not depend on
   // whatever happens to be in the register today.
   const stamp = Date.now().toString().slice(-7)
-  cr = `99${stamp}`
+  cr = pad10(`99${stamp}`)
   await db.query(`
     insert into public.government_company_registry
       (dataset_id, snapshot_period, snapshot_at, cr_number, name, unified_number,
@@ -50,7 +51,7 @@ try {
     values ('cccccccc-0000-0000-0000-000000000001', 'الربع الثاني 2026', '2026-06-30',
             $1, 'مصنع الفحص للبلاستيك', $2, 'رئيسي', 'شركة',
             'شركة ذات مسؤولية محدودة', 750000, 'المنطقة الشرقية', 'الدمام', '2018-05-12')`,
-  [cr, `70${stamp}`])
+  [cr, pad10(`70${stamp}`)])
 
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage()
   await signIn(page, BASE)

@@ -4,6 +4,7 @@ import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { notifyTenant } from '../lib/notify'
 import { SkeletonPage } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/official-status — ما تسجّله مرصد ولا تستطيع الشركة مسحه.
@@ -146,7 +147,7 @@ export default function AdminOfficialStatus () {
 
           <label>
             <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#334155', marginBottom: '7px' }}>المصدر أو المرجع</span>
-            <input value={statusFor.note} onChange={(e) => setStatusFor((s) => ({ ...s, note: e.target.value }))}
+            <input maxLength={LIMITS.reason} value={statusFor.note} onChange={(e) => setStatusFor((s) => ({ ...s, note: e.target.value }))}
                    placeholder="مثال: إعلان تصفية في الجريدة الرسمية بتاريخ …"
                    style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit' }} />
           </label>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fold } from '../../lib/extraction/fold.js'
+import { LIMITS } from '../../lib/validate.js'
 
 /**
  * Pick activities from the national directory, by name or by code.
@@ -121,7 +122,7 @@ export default function ActivityPicker({ value = [], onChange, max = 30 }) {
         </div>
       )}
 
-      <input
+      <input maxLength={LIMITS.search}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}

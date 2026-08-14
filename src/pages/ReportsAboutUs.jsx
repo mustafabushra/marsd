@@ -7,6 +7,7 @@ import { canPerform } from '../utils/roles'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /reports-about-us — what the market has published about this company.
@@ -384,7 +385,7 @@ export default function ReportsAboutUs() {
 
                 {composing && (
                   <div style={{ marginTop: '14px' }}>
-                    <textarea
+                    <textarea maxLength={LIMITS.reason}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       placeholder="بيّن سبب اعتراضك — ما الذي في هذا التقرير غير صحيح، وما الدليل"
@@ -393,7 +394,7 @@ export default function ReportsAboutUs() {
                     <div style={{ fontSize: '12px', color: reason.trim().length < MIN_REASON ? '#B45309' : '#94A3B8', fontWeight: 700, margin: '5px 2px 10px', textAlign: 'right' }}>
                       {reason.trim().length < MIN_REASON ? `${MIN_REASON - reason.trim().length} حرفاً على الأقل` : `${reason.trim().length} حرفاً`}
                     </div>
-                    <input
+                    <input maxLength={LIMITS.name}
                       value={evidence}
                       onChange={(e) => setEvidence(e.target.value)}
                       placeholder="رابط مستند يدعم اعتراضك (اختياري) — سند قبض، عقد، مراسلة"

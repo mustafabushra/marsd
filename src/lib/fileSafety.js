@@ -101,9 +101,22 @@ export async function inspectFile (file, {
   return { ok: true, mime: match.mime, ext: match.ext }
 }
 
-/** اسم تخزين عشوائي — لا يُشتقّ من اسم المستخدم إطلاقاً. */
+/**
+ * اسم تخزين عشوائي — لا يُشتقّ من اسم المستخدم إطلاقاً.
+ *
+ * الوسيط امتدادٌ لا اسم ملف: `safeStorageName(inspect.ext)`. لكنه مُصدَّر، ومن
+ * يمرّر `file.name.split('.').pop()` يوماً — وهي عادة شائعة — يمرّر معها
+ * `../../etc/passwd` إن كان الاسم كذلك، فيصير مفتاح التخزين مساراً صاعداً.
+ *
+ * فيُقصر الامتداد هنا على حروف وأرقام لاتينية، لا لأن المنادي اليوم يخطئ، بل
+ * لأن الدالة يجب أن تكون آمنة بأي وسيط — الأمان الذي يعتمد على أدب المنادي
+ * ليس أماناً.
+ */
 export const safeStorageName = (ext) => {
   const rnd = crypto.getRandomValues(new Uint8Array(16))
   const hex = Array.from(rnd, (b) => b.toString(16).padStart(2, '0')).join('')
-  return `${Date.now().toString(36)}-${hex}.${ext}`
+  // آخر مقطع بعد نقطة، ثم ما بقي من [a-z0-9] فقط.
+  const raw = String(ext ?? '').toLowerCase().split('.').pop() || ''
+  const safe = raw.replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin'
+  return `${Date.now().toString(36)}-${hex}.${safe}`
 }

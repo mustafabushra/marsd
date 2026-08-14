@@ -6,6 +6,7 @@ import { notifyTenant } from '../lib/notify'
 import { useLiveData } from '../hooks/useLiveData'
 import { LiveBadge } from '../components/LiveBadge'
 import { SkeletonPage, SkeletonTable } from '../components/Skeleton'
+import { LIMITS } from '../lib/validate.js'
 
 /**
  * /admin/companies — إدارة الشركات: the registry as it stands, and what can be
@@ -399,7 +400,7 @@ export default function AdminCompaniesManagement() {
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', gap: '11px', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '11px', padding: '0 14px' }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
+          <input maxLength={LIMITS.search} value={search} onChange={(e) => setSearch(e.target.value)}
                  placeholder="بحث بالاسم أو السجل التجاري أو المالك"
                  style={{ flex: 1, border: 0, background: 'transparent', padding: '12px 0', fontSize: '14.5px', outline: 'none', textAlign: 'right', fontFamily: 'inherit' }} />
         </div>
@@ -610,7 +611,7 @@ export default function AdminCompaniesManagement() {
                       <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#B91C1C', marginBottom: '8px' }}>
                         سبب التعليق — يُعرض للشركة
                       </span>
-                      <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
+                      <textarea maxLength={LIMITS.reason} value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
                                 placeholder="مثال: تكرار بلاغات موثّقة عن عدم السداد دون ردّ على طلبات التوضيح"
                                 style={{ width: '100%', padding: '11px 13px', border: '1.5px solid #FECACA', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit', resize: 'vertical' }} />
                     </label>
@@ -645,7 +646,7 @@ export default function AdminCompaniesManagement() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 البريد الرسمي للشركة <span style={{ color: '#B91C1C' }}>*</span>
               </span>
-              <input type="email" dir="ltr" value={invite.email}
+              <input maxLength={LIMITS.email} type="email" dir="ltr" value={invite.email}
                      onChange={(e) => setInvite((v) => ({ ...v, email: e.target.value }))}
                      placeholder="info@company.com"
                      style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
@@ -653,7 +654,7 @@ export default function AdminCompaniesManagement() {
 
             <label style={{ display: 'block', marginTop: '12px' }}>
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>ملاحظة داخلية</span>
-              <input value={invite.note}
+              <input maxLength={LIMITS.reason} value={invite.note}
                      onChange={(e) => setInvite((v) => ({ ...v, note: e.target.value }))}
                      placeholder="تُحفظ في سجل الشركة ولا تُرسل"
                      style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
@@ -763,7 +764,7 @@ export default function AdminCompaniesManagement() {
               <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                 سبب الدمج <span style={{ color: '#B91C1C' }}>*</span>
               </span>
-              <input value={merge.reason} onChange={(e) => setMerge((m) => ({ ...m, reason: e.target.value }))}
+              <input maxLength={LIMITS.reason} value={merge.reason} onChange={(e) => setMerge((m) => ({ ...m, reason: e.target.value }))}
                      placeholder="مثال: نفس المنشأة، أُضيفت مرتين بسجلّين مختلفين"
                      style={{ width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: '9px', fontSize: '13.5px', fontFamily: 'inherit' }} />
             </label>
