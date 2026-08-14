@@ -305,9 +305,29 @@ if (!sb) {
     ok('والفحص قبله', v.verdict === 'clean', v.reasons.join(','))
     ok('وأنتج مُعقَّماً', !!v.sanitized?.bytes)
 
+    // التصريح يُكتب قبل الرفع، كما تفعل البوّابة بالضبط (migration 180 و183):
+    // صفُّ حكمٍ نظيف بالمسار وحجم المخرَج. وبدونه يردّ مُشغّل الاستهلاك
+    // الكتابةَ — وهو ما يجب أن يفعله، فالمسبار يحاكي المنتج لا يلتفّ عليه.
+    const { rows: [permit] } = await db.query(
+      `insert into public.file_scans (sha256, quarantine_path, target_bucket, target_path,
+         size_bytes, stored_size_bytes, scanner_version, actor, verdict, scanned_at)
+       values ($1,$2,'company-documents',$3,$4,$5,$6,$7,'clean',now()) returning id`,
+      [v.sha256, qPath, tPath, bytes.length, v.sanitized.bytes.length, S.SCANNER_VERSION, ACTOR])
+
     const { error: e2 } = await sb.storage.from('company-documents')
       .upload(tPath, v.sanitized.bytes, { contentType: 'image/png' })
     ok('ورُقّي إلى الدلو الدائم', !e2, e2?.message)
+
+    const { rows: [spent] } = await db.query(
+      'select consumed_at from public.file_scans where id = $1', [permit.id])
+    ok('وأُنفق التصريح بالكتابة', spent?.consumed_at !== null)
+
+    // وكتابةٌ ثانية بنفس التصريح لا تمرّ.
+    const { error: e3 } = await sb.storage.from('company-documents')
+      .upload(`${tPath}.again`, v.sanitized.bytes, { contentType: 'image/png' })
+    ok('ولا يُعاد استعماله لمسار آخر', !!e3, 'مرّت كتابة ثانية بلا تصريح')
+
+    await db.query('delete from public.file_scans where id = $1', [permit.id])
 
     const { data: stored } = await sb.storage.from('company-documents').download(tPath)
     const storedBytes = Buffer.from(await stored.arrayBuffer())

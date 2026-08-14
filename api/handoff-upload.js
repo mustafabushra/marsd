@@ -167,6 +167,11 @@ export default async function handler(req, res) {
       const { data: peek } = await sb.rpc('peek_upload_handoff', { p_token: token })
       const peeked = Array.isArray(peek) ? peek[0] : peek
 
+      // المخرَج المُعقَّم يُحسب قبل قيد الحكم: مُشغّل الاستهلاك
+      // (migration 183) يقابل stored_size_bytes بحجم الكائن الواصل، فلا بدّ
+      // أن يُسجَّل طول ما سيُرفع فعلاً لا طول ما وصل.
+      const promoted = verdict.sanitized?.bytes || bytes
+
       await sb.from('file_scans').insert({
         sha256: sha256(bytes),
         quarantine_path: path,
@@ -175,6 +180,7 @@ export default async function handler(req, res) {
         declared_mime: null,
         detected_type: verdict.detectedType,
         size_bytes: bytes.length,
+        stored_size_bytes: verdict.verdict === 'clean' ? promoted.length : null,
         scanner_version: SCANNER_VERSION,
         actor: `handoff:${peeked?.company_name || 'unknown'}`,
         verdict: verdict.verdict,
@@ -196,10 +202,10 @@ export default async function handler(req, res) {
       }
 
       // الترقية بمفتاح الخدمة: لا هويّة مستخدم في هذا المسار — الرمز هو
-      // التصريح، والمسار مشتقّ منه لا من الهاتف.
-      const out = verdict.sanitized?.bytes || bytes
+      // التصريح، والمسار مشتقّ منه لا من الهاتف. ومُشغّل الاستهلاك يسري هنا
+      // أيضاً: لا استثناء لمفتاح الخدمة، ولا طريق يلتفّ.
       const { error: upErr } = await sb.storage.from(BUCKET)
-        .upload(targetPath, out, { contentType: TYPE_MIME[verdict.detectedType], upsert: false })
+        .upload(targetPath, promoted, { contentType: TYPE_MIME[verdict.detectedType], upsert: false })
       if (upErr) {
         console.error('handoff-upload — promote failed', upErr)
         return fail(res, 502, 'تعذّر حفظ الملف — أعد المحاولة')

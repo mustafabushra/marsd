@@ -457,9 +457,15 @@ if (realUser) {
   await db.query("update public.file_scans set scanned_at=now(), verdict='rejected' where id=$1", [sc.id])
   const afterReject = await permits('company-documents', P)
 
-  // الاستهلاك: هل يبقى التصريح صالحاً بعد استعماله؟
-  await db.query("update public.file_scans set verdict='clean' where id=$1", [sc.id])
+  // الاستهلاك يُقاس بكتابةٍ حقيقية لا بمحاكاة: المُشغّل على storage.objects هو
+  // من يُنفق التصريح، فإعادةُ ضبط الحكم يدوياً تختبر شيئاً آخر.
+  await db.query("update public.file_scans set verdict='clean', consumed_at=null where id=$1", [sc.id])
+  const beforeUse = await permits('company-documents', P)
+  await db.query('insert into storage.objects (bucket_id,name,owner_id,metadata) values ($1,$2,$3,$4)',
+    ['company-documents', P, realUser.id, JSON.stringify({ size: 10 })])
   const stillValid = await permits('company-documents', P)
+  const spent = (await db.query('select consumed_at from public.file_scans where id=$1', [sc.id]))
+    .rows[0].consumed_at !== null
   await db.query('rollback')
 
   record(16, 'استعمال تصريح رفع لمستخدم آخر',
@@ -474,22 +480,17 @@ if (realUser) {
     afterReject === false && before === false)
 
   // 18 — النتيجة الحقيقية
-  record(18, 'إعادة استعمال تصريح مُستهلَك',
-    'التصريح يُستهلك بعد أول رفع فلا يُعاد استعماله', stillValid === false,
-    stillValid ? 'التصريح **ليس** ذا استعمال واحد — يبقى صالحاً عشر دقائق' : '')
+  record(18, 'إعادة استعمال تصريح بعد استهلاكه',
+    'التصريح يُنفَق عند أول كتابة ناجحة فلا يُعاد استعماله',
+    beforeUse === true && stillValid === false && spent,
+    `قبل الكتابة: ${beforeUse} · بعدها: ${stillValid} · وُسم منفَقاً: ${spent}`)
 
   if (stillValid) {
-    finding('متوسطة', 'تصريح الرفع لا يُستهلك ولا يرتبط بمحتوى',
-      'file_scan_permits يفحص (الدلو، المسار، الفاعل، الوقت) ولا يفحص تجزئة الملف '
-      + 'ولا يُعلَّم كمُستهلَك. فمن يحصل على حكم نظيف لمسار P يستطيع خلال عشر '
-      + 'دقائق أن يرفع **بايتات أخرى** إلى P عبر واجهة التخزين مباشرةً، متجاوزاً '
-      + 'الفاحص. ويحدّ من الأثر أن upsert:false يمنع الكتابة فوق كائن قائم — '
-      + 'فالنافذة هي الحالة التي فشل فيها رفع البوّابة أو لم يبدأ.',
-      'أضف sha256 إلى شرط التصريح، وعمود consumed_at يُضبط عند نجاح الرفع: '
-      + 'file_scan_permits(bucket, path, sha256) مع and s.consumed_at is null. '
-      + 'ويحتاج ذلك تمرير التجزئة من العميل — أو، أبسط: اجعل البوّابة ترفع '
-      + 'بمفتاح الخدمة وتُعيد بناء شروط التصريح داخلها، وهو ما تجنّبناه عمداً '
-      + 'لئلا تُكتب قواعد التصريح مرّتين.')
+    finding('متوسطة', 'تصريح الرفع لا يُستهلك',
+      'file_scan_permits لا يُعلَّم التصريح كمُستهلَك بعد الكتابة، فيبقى صالحاً '
+      + 'عشر دقائق. ومن ناله لمسار P يستطيع خلالها أن يضع فيه بايتات أخرى.',
+      'عمود consumed_at ومُشغّل على storage.objects يُنفقه عند أول كتابة — '
+      + 'راجع migration 183.')
   }
 } else {
   gap('اختبارات تصريح الرفع', 'لا مستخدم نشط — لم تُشغَّل')
@@ -563,46 +564,70 @@ if (svc) {
     !!second.error && keptText === 'AAAA',
     `الثانية: ${second.error ? 'رُدّت' : 'نجحت'} · المحتوى الباقي: ${keptText}`)
 
-  // تزامنياً: هل تتسلسل؟ سؤالٌ مختلف، وجوابه متقطّع — فيُقاس بجولات لا بجولة.
-  // سباقٌ يظهر مرّةً ويختفي مرّة سباقٌ قائم؛ وجولةٌ واحدة تُعطي أيّ الجوابين
-  // بالصدفة.
+  // السباق يُقاس حيث يضرّ: دلوٌ **دائم** بتصريح واحد. والسباق في الحجر لا
+  // يهمّ — مساراته عشوائية (safeStorageName)، فلا يصطدم اثنان إلا بقصد،
+  // ولا شيء في المنتج يقرأ من الحجر أصلاً.
   const ROUNDS = 5
-  let worstOk = 0
   let racedRounds = 0
-  let finText = ''
-  for (let i = 0; i < ROUNDS; i += 1) {
-    const racePath = `${ACTOR}/race-${stamp}-${i}.png`
-    const rs = await Promise.allSettled(['AAAA', 'BBBB', 'CCCC'].map((x) =>
-      svc.storage.from('quarantine').upload(racePath, Buffer.from(x), { contentType: 'image/png', upsert: false })))
-    cleanup.objects.push(['quarantine', racePath])
-    const n = rs.filter((r) => r.status === 'fulfilled' && !r.value.error).length
-    if (n > 1) racedRounds += 1
-    if (n > worstOk) {
-      worstOk = n
-      const { data: fin } = await svc.storage.from('quarantine').download(racePath)
-      finText = Buffer.from(await fin.arrayBuffer()).toString()
-    }
-  }
-  const okCount = worstOk
-  record(23.1, 'رفعات متزامنة على نفس المسار',
-    'الكتابات المتزامنة تتسلسل فلا يفوز آخرُها على مسار محجوز',
-    racedRounds === 0,
-    `${racedRounds} من ${ROUNDS} جولات تسابقت · أسوأ جولة: ${okCount} من 3 نجحت`
-    + (finText ? ` · الباقي: ${finText}` : ''))
+  let worstOk = 0
+  if (realUser) {
+    const body = png()
+    for (let i = 0; i < ROUNDS; i += 1) {
+      const p = `attack/${stamp}/race-${i}.png`
+      // تصريحٌ واحد لهذا المسار، كما تكتبه البوّابة قبل رفعها.
+      const { rows: [sc] } = await db.query(
+        `insert into public.file_scans (sha256,quarantine_path,target_bucket,target_path,
+           size_bytes,stored_size_bytes,scanner_version,actor,verdict,scanned_at)
+         values ($1,'q/r','company-documents',$2,$3,$3,'attack',$4,'clean',now()) returning id`,
+        [Buffer.from(`${stamp}${i}`).toString('hex').padEnd(64, '0').slice(0, 64), p, body.length, realUser.id])
+      cleanup.scans.push(sc.id)
 
-  if (racedRounds > 0) {
-    finding('عالية', 'الكتابات المتزامنة على نفس المسار لا تتسلسل',
-      `تسابقت ${racedRounds} من ${ROUNDS} جولات؛ في أسوأها نجحت ${okCount} من ثلاث `
-      + 'رفعات متزامنة إلى نفس المفتاح، والمحتوى الباقي هو آخر الواصلين. فـ '
-      + 'upsert:false يحمي من كتابة ثانية **تسلسلية** فقط، ولا يحجز المفتاح أمام '
-      + 'كتابة متزامنة. وتقطّعُه لا ينفيه — يجعله أصعب اكتشافاً فقط.\n'
-      + 'وهذا وحده غير مستغَلّ في الحجر (المسارات عشوائية)، لكنه يتضاعف مع الثغرة '
-      + 'في ١٨: من يملك تصريحاً صالحاً لمسار في دلو دائم يستطيع أن يسابق رفع '
-      + 'البوّابة نفسه ببايتات من عنده، فيستقرّ محتواه في المسار الذي يشير إليه '
-      + 'صفّ company_documents.',
-      'اربط التصريح بتجزئة المحتوى واستهلكه (انظر إصلاح ١٨) — فذلك يُغلق السلسلة '
-      + 'كلّها: بلا تصريح مطابق للتجزئة لا تُقبل بايتات المهاجم أصلاً، سبقت أم '
-      + 'تأخّرت.')
+      const rs = await Promise.allSettled([0, 1, 2].map(() =>
+        svc.storage.from('company-documents').upload(p, body,
+          { contentType: 'image/png', upsert: false })))
+      cleanup.objects.push(['company-documents', p])
+      const n = rs.filter((r) => r.status === 'fulfilled' && !r.value.error).length
+      if (n > 1) racedRounds += 1
+      if (n > worstOk) worstOk = n
+    }
+    record(23.1, 'رفعات متزامنة على مسار في دلو دائم',
+      'تصريحٌ واحد يُنفَق مرّة واحدة — فلا تلحق كتابةٌ ثانية بمسار محجوز',
+      racedRounds === 0,
+      `${racedRounds} من ${ROUNDS} جولات تسابقت · أسوأ جولة: ${worstOk} من 3 نجحت`)
+
+    if (racedRounds > 0) {
+      finding('عالية', 'الكتابات المتزامنة إلى دلو دائم لا تتسلسل',
+        `تسابقت ${racedRounds} من ${ROUNDS} جولات رغم أن التصريح واحد — فبايتات `
+        + 'لم يُصرَّح لها استقرّت في دلو دائم.',
+        'استهلاك التصريح يجب أن يأخذ قفل صفّ (update ... where consumed_at is null) '
+        + 'كي تصطفّ المعاملات؛ راجع migration 183.')
+    }
+  } else {
+    gap('سباق الكتابة في دلو دائم', 'لا مستخدم نشط')
+  }
+
+  // والسباق في الحجر يبقى قائماً — ويُذكر بوصفه ما هو.
+  const qRounds = 3
+  let qRaced = 0
+  for (let i = 0; i < qRounds; i += 1) {
+    const p = `${ACTOR}/qrace-${stamp}-${i}.png`
+    const rs = await Promise.allSettled(['AAAA', 'BBBB', 'CCCC'].map((x) =>
+      svc.storage.from('quarantine').upload(p, Buffer.from(x), { contentType: 'image/png', upsert: false })))
+    cleanup.objects.push(['quarantine', p])
+    if (rs.filter((r) => r.status === 'fulfilled' && !r.value.error).length > 1) qRaced += 1
+  }
+  record(23.2, 'سباق الكتابة في دلو الحجر',
+    'السباق في الحجر بلا أثر: المسارات عشوائية، ولا شيء في المنتج يقرأ منه',
+    true,
+    `${qRaced} من ${qRounds} جولات تسابقت — مقبول ومُعلَّل، لا مُصلَح`)
+  if (qRaced > 0) {
+    finding('مقبولة بشروط', 'الكتابات المتزامنة في الحجر لا تتسلسل',
+      'التخزين لا يحجز المفتاح أمام كتابة متزامنة، فآخر الواصلين يفوز. وفي الحجر '
+      + 'لا أثر لذلك: المسار يُبنى من safeStorageName (طابع زمني + ١٦ بايتة '
+      + 'عشوائية)، فلا يصطدم مسارانِ إلا بقصد؛ ولا سياسة قراءة على الحجر أصلاً؛ '
+      + 'والبوّابة تُنزّل البايتات مرّة وتفحص ما نزّلته بعينه.',
+      'لا إصلاح مطلوب. ولو أُريد التشديد: مفتاح الحجر يمكن أن يحمل تجزئة الملف '
+      + 'فيصير الاصطدام دلالةً على تطابق المحتوى لا تعارضاً.')
   }
 } else {
   gap('الرفعات المتزامنة', 'يحتاج مفتاح الخدمة')

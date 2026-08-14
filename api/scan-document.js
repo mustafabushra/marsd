@@ -193,7 +193,9 @@ export default async function handler (req, res) {
     // منه، ولَوَجب فتح الدلو للكتابة المباشرة، وهو ما يُلغي البوّابة.
     //
     // وصفُّ `clean` بلا رفعٍ تالٍ لا يضرّ: تصريحٌ لم يُستعمل، وعمره عشر دقائق.
-    await settle(svc, scanId, 'clean', [], verdict.detectedType, finalPath)
+    // حجم المخرَج لا الوارد: إعادة ترميز PNG تُغيّر الطول دائماً، ومُشغّل
+    // الاستهلاك (migration 183) يقابل هذا الرقم بحجم الكائن الواصل.
+    await settle(svc, scanId, 'clean', [], verdict.detectedType, finalPath, out.length)
 
     const { error: upErr } = await asUser.storage.from(targetBucket).upload(finalPath, out, {
       contentType: MIME[verdict.detectedType],
@@ -243,7 +245,8 @@ export default async function handler (req, res) {
 }
 
 /** يكتب الحكم النهائي. المشغّل يتولّى قيد التدقيق عند الرفض. */
-async function settle (svc, id, verdict, reasons, detectedType = null, targetPath = undefined) {
+async function settle (svc, id, verdict, reasons, detectedType = null, targetPath = undefined,
+  storedSize = undefined) {
   const patch = {
     verdict,
     reasons,
@@ -251,6 +254,7 @@ async function settle (svc, id, verdict, reasons, detectedType = null, targetPat
     scanned_at: new Date().toISOString(),
   }
   if (targetPath !== undefined) patch.target_path = targetPath
+  if (storedSize !== undefined) patch.stored_size_bytes = storedSize
   const { error } = await svc.from('file_scans').update(patch).eq('id', id)
   if (error) console.error('scan-document — settle failed', error)
 }
