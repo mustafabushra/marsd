@@ -826,6 +826,65 @@ if (svc) {
     'يحتاج اتصالاً تُصدره PostgREST بتوكن Clerk، لا اتصال الهجرات')
 }
 
+// ===========================================================================
+section('رابعاً — الدالة المنشورة على الإنتاج')
+// ===========================================================================
+// قاعدة Supabase واحدة للتطوير والإنتاج (مشروع واحد)، فكل ما سبق جرى على
+// بيانات الإنتاج وتخزينه. وما يبقى خارج ذلك هو شيفرة الدالة نفسها على Vercel.
+const TARGET = process.env.TARGET_URL || 'https://marsd-peach.vercel.app'
+{
+  const hit = async (path, init = {}) => {
+    try {
+      const r = await fetch(`${TARGET}${path}`, init)
+      const text = await r.text()
+      let json = null
+      try { json = JSON.parse(text) } catch { /* ليس JSON */ }
+      return { status: r.status, json, text }
+    } catch (e) { return { status: -1, error: e.message } }
+  }
+
+  const noAuth = await hit('/api/scan-document', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  })
+  // ترتيب الفحوص في الدالة: الطريقة، ثم متغيّرات البيئة، ثم المصادقة.
+  // فوصولُها إلى ٤٠١ يعني أنها تجاوزت فحص البيئة — أي أن الأربعة موجودة.
+  record(31, 'الدالة منشورة ومُهيّأة على الإنتاج',
+    'بلوغ ٤٠١ لا ٥٠٠ يعني أن متغيّرات البيئة كاملة — وإلا لعادت missingEnvVars',
+    noAuth.status === 401 && !noAuth.json?.missingEnvVars,
+    `HTTP ${noAuth.status} · ${noAuth.json?.error || noAuth.text?.slice(0, 60)}`)
+
+  const badToken = await hit('/api/scan-document', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer not.a.token' },
+    body: JSON.stringify({ quarantinePath: 'x/y.pdf', targetBucket: 'company-documents', targetPath: 'a/b.pdf' }),
+  })
+  record(32, 'توكن مزوَّر يُردّ',
+    'التوكن يُتحقَّق منه بمفتاح Clerk، فلا يكفي أن يبدو توكناً',
+    badToken.status === 401,
+    `HTTP ${badToken.status} · ${badToken.json?.error || ''}`)
+
+  const wrongMethod = await hit('/api/scan-document', { method: 'GET' })
+  record(33, 'طريقة غير مسموحة تُردّ',
+    'نقطة النهاية تقبل POST وحدها', wrongMethod.status === 405,
+    `HTTP ${wrongMethod.status}`)
+
+  // لا يُفصح الردّ عن أسماء متغيّرات أو مسارات داخلية لغير المصرَّح له.
+  const leaks = /SUPABASE|SERVICE_ROLE|CLERK_SECRET|postgres:\/\//i.test(noAuth.text || '')
+  record(34, 'ردّ الرفض لا يُفصح عن إعدادات',
+    'رسالة الرفض تقول ما يكفي ولا تصف الخادم', !leaks,
+    leaks ? 'الردّ يذكر أسماء إعدادات' : 'نظيف')
+
+  // ومسار الهاتف كذلك.
+  const handoff = await hit('/api/handoff-upload', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'check', token: 'x'.repeat(50) }),
+  })
+  record(35, 'مسار الهاتف منشور ويردّ الرمز غير الصالح',
+    'الرمز هو التصريح في ذلك المسار، ويُتحقَّق منه في القاعدة',
+    handoff.status === 400 || handoff.status === 401,
+    `HTTP ${handoff.status} · ${handoff.json?.error || ''}`)
+}
+
 // ---------------------------------------------------------------------------
 // تنظيف
 // ---------------------------------------------------------------------------
@@ -853,9 +912,10 @@ gap('استنفاد الموارد بطلبات فحص متوازية',
   + 'الدالة عند ملفّات قرب الحدّ الأقصى')
 gap('سلامة الملف بعد الترقية',
   'لا تُقارَن تجزئة الكائن المستقرّ بتجزئة ما فُحص — فتبديلٌ لاحق لا يُكتشف')
-gap('اختبار مضادّ على الإنتاج نفسه',
-  'كل ما سبق على قاعدة التطوير والتخزين المرتبط بها؛ فروق الإعداد بين البيئتين '
-  + 'لم تُقَس')
+gap('دورة كاملة عبر الدالة المنشورة بجلسة مستخدم حقيقية',
+  'الدالة تتطلّب توكن Clerk، ولا يُصدَر خارج المتصفّح. المُختبَر هنا: أن '
+  + 'الدالة منشورة ومُهيّأة وترفض غير المصرَّح، وأن دورة البايتات تعمل على '
+  + 'تخزين الإنتاج وقاعدته. أمّا نداؤها مُصادَقاً فيحتاج متصفّحاً')
 
 // ===========================================================================
 // التقرير
