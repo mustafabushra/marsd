@@ -5,7 +5,7 @@ import RequiredCompanyDocuments, { uploadCompanyDocuments } from '../components/
 import RegistryLookup from '../components/RegistryLookup'
 import { getSupabase, buildCompanyInsert } from '../lib/api'
 import { uploadViaGateway } from '../lib/uploadViaGateway'
-import { CheckIcon, EyeIcon, TrendingUpIcon, UploadIcon } from '../components/icons'
+import { CheckIcon, EyeIcon, TrendingUpIcon } from '../components/icons'
 import { useEntitlements } from '../hooks/useEntitlements'
 
 // Lazy on purpose. Behind this sheet sit tesseract.js, pdfjs and a QR reader —
@@ -78,7 +78,6 @@ export default function AddCompany() {
   const [activities, setActivities] = useState([])   // [{code, name}]
   const [managers, setManagers] = useState([])       // ['اسم']
 
-  const [crFile, setCrFile] = useState(null) // { name, url(base64) }
   // The documents the checklist marks required, held as File objects until
   // there is a company id to name their folder after.
   const [docFiles, setDocFiles] = useState({})
@@ -96,21 +95,6 @@ export default function AddCompany() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
-
-  const handleCrFile = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) {
-      setError('حجم الملف كبير جداً (الحد الأقصى 10MB)')
-      e.target.value = ''
-      return
-    }
-    setError('')
-    // يُحتفظ بالملف نفسه لا بقراءته نصّاً. كان يُقرأ هنا إلى data: ويُخزَّن في
-    // العمود كما هو — فصار كل صفّ يحمل ملفاً بطول ميغابايت ونصف، غير مفحوص،
-    // في عمود اسمه \u200E_url\u200E. الرفع الآن عند الإرسال، عبر بوّابة الفحص.
-    setCrFile({ name: file.name, file })
   }
 
   // Everything in the patch has already been shown to the person and was
@@ -183,10 +167,10 @@ export default function AddCompany() {
     // `add_registry_company_to_marsad` already exempts it; this form did not,
     // so the same company was accepted through one door and refused at the
     // other.
-    if (!crFile && !fromRegistry) {
-      setError('صورة السجل التجاري مطلوبة — أرفقها قبل الإرسال')
-      return
-    }
+    // السجل التجاري لم يعد له فحص مستقل هنا: هو أحد الأنواع المطلوبة التي
+    // يفحصها السطر أدناه، والإعفاء عند `fromRegistry` ينطبق عليه كما ينطبق
+    // على البقية. فالمطلوب لم يتغيّر — تغيّر موضع السؤال عنه فقط.
+    //
     // A company arrives complete or it does not arrive.
     //
     // The alternative was accepting it with one document and chasing the rest
@@ -242,11 +226,18 @@ export default function AddCompany() {
       // companies.cr_number is NOT NULL — generate a placeholder if none provided
       const crNumber = formData.registryNumber.trim() || `CR${Date.now().toString().slice(-8)}`
 
-      // المستند يُرفع عبر البوّابة قبل إنشاء الصفّ. ولا شركة بعد، فالمسار تحت
-      // معرّف الرافع؛ ويُنقل إلى مجلّد الشركة عند الاعتماد إن لزم.
+      // السجل التجاري يُرفع من قسم المستندات، مرّةً واحدة، عبر البوّابة —
+      // حجرٌ ثم فحص ثم ترقية.
+      //
+      // ويُرفع **قبل** إنشاء الصفّ لأن `companies.cr_file_url` يُكتب عند
+      // الإدراج، ولأن مُشغّل `mirror_cr_file_to_documents` يقرأ ذلك العمود
+      // فيُنشئ صفّ المستند في `company_documents` تلقائياً. ولذلك يُستثنى هذا
+      // النوع من `uploadCompanyDocuments` أدناه: المُشغّل سبقه إليه، ورفعه
+      // ثانيةً كان ينتج كائنين وصفّين لمستند واحد.
+      const crDoc = docFiles.commercial_registration
       let crFileUrl = null
-      if (crFile?.file) {
-        const { path } = await uploadViaGateway(crFile.file, {
+      if (crDoc) {
+        const { path } = await uploadViaGateway(crDoc, {
           targetBucket: 'company-documents',
           targetPath: `pending/${user.id}/cr-${Date.now()}`,
         })
@@ -348,7 +339,9 @@ export default function AddCompany() {
       // over one upload would be the worse trade.
       if (user?.id) {
         const { data: me } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-        const failed = await uploadCompanyDocuments(docFiles, {
+        // بلا السجل التجاري: رُفع أعلاه وفَيّده المُشغّل عند الإدراج.
+        const { commercial_registration: _cr, ...restDocs } = docFiles
+        const failed = await uploadCompanyDocuments(restDocs, {
           companyId: company.id, tenantId: me?.tenant_id || null, userId: user.id,
         })
         if (failed.length) {
@@ -434,7 +427,8 @@ export default function AddCompany() {
   // How much is still missing, derived once so the button, its title and its
   // label cannot disagree about it.
   const docsLeft = fromRegistry ? 0 : docTypes.filter((t) => !docFiles[t.doc_type]).length
-  const ready = !!fromRegistry || (!!crFile && docsLeft === 0)
+  // السجل التجاري محسوبٌ ضمن docsLeft — فهو أحد الأنواع المطلوبة الأربعة.
+  const ready = !!fromRegistry || docsLeft === 0
 
   return (
     <div style={{ maxWidth: '820px', margin: '0 auto' }}>
@@ -633,39 +627,10 @@ export default function AddCompany() {
                     </div>
                   )
                 })}
-                <div style={{ gridColumn: '1/3' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '7px', textAlign: 'right' }}>
-                    السجل التجاري
-                    {/* The asterisk is a promise about what will be refused.
-                        For a record the Ministry published nothing is refused,
-                        and leaving it there would be the form contradicting
-                        itself in the same screen. */}
-                    {!fromRegistry && (
-                      <>
-                        <span style={{ color: '#B91C1C' }}> *</span>
-                        <span style={{ fontWeight: 600, color: '#64748B' }}> — مطلوب لإضافة الشركة</span>
-                      </>
-                    )}
-                    {fromRegistry && (
-                      <span style={{ fontWeight: 600, color: '#64748B' }}> — اختياري</span>
-                    )}
-                  </label>
-                  {crFile ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1.5px solid #BBF7D0', background: '#F0FDF4', borderRadius: '12px', padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                        <span style={{ fontSize: '20px' }}>📄</span>
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#15803D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{crFile.name}</span>
-                      </div>
-                      <button type="button" onClick={() => setCrFile(null)} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', color: '#B91C1C', fontSize: '13px', fontWeight: 800, padding: '7px 12px', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}>إزالة</button>
-                    </div>
-                  ) : (
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '2px dashed #FCA5A5', borderRadius: '12px', padding: '22px', textAlign: 'center', background: '#FEF2F2', color: '#B91C1C', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
-                      <UploadIcon />
-                      اضغط لاختيار صورة أو PDF للسجل التجاري (حتى 10MB)
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*" onChange={handleCrFile} style={{ display: 'none' }} />
-                    </label>
-                  )}
-                </div>
+                {/* السجل التجاري لا يُطلب هنا: هو أحد المستندات الأربعة
+                    المطلوبة في «مستندات الشركة» أدناه، وكان يُطلب مرّتين —
+                    فيُرفع مرّتين، ويُفحص مرّتين، ويُخزَّن ككائنين، ويُسجَّل
+                    صفّين في company_documents لمستند واحد. */}
               </div>
 
               <div style={{ display: 'flex', gap: '11px', marginTop: '26px', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
@@ -696,14 +661,13 @@ export default function AddCompany() {
                 )}
 
                 <button onClick={handleSubmit} disabled={submitting || !ready}
-                        title={fromRegistry ? '' : docsLeft ? `ناقص ${docsLeft} مستند` : (!crFile ? 'أرفق صورة السجل التجاري أولاً' : '')}
+                        title={fromRegistry ? '' : docsLeft ? `ناقص ${docsLeft} مستند` : ''}
                         style={{ background: submitting || !ready ? '#94A3B8' : '#16A34A', color: '#fff', border: 0, borderRadius: '11px', padding: '13px 30px', fontSize: '15px', fontWeight: 800, cursor: submitting || !ready ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                   {/* The label says what is missing rather than «إرسال» greyed
                       out with no reason. A disabled button that does not
                       explain itself is a dead end somebody stares at. */}
                   {submitting ? 'جاري الإرسال...'
                     : fromRegistry ? 'إرسال طلب الإضافة'
-                    : !crFile ? 'أرفق السجل التجاري للإرسال'
                     : docsLeft ? `ناقص ${docsLeft} مستند`
                     : 'إرسال طلب الإضافة'}
                 </button>

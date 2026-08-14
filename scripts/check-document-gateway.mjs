@@ -497,6 +497,18 @@ section('لا رفع مباشر باقٍ في المصدر')
   walk2(join(root, 'src'))
   ok('ولا احتياط يخزّن الملف نصّاً عند فشل الرفع',
     inline.length === 0, inline.join(' · '))
+
+  // السجل التجاري كان يُطلب مرّتين في نموذج إضافة الشركة: حقلاً مستقلاً في
+  // الأعلى، وضمن «مستندات الشركة». فيُرفع مرّتين ويُفحص مرّتين ويُخزَّن
+  // ككائنين. المستندات كلّها تأتي من RequiredCompanyDocuments وحده الآن.
+  const addCompany = readFileSync(join(root, 'src', 'pages', 'AddCompany.jsx'), 'utf8')
+  ok('نموذج إضافة الشركة بلا حقل ملف مستقل',
+    !/type=["']file["']/.test(addCompany))
+  ok('ويرفع عبر البوّابة', /uploadViaGateway\(/.test(addCompany))
+  ok('ويمنع الإرسال حتى تكتمل المستندات المطلوبة',
+    /docsLeft === 0/.test(addCompany) && /const docsLeft/.test(addCompany))
+  ok('ولا يبقى فيه أثر للحقل المحذوف',
+    !/\bcrFile\b(?!Url)/.test(addCompany))
 }
 done('البوّابة هي الطريق الوحيد')
 
