@@ -29,7 +29,8 @@
     "check:gateway": "node scripts/check-document-gateway.mjs",
     "check:activities": "node scripts/check-activity-import.mjs",
     "probe:gateway": "node scripts/probe-document-gateway.mjs",
-    "check:bundle": "node scripts/check-bundle-secrets.mjs"
+    "check:bundle": "node scripts/check-bundle-secrets.mjs",
+    "attack:gateway": "node scripts/attack-document-gateway.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
