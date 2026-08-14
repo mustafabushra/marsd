@@ -30,14 +30,28 @@ import { dirname, join } from 'node:path'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const S = await import(pathToFileURL(join(root, 'api', '_lib', 'fileScan.js')).href)
 
+/**
+ * يقرأ متغيّراً من ملفّات البيئة، منزوعَ ما لا يُرى.
+ *
+ * بادئة ترتيب البايتات U+FEFF تلتصق بأول اسم في الملف — فيصير
+ * \u200EDATABASE_URL\u200E ولا يطابق شيئاً، والملف يبدو صحيحاً في كل محرّر.
+ * وقد عطّل هذا Clerk في مرصد بالكامل مرّة، ولذلك كُتبت `clean` في
+ * api/_lib/secrets.js — وهذه نظيرتها لجانب السكربتات.
+ */
 const readVar = (name) => {
   for (const f of ['.env.migrations', '.env.local', '.env', '.env.production']) {
     let txt = ''
     try { txt = readFileSync(join(root, f), 'utf8') } catch { continue }
-    const line = txt.split(/\r?\n/).find((l) => l.trim().startsWith(`${name}=`))
-    if (line) return line.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g, '')
+    txt = txt.replace(/^\uFEFF/, '')
+    const line = txt.split(/\r?\n/).find((l) => l.replace(/^\uFEFF/, '').trim().startsWith(`${name}=`))
+    if (line) {
+      const v = line.split('=').slice(1).join('=')
+        .replace(/\uFEFF/g, '').trim().replace(/^["']|["']$/g, '').trim()
+      if (v) return v
+    }
   }
-  return process.env[name] || null
+  const env = process.env[name]
+  return env ? env.replace(/\uFEFF/g, '').trim() : null
 }
 
 const DB_URL = readVar('DATABASE_URL')
@@ -45,6 +59,14 @@ const SB_URL = readVar('SUPABASE_URL') || readVar('VITE_SUPABASE_URL')
 const SERVICE = readVar('SUPABASE_SERVICE_ROLE_KEY')
 
 if (!DB_URL) { console.error('❌ DATABASE_URL مفقود'); process.exit(2) }
+
+// مفتاح الخدمة رمز JWT يبدأ بـ eyJ. وفحص شكله هنا يُحوّل «تُخطّى الفحوص»
+// الغامضة إلى سبب مُسمّى: مفتاحٌ نُسخ ناقصاً أو أُخذ من الحقل الخطأ
+// (anon بدل service_role) يبدو موجوداً ولا يعمل.
+if (SERVICE && !/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./.test(SERVICE)) {
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY موجود لكنه ليس رمز JWT — أعد نسخه كاملاً')
+  process.exit(2)
+}
 
 const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } })
 await db.connect()
