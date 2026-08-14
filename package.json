@@ -15,7 +15,9 @@
     "check:model-privacy": "node scripts/check-trust-model-privacy.mjs",
     "check:doc-urls": "node scripts/check-document-url-safety.mjs",
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
-    "check:authz": "node scripts/check-authorization.mjs"
+    "check:authz": "node scripts/check-authorization.mjs",
+    "check:input": "node scripts/check-input-validation.mjs",
+    "check:all": "npm run check:enums && npm run check:schema-drift && npm run check:authz && npm run check:input && npm run check:model-privacy && npm run check:doc-urls && npm run check:tiles"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
