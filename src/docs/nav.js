@@ -18,15 +18,25 @@
  */
 
 /**
- * كل مجموعة: `{ id, title: {ar,en}, pages: [{ slug, title: {ar,en} }] }`
+ * كل مجموعة: `{ id, title, audience, pages: [{ slug, title }] }`
  *
  * و`slug` هو المسار تحت `/docs` وتحت `content/docs/<lang>/` معاً — فاسم الملف
  * هو العنوان، ولا خريطة ثالثة بينهما تُنسى.
+ *
+ * ============================================================================
+ * الجمهور مُعلَن
+ * ============================================================================
+ * DOC للمستخدمين أوّلاً: من يبحث عن شركة، أو يرفع مستنداً، أو يقرأ درجة ثقة.
+ * وقسمٌ واحد فيه — الواجهة البرمجية — مكتوبٌ لمن يتكامل برمجياً.
+ *
+ * وخلطهما بلا إشارة يُتعب الطرفين: المستخدم يقرأ SQL لا يعنيه، والمطوّر يبحث
+ * عن مرجع بين شروحٍ عامّة. فالوسم `audience` يجعل ذلك مرئياً في الشريط.
  */
 export const NAV = [
   {
     id: 'getting-started',
     title: { ar: 'البداية', en: 'Getting started' },
+    audience: 'user',
     pages: [
       { slug: 'getting-started/introduction', title: { ar: 'مقدّمة', en: 'Introduction' } },
       { slug: 'getting-started/quickstart', title: { ar: 'البدء السريع', en: 'Quickstart' } },
@@ -35,6 +45,7 @@ export const NAV = [
   {
     id: 'companies',
     title: { ar: 'الشركات', en: 'Companies' },
+    audience: 'user',
     pages: [
       { slug: 'companies/search', title: { ar: 'البحث', en: 'Search' } },
       { slug: 'companies/profile', title: { ar: 'ملفّ الشركة', en: 'Company profile' } },
@@ -45,6 +56,7 @@ export const NAV = [
   {
     id: 'documents',
     title: { ar: 'المستندات', en: 'Documents' },
+    audience: 'user',
     pages: [
       { slug: 'documents/overview', title: { ar: 'نظرة عامّة', en: 'Overview' } },
       { slug: 'documents/upload', title: { ar: 'الرفع', en: 'Upload' } },
@@ -56,6 +68,7 @@ export const NAV = [
   {
     id: 'security',
     title: { ar: 'الأمن', en: 'Security' },
+    audience: 'user',
     pages: [
       { slug: 'security/overview', title: { ar: 'نظرة عامّة', en: 'Overview' } },
       { slug: 'security/authentication', title: { ar: 'المصادقة', en: 'Authentication' } },
@@ -69,6 +82,7 @@ export const NAV = [
   {
     id: 'api',
     title: { ar: 'الواجهة البرمجية', en: 'API' },
+    audience: 'developer',
     pages: [
       { slug: 'api/overview', title: { ar: 'نظرة عامّة', en: 'Overview' } },
       { slug: 'api/authentication', title: { ar: 'المصادقة', en: 'Authentication' } },
@@ -81,6 +95,7 @@ export const NAV = [
   {
     id: 'dashboard',
     title: { ar: 'لوحة التحكّم', en: 'Dashboard' },
+    audience: 'user',
     pages: [
       { slug: 'dashboard/overview', title: { ar: 'نظرة عامّة', en: 'Overview' } },
       { slug: 'dashboard/companies', title: { ar: 'الشركات', en: 'Companies' } },

@@ -32,7 +32,9 @@
     "check:bundle": "node scripts/check-bundle-secrets.mjs",
     "attack:gateway": "node scripts/attack-document-gateway.mjs",
     "docs:index": "node scripts/build-docs-index.mjs",
-    "docs:sitemap": "node scripts/build-docs-sitemap.mjs"
+    "docs:sitemap": "node scripts/build-docs-sitemap.mjs",
+    "provision": "node scripts/provision-environment.mjs",
+    "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",

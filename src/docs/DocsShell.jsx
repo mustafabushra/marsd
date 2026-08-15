@@ -233,11 +233,25 @@ function SidebarNav () {
       {NAV.map((g) => (
         <div key={g.id} style={{ marginBottom: '20px' }}>
           <div style={{
-            fontSize: '11.5px', fontWeight: 900, color: DOC.faint,
-            letterSpacing: '.07em', textTransform: 'uppercase',
+            display: 'flex', alignItems: 'center', gap: '6px',
             padding: '0 10px', marginBottom: '7px',
           }}>
-            {g.title[lang] || g.title.ar}
+            <span style={{
+              fontSize: '11.5px', fontWeight: 900, color: DOC.faint,
+              letterSpacing: '.07em', textTransform: 'uppercase',
+            }}>
+              {g.title[lang] || g.title.ar}
+            </span>
+            {/* قسمٌ لمن يتكامل برمجياً — يُعلَّم كي لا يقرأه من لا يعنيه. */}
+            {g.audience === 'developer' && (
+              <span style={{
+                fontSize: '9.5px', fontWeight: 800, color: '#3730A3',
+                background: '#EEF2FF', border: '1px solid #C7D2FE',
+                borderRadius: '4px', padding: '0 5px', letterSpacing: 0,
+              }}>
+                {lang === 'en' ? 'DEV' : 'للمطوّرين'}
+              </span>
+            )}
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {g.pages.map((p) => {
