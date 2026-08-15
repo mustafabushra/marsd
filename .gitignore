@@ -38,3 +38,6 @@ scripts/_tmp-*
 
 # نسخ قاعدة البيانات — تحوي بيانات إنتاج حقيقية
 backups/
+
+# مُولَّد من backend/migrations — يُعاد بناؤه بـnpm run build:install-sql
+install-sql/
