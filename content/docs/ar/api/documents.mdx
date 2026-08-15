@@ -1,0 +1,122 @@
+export const meta = {
+  title: 'الواجهة البرمجية — المستندات',
+  description: 'مرجع نقطة فحص المستندات وترقيتها.',
+  updated: '٢٠٢٦-٠٨-١٥',
+  related: ['api/authentication', 'documents/security', 'documents/upload'],
+}
+
+نقطةٌ واحدة تتولّى فحص الملفّ وترقيته من الحجر إلى التخزين الدائم.
+
+<Endpoint
+  method="POST"
+  path="/api/scan-document"
+  auth="clerk"
+  summary="تفحص ملفّاً في دلو الحجر، وترقّيه إلى دلو دائم إن كان نظيفاً."
+>
+
+<Fields title="جسم الطلب" rows={[
+  { name: 'quarantinePath', type: 'string', required: true, desc: 'مسار الملفّ في دلو الحجر. يجب أن يبدأ بمعرّف المستخدم نفسه — وإلا 403.' },
+  { name: 'targetBucket', type: 'string', required: true, desc: 'company-documents أو report-documents أو support-attachments. وما عداها يُردّ.' },
+  { name: 'targetPath', type: 'string', required: true, desc: 'المسار المطلوب في الدلو الدائم. يُصحَّح امتداده ليطابق المحتوى الفعلي.' },
+  { name: 'declaredMime', type: 'string | null', desc: 'النوع الذي يُعلنه المتصفّح. يُقارَن بالمحتوى، والتناقض سبب رفض.' },
+]} />
+
+<Fields title="ردّ النجاح" rows={[
+  { name: 'ok', type: 'true', desc: 'الملفّ فُحص ورُقّي.' },
+  { name: 'path', type: 'string', desc: 'المسار الذي استقرّ فيه — قد يخالف المطلوب لتصحيح الامتداد.' },
+  { name: 'bucket', type: 'string', desc: 'الدلو الذي استقرّ فيه.' },
+  { name: 'detectedType', type: 'string', desc: 'pdf أو png أو jpeg أو webp — من البايتات لا من الادّعاء.' },
+  { name: 'sha256', type: 'string', desc: 'تجزئة الملفّ كما وصل.' },
+  { name: 'sanitized', type: 'string | null', desc: 'طريقة التعقيم: png_reencode أو jpeg_container أو webp_container، أو null لملفّ لم يُعقَّم.' },
+  { name: 'size', type: 'number', desc: 'حجم ما خُزِّن فعلاً — يخالف حجم الوارد عند إعادة ترميز PNG.' },
+]} />
+
+<Statuses rows={[
+  { code: 200, desc: 'فُحص ورُقّي.' },
+  { code: 400, desc: 'مسار غير صالح، أو وجهة غير معروفة.' },
+  { code: 401, desc: 'لا توكن، أو توكن غير صالح أو منتهٍ.' },
+  { code: 403, desc: 'مسار الحجر ليس للطالب، أو RLS رفضت الكتابة في الوجهة.' },
+  { code: 404, desc: 'لم يُعثر على الملفّ في الحجر.' },
+  { code: 405, desc: 'الطريقة ليست POST.' },
+  { code: 422, desc: 'الملفّ مفهوم وغير مقبول — مع reasons و messages.' },
+  { code: 429, desc: 'تجاوز حدّ ١٢٠ طلباً في الساعة. مع Retry-After.' },
+  { code: 500, desc: 'إعداد ناقص على الخادم، أو تعذّر الفحص. الملفّ يبقى في الحجر.' },
+  { code: 502, desc: 'الفحص نجح وتعذّر الحفظ. الملفّ يبقى في الحجر.' },
+]} />
+
+</Endpoint>
+
+## المثال
+
+<Tabs items={['الطلب', 'ردّ نظيف', 'ردّ مرفوض']}>
+<Tab>
+
+```bash
+curl -X POST https://marsd-peach.vercel.app/api/scan-document \
+  -H "Authorization: Bearer $CLERK_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "quarantinePath": "user_2abc.../mst4k1-9f3c....png",
+    "targetBucket": "company-documents",
+    "targetPath": "3f01485a-.../commercial_registration-1786",
+    "declaredMime": "image/png"
+  }'
+```
+
+</Tab>
+<Tab>
+
+```json
+{
+  "ok": true,
+  "path": "3f01485a-.../commercial_registration-1786.png",
+  "bucket": "company-documents",
+  "detectedType": "png",
+  "sha256": "9f3c1a...",
+  "sanitized": "png_reencode",
+  "size": 184203
+}
+```
+
+</Tab>
+<Tab>
+
+```json
+{
+  "error": "الملف مرفوض",
+  "reasons": ["pdf_active_content", "polyglot"],
+  "messages": [
+    "PDF يحوي محتوى نشطاً (سكربت أو إجراء تلقائي)",
+    "الملف صالح كصيغتين — بنية مزدوجة"
+  ]
+}
+```
+
+</Tab>
+</Tabs>
+
+## ترتيب ما يحدث
+
+1. يُتحقَّق من التوكن → `401` إن فشل
+2. يُحجز في حدّ المعدّل → `429` إن تجاوز
+3. تُفحص أشكال المسارات والوجهة → `400`
+4. يُتحقَّق أن مسار الحجر لصاحب الطلب → `403`
+5. يُنزَّل الملفّ بمفتاح الخدمة → `404` إن لم يوجد
+6. يُسجَّل قيد `pending` في `file_scans`
+7. تُفحص التجزئة في ذاكرة البوّابة — ما رُفض سابقاً يُرفض بلا إعادة فحص
+8. يُفحص الملفّ → `422` إن رُفض
+9. يُكتب الحكم `clean` **قبل** الرفع (فهو تصريح الرفع)
+10. يُرفع بهويّة الطالب → `403` إن رفضت RLS
+11. يُحذف من الحجر ويعود `200`
+
+<Callout type="info" title="لماذا يُكتب الحكم قبل الرفع">
+صفّ `clean` بهذا المسار وهذا الفاعل **هو تصريح الرفع** الذي تشترطه سياسة
+الدلو. فلو كُتب بعد الرفع لَما وجدت السياسةُ ما تتحقّق منه، ولَوَجب فتح الدلو
+للكتابة المباشرة — وهو ما يُلغي البوّابة.
+</Callout>
+
+## أحجام لا تمرّ في الطلب
+
+الملفّ **لا يُرسَل** في جسم الطلب. دالّة Vercel تقبل ٤٫٥ م.ب، ومستندات مرصد
+تبلغ ٢١. فالمتصفّح يرفع إلى دلو الحجر مباشرةً ثم ينادي هذه النقطة بالمسار،
+وتُنزّل الدالّة من التخزين — اتصال خادم بخادم لا يحدّه ذلك السقف.

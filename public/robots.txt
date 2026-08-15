@@ -38,3 +38,4 @@ Allow: /faq
 Allow: /contact
 
 Sitemap: https://marsd-peach.vercel.app/sitemap.xml
+Sitemap: https://marsd-peach.vercel.app/sitemap-docs.xml

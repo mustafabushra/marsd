@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build-report-template.mjs && vite build",
+    "build": "node scripts/build-report-template.mjs && node scripts/build-docs-index.mjs && node scripts/build-docs-sitemap.mjs && vite build",
     "preview": "vite preview",
     "check:enums": "node scripts/check-enum-drift.mjs",
     "lint": "eslint src api scripts",
@@ -30,12 +30,16 @@
     "check:activities": "node scripts/check-activity-import.mjs",
     "probe:gateway": "node scripts/probe-document-gateway.mjs",
     "check:bundle": "node scripts/check-bundle-secrets.mjs",
-    "attack:gateway": "node scripts/attack-document-gateway.mjs"
+    "attack:gateway": "node scripts/attack-document-gateway.mjs",
+    "docs:index": "node scripts/build-docs-index.mjs",
+    "docs:sitemap": "node scripts/build-docs-sitemap.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
     "@clerk/localizations": "^4.13.8",
     "@clerk/react": "^6.12.6",
+    "@mdx-js/react": "^3.1.1",
+    "@mdx-js/rollup": "^3.1.1",
     "@sparticuz/chromium": "^149.0.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
@@ -48,6 +52,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
+    "remark-gfm": "^4.0.1",
     "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },

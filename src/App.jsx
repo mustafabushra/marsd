@@ -14,6 +14,8 @@ import Unauthorized from './pages/Unauthorized'
 import Landing from './pages/Landing'
 const About = lazy(() => import('./pages/About'))
 const PhoneUpload = lazy(() => import('./pages/PhoneUpload'))
+// DOC كسولة: حزمتها ومحتواها لا يُنزَّلان لمن لا يفتح التوثيق.
+const DocsRoot = lazy(() => import('./docs/DocsRoot'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Partners = lazy(() => import('./pages/Partners'))
 const FAQ = lazy(() => import('./pages/FAQ'))
@@ -164,6 +166,16 @@ function AppContent() {
             have already committed to. Its authority is the token in the URL and
             nothing else, and that token can buy exactly one upload. */}
         <Route path="/u/:token" element={<PhoneUpload />} />
+
+        {/* DOC — منصّة التوثيق.
+
+            خارج VisitorShell عمداً، كما هي حال PhoneUpload: للتوثيق ترويسته
+            وشريطه الجانبي وفهرس صفحته، ووضعُه داخل قشرة الزائر يُنتج ترويستين
+            وتنقّلين لا علاقة بينهما.
+
+            وهي عامّة بلا مصادقة: توثيقٌ يُطلب تسجيل الدخول لقراءته لا يُقرأ.
+            و`/*` تلتقط الشجرة كلّها، فإضافة صفحة لا تحتاج مساراً جديداً هنا. */}
+        <Route path="/docs/*" element={<DocsRoot />} />
 
         {/* Visitor Routes - Always accessible */}
         <Route element={<VisitorShell />}>

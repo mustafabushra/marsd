@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
+import mdx from '@mdx-js/rollup'
+import remarkGfm from 'remark-gfm'
 
 /**
  * Serve api/*.js during `vite dev`, the way Vercel serves them in production.
@@ -88,7 +90,12 @@ function devApiRoutes () {
 
 export default defineConfig({
   build: { sourcemap: 'hidden' },
-  plugins: [react(), devApiRoutes()],
+  // MDX قبل react: الملحق يحوّل .mdx إلى JSX، ثم يتولّى ملحق react تحويله.
+  // العكس يجعل react يرى نصّاً لا يفهمه.
+  //
+  // ومداه محصور بـ .mdx وحدها، فلا يمسّ ملفاً قائماً في المشروع: صفحات
+  // التطبيق .jsx تمرّ كما كانت، ولا يتغيّر ناتج بنائها.
+  plugins: [mdx({ remarkPlugins: [remarkGfm] }), react(), devApiRoutes()],
   server: {
     port: 3000,
     host: 'localhost',
