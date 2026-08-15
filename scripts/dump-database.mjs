@@ -136,7 +136,11 @@ const data = readFileSync(join(OUT, 'data.sql'), 'utf8')
 const tables = (schema.match(/^CREATE TABLE /gm) || []).length
 const policies = (schema.match(/^CREATE POLICY /gm) || []).length
 const funcs = (schema.match(/^CREATE (OR REPLACE )?FUNCTION /gm) || []).length
-const triggers = (schema.match(/^CREATE TRIGGER /gm) || []).length
+// الصيغتان معاً: Supabase CLI يمرّ الناتج على
+// `sed 's/^CREATE TRIGGER "/CREATE OR REPLACE TRIGGER "/'` كي يصير قابلاً
+// لإعادة التطبيق. فعدُّ الصيغة الأولى وحدها كان يقول «صفر مشغّلات» عن نسخة
+// فيها ثلاثة وخمسون — إنذارٌ كاذب يُوهم أن حرّاس البوّابة ضاعوا.
+const triggers = (schema.match(/^CREATE (OR REPLACE )?TRIGGER /gm) || []).length
 const hasBuckets = /COPY "?storage"?\."?buckets"?/.test(data)
 const copies = (data.match(/^COPY /gm) || []).length
 

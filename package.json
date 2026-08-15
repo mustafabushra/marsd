@@ -36,7 +36,8 @@
     "provision": "node scripts/provision-environment.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "db:dump": "node scripts/dump-database.mjs",
-    "build:install-sql": "node scripts/build-install-sql.mjs && node scripts/check-install-sql.mjs"
+    "build:install-sql": "node scripts/build-install-sql.mjs && node scripts/check-install-sql.mjs",
+    "db:seed-filter": "node scripts/filter-seed-data.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
