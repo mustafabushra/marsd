@@ -34,7 +34,8 @@
     "docs:index": "node scripts/build-docs-index.mjs",
     "docs:sitemap": "node scripts/build-docs-sitemap.mjs",
     "provision": "node scripts/provision-environment.mjs",
-    "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
+    "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
+    "db:dump": "node scripts/dump-database.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.1",
