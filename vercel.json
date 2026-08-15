@@ -66,6 +66,18 @@
     "api/trust-report-pdf.js": {
       "maxDuration": 60,
       "memory": 2048
+    },
+    "api/scan-document.js": {
+      "maxDuration": 60,
+      "memory": 2048
+    },
+    "api/handoff-upload.js": {
+      "maxDuration": 60,
+      "memory": 2048
+    },
+    "api/extract-document.js": {
+      "maxDuration": 60,
+      "memory": 2048
     }
   }
 }

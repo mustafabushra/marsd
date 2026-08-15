@@ -115,8 +115,16 @@ const run = (label, file, extra) => {
   return size
 }
 
-// المخطّط: public و storage معاً — والثاني هو الذي يُنسى.
-const a = run('المخطّط (public+storage)', 'schema.sql', ['--schema', 'public,storage'])
+// المخطّط: public وحده.
+//
+// إدراج `storage` هنا كان يُخرج المخطّط كلّه — إنشاءه وثمانية جداول وسبع
+// عشرة دالّة ومنحاً وملكيات — وكلّها يُنشئها Supabase مع المشروع ويملكها
+// `supabase_storage_admin`. فلصقه في محرّر SQL يفشل بـ
+// «permission denied for schema storage»، وهو رفضٌ صحيح.
+//
+// وما يحتاجه مرصد من `storage` — سياساته ومشغّلاته — يُخرجه
+// dump-storage-rules.mjs من فهرس القاعدة، فيصير ملفّاً يستطيع دورك تطبيقه.
+const a = run('المخطّط (public)', 'schema-public.sql', ['--schema', 'public'])
 // البيانات: بـCOPY لا INSERT — أسرع وأمتن على الجداول الكبيرة.
 const b = run('البيانات', 'data.sql', ['--schema', 'public,storage', '--data-only', '--use-copy'])
 // الأدوار: تُستعمل عند إعادة البناء على خادم آخر.
@@ -130,7 +138,7 @@ if (a === null || b === null) {
 // ---------------------------------------------------------------------------
 // تحقّق: هل النسخة تحوي ما ينبغي؟
 // ---------------------------------------------------------------------------
-const schema = readFileSync(join(OUT, 'schema.sql'), 'utf8')
+const schema = readFileSync(join(OUT, 'schema-public.sql'), 'utf8')
 const data = readFileSync(join(OUT, 'data.sql'), 'utf8')
 
 const tables = (schema.match(/^CREATE TABLE /gm) || []).length
