@@ -7,6 +7,41 @@ const src = readdirSync(SRC).filter(f => f.endsWith('.sql'))
 let ok = 0, bad = 0
 const say = (c, m) => { if (c) ok++; else { bad++; console.log('  ❌ ' + m) } }
 
+// ---------------------------------------------------------------------------
+// 0) المصدر نفسه: أهو صالح للتشغيل أصلاً؟
+// ---------------------------------------------------------------------------
+// هذان الفحصان أُضيفا بعد أن فشلت الدفعة الأولى على قاعدة حقيقية. المُولّد
+// كان يجمع بأمانة ما في المجلّد — والمجلّد فيه ما لا يعمل:
+//
+//   ثلاثة أرقام لكلٍّ نسختان (_supabase وبدونها) فتُشغَّل الاثنتان
+//   وصياغة CREATE TRIGGER IF NOT EXISTS التي لا تدعمها PostgreSQL أصلاً
+//
+// ومرّت لأن سجلّ المهاجرات مُلئ بأثر رجعي بعد التحقّق من وجود **الكائنات**
+// لا من تشغيل **الملفّات**. فـ«مُطبَّقة» في السجلّ لم تكن تعني أنها عملت.
+const numbers = new Map()
+for (const f of src) {
+  const n = f.slice(0, 3)
+  if (!numbers.has(n)) numbers.set(n, [])
+  numbers.get(n).push(f)
+}
+const dupNums = [...numbers].filter(([, v]) => v.length > 1)
+say(dupNums.length === 0,
+  `أرقام مهاجرات مكرّرة — ستُشغَّل نسختان من الشيء نفسه:\n` +
+  dupNums.map(([n, v]) => `        ${n}: ${v.join('  ·  ')}`).join('\n'))
+
+const INVALID = [
+  [/create\s+trigger\s+if\s+not\s+exists/i, 'CREATE TRIGGER IF NOT EXISTS — غير مدعومة في PostgreSQL'],
+  [/create\s+policy\s+if\s+not\s+exists/i, 'CREATE POLICY IF NOT EXISTS — غير مدعومة'],
+  [/add\s+constraint\s+if\s+not\s+exists/i, 'ADD CONSTRAINT IF NOT EXISTS — غير مدعومة'],
+]
+const invalid = []
+for (const f of src) {
+  const body = readFileSync(join(SRC, f), 'utf8')
+  for (const [re, why] of INVALID) if (re.test(body)) invalid.push(`${f} — ${why}`)
+}
+say(invalid.length === 0,
+  `صياغة لا تعمل في المصدر:\n${invalid.map((i) => `        ${i}`).join('\n')}`)
+
 // 1) حدود الحرّاس متتابعة
 let cumulative = 0
 files.forEach((f, i) => {
